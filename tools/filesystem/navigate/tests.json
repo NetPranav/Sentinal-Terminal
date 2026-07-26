@@ -1,0 +1,18 @@
+{
+  "toolId": "filesystem.navigate",
+  "tests": [
+    {
+      "id": "filesystem-navigate-test-1",
+      "userRequest": "navigate to ~/Downloads",
+      "expectedIntent": {
+        "domain": "filesystem",
+        "action": "navigate"
+      },
+      "expectedToolId": "filesystem.navigate",
+      "expectedEntities": {
+        "path": "/test/path.txt"
+      },
+      "description": "Automated test case for Change Current Working Directory"
+    }
+  ]
+}

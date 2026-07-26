@@ -1,0 +1,27 @@
+{
+  "toolId": "filesystem.navigate",
+  "version": "1.0.0",
+  "description": "Executes native driver for Change Current Working Directory.",
+  "steps": [
+    {
+      "id": "step_exec_main",
+      "name": "Execute Change Current Working Directory",
+      "type": "ExecuteCapability",
+      "capabilityId": "filesystem.navigate",
+      "parameters": {
+        "command": "cd",
+        "args": [
+          "{{path}}"
+        ],
+        "path": "{{path}}"
+      },
+      "dependencies": [],
+      "onError": "fail"
+    }
+  ],
+  "successCondition": "step:step_exec_main:success",
+  "errorHandling": {
+    "strategy": "fail_fast",
+    "maxRetries": 0
+  }
+}

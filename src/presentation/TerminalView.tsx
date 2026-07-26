@@ -265,8 +265,8 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
               }
 
               // Intercept natural language directory navigation and execute directly in interactive PTY shell
-              const backCmds = ['go back', 'navigate back', 'move back', 'step back', 'go backward', 'go up', 'navigate up', 'move up', 'up a folder', 'up a dir', 'up a directory', 'go out', 'parent folder', 'parent directory', 'exit folder', 'exit directory', 'back'];
-              const homeCmds = ['go home', 'navigate home', 'move home', 'take me home', 'home folder', 'home directory', 'return home', 'go to home', 'navigate to home', 'switch to home', 'cd home'];
+              const backCmds = ['go back', 'navigate back', 'move back', 'step back', 'go backward', 'go up', 'navigate up', 'move up', 'up a folder', 'up a dir', 'up a directory', 'go out', 'parent folder', 'parent directory', 'exit folder', 'exit directory', 'back', 'take me back', 'bring me back'];
+              const homeCmds = ['go home', 'navigate home', 'move home', 'take me home', 'home folder', 'home directory', 'return home', 'go to home', 'navigate to home', 'switch to home', 'cd home', 'bring me home'];
               if (backCmds.includes(lowerCmd)) {
                 notifyNavigation('..');
                 await sessionManager.write(currentSessionId!, '\x03');
@@ -279,10 +279,10 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
                 term.write('\r\n\x1b[36m[AI Navigation] Translated command to: \x1b[1;32mcd ~\x1b[0m\r\n');
                 setTimeout(() => sessionManager.write(currentSessionId!, 'cd ~\r'), 80);
                 return;
-              } else if (/^(?:go to|navigate to|move to|switch to|jump to|enter|cd into|goto)\s+(.+)$/i.test(cleanCmd)) {
-                const match = cleanCmd.match(/^(?:go to|navigate to|move to|switch to|jump to|enter|cd into|goto)\s+(.+)$/i);
+              } else if (/^(?:go to|navigate to|move to|switch to|jump to|enter|cd into|goto|take me to|bring me to|head to|head over to|open folder|open directory|change directory to|change folder to|switch folder to|open dir|open)\s+(.+)$/i.test(cleanCmd)) {
+                const match = cleanCmd.match(/^(?:go to|navigate to|move to|switch to|jump to|enter|cd into|goto|take me to|bring me to|head to|head over to|open folder|open directory|change directory to|change folder to|switch folder to|open dir|open)\s+(.+)$/i);
                 if (match && match[1]) {
-                  let target = match[1].replace(/\s+(?:folder|fodler|directory|dir)$/i, '').trim();
+                  let target = match[1].replace(/\s+(?:folder|fodler|directory|dir)$/i, '').replace(/\/+$/, '').trim();
                   const knownDirs: Record<string, string> = {
                     'downloads': '~/Downloads', 'donwloads': '~/Downloads',
                     'desktop': '~/Desktop', 'documents': '~/Documents',

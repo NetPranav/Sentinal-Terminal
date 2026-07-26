@@ -1,0 +1,16 @@
+{
+  "toolId": "filesystem.navigate",
+  "examples": [
+    {
+      "input": "navigate to ~/Downloads",
+      "expectedIntent": {
+        "domain": "filesystem",
+        "action": "navigate"
+      },
+      "expectedEntities": {
+        "path": "/test/path.txt"
+      },
+      "description": "Example execution of Change Current Working Directory"
+    }
+  ]
+}

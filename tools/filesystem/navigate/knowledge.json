@@ -1,0 +1,67 @@
+{
+  "toolId": "filesystem.navigate",
+  "aliases": [
+    "cd",
+    "change directory",
+    "go to folder",
+    "navigate to",
+    "take me to",
+    "switch directory",
+    "move to directory",
+    "enter folder",
+    "bring me to",
+    "open directory",
+    "cd into"
+  ],
+  "synonyms": [
+    "please cd",
+    "please change directory",
+    "please go to folder",
+    "please navigate to",
+    "please take me to",
+    "please switch directory",
+    "please move to directory",
+    "please enter folder",
+    "please bring me to",
+    "please open directory",
+    "please cd into"
+  ],
+  "commonUserWording": [
+    "navigate to ~/Downloads",
+    "could you navigate to ~/Downloads",
+    "cd",
+    "change directory",
+    "go to folder",
+    "navigate to",
+    "take me to",
+    "switch directory",
+    "move to directory",
+    "enter folder",
+    "bring me to",
+    "open directory",
+    "cd into"
+  ],
+  "commonMistakes": [],
+  "entityHints": {
+    "path": [
+      "/Users/shared/file.json"
+    ]
+  },
+  "deviceNamingPatterns": [],
+  "commonAbbreviations": {},
+  "languageVariations": [
+    "navigate to ~/Downloads",
+    "cd",
+    "change directory",
+    "go to folder",
+    "navigate to",
+    "take me to",
+    "switch directory",
+    "move to directory",
+    "enter folder",
+    "bring me to",
+    "open directory",
+    "cd into"
+  ],
+  "relatedTools": []
+}

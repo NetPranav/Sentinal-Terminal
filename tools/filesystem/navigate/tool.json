@@ -1,0 +1,61 @@
+{
+  "id": "filesystem.navigate",
+  "version": "1.0.0",
+  "displayName": "Change Current Working Directory",
+  "description": "Navigates terminal or active session to a target directory path (cd).",
+  "domain": "filesystem",
+  "category": "Filesystem",
+  "tags": [
+    "filesystem",
+    "navigate",
+    "filesystem.navigate",
+    "change",
+    "current",
+    "working",
+    "directory",
+    "cd",
+    "go",
+    "take",
+    "switch",
+    "move",
+    "enter",
+    "bring",
+    "open"
+  ],
+  "aliases": [
+    "cd",
+    "change directory",
+    "go to folder",
+    "navigate to",
+    "take me to",
+    "switch directory",
+    "move to directory",
+    "enter folder",
+    "bring me to",
+    "open directory",
+    "cd into"
+  ],
+  "supportedPlatforms": [
+    "macos",
+    "windows",
+    "linux"
+  ],
+  "requiredPermissions": [
+    "ReadFiles"
+  ],
+  "securityRisk": "SAFE",
+  "parameters": [
+    {
+      "name": "path",
+      "type": "string",
+      "description": "Target directory path to switch to",
+      "required": true
+    }
+  ],
+  "optionalParameters": [],
+  "estimatedExecutionTime": "1s",
+  "confirmationRequired": false,
+  "rollbackAvailable": false,
+  "verificationSupported": true,
+  "deprecationStatus": "stable"
+}

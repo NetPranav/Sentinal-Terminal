@@ -24,6 +24,13 @@ const toolSpecs = [
     customWorkflowParams: { command: "ls", args: ["-la", "{{path}}"], path: "{{path}}" }
   },
   {
+    id: 'filesystem.navigate', folder: 'filesystem/navigate', domain: 'filesystem', action: 'navigate',
+    name: 'Change Current Working Directory', desc: 'Navigates terminal or active session to a target directory path (cd).',
+    category: 'Filesystem', risk: 'SAFE', params: [{ name: 'path', type: 'string', desc: 'Target directory path to switch to', required: true }],
+    aliases: ['cd', 'change directory', 'go to folder', 'navigate to', 'take me to', 'switch directory', 'move to directory', 'enter folder', 'bring me to', 'open directory', 'cd into'], sampleInput: 'navigate to ~/Downloads',
+    customWorkflowParams: { command: "cd", args: ["{{path}}"], path: "{{path}}" }
+  },
+  {
     id: 'filesystem.read', folder: 'filesystem/read', domain: 'filesystem', action: 'read',
     name: 'Read File Content', desc: 'Reads text content from a specified file path using safe native APIs.',
     category: 'Filesystem', risk: 'SAFE', params: [{ name: 'path', type: 'string', desc: 'File path to read', required: true }],

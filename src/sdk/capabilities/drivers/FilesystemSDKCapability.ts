@@ -15,7 +15,7 @@ export type FsOperation =
   | 'locate_files' | 'locate_folders' | 'grep'
   | 'move' | 'rename' | 'compress' | 'extract'
   | 'duplicate' | 'delete' | 'trash' | 'restore'
-  | 'permissions' | 'disk_usage' | 'recent_files' | 'mkdir' | 'create';
+  | 'permissions' | 'disk_usage' | 'recent_files' | 'mkdir' | 'create' | 'navigate' | 'cd';
 
 export interface FsDriverInput {
   operation?: FsOperation;
@@ -109,6 +109,8 @@ export class FilesystemSDKCapability extends BaseCapabilityDriver<FsDriverInput,
         case 'recent_files': return { success: true, data: { recent: ['/Users/shared/file1.txt', '/Users/shared/project.ts'] }, commandExecuted };
         case 'mkdir': return { success: true, data: { path: targetPath, created: true, stdout: `Directory created successfully at: ${targetPath}` }, commandExecuted, rollbackPayload: { action: 'remove', target: targetPath } };
         case 'create': return { success: true, data: { path: targetPath, created: true, stdout: `File created successfully at: ${targetPath}` }, commandExecuted, rollbackPayload: { action: 'remove', target: targetPath } };
+        case 'navigate':
+        case 'cd': return { success: true, data: { path: targetPath, stdout: `Changed directory to: ${targetPath}` }, commandExecuted };
         default: return { success: true, data: { status: 'mock_success' }, commandExecuted };
       }
     }
@@ -200,6 +202,13 @@ export class FilesystemSDKCapability extends BaseCapabilityDriver<FsDriverInput,
           }
           const stdout = `File created successfully at: ${targetPath}`;
           return { success: true, data: { path: resolvedPath, created: true, stdout }, commandExecuted: `touch "${resolvedPath}"`, rollbackPayload: { action: 'remove', target: resolvedPath } };
+        }
+
+        case 'navigate':
+        case 'cd': {
+          if (!resolvedPath) return { success: false, error: { code: 'MISSING_PATH', message: 'Path required' } };
+          const stdout = `Changed directory to: ${targetPath}`;
+          return { success: true, data: { path: resolvedPath, stdout }, commandExecuted: `cd "${resolvedPath}"` };
         }
 
         case 'copy': {
