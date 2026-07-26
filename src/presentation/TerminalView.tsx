@@ -90,6 +90,14 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
 
     let currentSessionId = initialSessionId;
     const sessionManager = SessionManager.getInstance();
+
+    // Helper to write output locally while recording to SessionManager buffer for pane switching persistence
+    const writeTerm = (text: string) => {
+      term.write(text);
+      if (currentSessionId) {
+        sessionManager.recordOutput(currentSessionId, text);
+      }
+    };
     
     // We must define the callback here so we can remove it later
     let outputCallback: ((data: Uint8Array) => void) | null = null;
@@ -272,13 +280,13 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
               if (backCmds.includes(lowerCmd) || backCmds.includes(lowerStripped)) {
                 notifyNavigation('..');
                 await sessionManager.write(currentSessionId!, '\x03');
-                term.write('\r\n\x1b[36m[AI Navigation] Translated command to: \x1b[1;32mcd ..\x1b[0m\r\n');
+                writeTerm('\r\n\x1b[36m[AI Navigation] Translated command to: \x1b[1;32mcd ..\x1b[0m\r\n');
                 setTimeout(() => sessionManager.write(currentSessionId!, 'cd ..\r'), 80);
                 return;
               } else if (homeCmds.includes(lowerCmd) || homeCmds.includes(lowerStripped)) {
                 notifyNavigation('~');
                 await sessionManager.write(currentSessionId!, '\x03');
-                term.write('\r\n\x1b[36m[AI Navigation] Translated command to: \x1b[1;32mcd ~\x1b[0m\r\n');
+                writeTerm('\r\n\x1b[36m[AI Navigation] Translated command to: \x1b[1;32mcd ~\x1b[0m\r\n');
                 setTimeout(() => sessionManager.write(currentSessionId!, 'cd ~\r'), 80);
                 return;
               } else if (/^(?:go to|navigate to|move to|switch to|jump to|enter|cd into|goto|take me to|bring me to|head to|head over to|open folder|open directory|change directory to|change folder to|switch folder to|open dir|open)\s+(.+)$/i.test(strippedCmd)) {
@@ -302,7 +310,7 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
                   notifyNavigation(target.replace(/["']/g, ''));
                   const cdCmd = target.includes(' ') && !target.startsWith('"') && !target.startsWith("'") ? `cd "${target}"` : `cd ${target}`;
                   await sessionManager.write(currentSessionId!, '\x03');
-                  term.write(`\r\n\x1b[36m[AI Navigation] Translated command to: \x1b[1;32m${cdCmd}\x1b[0m\r\n`);
+                  writeTerm(`\r\n\x1b[36m[AI Navigation] Translated command to: \x1b[1;32m${cdCmd}\x1b[0m\r\n`);
                   setTimeout(() => sessionManager.write(currentSessionId!, `${cdCmd}\r`), 80);
                   return;
                 }
@@ -312,7 +320,7 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
                 console.log("[TerminalView] Matched natural language!");
                 // Send Ctrl+C to cancel the shell's buffer
                 await sessionManager.write(currentSessionId, '\x03');
-                term.write('\r\n\x1b[35m[AI Planner] Analyzing request...\x1b[0m\r\n');
+                writeTerm('\r\n\x1b[35m[AI Planner] Analyzing request...\x1b[0m\r\n');
                 
                 // Trigger planner asynchronously
                 planner.plan({
@@ -320,14 +328,14 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
                   context: { os: 'mac', shell: 'zsh', cwd: currentPath || '~' }
                 }).then(response => {
                   if (response.success && response.workflow) {
-                    term.write(`\r\n\x1b[32m[AI Planner] Created workflow: ${response.workflow.name}\x1b[0m\r\n`);
-                    term.write(`\x1b[36mSummary: ${response.summary}\x1b[0m\r\n`);
+                    writeTerm(`\r\n\x1b[32m[AI Planner] Created workflow: ${response.workflow.name}\x1b[0m\r\n`);
+                    writeTerm(`\x1b[36mSummary: ${response.summary}\x1b[0m\r\n`);
                     if (response.intentResult) {
-                      term.write(`\x1b[35m[Local Intent AI] Active Model: ${response.intentResult.modelId} (${response.intentResult.providerId}) | Confidence: ${Math.round(response.intentResult.confidence * 100)}%\x1b[0m\r\n`);
+                      writeTerm(`\x1b[35m[Local Intent AI] Active Model: ${response.intentResult.modelId} (${response.intentResult.providerId}) | Confidence: ${Math.round(response.intentResult.confidence * 100)}%\x1b[0m\r\n`);
                       if (response.intentResult.tasks && response.intentResult.tasks.length > 1) {
-                        term.write(`\x1b[33m[Execution Plan] Sequential Tasks (${response.intentResult.tasks.length}):\x1b[0m\r\n`);
+                        writeTerm(`\x1b[33m[Execution Plan] Sequential Tasks (${response.intentResult.tasks.length}):\x1b[0m\r\n`);
                         response.intentResult.tasks.forEach((t, idx) => {
-                          term.write(`   ${idx + 1}. Tool: \x1b[1;36m${t.tool}\x1b[0m | Entities: ${JSON.stringify(t.entities)}\r\n`);
+                          writeTerm(`   ${idx + 1}. Tool: \x1b[1;36m${t.tool}\x1b[0m | Entities: ${JSON.stringify(t.entities)}\r\n`);
                         });
                       }
                     }
@@ -347,14 +355,14 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
                     runtime.on((event, payload) => {
                       if (event === 'ApprovalRequested' && payload?.plan) {
                         const p = payload.plan;
-                        term.write(`\r\n\x1b[1;33m[Security Engine: ${p.riskLevel || 'ADMIN'} RISK ACTION DETECTED]\x1b[0m\r\n`);
-                        term.write(`  • Operation: \x1b[1;36m${p.capabilityId}\x1b[0m\r\n`);
-                        term.write(`  • Target: \x1b[1;33m${p.parameters?.path || p.parameters?.source || p.parameters?.directory || JSON.stringify(p.parameters)}\x1b[0m\r\n`);
-                        term.write(`  • Explanation: ${p.explanation || 'Destructive filesystem operation requires authorization'}\r\n`);
-                        term.write(`\x1b[36m[Security Authentication]\x1b[0m Verifying user administrative authorization & system security credentials...\r\n`);
+                        writeTerm(`\r\n\x1b[1;33m[Security Engine: ${p.riskLevel || 'ADMIN'} RISK ACTION DETECTED]\x1b[0m\r\n`);
+                        writeTerm(`  • Operation: \x1b[1;36m${p.capabilityId}\x1b[0m\r\n`);
+                        writeTerm(`  • Target: \x1b[1;33m${p.parameters?.path || p.parameters?.source || p.parameters?.directory || JSON.stringify(p.parameters)}\x1b[0m\r\n`);
+                        writeTerm(`  • Explanation: ${p.explanation || 'Destructive filesystem operation requires authorization'}\r\n`);
+                        writeTerm(`\x1b[36m[Security Authentication]\x1b[0m Verifying user administrative authorization & system security credentials...\r\n`);
                         return;
                       } else if (event === 'ApprovalGranted') {
-                        term.write(`\x1b[1;32m[Security Authentication Verified]\x1b[0m Authorization confirmed for secure filesystem execution.\r\n`);
+                        writeTerm(`\x1b[1;32m[Security Authentication Verified]\x1b[0m Authorization confirmed for secure filesystem execution.\r\n`);
                         return;
                       }
 
@@ -365,9 +373,9 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
                       } else if (event === 'StepCompleted' && payload?.step) {
                         msg = `StepCompleted: ${payload.step.name}`;
                         if (payload.data?.stdout) {
-                          term.write(`\r\n\x1b[32m[Command Output]\x1b[0m\r\n${String(payload.data.stdout).replace(/\n/g, '\r\n')}\r\n`);
+                          writeTerm(`\r\n\x1b[32m[Command Output]\x1b[0m\r\n${String(payload.data.stdout).replace(/\n/g, '\r\n')}\r\n`);
                         } else if (payload.data?.stderr) {
-                          term.write(`\r\n\x1b[33m[Command Output (Stderr)]\x1b[0m\r\n${String(payload.data.stderr).replace(/\n/g, '\r\n')}\r\n`);
+                          writeTerm(`\r\n\x1b[33m[Command Output (Stderr)]\x1b[0m\r\n${String(payload.data.stderr).replace(/\n/g, '\r\n')}\r\n`);
                         } else if (payload.data && typeof payload.data === 'object' && Object.keys(payload.data).length > 0) {
                           const formatted = Object.entries(payload.data)
                             .filter(([k]) => k !== 'commandExecuted' && k !== 'dryRun')
@@ -392,28 +400,28 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
                             })
                             .join('\r\n');
                           if (formatted.trim()) {
-                            term.write(`\r\n\x1b[32m[Capability Output]\x1b[0m\r\n${formatted}\r\n`);
+                            writeTerm(`\r\n\x1b[32m[Capability Output]\x1b[0m\r\n${formatted}\r\n`);
                           }
                         }
                       }
-                      term.write(`\x1b[34m[AgentRuntime] ${msg}\x1b[0m\r\n`);
+                      writeTerm(`\x1b[34m[AgentRuntime] ${msg}\x1b[0m\r\n`);
                     });
 
-                    term.write(`\x1b[33mStarting Agent Runtime...\x1b[0m\r\n`);
+                    writeTerm(`\x1b[33mStarting Agent Runtime...\x1b[0m\r\n`);
                     runtime.start().then(summary => {
-                      term.write(`\r\n\x1b[35m[Execution Summary]\x1b[0m\r\n`);
-                      term.write(`Goal: ${summary.goal}\r\n`);
-                      term.write(`Result: ${summary.finalResult}\r\n`);
-                      term.write(`Time: ${summary.executionTimeMs.toFixed(2)}ms\r\n`);
-                      term.write(`Completed: ${summary.completedSteps.length}\r\n`);
-                      term.write(`Failed: ${summary.failedSteps.length}\r\n`);
-                      term.write(`Retries: ${Object.keys(summary.retries).length}\r\n`);
-                      term.write(`Repairs: ${summary.repairCount}\r\n`);
-                      term.write('\r\n');
+                      writeTerm(`\r\n\x1b[35m[Execution Summary]\x1b[0m\r\n`);
+                      writeTerm(`Goal: ${summary.goal}\r\n`);
+                      writeTerm(`Result: ${summary.finalResult}\r\n`);
+                      writeTerm(`Time: ${summary.executionTimeMs.toFixed(2)}ms\r\n`);
+                      writeTerm(`Completed: ${summary.completedSteps.length}\r\n`);
+                      writeTerm(`Failed: ${summary.failedSteps.length}\r\n`);
+                      writeTerm(`Retries: ${Object.keys(summary.retries).length}\r\n`);
+                      writeTerm(`Repairs: ${summary.repairCount}\r\n`);
+                      writeTerm('\r\n');
                       sessionManager.write(currentSessionId!, '\r');
                     });
                   } else {
-                    term.write(`\x1b[31m[AI Planner Failed] ${response.error?.message || 'Unknown error'}\x1b[0m\r\n\r\n`);
+                    writeTerm(`\x1b[31m[AI Planner Failed] ${response.error?.message || 'Unknown error'}\x1b[0m\r\n\r\n`);
                     sessionManager.write(currentSessionId!, '\r');
                   }
                 });

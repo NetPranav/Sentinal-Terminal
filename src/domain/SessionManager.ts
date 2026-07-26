@@ -30,15 +30,7 @@ export class SessionManager {
       const u8Data = new Uint8Array(data);
 
       // Buffer incoming output so it persists across pane splitting and React component remounts
-      if (!this.sessionBuffers.has(session_id)) {
-        this.sessionBuffers.set(session_id, []);
-      }
-      const buffer = this.sessionBuffers.get(session_id)!;
-      buffer.push(u8Data);
-      // Limit buffer to last 1000 chunks (~500KB) to prevent excessive RAM usage over long running sessions
-      if (buffer.length > 1000) {
-        buffer.shift();
-      }
+      this.recordOutput(session_id, u8Data, false);
 
       const callbacks = this.outputListeners.get(session_id);
       if (callbacks) {
@@ -51,6 +43,25 @@ export class SessionManager {
       this.outputListeners.delete(session_id);
       this.sessionBuffers.delete(session_id);
     });
+  }
+
+  public recordOutput(sessionId: string, data: string | Uint8Array, notifyListeners = false): void {
+    if (!this.sessionBuffers.has(sessionId)) {
+      this.sessionBuffers.set(sessionId, []);
+    }
+    const buffer = this.sessionBuffers.get(sessionId)!;
+    const u8Data = typeof data === 'string' ? new TextEncoder().encode(data) : data;
+    buffer.push(u8Data);
+    // Limit buffer to last 3000 chunks to prevent RAM overflow while retaining deep session history
+    if (buffer.length > 3000) {
+      buffer.shift();
+    }
+    if (notifyListeners) {
+      const callbacks = this.outputListeners.get(sessionId);
+      if (callbacks) {
+        callbacks.forEach(cb => cb(u8Data));
+      }
+    }
   }
 
   public async createSession(rows: number, cols: number): Promise<string> {
