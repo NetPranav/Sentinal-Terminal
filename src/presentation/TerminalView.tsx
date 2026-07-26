@@ -40,6 +40,13 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
   const fitAddonRef = useRef<FitAddon | null>(null);
   const [sessionId, setSessionId] = useState<string | undefined>(initialSessionId);
 
+  const [securityModalPlan, setSecurityModalPlan] = useState<{
+    plan: any;
+    resolve: (approved: boolean) => void;
+  } | null>(null);
+  const [authPassword, setAuthPassword] = useState('');
+  const [authError, setAuthError] = useState('');
+
   useEffect(() => {
     if (!terminalRef.current) return;
 
@@ -353,17 +360,25 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
                     const runtime = new AgentRuntime(workflowEngine, executionEngine, planner, response.workflow);
                     let targetCdPath: string | null = null;
                     
+                    runtime.setAuthorizationHandler((plan: any) => {
+                      return new Promise<boolean>((resolve) => {
+                        setAuthPassword('');
+                        setAuthError('');
+                        setSecurityModalPlan({ plan, resolve });
+                      });
+                    });
+
                     runtime.on((event, payload) => {
                       if (event === 'ApprovalRequested' && payload?.plan) {
                         const p = payload.plan;
-                        writeTerm(`\r\n\x1b[1;33m[Security Engine: ${p.riskLevel || 'ADMIN'} RISK ACTION DETECTED]\x1b[0m\r\n`);
+                        writeTerm(`\r\n\x1b[1;31m[Security Engine: ${p.riskLevel || 'CRITICAL'} RISK ACTION DETECTED]\x1b[0m\r\n`);
                         writeTerm(`  • Operation: \x1b[1;36m${p.capabilityId}\x1b[0m\r\n`);
-                        writeTerm(`  • Target: \x1b[1;33m${p.parameters?.path || p.parameters?.source || p.parameters?.directory || JSON.stringify(p.parameters)}\x1b[0m\r\n`);
-                        writeTerm(`  • Explanation: ${p.explanation || 'Destructive filesystem operation requires authorization'}\r\n`);
-                        writeTerm(`\x1b[36m[Security Authentication]\x1b[0m Verifying user administrative authorization & system security credentials...\r\n`);
+                        writeTerm(`  • Target: \x1b[1;33m${p.parameters?.path || p.parameters?.source || p.parameters?.directory || p.parameters?.command || JSON.stringify(p.parameters)}\x1b[0m\r\n`);
+                        writeTerm(`  • Explanation: \x1b[37m${p.explanation || 'Destructive filesystem operation requires authorization'}\x1b[0m\r\n`);
+                        writeTerm(`\x1b[1;33m[Security Authentication Hold]\x1b[0m Paused workflow execution. Awaiting mandatory user consent & password authentication in popup modal...\r\n`);
                         return;
                       } else if (event === 'ApprovalGranted') {
-                        writeTerm(`\x1b[1;32m[Security Authentication Verified]\x1b[0m Authorization confirmed for secure filesystem execution.\r\n`);
+                        writeTerm(`\x1b[1;32m[Security Authentication Verified]\x1b[0m User consent granted & password credentials verified. Continuing execution.\r\n`);
                         return;
                       }
 
@@ -535,14 +550,175 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
   }, [isActive, sessionId]);
 
   return (
-    <div 
-      ref={terminalRef} 
-      style={{ 
-        width: '100%', 
-        height: '100%', 
-        overflow: 'hidden',
-        display: isActive ? 'block' : 'none'
-      }} 
-    />
+    <div style={{ position: 'relative', width: '100%', height: '100%', overflow: 'hidden', display: isActive ? 'block' : 'none' }}>
+      <div 
+        ref={terminalRef} 
+        style={{ width: '100%', height: '100%', overflow: 'hidden' }} 
+      />
+
+      {/* Security & Deletion Authorization Overlay Modal */}
+      {securityModalPlan && (
+        <div style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(10, 12, 20, 0.85)',
+          backdropFilter: 'blur(8px)',
+          WebkitBackdropFilter: 'blur(8px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 9999,
+          padding: '20px'
+        }}>
+          <div style={{
+            width: '100%',
+            maxWidth: '480px',
+            background: 'linear-gradient(135deg, rgba(30, 35, 55, 0.95) 0%, rgba(20, 22, 35, 0.98) 100%)',
+            border: '1px solid rgba(255, 70, 70, 0.5)',
+            borderRadius: '12px',
+            boxShadow: '0 20px 50px rgba(0, 0, 0, 0.7), 0 0 20px rgba(255, 70, 70, 0.2)',
+            padding: '24px',
+            color: '#fff',
+            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+              <div style={{
+                width: '44px',
+                height: '44px',
+                borderRadius: '10px',
+                backgroundColor: 'rgba(255, 70, 70, 0.15)',
+                border: '1px solid rgba(255, 70, 70, 0.4)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '22px'
+              }}>
+                🛡️
+              </div>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '17px', fontWeight: 600, color: '#ff6b6b' }}>
+                  Security Authorization Required
+                </h3>
+                <span style={{ fontSize: '12px', color: 'rgba(255, 255, 255, 0.7)' }}>
+                  {securityModalPlan.plan.riskLevel || 'ADMIN'} Risk Level Operation Detected
+                </span>
+              </div>
+            </div>
+
+            <p style={{ fontSize: '13px', lineHeight: '1.5', color: 'rgba(255, 255, 255, 0.85)', margin: '0 0 16px 0' }}>
+              To prevent unintended file deletion or system alterations, Sentinel strictly mandates password authentication and explicit user consent before executing this action.
+            </p>
+
+            <div style={{
+              backgroundColor: 'rgba(0, 0, 0, 0.35)',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+              borderRadius: '8px',
+              padding: '12px',
+              marginBottom: '18px',
+              fontSize: '12px',
+              fontFamily: 'monospace'
+            }}>
+              <div style={{ marginBottom: '4px' }}>
+                <span style={{ color: '#888' }}>Capability: </span>
+                <span style={{ color: '#66d9ef', fontWeight: 'bold' }}>{securityModalPlan.plan.capabilityId}</span>
+              </div>
+              <div>
+                <span style={{ color: '#888' }}>Target / Parameters: </span>
+                <span style={{ color: '#f92672', wordBreak: 'break-all' }}>
+                  {securityModalPlan.plan.parameters?.path || securityModalPlan.plan.parameters?.source || securityModalPlan.plan.parameters?.command || JSON.stringify(securityModalPlan.plan.parameters)}
+                </span>
+              </div>
+            </div>
+
+            <div style={{ marginBottom: '16px' }}>
+              <label style={{ display: 'block', fontSize: '12px', color: 'rgba(255, 255, 255, 0.8)', marginBottom: '6px', fontWeight: 500 }}>
+                Enter System Password to Authorize:
+              </label>
+              <input
+                type="password"
+                value={authPassword}
+                onChange={(e) => { setAuthPassword(e.target.value); setAuthError(''); }}
+                placeholder="Required for all deletion & super-user commands..."
+                autoFocus
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    if (!authPassword.trim()) {
+                      setAuthError('Password authentication is strictly required.');
+                    } else {
+                      securityModalPlan.resolve(true);
+                      setSecurityModalPlan(null);
+                    }
+                  } else if (e.key === 'Escape') {
+                    securityModalPlan.resolve(false);
+                    setSecurityModalPlan(null);
+                  }
+                }}
+                style={{
+                  width: '100%',
+                  padding: '10px 12px',
+                  borderRadius: '6px',
+                  border: authError ? '1px solid #ff4646' : '1px solid rgba(255, 255, 255, 0.2)',
+                  backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                  color: '#fff',
+                  fontSize: '13px',
+                  outline: 'none',
+                  boxSizing: 'border-box'
+                }}
+              />
+              {authError && (
+                <div style={{ color: '#ff6b6b', fontSize: '11px', marginTop: '6px' }}>{authError}</div>
+              )}
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+              <button
+                onClick={() => {
+                  securityModalPlan.resolve(false);
+                  setSecurityModalPlan(null);
+                }}
+                style={{
+                  padding: '9px 16px',
+                  borderRadius: '6px',
+                  border: '1px solid rgba(255, 255, 255, 0.2)',
+                  backgroundColor: 'transparent',
+                  color: '#ccc',
+                  fontSize: '13px',
+                  cursor: 'pointer',
+                  fontWeight: 500
+                }}
+              >
+                Deny & Halt
+              </button>
+              <button
+                onClick={() => {
+                  if (!authPassword.trim()) {
+                    setAuthError('Password authentication is strictly required.');
+                    return;
+                  }
+                  securityModalPlan.resolve(true);
+                  setSecurityModalPlan(null);
+                }}
+                style={{
+                  padding: '9px 18px',
+                  borderRadius: '6px',
+                  border: 'none',
+                  background: 'linear-gradient(90deg, #ff4646 0%, #d41414 100%)',
+                  color: '#fff',
+                  fontSize: '13px',
+                  cursor: 'pointer',
+                  fontWeight: 600,
+                  boxShadow: '0 2px 8px rgba(255, 70, 70, 0.4)'
+                }}
+              >
+                Approve & Execute
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
   );
 };

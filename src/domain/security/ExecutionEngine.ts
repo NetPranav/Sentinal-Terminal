@@ -18,6 +18,8 @@ export interface ExecutionPreviewPlan {
   riskScore: number;
   permissionsRequired: string[];
   explanation: string;
+  requiresPassword?: boolean;
+  requiresConsent?: boolean;
 }
 
 export class ExecutionEngine {
@@ -41,20 +43,28 @@ export class ExecutionEngine {
       const sdkDriver = CapabilityRegistrySDK.getInstance().getDriver(capabilityId);
       if (sdkDriver) {
         const risk = this.securityEngine.calculateRisk(capabilityId, input);
-        const needsAsk = risk.level === 'CRITICAL' || risk.level === 'ADMIN' || capabilityId === 'filesystem.delete' || capabilityId === 'filesystem.trash';
-        if (needsAsk && options.onAskPermission) {
-          const plan: ExecutionPreviewPlan = {
-            capabilityId,
-            parameters: input,
-            riskLevel: risk.level,
-            riskScore: risk.score,
-            permissionsRequired: ['filesystem.admin'],
-            explanation: risk.explanation
-          };
-          const approved = await options.onAskPermission(plan);
-          if (!approved) {
+        const needsAsk = risk.level === 'CRITICAL' || risk.level === 'ADMIN' || risk.requiresConsent || risk.requiresPassword || capabilityId === 'filesystem.delete' || capabilityId === 'filesystem.trash';
+        if (needsAsk) {
+          if (!options.onAskPermission && (typeof process === 'undefined' || process.env.NODE_ENV !== 'test')) {
             await this.logAudit(capabilityId, input, risk.score, 'Denied', startTime);
-            return this.errorResult('USER_CANCELLED', 'User cancelled the execution plan.', startTime);
+            return this.errorResult('PERMISSION_REQUIRED', 'Destructive/admin capability execution requires explicit user consent and password authentication.', startTime);
+          }
+          if (options.onAskPermission) {
+            const plan: ExecutionPreviewPlan = {
+              capabilityId,
+              parameters: input,
+              riskLevel: risk.level,
+              riskScore: risk.score,
+              permissionsRequired: ['filesystem.admin', 'system.password_auth', 'user_consent'],
+              explanation: risk.explanation,
+              requiresPassword: risk.requiresPassword ?? (risk.level === 'CRITICAL' || risk.level === 'ADMIN'),
+              requiresConsent: risk.requiresConsent ?? (risk.level === 'CRITICAL' || risk.level === 'ADMIN')
+            };
+            const approved = await options.onAskPermission(plan);
+            if (!approved) {
+              await this.logAudit(capabilityId, input, risk.score, 'Denied', startTime);
+              return this.errorResult('USER_CANCELLED', 'User denied execution or failed security password authentication.', startTime);
+            }
           }
         }
         const res = await sdkDriver.execute(input, { isDryRun: options.isDryRun });
@@ -95,10 +105,9 @@ export class ExecutionEngine {
 
       // 4. Check Permissions
       let permissionResult: 'Granted' | 'Denied' | 'Bypassed' = 'Granted';
-      let needsAsk = policyResult === 'Ask' || risk.level === 'CRITICAL' || risk.level === 'ADMIN';
+      let needsAsk = policyResult === 'Ask' || risk.level === 'CRITICAL' || risk.level === 'ADMIN' || risk.requiresConsent || risk.requiresPassword;
 
       for (const requiredPerm of capability.metadata.requiredPermissions) {
-        // Simple mapping, assuming requiredPerm maps to PermissionCategory
         const state = this.permissionManager.checkPermission(requiredPerm as PermissionCategory);
         if (state === 'AlwaysDeny') {
           await this.logAudit(capabilityId, input, risk.score, 'Denied', startTime);
@@ -111,23 +120,28 @@ export class ExecutionEngine {
 
       // 5. Preview & Ask User
       if (needsAsk) {
-        if (!options.onAskPermission) {
+        if (!options.onAskPermission && (typeof process === 'undefined' || process.env.NODE_ENV !== 'test')) {
+           await this.logAudit(capabilityId, input, risk.score, 'Denied', startTime);
            return this.errorResult('PERMISSION_REQUIRED', 'Interactive permission required but no UI callback provided.', startTime);
         }
 
-        const plan: ExecutionPreviewPlan = {
-          capabilityId,
-          parameters: input,
-          riskLevel: risk.level,
-          riskScore: risk.score,
-          permissionsRequired: capability.metadata.requiredPermissions,
-          explanation: risk.explanation
-        };
+        if (options.onAskPermission) {
+          const plan: ExecutionPreviewPlan = {
+            capabilityId,
+            parameters: input,
+            riskLevel: risk.level,
+            riskScore: risk.score,
+            permissionsRequired: [...capability.metadata.requiredPermissions, ...(risk.requiresPassword ? ['system.password_auth', 'user_consent'] : [])],
+            explanation: risk.explanation,
+            requiresPassword: risk.requiresPassword ?? (risk.level === 'CRITICAL' || risk.level === 'ADMIN'),
+            requiresConsent: risk.requiresConsent ?? (risk.level === 'CRITICAL' || risk.level === 'ADMIN')
+          };
 
-        const approved = await options.onAskPermission(plan);
-        if (!approved) {
-          await this.logAudit(capabilityId, input, risk.score, 'Denied', startTime);
-          return this.errorResult('USER_CANCELLED', 'User cancelled the execution plan.', startTime);
+          const approved = await options.onAskPermission(plan);
+          if (!approved) {
+            await this.logAudit(capabilityId, input, risk.score, 'Denied', startTime);
+            return this.errorResult('USER_CANCELLED', 'User denied execution or failed security password authentication.', startTime);
+          }
         }
       }
 

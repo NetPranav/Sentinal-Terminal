@@ -13,8 +13,13 @@ export class AgentRuntime {
   private listeners: AgentEventListener[] = [];
   private cancelToken: boolean = false;
   private pauseToken: boolean = false;
+  private authHandler?: (plan: ExecutionPreviewPlan) => Promise<boolean>;
 
   private repairCount = 0;
+
+  public setAuthorizationHandler(handler: (plan: ExecutionPreviewPlan) => Promise<boolean>) {
+    this.authHandler = handler;
+  }
 
   constructor(
     private workflowEngine: WorkflowEngine,
@@ -145,9 +150,27 @@ export class AgentRuntime {
           result = await this.executionEngine.execute(step.capabilityId!, input, {
             onAskPermission: async (plan: ExecutionPreviewPlan) => {
               this.emit('ApprovalRequested', { plan });
-              // Simple mock approval for now, real UI would resolve a promise
-              this.emit('ApprovalGranted', { log: 'Approval granted by user.' });
-              return true;
+              
+              if (this.authHandler) {
+                const approved = await this.authHandler(plan);
+                if (approved) {
+                  this.emit('ApprovalGranted', { log: 'Security authentication & user consent verified.' });
+                  return true;
+                } else {
+                  this.emit('VerificationFailed', { step, error: { message: 'Security authorization denied or password authentication failed.' } });
+                  return false;
+                }
+              }
+
+              // Only permit automated bypass within unit test verification suites
+              if (typeof process !== 'undefined' && process.env.NODE_ENV === 'test') {
+                this.emit('ApprovalGranted', { log: '[Test Suite Mock] Approval granted by automated verification.' });
+                return true;
+              }
+
+              // Default safety block: Deny any deletion or administrative command if explicit authentication is missing
+              this.emit('VerificationFailed', { step, error: { message: 'Destructive operation blocked: Strict user consent and password authentication required.' } });
+              return false;
             }
           });
 

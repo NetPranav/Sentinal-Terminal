@@ -133,7 +133,9 @@ describe('ExecutionEngine Pipeline', () => {
     const res = await executionEngine.execute('filesystem.delete', { path: '~/Downloads/AAAAAAAA', operation: 'delete' }, {
       onAskPermission: async (plan) => {
         asked = true;
-        expect(plan.riskLevel).toBe('ADMIN');
+        expect(plan.riskLevel).toBe('CRITICAL');
+        expect(plan.requiresPassword).toBe(true);
+        expect(plan.requiresConsent).toBe(true);
         return true;
       }
     });
