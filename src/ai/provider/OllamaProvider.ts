@@ -85,7 +85,7 @@ export class OllamaProvider implements ModelProvider {
     }
   }
 
-  public async generate(prompt: string, modelId: string = 'qwen2.5:0.5b', options?: GenerateOptions): Promise<ProviderResponse> {
+  public async generate(prompt: string, modelId: string = 'qwen2.5:1.5b', options?: GenerateOptions): Promise<ProviderResponse> {
     const startTime = performance.now();
     const response = await fetch(`${this.baseUrl}/api/generate`, {
       method: 'POST',

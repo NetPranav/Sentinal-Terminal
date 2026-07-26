@@ -148,15 +148,23 @@ export class Planner {
         if (!combinedEntities.query) combinedEntities.query = clause.replace(/^.*search (for )?/i, '').trim();
       } else if (clauseLower.includes('show all the bluetooth devices') || clauseLower.includes('show all bluetooth devices') || clauseLower.includes('list bluetooth')) {
         toolId = 'network.bluetooth.list';
-      } else if (clauseLower.includes('kill') || clauseLower.includes('terminate') || clauseLower.includes('pkill') || clauseLower.includes('killall') || clauseLower.includes('force quit') || clauseLower.includes('force close') || clauseLower.includes('end task') || (clauseLower.includes('stop') && (clauseLower.includes('process') || clauseLower.includes('service') || clauseLower.includes('app') || clauseLower.includes('daemon') || clauseLower.includes('task') || combinedEntities.process))) {
+      } else if (clauseLower.includes('kill') || clauseLower.includes('terminate') || clauseLower.includes('pkill') || clauseLower.includes('killall') || clauseLower.includes('force quit') || clauseLower.includes('force close') || clauseLower.includes('end task') || clauseLower.startsWith('stop ') || clauseLower.includes(' stop ') || clauseLower.includes('stop all') || clauseLower.includes('stop any')) {
         if (clauseLower.includes('force quit') || clauseLower.includes('force close') || (clauseLower.includes('kill') && clauseLower.includes('app'))) {
           toolId = 'application.force_quit';
         } else {
           toolId = 'system.kill_process';
         }
         if (!combinedEntities.process && !combinedEntities.app) {
-          const m = clause.match(/(?:kill|terminate|stop|end|pkill|killall|force\s+quit|force\s+close)\s+(?:any\s+|the\s+|all\s+)?(?:process|app|application|task|service)?\s*["']?([^\s,;:"'!?.]+)/i);
-          const target = m && m[1] && !['process', 'app', 'application', 'task', 'any'].includes(m[1].toLowerCase()) ? m[1] : (combinedEntities.applications?.[0] || combinedEntities.processes?.[0] || 'any');
+          let target = clause.replace(/^.*(?:kill|terminate|stop|end|pkill|killall|force\s+quit|force\s+close)\s+/i, '').trim();
+          const cleanWords = /^(?:entirely|completely|all|the|any|every|active|running|processes|process|services|service|apps|app|applications|application|tasks|task|of|called|named|with\s+name|by\s+name)\s+/i;
+          while (cleanWords.test(target)) {
+            target = target.replace(cleanWords, '').trim();
+          }
+          target = target.replace(/\s+(?:processes|process|services|service|apps|app|applications|application|tasks|task)$/i, '').trim();
+          target = target.replace(/["'.!;,?]/g, '').trim();
+          if (!target || ['process', 'app', 'application', 'task', 'any'].includes(target.toLowerCase())) {
+            target = combinedEntities.applications?.[0] || combinedEntities.processes?.[0] || 'any';
+          }
           combinedEntities.process = target;
           combinedEntities.app = target;
         }

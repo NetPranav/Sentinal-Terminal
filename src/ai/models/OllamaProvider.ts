@@ -12,7 +12,7 @@ export interface OllamaModel {
 export class OllamaProvider extends LocalModel {
   public baseUrl = 'http://localhost:11434';
   
-  constructor(public modelName: string = 'qwen:latest') {
+  constructor(public modelName: string = 'qwen2.5:1.5b') {
     super();
   }
 

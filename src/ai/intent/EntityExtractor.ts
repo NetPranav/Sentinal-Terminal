@@ -210,25 +210,31 @@ export class EntityExtractor {
         if (!result.applications.includes(app)) result.applications.push(app);
       }
     }
-    const openAppRegex = /(?:open|launch|start|run|close|kill|terminate|stop|force\s+quit)\s+(?:my|the|any|all)?\s*(?:process|app|application|service|task)?\s*([a-zA-Z0-9_\-\.]+)/i;
+    const openAppRegex = /(?:open|launch|start|run)\s+(?:my|the|any|all)?\s*(?:app|application|service|task)?\s*([a-zA-Z0-9_\-\.]+)/i;
     const openMatch = text.match(openAppRegex);
     if (openMatch && openMatch[1]) {
       const appName = openMatch[1].trim();
       if (appName && !['process', 'app', 'application', 'service', 'task', 'any', 'all'].includes(appName.toLowerCase())) {
         if (!result.applications) result.applications = [];
         if (!result.applications.includes(appName)) result.applications.push(appName);
-        if (!result.processes) result.processes = [];
-        if (!result.processes.includes(appName)) result.processes.push(appName);
       }
     }
 
-    const procRegex = /(?:kill|terminate|stop|end|pkill|killall|force\s+quit|force\s+close)\s+(?:any\s+|all\s+|the\s+)?(?:process|app|application|task|service)?\s*["']?([a-zA-Z0-9_.\-\/]+)["']?/i;
-    const procMatch = text.match(procRegex);
-    if (procMatch && procMatch[1]) {
-      const procName = procMatch[1].trim();
-      if (procName && !['process', 'app', 'application', 'task', 'any', 'all', 'the'].includes(procName.toLowerCase())) {
+    // Comprehensive process & app termination extraction for kill, stop, force quit, terminate commands
+    const killStopMatch = text.match(/(?:kill|terminate|stop|end|pkill|killall|force\s+quit|force\s+close|halt)\s+(.+)/i);
+    if (killStopMatch && killStopMatch[1]) {
+      let target = killStopMatch[1].trim();
+      const cleanPrefix = /^(?:entirely|completely|all|the|any|every|active|running|processes|process|services|service|apps|app|applications|application|tasks|task|of|called|named|with\s+name|by\s+name)\s+/i;
+      while (cleanPrefix.test(target)) {
+        target = target.replace(cleanPrefix, '').trim();
+      }
+      target = target.replace(/\s+(?:processes|process|services|service|apps|app|applications|application|tasks|task)$/i, '').trim();
+      target = target.replace(/["'.!;,?]/g, '').trim();
+      if (target && !['process', 'app', 'application', 'task', 'any', 'all', 'the', 'service'].includes(target.toLowerCase())) {
         if (!result.processes) result.processes = [];
-        if (!result.processes.includes(procName)) result.processes.push(procName);
+        if (!result.processes.includes(target)) result.processes.push(target);
+        if (!result.applications) result.applications = [];
+        if (!result.applications.includes(target)) result.applications.push(target);
       }
     }
 

@@ -118,7 +118,7 @@ export class IntentEngine {
       entities,
       validation,
       modelTelemetry: {
-        modelId: activeModel?.modelId || 'qwen2.5:0.5b',
+        modelId: activeModel?.modelId || 'qwen2.5:1.5b',
         providerId: activeModel?.providerId || 'ollama',
         inferenceTimeMs
       }

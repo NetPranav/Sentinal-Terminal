@@ -7,7 +7,7 @@ class MockOfflineProvider implements ModelProvider {
   readonly providerName = 'Mock Local Runtime';
   public isReady = true;
   public mockModels = [
-    { id: 'qwen2.5:0.5b', name: 'qwen2.5:0.5b', sizeBytes: 400000000, digest: 'sha256:abc123999' },
+    { id: 'qwen2.5:1.5b', name: 'qwen2.5:1.5b', sizeBytes: 1100000000, digest: 'sha256:abc123999' },
     { id: 'phi4:mini', name: 'phi4:mini', sizeBytes: 1500000000, digest: 'sha256:xyz888' }
   ];
 
@@ -24,10 +24,10 @@ describe('Phase X — ModelManager Verification', () => {
     const manager = new ModelManager([mockProvider]);
 
     const active = await manager.initialize();
-    // qwen2.5:0.5b (score 98) should beat phi4:mini (score 85)
-    expect(active.modelId).toBe('qwen2.5:0.5b');
+    // qwen2.5:1.5b (score 99) should beat phi4:mini (score 85)
+    expect(active.modelId).toBe('qwen2.5:1.5b');
     expect(active.providerId).toBe('mock');
-    expect(active.score).toBe(98);
+    expect(active.score).toBe(99);
   });
 
   it('should verify model checksums accurately against provider digests', async () => {
@@ -49,6 +49,6 @@ describe('Phase X — ModelManager Verification', () => {
     expect(manager.getActiveModel().modelId).toBe('phi4:mini');
 
     const rolledBack = manager.rollback();
-    expect(rolledBack?.modelId).toBe('qwen2.5:0.5b');
+    expect(rolledBack?.modelId).toBe('qwen2.5:1.5b');
   });
 });

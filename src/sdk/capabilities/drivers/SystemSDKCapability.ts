@@ -71,14 +71,14 @@ export class SystemSDKCapability extends BaseCapabilityDriver<SystemDriverInput,
             await invoke('execute_command', { command: 'kill', args: ['-9', targetStr] });
             return { success: true, data: { terminated: true, pid: targetStr, signal: 'SIGKILL (-9)' }, commandExecuted: `kill -9 ${targetStr}` };
           } else {
-            await invoke('execute_command', { command: 'pkill', args: ['-9', '-i', targetStr] });
-            return { success: true, data: { terminated: true, processName: targetStr, signal: 'SIGKILL (-9)' }, commandExecuted: `pkill -9 -i ${targetStr}` };
+            await invoke('execute_command', { command: 'pkill', args: ['-9', '-i', '-f', targetStr] });
+            return { success: true, data: { terminated: true, processName: targetStr, signal: 'SIGKILL (-9)', allProcessesStopped: true }, commandExecuted: `pkill -9 -i -f ${targetStr}` };
           }
         } catch (err: any) {
-          // Attempt graceful pkill if -9 fails or fallback
+          // Attempt fallback killall if pkill fails
           try {
-            await invoke('execute_command', { command: 'killall', args: ['-i', target.toString().trim()] });
-            return { success: true, data: { terminated: true, process: target }, commandExecuted: `killall -i ${target}` };
+            await invoke('execute_command', { command: 'killall', args: ['-9', '-i', target.toString().trim()] });
+            return { success: true, data: { terminated: true, process: target, allProcessesStopped: true }, commandExecuted: `killall -9 -i ${target}` };
           } catch {
             return { success: false, error: { code: 'KILL_FAILED', message: err.message || `Could not terminate process "${target}": process not found or access denied.` } };
           }

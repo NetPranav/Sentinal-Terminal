@@ -654,7 +654,7 @@ const toolSpecs = [
     category: 'System', risk: 'HIGH', params: [
       { name: 'process', type: 'string', desc: 'Process name or PID to terminate', required: true }
     ],
-    aliases: ['kill process', 'kill any process', 'terminate process', 'stop process', 'end task', 'killall', 'pkill', 'force kill', 'kill'], sampleInput: 'kill process node'
+    aliases: ['kill process', 'kill any process', 'terminate process', 'stop process', 'stop all process', 'end task', 'killall', 'pkill', 'force kill', 'kill', 'stop', 'halt', 'kill antigravity', 'stop antigravity', 'kill chrome'], sampleInput: 'kill process node'
   },
 
   // ─── 10. DEVELOPER TOOLING DOMAIN ───

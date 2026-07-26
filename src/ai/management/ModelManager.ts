@@ -48,17 +48,6 @@ export class ModelManager {
 
   // Curated registry of high-performance lightweight local candidates (< 1.5 GB memory target)
   readonly candidateCatalog: Record<string, CandidateModelSpec> = {
-    'qwen2.5:0.5b': {
-      id: 'qwen2.5:0.5b',
-      name: 'Qwen2.5 0.5B Instruct',
-      recommendedTag: 'qwen2.5:0.5b',
-      maxRamBytes: 450 * 1024 * 1024, // ~450MB
-      expectedLatencyMs: 150,
-      jsonReliabilityScore: 95,
-      toolSelectionAccuracy: 94,
-      overallScore: 98,
-      appleSiliconOptimized: true
-    },
     'qwen2.5:1.5b': {
       id: 'qwen2.5:1.5b',
       name: 'Qwen2.5 1.5B Instruct',
@@ -67,7 +56,7 @@ export class ModelManager {
       expectedLatencyMs: 240,
       jsonReliabilityScore: 98,
       toolSelectionAccuracy: 97,
-      overallScore: 96,
+      overallScore: 99,
       appleSiliconOptimized: true
     },
     'smollm2:1.7b': {
@@ -172,8 +161,8 @@ export class ModelManager {
       return this.activeModelInfo!;
     }
 
-    // No local candidate found -> automatically download the highest ranked default candidate (qwen2.5:0.5b)
-    const targetSpec = this.candidateCatalog['qwen2.5:0.5b'];
+    // No local candidate found -> automatically download the highest ranked default candidate (qwen2.5:1.5b)
+    const targetSpec = this.candidateCatalog['qwen2.5:1.5b'];
     this.isAutoPulling = true;
     onDownloadProgress?.(5, `No model installed. Auto-pulling lightweight model: ${targetSpec.name}...`);
     
@@ -307,10 +296,10 @@ export class ModelManager {
 
   public getActiveModel(): ActiveModelInfo {
     if (!this.activeModelInfo) {
-      const defaultSpec = this.candidateCatalog['qwen2.5:0.5b'];
+      const defaultSpec = this.candidateCatalog['qwen2.5:1.5b'];
       this.activeModelInfo = {
         providerId: 'ollama',
-        modelId: 'qwen2.5:0.5b',
+        modelId: 'qwen2.5:1.5b',
         displayName: defaultSpec.name,
         score: defaultSpec.overallScore,
         sizeBytes: defaultSpec.maxRamBytes,

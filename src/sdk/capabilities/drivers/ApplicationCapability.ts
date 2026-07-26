@@ -151,8 +151,8 @@ export class ApplicationCapability extends BaseCapabilityDriver<AppDriverInput, 
 
       if (op === 'close' || op === 'force_quit') {
         const flag = op === 'force_quit' ? '-9' : '-15';
-        await invoke('execute_command', { command: 'pkill', args: [flag, '-i', target] });
-        return { success: true, data: { closed: true }, commandExecuted: `pkill ${flag} -i ${target}` };
+        await invoke('execute_command', { command: 'pkill', args: [flag, '-i', '-f', target] });
+        return { success: true, data: { closed: true, allProcessesStopped: true }, commandExecuted: `pkill ${flag} -i -f ${target}` };
       }
 
       if (op === 'list_running') {

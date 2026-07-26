@@ -99,6 +99,14 @@ describe('Phase X — Core Intent Engine & Multi-Step Planner Verification', () 
     expect(killRes.plan.tasks[0].tool).toBe('system.kill_process');
     expect(killRes.plan.tasks[0].entities.process).toBe('node');
 
+    const killAntigravityRes = await engine.parseIntent('kill antigravity');
+    expect(killAntigravityRes.plan.tasks[0].tool).toBe('system.kill_process');
+    expect(killAntigravityRes.plan.tasks[0].entities.process).toBe('antigravity');
+
+    const stopChromeRes = await engine.parseIntent('entirely stop all the process of chrome');
+    expect(stopChromeRes.plan.tasks[0].tool).toBe('system.kill_process');
+    expect(stopChromeRes.plan.tasks[0].entities.process).toBe('chrome');
+
     const readRes = await engine.parseIntent('read file config.json');
     expect(readRes.plan.tasks[0].tool).toBe('filesystem.read');
     expect(readRes.plan.tasks[0].entities.file).toBe('config.json');
