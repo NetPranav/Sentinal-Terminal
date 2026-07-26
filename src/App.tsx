@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
+import { listen } from "@tauri-apps/api/event";
 import { TerminalView } from "./presentation/TerminalView";
 import { CommandPalette } from "./ui/components/CommandPalette";
 import { StatusBar } from "./ui/components/StatusBar";
@@ -73,14 +74,28 @@ function App() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  const addTab = () => {
+  const addTab = useCallback(() => {
     const newId = getUniqueId('tab');
     const newPane = createTerminalPane();
     setPanePaths(prev => ({ ...prev, [newPane.data.id]: '~' }));
     setTabs(prev => [...prev, { id: newId, name: `Terminal ${prev.length + 1}`, rootPane: newPane }]);
     setActiveTabId(newId);
     setActivePaneId(newPane.data.id);
-  };
+  }, []);
+
+  useEffect(() => {
+    let unlistenMenu: (() => void) | undefined;
+    listen<string>("menu-event", (event) => {
+      if (event.payload === "open-theme") {
+        setShowThemeModal(true);
+      } else if (event.payload === "open-ai-settings") {
+        setShowAiSettings(true);
+      } else if (event.payload === "new-tab") {
+        addTab();
+      }
+    }).then(fn => { unlistenMenu = fn; }).catch(() => {});
+    return () => { if (unlistenMenu) unlistenMenu(); };
+  }, [addTab]);
 
   const closeTab = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
