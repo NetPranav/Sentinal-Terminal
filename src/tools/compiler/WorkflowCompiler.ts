@@ -97,7 +97,9 @@ export class WorkflowCompiler {
         if (param.default !== undefined) {
           params[param.name] = param.default;
         } else if (['dir', 'path', 'directory', 'workingDir', 'cwd', 'targetDir', 'targetPath', 'folder'].includes(param.name)) {
-          params[param.name] = context?.cwd || '~';
+          params[param.name] = (context?.cwd && context.cwd !== 'unknown') ? context.cwd : '~';
+        } else if (['pattern', 'query', 'name', 'keyword', 'filename'].includes(param.name)) {
+          params[param.name] = '*';
         } else {
           return `Missing required parameter: ${param.name} (${param.description})`;
         }

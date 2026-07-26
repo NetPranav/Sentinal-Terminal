@@ -190,7 +190,7 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
               const commandText = promptMatch ? fullText.substring(promptMatch[0].length) : fullText;
 
               if (commandText.trim()) {
-                 historyProvider.addHistory(commandText.trim(), 'unknown');
+                 historyProvider.addHistory(commandText.trim(), currentPath || '~');
               }
 
               const isNaturalLanguage = (text: string) => {
@@ -312,7 +312,7 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
                 // Trigger planner asynchronously
                 planner.plan({
                   goal: commandText,
-                  context: { os: 'mac', shell: 'zsh', cwd: 'unknown' }
+                  context: { os: 'mac', shell: 'zsh', cwd: currentPath || '~' }
                 }).then(response => {
                   if (response.success && response.workflow) {
                     term.write(`\r\n\x1b[32m[AI Planner] Created workflow: ${response.workflow.name}\x1b[0m\r\n`);
@@ -434,7 +434,7 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
                 if (commandText.length > 0) {
                   const suggestions = await autocompleteEngine.getSuggestions({ 
                     currentInput: commandText, 
-                    cwd: 'unknown',
+                    cwd: currentPath || '~',
                     cursorPosition: commandText.length,
                     os: 'macos'
                   });

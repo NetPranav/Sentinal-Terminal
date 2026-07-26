@@ -275,7 +275,8 @@ export class FilesystemSDKCapability extends BaseCapabilityDriver<FsDriverInput,
         case 'locate_files':
         case 'locate_folders': {
           const pattern = input.pattern || input.query || input.name || '';
-          const startDir = input.dir || input.path || '~';
+          let startDir = input.dir || input.path || '~';
+          if (startDir === 'unknown') startDir = '~';
           let resolvedDir = startDir;
           if (resolvedDir.startsWith('~/') || resolvedDir === '~') {
             try {
@@ -284,13 +285,14 @@ export class FilesystemSDKCapability extends BaseCapabilityDriver<FsDriverInput,
               if (hd) resolvedDir = resolvedDir === '~' ? hd : resolvedDir.replace(/^~/, hd);
             } catch { /* ignore */ }
           }
-          const cleanPattern = pattern.toString().trim();
+          const cleanPattern = pattern.toString().trim() || '*';
+          const inamePattern = cleanPattern.includes('*') ? cleanPattern : `*${cleanPattern}*`;
           let matches: string[] = [];
           let stdout = '';
           try {
             const findCmd = await invoke<{ stdout: string; stderr: string; code: number }>('execute_command', {
               command: 'find',
-              args: [resolvedDir, '-maxdepth', '5', '-iname', `*${cleanPattern}*`, '-not', '-path', '*/.*']
+              args: [resolvedDir, '-maxdepth', '5', '-iname', inamePattern, '-not', '-path', '*/.*']
             });
             if (findCmd && findCmd.stdout) {
               matches = findCmd.stdout.split('\n').map(l => l.trim()).filter(Boolean);
@@ -298,12 +300,12 @@ export class FilesystemSDKCapability extends BaseCapabilityDriver<FsDriverInput,
             if (matches.length > 0) {
               stdout = `Located ${matches.length} match(es) for "${cleanPattern}" in ${startDir}:\r\n` + matches.map(m => `  • ${m}`).join('\r\n');
             } else {
-              stdout = `No folder or file named "${cleanPattern}" was found under ${startDir}.\r\nNote: If a previous folder creation command failed or errored out, the folder was likely never created on disk.`;
+              stdout = `No folder or file matching "${cleanPattern}" was found under ${startDir}.`;
             }
           } catch {
             stdout = `Could not execute search for "${cleanPattern}" in ${startDir}.`;
           }
-          return { success: true, data: { matches, pattern: cleanPattern, dir: startDir, stdout }, commandExecuted: `find "${resolvedDir}" -iname "*${cleanPattern}*"` };
+          return { success: true, data: { matches, pattern: cleanPattern, dir: startDir, stdout }, commandExecuted: `find "${resolvedDir}" -iname "${inamePattern}"` };
         }
 
         default: {

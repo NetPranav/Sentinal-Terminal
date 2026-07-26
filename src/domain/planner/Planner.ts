@@ -263,13 +263,35 @@ export class Planner {
       }
     }
 
-    // Extract search pattern or keyword (e.g., "png files", "id_rsa", "*.ts")
+    // Extract search pattern or keyword (e.g., "png files", "starting with whatsapp", "named id_rsa")
     if (!params['pattern'] && !params['query'] && !params['name'] && tool.definition.parameters.some(p => ['pattern', 'query', 'name'].includes(p.name))) {
-      const extMatch = goal.match(/(?:all\s+|any\s+|the\s+)?(\w+|\*?\.\w+)\s+files?/i);
-      if (extMatch && extMatch[1] && !['the', 'all', 'any', 'some', 'these'].includes(extMatch[1].toLowerCase())) {
-        params['pattern'] = extMatch[1].startsWith('.') ? extMatch[1] : `${extMatch[1]}`;
-        params['query'] = params['pattern'];
-        params['name'] = params['pattern'];
+      let extVal = '';
+      const startMatch = goal.match(/(?:starting with|starts with|begins with|beginning with)\s+([^\s,.]+(?:\.\w+)?)/i);
+      const endMatch = goal.match(/(?:ending with|ends with|ending in|ends in)\s+\.?([^\s,.]+(?:\.\w+)?)/i);
+      const nameMatch = goal.match(/(?:named|called|containing|with name|matching|keyword|labeled)\s+([^\s,.]+(?:\.\w+)?)/i);
+      const extMatch = goal.match(/(?:all\s+|any\s+|the\s+)?(\w+|\*?\.\w+)\s+(?:files?|folders?|directories|dirs?)/i);
+
+      if (startMatch && startMatch[1]) {
+        extVal = `${startMatch[1]}*`;
+      } else if (endMatch && endMatch[1]) {
+        extVal = `*${endMatch[1]}`;
+      } else if (nameMatch && nameMatch[1]) {
+        extVal = nameMatch[1];
+      } else if (extMatch && extMatch[1] && !['the', 'all', 'any', 'some', 'these', 'those', 'few', 'other'].includes(extMatch[1].toLowerCase())) {
+        extVal = extMatch[1].startsWith('.') || extMatch[1].startsWith('*') ? extMatch[1] : `*.${extMatch[1]}`;
+      }
+
+      if (!extVal) {
+        const catchAll = goal.match(/(?:find|search|locate|show|tell me all the|tell me all)\s+([^\s,.]+(?:\.\w+)?)/i);
+        if (catchAll && catchAll[1] && !['the', 'all', 'any', 'some', 'files', 'folders', 'here', 'there', 'in'].includes(catchAll[1].toLowerCase())) {
+          extVal = catchAll[1];
+        }
+      }
+
+      if (extVal) {
+        params['pattern'] = extVal;
+        params['query'] = extVal;
+        params['name'] = extVal;
       }
     }
 
