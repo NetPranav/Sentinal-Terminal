@@ -1,5 +1,5 @@
 use portable_pty::{CommandBuilder, NativePtySystem, PtySize, PtySystem};
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::io::{Read, Write};
@@ -46,10 +46,26 @@ pub fn spawn_pty(
     }).map_err(|e| e.to_string())?;
 
     #[cfg(target_os = "windows")]
-    let cmd = CommandBuilder::new("powershell.exe");
+    let mut cmd = CommandBuilder::new("powershell.exe");
     
     #[cfg(not(target_os = "windows"))]
-    let cmd = CommandBuilder::new(std::env::var("SHELL").unwrap_or_else(|_| "bash".to_string()));
+    let mut cmd = CommandBuilder::new(std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".to_string()));
+
+    // Enforce interactive term mode so shells (zsh/bash) handle Backspace (0x7F/0x08) properly
+    // instead of defaulting to dumb teleprinter mode when launched via Finder/Launch Services
+    cmd.env("TERM", "xterm-256color");
+    cmd.env("COLORTERM", "truecolor");
+    cmd.env("TERM_PROGRAM", "Sentinel Terminal");
+    cmd.env("LANG", "en_US.UTF-8");
+    cmd.env("LC_ALL", "en_US.UTF-8");
+
+    if let Ok(path) = std::env::var("PATH") {
+        if !path.contains("/opt/homebrew/bin") && !path.contains("/usr/local/bin") {
+            cmd.env("PATH", format!("{}:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin", path));
+        }
+    } else {
+        cmd.env("PATH", "/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin");
+    }
 
     let _child = pair.slave.spawn_command(cmd).map_err(|e| e.to_string())?;
     
