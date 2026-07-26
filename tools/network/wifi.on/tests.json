@@ -1,0 +1,16 @@
+{
+  "toolId": "network.wifi.on",
+  "tests": [
+    {
+      "id": "network-wifi.on-test-1",
+      "userRequest": "turn the wifi on",
+      "expectedIntent": {
+        "domain": "network",
+        "action": "wifi.on"
+      },
+      "expectedToolId": "network.wifi.on",
+      "expectedEntities": {},
+      "description": "Automated test case for Turn Wi-Fi On"
+    }
+  ]
+}

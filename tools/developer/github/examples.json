@@ -1,0 +1,16 @@
+{
+  "toolId": "developer.github",
+  "examples": [
+    {
+      "input": "github cli command pr list",
+      "expectedIntent": {
+        "domain": "developer",
+        "action": "github"
+      },
+      "expectedEntities": {
+        "command": "sample_val"
+      },
+      "description": "Example execution of Interact with GitHub CLI"
+    }
+  ]
+}

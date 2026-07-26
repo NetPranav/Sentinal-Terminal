@@ -1,0 +1,43 @@
+{
+  "id": "network.wifi.scan",
+  "version": "1.0.0",
+  "displayName": "Scan Wi-Fi Networks",
+  "description": "Scans and lists nearby accessible wireless Wi-Fi SSID networks and signal strength.",
+  "domain": "network",
+  "category": "Networking",
+  "tags": [
+    "network",
+    "wifi.scan",
+    "wifi",
+    "scan",
+    "network.wifi.scan",
+    "wi-fi",
+    "networks",
+    "show",
+    "list",
+    "find"
+  ],
+  "aliases": [
+    "scan wifi",
+    "show wireless networks",
+    "list wifi networks",
+    "find wifi",
+    "scan for wireless networks"
+  ],
+  "supportedPlatforms": [
+    "macos",
+    "windows",
+    "linux"
+  ],
+  "requiredPermissions": [
+    "ShellExecution"
+  ],
+  "securityRisk": "SAFE",
+  "parameters": [],
+  "optionalParameters": [],
+  "estimatedExecutionTime": "1s",
+  "confirmationRequired": false,
+  "rollbackAvailable": false,
+  "verificationSupported": true,
+  "deprecationStatus": "stable"
+}

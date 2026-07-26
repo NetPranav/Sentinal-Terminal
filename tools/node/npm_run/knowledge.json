@@ -1,0 +1,38 @@
+{
+  "toolId": "node.npm_run",
+  "aliases": [
+    "npm run",
+    "run npm script",
+    "execute package script"
+  ],
+  "synonyms": [
+    "please npm run",
+    "please run npm script",
+    "please execute package script"
+  ],
+  "commonUserWording": [
+    "npm run build",
+    "could you npm run build",
+    "npm run",
+    "run npm script",
+    "execute package script"
+  ],
+  "commonMistakes": [],
+  "entityHints": {
+    "script": [
+      "test_value"
+    ],
+    "args": [
+      "test_value"
+    ]
+  },
+  "deviceNamingPatterns": [],
+  "commonAbbreviations": {},
+  "languageVariations": [
+    "npm run build",
+    "npm run",
+    "run npm script",
+    "execute package script"
+  ],
+  "relatedTools": []
+}

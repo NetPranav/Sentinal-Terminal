@@ -1,0 +1,23 @@
+{
+  "toolId": "developer.android_studio",
+  "version": "1.0.0",
+  "description": "Executes native driver for Open in Android Studio.",
+  "steps": [
+    {
+      "id": "step_exec_main",
+      "name": "Execute Open in Android Studio",
+      "type": "ExecuteCapability",
+      "capabilityId": "developer.android_studio",
+      "parameters": {
+        "path": "{{path}}"
+      },
+      "dependencies": [],
+      "onError": "fail"
+    }
+  ],
+  "successCondition": "step:step_exec_main:success",
+  "errorHandling": {
+    "strategy": "fail_fast",
+    "maxRetries": 0
+  }
+}

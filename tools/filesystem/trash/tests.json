@@ -1,0 +1,18 @@
+{
+  "toolId": "filesystem.trash",
+  "tests": [
+    {
+      "id": "filesystem-trash-test-1",
+      "userRequest": "trash file old_dump.sql",
+      "expectedIntent": {
+        "domain": "filesystem",
+        "action": "trash"
+      },
+      "expectedToolId": "filesystem.trash",
+      "expectedEntities": {
+        "path": "/test/path.txt"
+      },
+      "description": "Automated test case for Move to System Trash"
+    }
+  ]
+}

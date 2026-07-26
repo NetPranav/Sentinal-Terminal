@@ -1,0 +1,45 @@
+{
+  "id": "node.bun",
+  "version": "1.0.0",
+  "displayName": "Execute via Bun Runtime",
+  "description": "Runs script, test runner, or rapid package installation using modern Bun runtime.",
+  "domain": "node",
+  "category": "Node",
+  "tags": [
+    "node",
+    "bun",
+    "node.bun",
+    "execute",
+    "via",
+    "runtime",
+    "use"
+  ],
+  "aliases": [
+    "bun run",
+    "bun install",
+    "use bun runtime"
+  ],
+  "supportedPlatforms": [
+    "macos",
+    "windows",
+    "linux"
+  ],
+  "requiredPermissions": [
+    "ShellExecution"
+  ],
+  "securityRisk": "LOW",
+  "parameters": [
+    {
+      "name": "command",
+      "type": "string",
+      "description": "Bun argument command e.g. test, run index.ts, install",
+      "required": true
+    }
+  ],
+  "optionalParameters": [],
+  "estimatedExecutionTime": "2s",
+  "confirmationRequired": false,
+  "rollbackAvailable": false,
+  "verificationSupported": true,
+  "deprecationStatus": "stable"
+}

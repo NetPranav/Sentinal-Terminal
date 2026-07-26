@@ -1,0 +1,21 @@
+{
+  "toolId": "application.list_running",
+  "version": "1.0.0",
+  "description": "Executes native driver for List Running Applications.",
+  "steps": [
+    {
+      "id": "step_exec_main",
+      "name": "Execute List Running Applications",
+      "type": "ExecuteCapability",
+      "capabilityId": "application.list_running",
+      "parameters": {},
+      "dependencies": [],
+      "onError": "fail"
+    }
+  ],
+  "successCondition": "step:step_exec_main:success",
+  "errorHandling": {
+    "strategy": "fail_fast",
+    "maxRetries": 0
+  }
+}

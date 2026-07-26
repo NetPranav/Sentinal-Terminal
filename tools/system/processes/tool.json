@@ -1,0 +1,57 @@
+{
+  "id": "system.processes",
+  "version": "1.0.0",
+  "displayName": "Monitor Active OS Processes",
+  "description": "Lists top CPU or memory consuming processes, daemons, and background services.",
+  "domain": "system",
+  "category": "System",
+  "tags": [
+    "system",
+    "processes",
+    "system.processes",
+    "monitor",
+    "active",
+    "os",
+    "show",
+    "top",
+    "list",
+    "activity"
+  ],
+  "aliases": [
+    "show running processes",
+    "top processes",
+    "list background tasks",
+    "activity monitor"
+  ],
+  "supportedPlatforms": [
+    "macos",
+    "windows",
+    "linux"
+  ],
+  "requiredPermissions": [
+    "ShellExecution"
+  ],
+  "securityRisk": "SAFE",
+  "parameters": [],
+  "optionalParameters": [
+    {
+      "name": "sort",
+      "type": "string",
+      "description": "Sort criteria: cpu or ram",
+      "required": false,
+      "default": "cpu"
+    },
+    {
+      "name": "count",
+      "type": "number",
+      "description": "Number of top processes to list",
+      "required": false,
+      "default": 15
+    }
+  ],
+  "estimatedExecutionTime": "1s",
+  "confirmationRequired": false,
+  "rollbackAvailable": false,
+  "verificationSupported": true,
+  "deprecationStatus": "stable"
+}

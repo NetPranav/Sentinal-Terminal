@@ -1,0 +1,24 @@
+{
+  "toolId": "filesystem.copy",
+  "version": "1.0.0",
+  "description": "Executes native driver for Copy File or Directory.",
+  "steps": [
+    {
+      "id": "step_exec_main",
+      "name": "Execute Copy File or Directory",
+      "type": "ExecuteCapability",
+      "capabilityId": "filesystem.copy",
+      "parameters": {
+        "source": "{{source}}",
+        "destination": "{{destination}}"
+      },
+      "dependencies": [],
+      "onError": "fail"
+    }
+  ],
+  "successCondition": "step:step_exec_main:success",
+  "errorHandling": {
+    "strategy": "fail_fast",
+    "maxRetries": 0
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "toolId": "filesystem.extract",
+  "version": "1.0.0",
+  "description": "Executes native driver for Extract Archive File.",
+  "steps": [
+    {
+      "id": "step_exec_main",
+      "name": "Execute Extract Archive File",
+      "type": "ExecuteCapability",
+      "capabilityId": "filesystem.extract",
+      "parameters": {
+        "archivePath": "{{archivePath}}",
+        "destination": "{{destination}}"
+      },
+      "dependencies": [],
+      "onError": "fail"
+    }
+  ],
+  "successCondition": "step:step_exec_main:success",
+  "errorHandling": {
+    "strategy": "fail_fast",
+    "maxRetries": 0
+  }
+}

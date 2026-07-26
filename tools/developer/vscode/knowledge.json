@@ -1,0 +1,39 @@
+{
+  "toolId": "developer.vscode",
+  "aliases": [
+    "open in vscode",
+    "code open",
+    "open visual studio code",
+    "launch vscode"
+  ],
+  "synonyms": [
+    "please open in vscode",
+    "please code open",
+    "please open visual studio code",
+    "please launch vscode"
+  ],
+  "commonUserWording": [
+    "open current folder in vscode",
+    "could you open current folder in vscode",
+    "open in vscode",
+    "code open",
+    "open visual studio code",
+    "launch vscode"
+  ],
+  "commonMistakes": [],
+  "entityHints": {
+    "path": [
+      "/Users/shared/file.json"
+    ]
+  },
+  "deviceNamingPatterns": [],
+  "commonAbbreviations": {},
+  "languageVariations": [
+    "open current folder in vscode",
+    "open in vscode",
+    "code open",
+    "open visual studio code",
+    "launch vscode"
+  ],
+  "relatedTools": []
+}

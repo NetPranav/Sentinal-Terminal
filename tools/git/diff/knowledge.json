@@ -1,0 +1,35 @@
+{
+  "toolId": "git.diff",
+  "aliases": [
+    "git diff",
+    "show git diff",
+    "check file changes"
+  ],
+  "synonyms": [
+    "please git diff",
+    "please show git diff",
+    "please check file changes"
+  ],
+  "commonUserWording": [
+    "show git diff for modified files",
+    "could you show git diff for modified files",
+    "git diff",
+    "show git diff",
+    "check file changes"
+  ],
+  "commonMistakes": [],
+  "entityHints": {
+    "target": [
+      "test_value"
+    ]
+  },
+  "deviceNamingPatterns": [],
+  "commonAbbreviations": {},
+  "languageVariations": [
+    "show git diff for modified files",
+    "git diff",
+    "show git diff",
+    "check file changes"
+  ],
+  "relatedTools": []
+}

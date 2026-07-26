@@ -1,0 +1,24 @@
+{
+  "toolId": "network.wifi.connect",
+  "version": "1.0.0",
+  "description": "Executes native driver for Connect to Wi-Fi Network.",
+  "steps": [
+    {
+      "id": "step_exec_main",
+      "name": "Execute Connect to Wi-Fi Network",
+      "type": "ExecuteCapability",
+      "capabilityId": "network.wifi.connect",
+      "parameters": {
+        "ssid": "{{ssid}}",
+        "password": "{{password}}"
+      },
+      "dependencies": [],
+      "onError": "fail"
+    }
+  ],
+  "successCondition": "step:step_exec_main:success",
+  "errorHandling": {
+    "strategy": "fail_fast",
+    "maxRetries": 1
+  }
+}

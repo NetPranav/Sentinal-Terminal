@@ -1,0 +1,16 @@
+{
+  "toolId": "application.minimize",
+  "examples": [
+    {
+      "input": "minimize Spotify",
+      "expectedIntent": {
+        "domain": "application",
+        "action": "minimize"
+      },
+      "expectedEntities": {
+        "app": "sample_val"
+      },
+      "description": "Example execution of Minimize Application Window"
+    }
+  ]
+}

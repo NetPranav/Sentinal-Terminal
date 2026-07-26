@@ -1,0 +1,41 @@
+{
+  "toolId": "network.bluetooth.list",
+  "aliases": [
+    "list bluetooth devices",
+    "show bluetooth",
+    "bluetooth devices",
+    "show me all the bluetooth devices",
+    "what bt devices are nearby"
+  ],
+  "synonyms": [
+    "please list bluetooth devices",
+    "please show bluetooth",
+    "please bluetooth devices",
+    "please show me all the bluetooth devices",
+    "please what bt devices are nearby"
+  ],
+  "commonUserWording": [
+    "show me all the bluetooth devices",
+    "could you show me all the bluetooth devices",
+    "list bluetooth devices",
+    "show bluetooth",
+    "bluetooth devices",
+    "show me all the bluetooth devices",
+    "what bt devices are nearby"
+  ],
+  "commonMistakes": [],
+  "entityHints": {},
+  "deviceNamingPatterns": [],
+  "commonAbbreviations": {
+    "bt": "bluetooth"
+  },
+  "languageVariations": [
+    "show me all the bluetooth devices",
+    "list bluetooth devices",
+    "show bluetooth",
+    "bluetooth devices",
+    "show me all the bluetooth devices",
+    "what bt devices are nearby"
+  ],
+  "relatedTools": []
+}

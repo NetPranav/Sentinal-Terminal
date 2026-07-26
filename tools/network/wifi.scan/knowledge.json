@@ -1,0 +1,39 @@
+{
+  "toolId": "network.wifi.scan",
+  "aliases": [
+    "scan wifi",
+    "show wireless networks",
+    "list wifi networks",
+    "find wifi",
+    "scan for wireless networks"
+  ],
+  "synonyms": [
+    "please scan wifi",
+    "please show wireless networks",
+    "please list wifi networks",
+    "please find wifi",
+    "please scan for wireless networks"
+  ],
+  "commonUserWording": [
+    "scan available wifi networks",
+    "could you scan available wifi networks",
+    "scan wifi",
+    "show wireless networks",
+    "list wifi networks",
+    "find wifi",
+    "scan for wireless networks"
+  ],
+  "commonMistakes": [],
+  "entityHints": {},
+  "deviceNamingPatterns": [],
+  "commonAbbreviations": {},
+  "languageVariations": [
+    "scan available wifi networks",
+    "scan wifi",
+    "show wireless networks",
+    "list wifi networks",
+    "find wifi",
+    "scan for wireless networks"
+  ],
+  "relatedTools": []
+}

@@ -1,0 +1,23 @@
+{
+  "toolId": "application.maximize",
+  "version": "1.0.0",
+  "description": "Executes native driver for Maximize Application Window.",
+  "steps": [
+    {
+      "id": "step_exec_main",
+      "name": "Execute Maximize Application Window",
+      "type": "ExecuteCapability",
+      "capabilityId": "application.maximize",
+      "parameters": {
+        "app": "{{app}}"
+      },
+      "dependencies": [],
+      "onError": "fail"
+    }
+  ],
+  "successCondition": "step:step_exec_main:success",
+  "errorHandling": {
+    "strategy": "fail_fast",
+    "maxRetries": 0
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "toolId": "python.pip_install",
+  "tests": [
+    {
+      "id": "python-pip_install-test-1",
+      "userRequest": "pip install numpy",
+      "expectedIntent": {
+        "domain": "python",
+        "action": "pip_install"
+      },
+      "expectedToolId": "python.pip_install",
+      "expectedEntities": {
+        "package": "sample_val"
+      },
+      "description": "Automated test case for Install Python Pip Package"
+    }
+  ]
+}

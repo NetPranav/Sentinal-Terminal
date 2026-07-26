@@ -1,0 +1,53 @@
+{
+  "id": "docker.compose_up",
+  "version": "1.0.0",
+  "displayName": "Start Docker Compose Stack",
+  "description": "Starts multi-container application services defined in docker-compose.yml.",
+  "domain": "docker",
+  "category": "Docker",
+  "tags": [
+    "docker",
+    "compose_up",
+    "docker.compose",
+    "up",
+    "start",
+    "compose",
+    "stack"
+  ],
+  "aliases": [
+    "docker compose up",
+    "start docker stack",
+    "compose up"
+  ],
+  "supportedPlatforms": [
+    "macos",
+    "windows",
+    "linux"
+  ],
+  "requiredPermissions": [
+    "ShellExecution"
+  ],
+  "securityRisk": "MEDIUM",
+  "parameters": [],
+  "optionalParameters": [
+    {
+      "name": "detach",
+      "type": "boolean",
+      "description": "Run containers in background detached mode (-d)",
+      "required": false,
+      "default": true
+    },
+    {
+      "name": "file",
+      "type": "string",
+      "description": "Path to docker-compose file",
+      "required": false,
+      "default": "docker-compose.yml"
+    }
+  ],
+  "estimatedExecutionTime": "2s",
+  "confirmationRequired": false,
+  "rollbackAvailable": false,
+  "verificationSupported": true,
+  "deprecationStatus": "stable"
+}

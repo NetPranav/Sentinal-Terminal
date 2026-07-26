@@ -1,0 +1,16 @@
+{
+  "toolId": "application.close",
+  "examples": [
+    {
+      "input": "close Safari",
+      "expectedIntent": {
+        "domain": "application",
+        "action": "close"
+      },
+      "expectedEntities": {
+        "app": "sample_val"
+      },
+      "description": "Example execution of Close Desktop Application"
+    }
+  ]
+}

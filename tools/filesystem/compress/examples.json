@@ -1,0 +1,17 @@
+{
+  "toolId": "filesystem.compress",
+  "examples": [
+    {
+      "input": "compress src to build.zip",
+      "expectedIntent": {
+        "domain": "filesystem",
+        "action": "compress"
+      },
+      "expectedEntities": {
+        "source": "/test/path.txt",
+        "archiveName": "sample_val"
+      },
+      "description": "Example execution of Compress Files to Archive"
+    }
+  ]
+}

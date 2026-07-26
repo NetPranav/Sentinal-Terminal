@@ -1,0 +1,16 @@
+{
+  "toolId": "application.list_running",
+  "tests": [
+    {
+      "id": "application-list_running-test-1",
+      "userRequest": "list running applications",
+      "expectedIntent": {
+        "domain": "application",
+        "action": "list_running"
+      },
+      "expectedToolId": "application.list_running",
+      "expectedEntities": {},
+      "description": "Automated test case for List Running Applications"
+    }
+  ]
+}

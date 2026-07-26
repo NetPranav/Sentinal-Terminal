@@ -1,0 +1,46 @@
+{
+  "id": "docker.ps",
+  "version": "1.0.0",
+  "displayName": "List Running Docker Containers",
+  "description": "Lists running and stopped Docker container instances and container statuses.",
+  "domain": "docker",
+  "category": "Docker",
+  "tags": [
+    "docker",
+    "ps",
+    "docker.ps",
+    "list",
+    "running",
+    "containers",
+    "show"
+  ],
+  "aliases": [
+    "docker ps",
+    "list docker containers",
+    "show running containers"
+  ],
+  "supportedPlatforms": [
+    "macos",
+    "windows",
+    "linux"
+  ],
+  "requiredPermissions": [
+    "ShellExecution"
+  ],
+  "securityRisk": "SAFE",
+  "parameters": [],
+  "optionalParameters": [
+    {
+      "name": "all",
+      "type": "boolean",
+      "description": "Include stopped containers (-a)",
+      "required": false,
+      "default": true
+    }
+  ],
+  "estimatedExecutionTime": "1s",
+  "confirmationRequired": false,
+  "rollbackAvailable": false,
+  "verificationSupported": true,
+  "deprecationStatus": "stable"
+}

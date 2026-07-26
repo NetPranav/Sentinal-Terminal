@@ -1,0 +1,23 @@
+{
+  "toolId": "browser.downloads",
+  "version": "1.0.0",
+  "description": "Executes native driver for Check Browser Downloads.",
+  "steps": [
+    {
+      "id": "step_exec_main",
+      "name": "Execute Check Browser Downloads",
+      "type": "ExecuteCapability",
+      "capabilityId": "browser.downloads",
+      "parameters": {
+        "limit": "{{limit}}"
+      },
+      "dependencies": [],
+      "onError": "fail"
+    }
+  ],
+  "successCondition": "step:step_exec_main:success",
+  "errorHandling": {
+    "strategy": "fail_fast",
+    "maxRetries": 0
+  }
+}

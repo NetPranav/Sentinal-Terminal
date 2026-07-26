@@ -1,0 +1,44 @@
+{
+  "id": "application.maximize",
+  "version": "1.0.0",
+  "displayName": "Maximize Application Window",
+  "description": "Maximizes or switches application window into full-screen workspace mode.",
+  "domain": "application",
+  "category": "Desktop",
+  "tags": [
+    "application",
+    "maximize",
+    "application.maximize",
+    "window",
+    "full",
+    "zoom"
+  ],
+  "aliases": [
+    "maximize app",
+    "full screen application",
+    "zoom window"
+  ],
+  "supportedPlatforms": [
+    "macos",
+    "windows",
+    "linux"
+  ],
+  "requiredPermissions": [
+    "ShellExecution"
+  ],
+  "securityRisk": "SAFE",
+  "parameters": [
+    {
+      "name": "app",
+      "type": "string",
+      "description": "Application name to maximize or full-screen",
+      "required": true
+    }
+  ],
+  "optionalParameters": [],
+  "estimatedExecutionTime": "1s",
+  "confirmationRequired": false,
+  "rollbackAvailable": false,
+  "verificationSupported": true,
+  "deprecationStatus": "stable"
+}

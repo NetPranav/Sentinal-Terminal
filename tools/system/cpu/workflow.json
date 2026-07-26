@@ -1,0 +1,21 @@
+{
+  "toolId": "system.cpu",
+  "version": "1.0.0",
+  "description": "Executes native driver for Inspect CPU Utilization.",
+  "steps": [
+    {
+      "id": "step_exec_main",
+      "name": "Execute Inspect CPU Utilization",
+      "type": "ExecuteCapability",
+      "capabilityId": "system.cpu",
+      "parameters": {},
+      "dependencies": [],
+      "onError": "fail"
+    }
+  ],
+  "successCondition": "step:step_exec_main:success",
+  "errorHandling": {
+    "strategy": "fail_fast",
+    "maxRetries": 0
+  }
+}

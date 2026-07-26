@@ -1,0 +1,19 @@
+{
+  "toolId": "filesystem.copy",
+  "tests": [
+    {
+      "id": "filesystem-copy-test-1",
+      "userRequest": "copy config.json to config.bak",
+      "expectedIntent": {
+        "domain": "filesystem",
+        "action": "copy"
+      },
+      "expectedToolId": "filesystem.copy",
+      "expectedEntities": {
+        "source": "/test/path.txt",
+        "destination": "sample_val"
+      },
+      "description": "Automated test case for Copy File or Directory"
+    }
+  ]
+}

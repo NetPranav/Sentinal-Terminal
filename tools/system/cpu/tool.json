@@ -1,0 +1,40 @@
+{
+  "id": "system.cpu",
+  "version": "1.0.0",
+  "displayName": "Inspect CPU Utilization",
+  "description": "Monitors real-time processor core load percentages and frequency metrics.",
+  "domain": "system",
+  "category": "System",
+  "tags": [
+    "system",
+    "cpu",
+    "system.cpu",
+    "inspect",
+    "utilization",
+    "processor",
+    "check",
+    "show"
+  ],
+  "aliases": [
+    "cpu usage",
+    "processor load",
+    "check cpu load",
+    "show processor stats"
+  ],
+  "supportedPlatforms": [
+    "macos",
+    "windows",
+    "linux"
+  ],
+  "requiredPermissions": [
+    "ShellExecution"
+  ],
+  "securityRisk": "SAFE",
+  "parameters": [],
+  "optionalParameters": [],
+  "estimatedExecutionTime": "1s",
+  "confirmationRequired": false,
+  "rollbackAvailable": false,
+  "verificationSupported": true,
+  "deprecationStatus": "stable"
+}

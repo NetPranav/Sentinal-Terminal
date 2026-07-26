@@ -1,0 +1,35 @@
+{
+  "toolId": "python.notebook",
+  "aliases": [
+    "start jupyter notebook",
+    "run jupyter lab",
+    "open python notebook"
+  ],
+  "synonyms": [
+    "please start jupyter notebook",
+    "please run jupyter lab",
+    "please open python notebook"
+  ],
+  "commonUserWording": [
+    "start jupyter lab",
+    "could you start jupyter lab",
+    "start jupyter notebook",
+    "run jupyter lab",
+    "open python notebook"
+  ],
+  "commonMistakes": [],
+  "entityHints": {
+    "lab": [
+      "test_value"
+    ]
+  },
+  "deviceNamingPatterns": [],
+  "commonAbbreviations": {},
+  "languageVariations": [
+    "start jupyter lab",
+    "start jupyter notebook",
+    "run jupyter lab",
+    "open python notebook"
+  ],
+  "relatedTools": []
+}

@@ -1,0 +1,59 @@
+{
+  "toolId": "system.kill_process",
+  "aliases": [
+    "kill process",
+    "kill any process",
+    "terminate process",
+    "stop process",
+    "end task",
+    "killall",
+    "pkill",
+    "force kill",
+    "kill"
+  ],
+  "synonyms": [
+    "please kill process",
+    "please kill any process",
+    "please terminate process",
+    "please stop process",
+    "please end task",
+    "please killall",
+    "please pkill",
+    "please force kill",
+    "please kill"
+  ],
+  "commonUserWording": [
+    "kill process node",
+    "could you kill process node",
+    "kill process",
+    "kill any process",
+    "terminate process",
+    "stop process",
+    "end task",
+    "killall",
+    "pkill",
+    "force kill",
+    "kill"
+  ],
+  "commonMistakes": [],
+  "entityHints": {
+    "process": [
+      "test_value"
+    ]
+  },
+  "deviceNamingPatterns": [],
+  "commonAbbreviations": {},
+  "languageVariations": [
+    "kill process node",
+    "kill process",
+    "kill any process",
+    "terminate process",
+    "stop process",
+    "end task",
+    "killall",
+    "pkill",
+    "force kill",
+    "kill"
+  ],
+  "relatedTools": []
+}

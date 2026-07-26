@@ -1,0 +1,42 @@
+{
+  "toolId": "filesystem.extract",
+  "aliases": [
+    "unzip file",
+    "extract archive",
+    "untar file",
+    "decompress archive"
+  ],
+  "synonyms": [
+    "please unzip file",
+    "please extract archive",
+    "please untar file",
+    "please decompress archive"
+  ],
+  "commonUserWording": [
+    "extract build.zip into ./dist",
+    "could you extract build.zip into ./dist",
+    "unzip file",
+    "extract archive",
+    "untar file",
+    "decompress archive"
+  ],
+  "commonMistakes": [],
+  "entityHints": {
+    "archivePath": [
+      "test_value"
+    ],
+    "destination": [
+      "test_value"
+    ]
+  },
+  "deviceNamingPatterns": [],
+  "commonAbbreviations": {},
+  "languageVariations": [
+    "extract build.zip into ./dist",
+    "unzip file",
+    "extract archive",
+    "untar file",
+    "decompress archive"
+  ],
+  "relatedTools": []
+}

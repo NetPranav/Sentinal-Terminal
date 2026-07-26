@@ -1,0 +1,14 @@
+{
+  "toolId": "application.list_running",
+  "examples": [
+    {
+      "input": "list running applications",
+      "expectedIntent": {
+        "domain": "application",
+        "action": "list_running"
+      },
+      "expectedEntities": {},
+      "description": "Example execution of List Running Applications"
+    }
+  ]
+}

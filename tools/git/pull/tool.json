@@ -1,0 +1,51 @@
+{
+  "id": "git.pull",
+  "version": "1.0.0",
+  "displayName": "Pull Remote Git Changes",
+  "description": "Fetches and merges latest upstream commit changes from remote repository.",
+  "domain": "git",
+  "category": "Git",
+  "tags": [
+    "git",
+    "pull",
+    "git.pull",
+    "remote",
+    "changes",
+    "fetch"
+  ],
+  "aliases": [
+    "git pull",
+    "pull changes",
+    "fetch repository updates"
+  ],
+  "supportedPlatforms": [
+    "macos",
+    "windows",
+    "linux"
+  ],
+  "requiredPermissions": [
+    "ShellExecution"
+  ],
+  "securityRisk": "LOW",
+  "parameters": [],
+  "optionalParameters": [
+    {
+      "name": "remote",
+      "type": "string",
+      "description": "Target remote name",
+      "required": false,
+      "default": "origin"
+    },
+    {
+      "name": "branch",
+      "type": "string",
+      "description": "Target branch name",
+      "required": false
+    }
+  ],
+  "estimatedExecutionTime": "2s",
+  "confirmationRequired": false,
+  "rollbackAvailable": false,
+  "verificationSupported": true,
+  "deprecationStatus": "stable"
+}

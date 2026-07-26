@@ -1,0 +1,43 @@
+{
+  "toolId": "filesystem.list",
+  "aliases": [
+    "list files",
+    "ls",
+    "dir",
+    "show directory",
+    "list directory"
+  ],
+  "synonyms": [
+    "please list files",
+    "please ls",
+    "please dir",
+    "please show directory",
+    "please list directory"
+  ],
+  "commonUserWording": [
+    "list files in /tmp",
+    "could you list files in /tmp",
+    "list files",
+    "ls",
+    "dir",
+    "show directory",
+    "list directory"
+  ],
+  "commonMistakes": [],
+  "entityHints": {
+    "path": [
+      "/Users/shared/file.json"
+    ]
+  },
+  "deviceNamingPatterns": [],
+  "commonAbbreviations": {},
+  "languageVariations": [
+    "list files in /tmp",
+    "list files",
+    "ls",
+    "dir",
+    "show directory",
+    "list directory"
+  ],
+  "relatedTools": []
+}

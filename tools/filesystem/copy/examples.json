@@ -1,0 +1,17 @@
+{
+  "toolId": "filesystem.copy",
+  "examples": [
+    {
+      "input": "copy config.json to config.bak",
+      "expectedIntent": {
+        "domain": "filesystem",
+        "action": "copy"
+      },
+      "expectedEntities": {
+        "source": "/test/path.txt",
+        "destination": "sample_val"
+      },
+      "description": "Example execution of Copy File or Directory"
+    }
+  ]
+}

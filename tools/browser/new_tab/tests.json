@@ -1,0 +1,16 @@
+{
+  "toolId": "browser.new_tab",
+  "tests": [
+    {
+      "id": "browser-new_tab-test-1",
+      "userRequest": "open new tab with github.com",
+      "expectedIntent": {
+        "domain": "browser",
+        "action": "new_tab"
+      },
+      "expectedToolId": "browser.new_tab",
+      "expectedEntities": {},
+      "description": "Automated test case for Open New Browser Tab"
+    }
+  ]
+}

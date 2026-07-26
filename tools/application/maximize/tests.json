@@ -1,0 +1,18 @@
+{
+  "toolId": "application.maximize",
+  "tests": [
+    {
+      "id": "application-maximize-test-1",
+      "userRequest": "maximize Terminal",
+      "expectedIntent": {
+        "domain": "application",
+        "action": "maximize"
+      },
+      "expectedToolId": "application.maximize",
+      "expectedEntities": {
+        "app": "sample_val"
+      },
+      "description": "Automated test case for Maximize Application Window"
+    }
+  ]
+}

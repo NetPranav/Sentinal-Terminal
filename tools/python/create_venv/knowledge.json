@@ -1,0 +1,39 @@
+{
+  "toolId": "python.create_venv",
+  "aliases": [
+    "create venv",
+    "make python virtualenv",
+    "python -m venv",
+    "setup venv"
+  ],
+  "synonyms": [
+    "please create venv",
+    "please make python virtualenv",
+    "please python -m venv",
+    "please setup venv"
+  ],
+  "commonUserWording": [
+    "create venv in directory .venv",
+    "could you create venv in directory .venv",
+    "create venv",
+    "make python virtualenv",
+    "python -m venv",
+    "setup venv"
+  ],
+  "commonMistakes": [],
+  "entityHints": {
+    "directory": [
+      "test_value"
+    ]
+  },
+  "deviceNamingPatterns": [],
+  "commonAbbreviations": {},
+  "languageVariations": [
+    "create venv in directory .venv",
+    "create venv",
+    "make python virtualenv",
+    "python -m venv",
+    "setup venv"
+  ],
+  "relatedTools": []
+}

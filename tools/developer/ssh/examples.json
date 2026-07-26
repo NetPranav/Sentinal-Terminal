@@ -1,0 +1,16 @@
+{
+  "toolId": "developer.ssh",
+  "examples": [
+    {
+      "input": "ssh connect to admin@production-server",
+      "expectedIntent": {
+        "domain": "developer",
+        "action": "ssh"
+      },
+      "expectedEntities": {
+        "target": "sample_val"
+      },
+      "description": "Example execution of Connect via SSH Remote Session"
+    }
+  ]
+}

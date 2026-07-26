@@ -1,0 +1,39 @@
+{
+  "toolId": "filesystem.restore",
+  "aliases": [
+    "restore file",
+    "undelete file",
+    "untrash file",
+    "recover from bin"
+  ],
+  "synonyms": [
+    "please restore file",
+    "please undelete file",
+    "please untrash file",
+    "please recover from bin"
+  ],
+  "commonUserWording": [
+    "restore file document.docx",
+    "could you restore file document.docx",
+    "restore file",
+    "undelete file",
+    "untrash file",
+    "recover from bin"
+  ],
+  "commonMistakes": [],
+  "entityHints": {
+    "name": [
+      "test_value"
+    ]
+  },
+  "deviceNamingPatterns": [],
+  "commonAbbreviations": {},
+  "languageVariations": [
+    "restore file document.docx",
+    "restore file",
+    "undelete file",
+    "untrash file",
+    "recover from bin"
+  ],
+  "relatedTools": []
+}

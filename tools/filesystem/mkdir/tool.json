@@ -1,0 +1,53 @@
+{
+  "id": "filesystem.mkdir",
+  "version": "1.0.0",
+  "displayName": "Create New Directory",
+  "description": "Creates a new folder or directory hierarchy on disk.",
+  "domain": "filesystem",
+  "category": "Filesystem",
+  "tags": [
+    "filesystem",
+    "mkdir",
+    "filesystem.mkdir",
+    "create",
+    "new",
+    "directory",
+    "make"
+  ],
+  "aliases": [
+    "make folder",
+    "create folder",
+    "new folder",
+    "mkdir",
+    "make directory",
+    "create directory",
+    "new dir",
+    "create dir",
+    "make a new folder",
+    "create a new folder",
+    "make new directory"
+  ],
+  "supportedPlatforms": [
+    "macos",
+    "windows",
+    "linux"
+  ],
+  "requiredPermissions": [
+    "ReadFiles"
+  ],
+  "securityRisk": "SAFE",
+  "parameters": [
+    {
+      "name": "path",
+      "type": "string",
+      "description": "Directory or folder path to create",
+      "required": true
+    }
+  ],
+  "optionalParameters": [],
+  "estimatedExecutionTime": "1s",
+  "confirmationRequired": false,
+  "rollbackAvailable": false,
+  "verificationSupported": true,
+  "deprecationStatus": "stable"
+}

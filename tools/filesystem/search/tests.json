@@ -1,0 +1,19 @@
+{
+  "toolId": "filesystem.search",
+  "tests": [
+    {
+      "id": "filesystem-search-test-1",
+      "userRequest": "search for *.ts files in src directory",
+      "expectedIntent": {
+        "domain": "filesystem",
+        "action": "search"
+      },
+      "expectedToolId": "filesystem.search",
+      "expectedEntities": {
+        "dir": "sample_val",
+        "pattern": "sample_val"
+      },
+      "description": "Automated test case for Search Filesystem by Name"
+    }
+  ]
+}

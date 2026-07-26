@@ -1,0 +1,14 @@
+{
+  "toolId": "system.info",
+  "examples": [
+    {
+      "input": "what are my computer specs?",
+      "expectedIntent": {
+        "domain": "system",
+        "action": "info"
+      },
+      "expectedEntities": {},
+      "description": "Example execution of Get System Diagnostic Info"
+    }
+  ]
+}

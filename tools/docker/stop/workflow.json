@@ -1,0 +1,23 @@
+{
+  "toolId": "docker.stop",
+  "version": "1.0.0",
+  "description": "Executes native driver for Stop Running Container.",
+  "steps": [
+    {
+      "id": "step_exec_main",
+      "name": "Execute Stop Running Container",
+      "type": "ExecuteCapability",
+      "capabilityId": "docker.stop",
+      "parameters": {
+        "container": "{{container}}"
+      },
+      "dependencies": [],
+      "onError": "fail"
+    }
+  ],
+  "successCondition": "step:step_exec_main:success",
+  "errorHandling": {
+    "strategy": "fail_fast",
+    "maxRetries": 0
+  }
+}

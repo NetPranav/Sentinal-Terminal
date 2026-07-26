@@ -1,0 +1,53 @@
+{
+  "toolId": "system.info",
+  "aliases": [
+    "system info",
+    "show os version",
+    "machine diagnostics",
+    "uname status",
+    "sysinfo",
+    "what are my computer specs?",
+    "what are my computer specs",
+    "computer specs"
+  ],
+  "synonyms": [
+    "please system info",
+    "please show os version",
+    "please machine diagnostics",
+    "please uname status",
+    "please sysinfo",
+    "please what are my computer specs?",
+    "please what are my computer specs",
+    "please computer specs"
+  ],
+  "commonUserWording": [
+    "what are my computer specs?",
+    "could you what are my computer specs?",
+    "system info",
+    "show os version",
+    "machine diagnostics",
+    "uname status",
+    "sysinfo",
+    "what are my computer specs?",
+    "what are my computer specs",
+    "computer specs"
+  ],
+  "commonMistakes": [],
+  "entityHints": {},
+  "deviceNamingPatterns": [],
+  "commonAbbreviations": {
+    "sysinfo": "system info"
+  },
+  "languageVariations": [
+    "what are my computer specs?",
+    "system info",
+    "show os version",
+    "machine diagnostics",
+    "uname status",
+    "sysinfo",
+    "what are my computer specs?",
+    "what are my computer specs",
+    "computer specs"
+  ],
+  "relatedTools": []
+}

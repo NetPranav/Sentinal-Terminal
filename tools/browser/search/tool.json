@@ -1,0 +1,55 @@
+{
+  "id": "browser.search",
+  "version": "1.0.0",
+  "displayName": "Search the Web in Browser",
+  "description": "Launches search query directly in default system browser on Google, YouTube, or GitHub.",
+  "domain": "browser",
+  "category": "Web",
+  "tags": [
+    "browser",
+    "search",
+    "browser.search",
+    "the",
+    "web",
+    "in",
+    "google",
+    "find"
+  ],
+  "aliases": [
+    "search for",
+    "google for",
+    "find online",
+    "search web"
+  ],
+  "supportedPlatforms": [
+    "macos",
+    "windows",
+    "linux"
+  ],
+  "requiredPermissions": [
+    "ShellExecution"
+  ],
+  "securityRisk": "SAFE",
+  "parameters": [
+    {
+      "name": "query",
+      "type": "string",
+      "description": "Keywords to search",
+      "required": true
+    }
+  ],
+  "optionalParameters": [
+    {
+      "name": "engine",
+      "type": "string",
+      "description": "Target search engine",
+      "required": false,
+      "default": "google"
+    }
+  ],
+  "estimatedExecutionTime": "1s",
+  "confirmationRequired": false,
+  "rollbackAvailable": false,
+  "verificationSupported": true,
+  "deprecationStatus": "stable"
+}

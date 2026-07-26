@@ -1,0 +1,23 @@
+{
+  "toolId": "application.force_quit",
+  "version": "1.0.0",
+  "description": "Executes native driver for Force Quit Application.",
+  "steps": [
+    {
+      "id": "step_exec_main",
+      "name": "Execute Force Quit Application",
+      "type": "ExecuteCapability",
+      "capabilityId": "application.force_quit",
+      "parameters": {
+        "app": "{{app}}"
+      },
+      "dependencies": [],
+      "onError": "fail"
+    }
+  ],
+  "successCondition": "step:step_exec_main:success",
+  "errorHandling": {
+    "strategy": "fail_fast",
+    "maxRetries": 0
+  }
+}

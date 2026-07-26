@@ -1,0 +1,14 @@
+{
+  "toolId": "system.battery",
+  "examples": [
+    {
+      "input": "check battery status",
+      "expectedIntent": {
+        "domain": "system",
+        "action": "battery"
+      },
+      "expectedEntities": {},
+      "description": "Example execution of Check Battery Level & Power Status"
+    }
+  ]
+}

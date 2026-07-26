@@ -1,0 +1,38 @@
+{
+  "toolId": "filesystem.move",
+  "aliases": [
+    "move file",
+    "mv file",
+    "relocate folder"
+  ],
+  "synonyms": [
+    "please move file",
+    "please mv file",
+    "please relocate folder"
+  ],
+  "commonUserWording": [
+    "move test.txt to archive/test.txt",
+    "could you move test.txt to archive/test.txt",
+    "move file",
+    "mv file",
+    "relocate folder"
+  ],
+  "commonMistakes": [],
+  "entityHints": {
+    "source": [
+      "test_value"
+    ],
+    "destination": [
+      "test_value"
+    ]
+  },
+  "deviceNamingPatterns": [],
+  "commonAbbreviations": {},
+  "languageVariations": [
+    "move test.txt to archive/test.txt",
+    "move file",
+    "mv file",
+    "relocate folder"
+  ],
+  "relatedTools": []
+}

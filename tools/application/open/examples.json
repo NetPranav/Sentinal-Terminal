@@ -1,0 +1,16 @@
+{
+  "toolId": "application.open",
+  "examples": [
+    {
+      "input": "open Chrome",
+      "expectedIntent": {
+        "domain": "application",
+        "action": "open"
+      },
+      "expectedEntities": {
+        "app": "sample_val"
+      },
+      "description": "Example execution of Open Desktop Application"
+    }
+  ]
+}

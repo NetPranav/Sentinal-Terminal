@@ -1,0 +1,16 @@
+{
+  "toolId": "developer.terminal",
+  "tests": [
+    {
+      "id": "developer-terminal-test-1",
+      "userRequest": "open terminal window at ./src",
+      "expectedIntent": {
+        "domain": "developer",
+        "action": "terminal"
+      },
+      "expectedToolId": "developer.terminal",
+      "expectedEntities": {},
+      "description": "Automated test case for Launch Standalone Terminal"
+    }
+  ]
+}

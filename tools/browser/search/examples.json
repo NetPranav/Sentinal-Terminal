@@ -1,0 +1,16 @@
+{
+  "toolId": "browser.search",
+  "examples": [
+    {
+      "input": "search for AI tutorials on youtube",
+      "expectedIntent": {
+        "domain": "browser",
+        "action": "search"
+      },
+      "expectedEntities": {
+        "query": "sample_val"
+      },
+      "description": "Example execution of Search the Web in Browser"
+    }
+  ]
+}

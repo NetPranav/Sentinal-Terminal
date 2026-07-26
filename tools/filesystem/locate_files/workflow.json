@@ -1,0 +1,23 @@
+{
+  "toolId": "filesystem.locate_files",
+  "version": "1.0.0",
+  "description": "Executes native driver for Locate Specific Files.",
+  "steps": [
+    {
+      "id": "step_exec_main",
+      "name": "Execute Locate Specific Files",
+      "type": "ExecuteCapability",
+      "capabilityId": "filesystem.locate_files",
+      "parameters": {
+        "name": "{{name}}"
+      },
+      "dependencies": [],
+      "onError": "fail"
+    }
+  ],
+  "successCondition": "step:step_exec_main:success",
+  "errorHandling": {
+    "strategy": "fail_fast",
+    "maxRetries": 0
+  }
+}

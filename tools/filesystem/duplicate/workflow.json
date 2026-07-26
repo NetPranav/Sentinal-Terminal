@@ -1,0 +1,23 @@
+{
+  "toolId": "filesystem.duplicate",
+  "version": "1.0.0",
+  "description": "Executes native driver for Duplicate File or Directory.",
+  "steps": [
+    {
+      "id": "step_exec_main",
+      "name": "Execute Duplicate File or Directory",
+      "type": "ExecuteCapability",
+      "capabilityId": "filesystem.duplicate",
+      "parameters": {
+        "path": "{{path}}"
+      },
+      "dependencies": [],
+      "onError": "fail"
+    }
+  ],
+  "successCondition": "step:step_exec_main:success",
+  "errorHandling": {
+    "strategy": "fail_fast",
+    "maxRetries": 0
+  }
+}

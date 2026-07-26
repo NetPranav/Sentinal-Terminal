@@ -1,0 +1,41 @@
+{
+  "id": "application.list_running",
+  "version": "1.0.0",
+  "displayName": "List Running Applications",
+  "description": "Lists all actively running desktop graphical applications and their PIDs.",
+  "domain": "application",
+  "category": "Desktop",
+  "tags": [
+    "application",
+    "list_running",
+    "application.list",
+    "running",
+    "list",
+    "applications",
+    "show",
+    "what",
+    "active"
+  ],
+  "aliases": [
+    "list running apps",
+    "show running applications",
+    "what apps are running",
+    "active apps"
+  ],
+  "supportedPlatforms": [
+    "macos",
+    "windows",
+    "linux"
+  ],
+  "requiredPermissions": [
+    "ShellExecution"
+  ],
+  "securityRisk": "SAFE",
+  "parameters": [],
+  "optionalParameters": [],
+  "estimatedExecutionTime": "1s",
+  "confirmationRequired": false,
+  "rollbackAvailable": false,
+  "verificationSupported": true,
+  "deprecationStatus": "stable"
+}

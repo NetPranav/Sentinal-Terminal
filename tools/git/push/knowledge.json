@@ -1,0 +1,42 @@
+{
+  "toolId": "git.push",
+  "aliases": [
+    "git push",
+    "push changes",
+    "push to origin",
+    "upload commits"
+  ],
+  "synonyms": [
+    "please git push",
+    "please push changes",
+    "please push to origin",
+    "please upload commits"
+  ],
+  "commonUserWording": [
+    "git push to origin main",
+    "could you git push to origin main",
+    "git push",
+    "push changes",
+    "push to origin",
+    "upload commits"
+  ],
+  "commonMistakes": [],
+  "entityHints": {
+    "remote": [
+      "test_value"
+    ],
+    "branch": [
+      "test_value"
+    ]
+  },
+  "deviceNamingPatterns": [],
+  "commonAbbreviations": {},
+  "languageVariations": [
+    "git push to origin main",
+    "git push",
+    "push changes",
+    "push to origin",
+    "upload commits"
+  ],
+  "relatedTools": []
+}

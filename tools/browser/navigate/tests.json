@@ -1,0 +1,18 @@
+{
+  "toolId": "browser.navigate",
+  "tests": [
+    {
+      "id": "browser-navigate-test-1",
+      "userRequest": "go to youtube.com",
+      "expectedIntent": {
+        "domain": "browser",
+        "action": "navigate"
+      },
+      "expectedToolId": "browser.navigate",
+      "expectedEntities": {
+        "url": "sample_val"
+      },
+      "description": "Automated test case for Navigate Browser to URL"
+    }
+  ]
+}

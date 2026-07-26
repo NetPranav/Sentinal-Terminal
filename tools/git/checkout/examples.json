@@ -1,0 +1,16 @@
+{
+  "toolId": "git.checkout",
+  "examples": [
+    {
+      "input": "switch branch to feature/auth",
+      "expectedIntent": {
+        "domain": "git",
+        "action": "checkout"
+      },
+      "expectedEntities": {
+        "target": "sample_val"
+      },
+      "description": "Example execution of Checkout Git Branch or Commit"
+    }
+  ]
+}

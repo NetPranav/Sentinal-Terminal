@@ -1,0 +1,16 @@
+{
+  "toolId": "filesystem.mkdir",
+  "examples": [
+    {
+      "input": "make a new folder named AAAAAAAA in Downloads",
+      "expectedIntent": {
+        "domain": "filesystem",
+        "action": "mkdir"
+      },
+      "expectedEntities": {
+        "path": "/test/path.txt"
+      },
+      "description": "Example execution of Create New Directory"
+    }
+  ]
+}

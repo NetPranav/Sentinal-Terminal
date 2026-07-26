@@ -1,0 +1,14 @@
+{
+  "toolId": "browser.bookmarks",
+  "examples": [
+    {
+      "input": "show bookmarks for sentinel",
+      "expectedIntent": {
+        "domain": "browser",
+        "action": "bookmarks"
+      },
+      "expectedEntities": {},
+      "description": "Example execution of Inspect Browser Bookmarks"
+    }
+  ]
+}

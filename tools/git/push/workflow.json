@@ -1,0 +1,24 @@
+{
+  "toolId": "git.push",
+  "version": "1.0.0",
+  "description": "Executes native driver for Push Git Commits.",
+  "steps": [
+    {
+      "id": "step_exec_main",
+      "name": "Execute Push Git Commits",
+      "type": "ExecuteCapability",
+      "capabilityId": "git.push",
+      "parameters": {
+        "remote": "{{remote}}",
+        "branch": "{{branch}}"
+      },
+      "dependencies": [],
+      "onError": "fail"
+    }
+  ],
+  "successCondition": "step:step_exec_main:success",
+  "errorHandling": {
+    "strategy": "fail_fast",
+    "maxRetries": 0
+  }
+}

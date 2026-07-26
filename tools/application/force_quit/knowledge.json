@@ -1,0 +1,39 @@
+{
+  "toolId": "application.force_quit",
+  "aliases": [
+    "force quit app",
+    "kill application",
+    "kill process app",
+    "force close"
+  ],
+  "synonyms": [
+    "please force quit app",
+    "please kill application",
+    "please kill process app",
+    "please force close"
+  ],
+  "commonUserWording": [
+    "force quit Xcode",
+    "could you force quit Xcode",
+    "force quit app",
+    "kill application",
+    "kill process app",
+    "force close"
+  ],
+  "commonMistakes": [],
+  "entityHints": {
+    "app": [
+      "test_value"
+    ]
+  },
+  "deviceNamingPatterns": [],
+  "commonAbbreviations": {},
+  "languageVariations": [
+    "force quit Xcode",
+    "force quit app",
+    "kill application",
+    "kill process app",
+    "force close"
+  ],
+  "relatedTools": []
+}

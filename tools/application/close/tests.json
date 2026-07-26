@@ -1,0 +1,18 @@
+{
+  "toolId": "application.close",
+  "tests": [
+    {
+      "id": "application-close-test-1",
+      "userRequest": "close Safari",
+      "expectedIntent": {
+        "domain": "application",
+        "action": "close"
+      },
+      "expectedToolId": "application.close",
+      "expectedEntities": {
+        "app": "sample_val"
+      },
+      "description": "Automated test case for Close Desktop Application"
+    }
+  ]
+}

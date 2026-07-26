@@ -1,0 +1,18 @@
+{
+  "toolId": "network.traceroute",
+  "tests": [
+    {
+      "id": "network-traceroute-test-1",
+      "userRequest": "traceroute host github.com",
+      "expectedIntent": {
+        "domain": "network",
+        "action": "traceroute"
+      },
+      "expectedToolId": "network.traceroute",
+      "expectedEntities": {
+        "host": "sample_val"
+      },
+      "description": "Automated test case for Traceroute Network Path"
+    }
+  ]
+}

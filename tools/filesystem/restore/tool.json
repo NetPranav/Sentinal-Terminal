@@ -1,0 +1,48 @@
+{
+  "id": "filesystem.restore",
+  "version": "1.0.0",
+  "displayName": "Restore File from Trash",
+  "description": "Restores a recently deleted file from system Trash back to its original path.",
+  "domain": "filesystem",
+  "category": "Filesystem",
+  "tags": [
+    "filesystem",
+    "restore",
+    "filesystem.restore",
+    "file",
+    "from",
+    "trash",
+    "undelete",
+    "untrash",
+    "recover"
+  ],
+  "aliases": [
+    "restore file",
+    "undelete file",
+    "untrash file",
+    "recover from bin"
+  ],
+  "supportedPlatforms": [
+    "macos",
+    "windows",
+    "linux"
+  ],
+  "requiredPermissions": [
+    "ReadFiles"
+  ],
+  "securityRisk": "LOW",
+  "parameters": [
+    {
+      "name": "name",
+      "type": "string",
+      "description": "Filename or trashed path to restore",
+      "required": true
+    }
+  ],
+  "optionalParameters": [],
+  "estimatedExecutionTime": "2s",
+  "confirmationRequired": false,
+  "rollbackAvailable": false,
+  "verificationSupported": true,
+  "deprecationStatus": "stable"
+}

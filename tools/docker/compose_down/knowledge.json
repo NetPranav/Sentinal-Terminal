@@ -1,0 +1,38 @@
+{
+  "toolId": "docker.compose_down",
+  "aliases": [
+    "docker compose down",
+    "stop docker stack",
+    "compose down"
+  ],
+  "synonyms": [
+    "please docker compose down",
+    "please stop docker stack",
+    "please compose down"
+  ],
+  "commonUserWording": [
+    "docker compose down stack",
+    "could you docker compose down stack",
+    "docker compose down",
+    "stop docker stack",
+    "compose down"
+  ],
+  "commonMistakes": [],
+  "entityHints": {
+    "volumes": [
+      "test_value"
+    ],
+    "file": [
+      "test_value"
+    ]
+  },
+  "deviceNamingPatterns": [],
+  "commonAbbreviations": {},
+  "languageVariations": [
+    "docker compose down stack",
+    "docker compose down",
+    "stop docker stack",
+    "compose down"
+  ],
+  "relatedTools": []
+}

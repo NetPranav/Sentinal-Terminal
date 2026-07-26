@@ -1,0 +1,16 @@
+{
+  "toolId": "network.traceroute",
+  "examples": [
+    {
+      "input": "traceroute host github.com",
+      "expectedIntent": {
+        "domain": "network",
+        "action": "traceroute"
+      },
+      "expectedEntities": {
+        "host": "sample_val"
+      },
+      "description": "Example execution of Traceroute Network Path"
+    }
+  ]
+}

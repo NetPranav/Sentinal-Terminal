@@ -1,0 +1,41 @@
+{
+  "id": "system.storage",
+  "version": "1.0.0",
+  "displayName": "Inspect Storage Health & Volumes",
+  "description": "Lists mounted disk partitions, filesystem volume formats, and SSD health status.",
+  "domain": "system",
+  "category": "System",
+  "tags": [
+    "system",
+    "storage",
+    "system.storage",
+    "inspect",
+    "health",
+    "volumes",
+    "check",
+    "mounted",
+    "list"
+  ],
+  "aliases": [
+    "storage status",
+    "check disk health",
+    "mounted drives",
+    "list partitions"
+  ],
+  "supportedPlatforms": [
+    "macos",
+    "windows",
+    "linux"
+  ],
+  "requiredPermissions": [
+    "ShellExecution"
+  ],
+  "securityRisk": "SAFE",
+  "parameters": [],
+  "optionalParameters": [],
+  "estimatedExecutionTime": "1s",
+  "confirmationRequired": false,
+  "rollbackAvailable": false,
+  "verificationSupported": true,
+  "deprecationStatus": "stable"
+}

@@ -1,0 +1,16 @@
+{
+  "toolId": "git.merge",
+  "examples": [
+    {
+      "input": "merge branch develop",
+      "expectedIntent": {
+        "domain": "git",
+        "action": "merge"
+      },
+      "expectedEntities": {
+        "branch": "sample_val"
+      },
+      "description": "Example execution of Merge Git Branch"
+    }
+  ]
+}

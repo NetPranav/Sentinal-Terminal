@@ -1,0 +1,23 @@
+{
+  "toolId": "git.stash",
+  "version": "1.0.0",
+  "description": "Executes native driver for Stash Workspace Modifications.",
+  "steps": [
+    {
+      "id": "step_exec_main",
+      "name": "Execute Stash Workspace Modifications",
+      "type": "ExecuteCapability",
+      "capabilityId": "git.stash",
+      "parameters": {
+        "operation": "{{operation}}"
+      },
+      "dependencies": [],
+      "onError": "fail"
+    }
+  ],
+  "successCondition": "step:step_exec_main:success",
+  "errorHandling": {
+    "strategy": "fail_fast",
+    "maxRetries": 0
+  }
+}

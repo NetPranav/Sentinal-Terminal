@@ -1,0 +1,19 @@
+{
+  "toolId": "docker.exec",
+  "tests": [
+    {
+      "id": "docker-exec-test-1",
+      "userRequest": "docker exec command \"env\" inside container api_server",
+      "expectedIntent": {
+        "domain": "docker",
+        "action": "exec"
+      },
+      "expectedToolId": "docker.exec",
+      "expectedEntities": {
+        "container": "sample_val",
+        "command": "sample_val"
+      },
+      "description": "Automated test case for Execute Command inside Container"
+    }
+  ]
+}

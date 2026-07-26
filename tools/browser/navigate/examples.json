@@ -1,0 +1,16 @@
+{
+  "toolId": "browser.navigate",
+  "examples": [
+    {
+      "input": "go to youtube.com",
+      "expectedIntent": {
+        "domain": "browser",
+        "action": "navigate"
+      },
+      "expectedEntities": {
+        "url": "sample_val"
+      },
+      "description": "Example execution of Navigate Browser to URL"
+    }
+  ]
+}

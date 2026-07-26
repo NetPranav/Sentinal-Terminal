@@ -1,0 +1,35 @@
+{
+  "toolId": "browser.close_tabs",
+  "aliases": [
+    "close tab",
+    "close all browser tabs",
+    "close current tab"
+  ],
+  "synonyms": [
+    "please close tab",
+    "please close all browser tabs",
+    "please close current tab"
+  ],
+  "commonUserWording": [
+    "close current browser tab",
+    "could you close current browser tab",
+    "close tab",
+    "close all browser tabs",
+    "close current tab"
+  ],
+  "commonMistakes": [],
+  "entityHints": {
+    "target": [
+      "test_value"
+    ]
+  },
+  "deviceNamingPatterns": [],
+  "commonAbbreviations": {},
+  "languageVariations": [
+    "close current browser tab",
+    "close tab",
+    "close all browser tabs",
+    "close current tab"
+  ],
+  "relatedTools": []
+}

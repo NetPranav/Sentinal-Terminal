@@ -1,0 +1,14 @@
+{
+  "toolId": "browser.history",
+  "examples": [
+    {
+      "input": "search browser history for docs",
+      "expectedIntent": {
+        "domain": "browser",
+        "action": "history"
+      },
+      "expectedEntities": {},
+      "description": "Example execution of Query Browser History"
+    }
+  ]
+}

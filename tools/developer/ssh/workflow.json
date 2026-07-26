@@ -1,0 +1,24 @@
+{
+  "toolId": "developer.ssh",
+  "version": "1.0.0",
+  "description": "Executes native driver for Connect via SSH Remote Session.",
+  "steps": [
+    {
+      "id": "step_exec_main",
+      "name": "Execute Connect via SSH Remote Session",
+      "type": "ExecuteCapability",
+      "capabilityId": "developer.ssh",
+      "parameters": {
+        "target": "{{target}}",
+        "port": "{{port}}"
+      },
+      "dependencies": [],
+      "onError": "fail"
+    }
+  ],
+  "successCondition": "step:step_exec_main:success",
+  "errorHandling": {
+    "strategy": "fail_fast",
+    "maxRetries": 0
+  }
+}

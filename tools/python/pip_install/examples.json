@@ -1,0 +1,16 @@
+{
+  "toolId": "python.pip_install",
+  "examples": [
+    {
+      "input": "pip install numpy",
+      "expectedIntent": {
+        "domain": "python",
+        "action": "pip_install"
+      },
+      "expectedEntities": {
+        "package": "sample_val"
+      },
+      "description": "Example execution of Install Python Pip Package"
+    }
+  ]
+}

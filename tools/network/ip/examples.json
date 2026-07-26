@@ -1,0 +1,14 @@
+{
+  "toolId": "network.ip",
+  "examples": [
+    {
+      "input": "what is my public ip address",
+      "expectedIntent": {
+        "domain": "network",
+        "action": "ip"
+      },
+      "expectedEntities": {},
+      "description": "Example execution of Resolve System IP Addresses"
+    }
+  ]
+}

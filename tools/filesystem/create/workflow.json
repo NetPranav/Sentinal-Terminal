@@ -1,0 +1,24 @@
+{
+  "toolId": "filesystem.create",
+  "version": "1.0.0",
+  "description": "Executes native driver for Create New File.",
+  "steps": [
+    {
+      "id": "step_exec_main",
+      "name": "Execute Create New File",
+      "type": "ExecuteCapability",
+      "capabilityId": "filesystem.create",
+      "parameters": {
+        "path": "{{path}}",
+        "content": "{{content}}"
+      },
+      "dependencies": [],
+      "onError": "fail"
+    }
+  ],
+  "successCondition": "step:step_exec_main:success",
+  "errorHandling": {
+    "strategy": "fail_fast",
+    "maxRetries": 0
+  }
+}

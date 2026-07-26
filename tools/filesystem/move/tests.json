@@ -1,0 +1,19 @@
+{
+  "toolId": "filesystem.move",
+  "tests": [
+    {
+      "id": "filesystem-move-test-1",
+      "userRequest": "move test.txt to archive/test.txt",
+      "expectedIntent": {
+        "domain": "filesystem",
+        "action": "move"
+      },
+      "expectedToolId": "filesystem.move",
+      "expectedEntities": {
+        "source": "/test/path.txt",
+        "destination": "sample_val"
+      },
+      "description": "Automated test case for Move File or Directory"
+    }
+  ]
+}

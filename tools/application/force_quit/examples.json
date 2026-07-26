@@ -1,0 +1,16 @@
+{
+  "toolId": "application.force_quit",
+  "examples": [
+    {
+      "input": "force quit Xcode",
+      "expectedIntent": {
+        "domain": "application",
+        "action": "force_quit"
+      },
+      "expectedEntities": {
+        "app": "sample_val"
+      },
+      "description": "Example execution of Force Quit Application"
+    }
+  ]
+}

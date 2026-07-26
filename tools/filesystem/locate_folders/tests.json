@@ -1,0 +1,18 @@
+{
+  "toolId": "filesystem.locate_folders",
+  "tests": [
+    {
+      "id": "filesystem-locate_folders-test-1",
+      "userRequest": "locate folders named node_modules",
+      "expectedIntent": {
+        "domain": "filesystem",
+        "action": "locate_folders"
+      },
+      "expectedToolId": "filesystem.locate_folders",
+      "expectedEntities": {
+        "name": "sample_val"
+      },
+      "description": "Automated test case for Locate Specific Folders"
+    }
+  ]
+}

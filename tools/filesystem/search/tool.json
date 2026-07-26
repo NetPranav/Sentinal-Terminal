@@ -1,0 +1,58 @@
+{
+  "id": "filesystem.search",
+  "version": "1.0.0",
+  "displayName": "Search Filesystem by Name",
+  "description": "Searches directory recursively for files or folders matching a filename pattern.",
+  "domain": "filesystem",
+  "category": "Filesystem",
+  "tags": [
+    "filesystem",
+    "search",
+    "filesystem.search",
+    "by",
+    "name",
+    "find",
+    "locate",
+    "where",
+    "tell"
+  ],
+  "aliases": [
+    "find file",
+    "search directory",
+    "search files",
+    "locate file",
+    "find folder",
+    "locate folder",
+    "where is",
+    "tell me the path"
+  ],
+  "supportedPlatforms": [
+    "macos",
+    "windows",
+    "linux"
+  ],
+  "requiredPermissions": [
+    "ReadFiles"
+  ],
+  "securityRisk": "SAFE",
+  "parameters": [
+    {
+      "name": "dir",
+      "type": "string",
+      "description": "Starting root directory path",
+      "required": true
+    },
+    {
+      "name": "pattern",
+      "type": "string",
+      "description": "Search keyword or glob pattern",
+      "required": true
+    }
+  ],
+  "optionalParameters": [],
+  "estimatedExecutionTime": "1s",
+  "confirmationRequired": false,
+  "rollbackAvailable": false,
+  "verificationSupported": true,
+  "deprecationStatus": "stable"
+}

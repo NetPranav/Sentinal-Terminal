@@ -1,0 +1,35 @@
+{
+  "toolId": "node.yarn",
+  "aliases": [
+    "yarn install",
+    "yarn add",
+    "yarn build"
+  ],
+  "synonyms": [
+    "please yarn install",
+    "please yarn add",
+    "please yarn build"
+  ],
+  "commonUserWording": [
+    "yarn install packages",
+    "could you yarn install packages",
+    "yarn install",
+    "yarn add",
+    "yarn build"
+  ],
+  "commonMistakes": [],
+  "entityHints": {
+    "command": [
+      "test_value"
+    ]
+  },
+  "deviceNamingPatterns": [],
+  "commonAbbreviations": {},
+  "languageVariations": [
+    "yarn install packages",
+    "yarn install",
+    "yarn add",
+    "yarn build"
+  ],
+  "relatedTools": []
+}

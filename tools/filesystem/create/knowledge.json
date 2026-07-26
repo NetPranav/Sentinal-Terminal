@@ -1,0 +1,50 @@
+{
+  "toolId": "filesystem.create",
+  "aliases": [
+    "create file",
+    "make file",
+    "new file",
+    "touch file",
+    "create a new file",
+    "make new file"
+  ],
+  "synonyms": [
+    "please create file",
+    "please make file",
+    "please new file",
+    "please touch file",
+    "please create a new file",
+    "please make new file"
+  ],
+  "commonUserWording": [
+    "create file notes.txt",
+    "could you create file notes.txt",
+    "create file",
+    "make file",
+    "new file",
+    "touch file",
+    "create a new file",
+    "make new file"
+  ],
+  "commonMistakes": [],
+  "entityHints": {
+    "path": [
+      "/Users/shared/file.json"
+    ],
+    "content": [
+      "test_value"
+    ]
+  },
+  "deviceNamingPatterns": [],
+  "commonAbbreviations": {},
+  "languageVariations": [
+    "create file notes.txt",
+    "create file",
+    "make file",
+    "new file",
+    "touch file",
+    "create a new file",
+    "make new file"
+  ],
+  "relatedTools": []
+}

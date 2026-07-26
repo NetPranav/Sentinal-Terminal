@@ -1,0 +1,24 @@
+{
+  "toolId": "docker.compose_up",
+  "version": "1.0.0",
+  "description": "Executes native driver for Start Docker Compose Stack.",
+  "steps": [
+    {
+      "id": "step_exec_main",
+      "name": "Execute Start Docker Compose Stack",
+      "type": "ExecuteCapability",
+      "capabilityId": "docker.compose_up",
+      "parameters": {
+        "detach": "{{detach}}",
+        "file": "{{file}}"
+      },
+      "dependencies": [],
+      "onError": "fail"
+    }
+  ],
+  "successCondition": "step:step_exec_main:success",
+  "errorHandling": {
+    "strategy": "fail_fast",
+    "maxRetries": 0
+  }
+}

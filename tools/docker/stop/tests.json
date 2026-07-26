@@ -1,0 +1,18 @@
+{
+  "toolId": "docker.stop",
+  "tests": [
+    {
+      "id": "docker-stop-test-1",
+      "userRequest": "stop docker container postgres_dev",
+      "expectedIntent": {
+        "domain": "docker",
+        "action": "stop"
+      },
+      "expectedToolId": "docker.stop",
+      "expectedEntities": {
+        "container": "sample_val"
+      },
+      "description": "Automated test case for Stop Running Container"
+    }
+  ]
+}

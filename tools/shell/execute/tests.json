@@ -1,0 +1,18 @@
+{
+  "toolId": "shell.execute",
+  "tests": [
+    {
+      "id": "shell-execute-test-1",
+      "userRequest": "run shell command ls -l",
+      "expectedIntent": {
+        "domain": "shell",
+        "action": "execute"
+      },
+      "expectedToolId": "shell.execute",
+      "expectedEntities": {
+        "command": "sample_val"
+      },
+      "description": "Automated test case for Execute Terminal Shell Command"
+    }
+  ]
+}

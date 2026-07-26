@@ -1,0 +1,35 @@
+{
+  "toolId": "system.cpu",
+  "aliases": [
+    "cpu usage",
+    "processor load",
+    "check cpu load",
+    "show processor stats"
+  ],
+  "synonyms": [
+    "please cpu usage",
+    "please processor load",
+    "please check cpu load",
+    "please show processor stats"
+  ],
+  "commonUserWording": [
+    "check cpu usage",
+    "could you check cpu usage",
+    "cpu usage",
+    "processor load",
+    "check cpu load",
+    "show processor stats"
+  ],
+  "commonMistakes": [],
+  "entityHints": {},
+  "deviceNamingPatterns": [],
+  "commonAbbreviations": {},
+  "languageVariations": [
+    "check cpu usage",
+    "cpu usage",
+    "processor load",
+    "check cpu load",
+    "show processor stats"
+  ],
+  "relatedTools": []
+}

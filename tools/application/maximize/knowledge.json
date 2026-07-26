@@ -1,0 +1,35 @@
+{
+  "toolId": "application.maximize",
+  "aliases": [
+    "maximize app",
+    "full screen application",
+    "zoom window"
+  ],
+  "synonyms": [
+    "please maximize app",
+    "please full screen application",
+    "please zoom window"
+  ],
+  "commonUserWording": [
+    "maximize Terminal",
+    "could you maximize Terminal",
+    "maximize app",
+    "full screen application",
+    "zoom window"
+  ],
+  "commonMistakes": [],
+  "entityHints": {
+    "app": [
+      "test_value"
+    ]
+  },
+  "deviceNamingPatterns": [],
+  "commonAbbreviations": {},
+  "languageVariations": [
+    "maximize Terminal",
+    "maximize app",
+    "full screen application",
+    "zoom window"
+  ],
+  "relatedTools": []
+}

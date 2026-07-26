@@ -1,0 +1,23 @@
+{
+  "toolId": "git.diff",
+  "version": "1.0.0",
+  "description": "Executes native driver for View Git Workspace Diff.",
+  "steps": [
+    {
+      "id": "step_exec_main",
+      "name": "Execute View Git Workspace Diff",
+      "type": "ExecuteCapability",
+      "capabilityId": "git.diff",
+      "parameters": {
+        "target": "{{target}}"
+      },
+      "dependencies": [],
+      "onError": "fail"
+    }
+  ],
+  "successCondition": "step:step_exec_main:success",
+  "errorHandling": {
+    "strategy": "fail_fast",
+    "maxRetries": 0
+  }
+}

@@ -1,0 +1,38 @@
+{
+  "toolId": "git.clone",
+  "aliases": [
+    "git clone",
+    "clone repository",
+    "download repo"
+  ],
+  "synonyms": [
+    "please git clone",
+    "please clone repository",
+    "please download repo"
+  ],
+  "commonUserWording": [
+    "clone repository https://github.com/torvalds/linux",
+    "could you clone repository https://github.com/torvalds/linux",
+    "git clone",
+    "clone repository",
+    "download repo"
+  ],
+  "commonMistakes": [],
+  "entityHints": {
+    "url": [
+      "test_value"
+    ],
+    "directory": [
+      "test_value"
+    ]
+  },
+  "deviceNamingPatterns": [],
+  "commonAbbreviations": {},
+  "languageVariations": [
+    "clone repository https://github.com/torvalds/linux",
+    "git clone",
+    "clone repository",
+    "download repo"
+  ],
+  "relatedTools": []
+}

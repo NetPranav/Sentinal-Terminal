@@ -1,0 +1,23 @@
+{
+  "toolId": "network.traceroute",
+  "version": "1.0.0",
+  "description": "Executes native driver for Traceroute Network Path.",
+  "steps": [
+    {
+      "id": "step_exec_main",
+      "name": "Execute Traceroute Network Path",
+      "type": "ExecuteCapability",
+      "capabilityId": "network.traceroute",
+      "parameters": {
+        "host": "{{host}}"
+      },
+      "dependencies": [],
+      "onError": "fail"
+    }
+  ],
+  "successCondition": "step:step_exec_main:success",
+  "errorHandling": {
+    "strategy": "fail_fast",
+    "maxRetries": 1
+  }
+}

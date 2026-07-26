@@ -1,0 +1,21 @@
+{
+  "toolId": "network.wifi.scan",
+  "version": "1.0.0",
+  "description": "Executes native driver for Scan Wi-Fi Networks.",
+  "steps": [
+    {
+      "id": "step_exec_main",
+      "name": "Execute Scan Wi-Fi Networks",
+      "type": "ExecuteCapability",
+      "capabilityId": "network.wifi.scan",
+      "parameters": {},
+      "dependencies": [],
+      "onError": "fail"
+    }
+  ],
+  "successCondition": "step:step_exec_main:success",
+  "errorHandling": {
+    "strategy": "fail_fast",
+    "maxRetries": 1
+  }
+}

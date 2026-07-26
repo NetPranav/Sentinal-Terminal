@@ -1,0 +1,24 @@
+{
+  "toolId": "filesystem.permissions",
+  "version": "1.0.0",
+  "description": "Executes native driver for Inspect or Modify File Permissions.",
+  "steps": [
+    {
+      "id": "step_exec_main",
+      "name": "Execute Inspect or Modify File Permissions",
+      "type": "ExecuteCapability",
+      "capabilityId": "filesystem.permissions",
+      "parameters": {
+        "path": "{{path}}",
+        "mode": "{{mode}}"
+      },
+      "dependencies": [],
+      "onError": "fail"
+    }
+  ],
+  "successCondition": "step:step_exec_main:success",
+  "errorHandling": {
+    "strategy": "fail_fast",
+    "maxRetries": 0
+  }
+}

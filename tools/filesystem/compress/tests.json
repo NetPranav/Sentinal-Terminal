@@ -1,0 +1,19 @@
+{
+  "toolId": "filesystem.compress",
+  "tests": [
+    {
+      "id": "filesystem-compress-test-1",
+      "userRequest": "compress src to build.zip",
+      "expectedIntent": {
+        "domain": "filesystem",
+        "action": "compress"
+      },
+      "expectedToolId": "filesystem.compress",
+      "expectedEntities": {
+        "source": "/test/path.txt",
+        "archiveName": "sample_val"
+      },
+      "description": "Automated test case for Compress Files to Archive"
+    }
+  ]
+}

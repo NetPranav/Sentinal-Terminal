@@ -1,0 +1,37 @@
+{
+  "id": "docker.images",
+  "version": "1.0.0",
+  "displayName": "List Cached Docker Images",
+  "description": "Lists local cached Docker container images, tags, and sizes.",
+  "domain": "docker",
+  "category": "Docker",
+  "tags": [
+    "docker",
+    "images",
+    "docker.images",
+    "list",
+    "cached",
+    "show"
+  ],
+  "aliases": [
+    "docker images",
+    "list docker images",
+    "show local images"
+  ],
+  "supportedPlatforms": [
+    "macos",
+    "windows",
+    "linux"
+  ],
+  "requiredPermissions": [
+    "ShellExecution"
+  ],
+  "securityRisk": "SAFE",
+  "parameters": [],
+  "optionalParameters": [],
+  "estimatedExecutionTime": "1s",
+  "confirmationRequired": false,
+  "rollbackAvailable": false,
+  "verificationSupported": true,
+  "deprecationStatus": "stable"
+}

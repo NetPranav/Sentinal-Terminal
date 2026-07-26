@@ -1,0 +1,24 @@
+{
+  "toolId": "python.run_script",
+  "version": "1.0.0",
+  "description": "Executes native driver for Execute Python Script.",
+  "steps": [
+    {
+      "id": "step_exec_main",
+      "name": "Execute Execute Python Script",
+      "type": "ExecuteCapability",
+      "capabilityId": "python.run_script",
+      "parameters": {
+        "script": "{{script}}",
+        "args": "{{args}}"
+      },
+      "dependencies": [],
+      "onError": "fail"
+    }
+  ],
+  "successCondition": "step:step_exec_main:success",
+  "errorHandling": {
+    "strategy": "fail_fast",
+    "maxRetries": 0
+  }
+}

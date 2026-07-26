@@ -1,0 +1,46 @@
+{
+  "id": "application.close",
+  "version": "1.0.0",
+  "displayName": "Close Desktop Application",
+  "description": "Gracefully requests an running application process or window to quit.",
+  "domain": "application",
+  "category": "Desktop",
+  "tags": [
+    "application",
+    "close",
+    "application.close",
+    "desktop",
+    "quit",
+    "exit",
+    "terminate"
+  ],
+  "aliases": [
+    "close app",
+    "quit application",
+    "exit program",
+    "terminate app"
+  ],
+  "supportedPlatforms": [
+    "macos",
+    "windows",
+    "linux"
+  ],
+  "requiredPermissions": [
+    "ShellExecution"
+  ],
+  "securityRisk": "LOW",
+  "parameters": [
+    {
+      "name": "app",
+      "type": "string",
+      "description": "Application name to close",
+      "required": true
+    }
+  ],
+  "optionalParameters": [],
+  "estimatedExecutionTime": "2s",
+  "confirmationRequired": false,
+  "rollbackAvailable": false,
+  "verificationSupported": true,
+  "deprecationStatus": "stable"
+}

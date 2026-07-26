@@ -1,0 +1,14 @@
+{
+  "toolId": "docker.images",
+  "examples": [
+    {
+      "input": "show local docker images",
+      "expectedIntent": {
+        "domain": "docker",
+        "action": "images"
+      },
+      "expectedEntities": {},
+      "description": "Example execution of List Cached Docker Images"
+    }
+  ]
+}

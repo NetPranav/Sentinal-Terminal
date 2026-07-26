@@ -1,0 +1,18 @@
+{
+  "toolId": "application.open",
+  "tests": [
+    {
+      "id": "application-open-test-1",
+      "userRequest": "open Chrome",
+      "expectedIntent": {
+        "domain": "application",
+        "action": "open"
+      },
+      "expectedToolId": "application.open",
+      "expectedEntities": {
+        "app": "sample_val"
+      },
+      "description": "Automated test case for Open Desktop Application"
+    }
+  ]
+}

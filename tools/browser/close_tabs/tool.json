@@ -1,0 +1,44 @@
+{
+  "id": "browser.close_tabs",
+  "version": "1.0.0",
+  "displayName": "Close Browser Tabs",
+  "description": "Closes active browser tab or all open background tabs.",
+  "domain": "browser",
+  "category": "Web",
+  "tags": [
+    "browser",
+    "close_tabs",
+    "browser.close",
+    "tabs",
+    "close"
+  ],
+  "aliases": [
+    "close tab",
+    "close all browser tabs",
+    "close current tab"
+  ],
+  "supportedPlatforms": [
+    "macos",
+    "windows",
+    "linux"
+  ],
+  "requiredPermissions": [
+    "ShellExecution"
+  ],
+  "securityRisk": "LOW",
+  "parameters": [],
+  "optionalParameters": [
+    {
+      "name": "target",
+      "type": "string",
+      "description": "Tab target: current, background, or all",
+      "required": false,
+      "default": "current"
+    }
+  ],
+  "estimatedExecutionTime": "2s",
+  "confirmationRequired": false,
+  "rollbackAvailable": false,
+  "verificationSupported": true,
+  "deprecationStatus": "stable"
+}

@@ -1,0 +1,14 @@
+{
+  "toolId": "developer.android_studio",
+  "examples": [
+    {
+      "input": "open mobile project in android studio",
+      "expectedIntent": {
+        "domain": "developer",
+        "action": "android_studio"
+      },
+      "expectedEntities": {},
+      "description": "Example execution of Open in Android Studio"
+    }
+  ]
+}

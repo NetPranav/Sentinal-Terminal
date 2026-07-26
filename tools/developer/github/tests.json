@@ -1,0 +1,18 @@
+{
+  "toolId": "developer.github",
+  "tests": [
+    {
+      "id": "developer-github-test-1",
+      "userRequest": "github cli command pr list",
+      "expectedIntent": {
+        "domain": "developer",
+        "action": "github"
+      },
+      "expectedToolId": "developer.github",
+      "expectedEntities": {
+        "command": "sample_val"
+      },
+      "description": "Automated test case for Interact with GitHub CLI"
+    }
+  ]
+}

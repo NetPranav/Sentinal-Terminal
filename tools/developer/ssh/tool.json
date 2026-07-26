@@ -1,0 +1,54 @@
+{
+  "id": "developer.ssh",
+  "version": "1.0.0",
+  "displayName": "Connect via SSH Remote Session",
+  "description": "Establishes secure shell (SSH) remote terminal connection to destination server host.",
+  "domain": "developer",
+  "category": "Developer",
+  "tags": [
+    "developer",
+    "ssh",
+    "developer.ssh",
+    "connect",
+    "via",
+    "remote",
+    "session",
+    "open"
+  ],
+  "aliases": [
+    "ssh connect",
+    "open ssh session",
+    "remote shell connect"
+  ],
+  "supportedPlatforms": [
+    "macos",
+    "windows",
+    "linux"
+  ],
+  "requiredPermissions": [
+    "ShellExecution"
+  ],
+  "securityRisk": "LOW",
+  "parameters": [
+    {
+      "name": "target",
+      "type": "string",
+      "description": "SSH connection string e.g. user@hostname",
+      "required": true
+    }
+  ],
+  "optionalParameters": [
+    {
+      "name": "port",
+      "type": "number",
+      "description": "Remote SSH TCP server port",
+      "required": false,
+      "default": 22
+    }
+  ],
+  "estimatedExecutionTime": "2s",
+  "confirmationRequired": false,
+  "rollbackAvailable": false,
+  "verificationSupported": true,
+  "deprecationStatus": "stable"
+}

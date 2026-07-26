@@ -1,0 +1,16 @@
+{
+  "toolId": "node.bun",
+  "examples": [
+    {
+      "input": "bun run server.ts",
+      "expectedIntent": {
+        "domain": "node",
+        "action": "bun"
+      },
+      "expectedEntities": {
+        "command": "sample_val"
+      },
+      "description": "Example execution of Execute via Bun Runtime"
+    }
+  ]
+}

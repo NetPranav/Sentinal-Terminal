@@ -1,0 +1,14 @@
+{
+  "toolId": "system.processes",
+  "examples": [
+    {
+      "input": "show top 10 processes by cpu usage",
+      "expectedIntent": {
+        "domain": "system",
+        "action": "processes"
+      },
+      "expectedEntities": {},
+      "description": "Example execution of Monitor Active OS Processes"
+    }
+  ]
+}

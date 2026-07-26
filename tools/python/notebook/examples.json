@@ -1,0 +1,14 @@
+{
+  "toolId": "python.notebook",
+  "examples": [
+    {
+      "input": "start jupyter lab",
+      "expectedIntent": {
+        "domain": "python",
+        "action": "notebook"
+      },
+      "expectedEntities": {},
+      "description": "Example execution of Launch Jupyter Notebook"
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "toolId": "application.open",
+  "version": "1.0.0",
+  "description": "Executes native driver for Open Desktop Application.",
+  "steps": [
+    {
+      "id": "step_exec_main",
+      "name": "Execute Open Desktop Application",
+      "type": "ExecuteCapability",
+      "capabilityId": "application.open",
+      "parameters": {
+        "app": "{{app}}"
+      },
+      "dependencies": [],
+      "onError": "fail"
+    }
+  ],
+  "successCondition": "step:step_exec_main:success",
+  "errorHandling": {
+    "strategy": "fail_fast",
+    "maxRetries": 0
+  }
+}

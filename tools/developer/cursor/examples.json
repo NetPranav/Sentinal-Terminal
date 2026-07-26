@@ -1,0 +1,14 @@
+{
+  "toolId": "developer.cursor",
+  "examples": [
+    {
+      "input": "open workspace in cursor",
+      "expectedIntent": {
+        "domain": "developer",
+        "action": "cursor"
+      },
+      "expectedEntities": {},
+      "description": "Example execution of Open in Cursor AI IDE"
+    }
+  ]
+}

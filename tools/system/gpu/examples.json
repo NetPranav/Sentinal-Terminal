@@ -1,0 +1,14 @@
+{
+  "toolId": "system.gpu",
+  "examples": [
+    {
+      "input": "check gpu status",
+      "expectedIntent": {
+        "domain": "system",
+        "action": "gpu"
+      },
+      "expectedEntities": {},
+      "description": "Example execution of Inspect GPU Acceleration Status"
+    }
+  ]
+}

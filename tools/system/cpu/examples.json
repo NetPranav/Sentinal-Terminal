@@ -1,0 +1,14 @@
+{
+  "toolId": "system.cpu",
+  "examples": [
+    {
+      "input": "check cpu usage",
+      "expectedIntent": {
+        "domain": "system",
+        "action": "cpu"
+      },
+      "expectedEntities": {},
+      "description": "Example execution of Inspect CPU Utilization"
+    }
+  ]
+}

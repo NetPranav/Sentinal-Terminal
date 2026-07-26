@@ -1,0 +1,58 @@
+{
+  "toolId": "filesystem.search",
+  "aliases": [
+    "find file",
+    "search directory",
+    "search files",
+    "locate file",
+    "find folder",
+    "locate folder",
+    "where is",
+    "tell me the path"
+  ],
+  "synonyms": [
+    "please find file",
+    "please search directory",
+    "please search files",
+    "please locate file",
+    "please find folder",
+    "please locate folder",
+    "please where is",
+    "please tell me the path"
+  ],
+  "commonUserWording": [
+    "search for *.ts files in src directory",
+    "could you search for *.ts files in src directory",
+    "find file",
+    "search directory",
+    "search files",
+    "locate file",
+    "find folder",
+    "locate folder",
+    "where is",
+    "tell me the path"
+  ],
+  "commonMistakes": [],
+  "entityHints": {
+    "dir": [
+      "test_value"
+    ],
+    "pattern": [
+      "test_value"
+    ]
+  },
+  "deviceNamingPatterns": [],
+  "commonAbbreviations": {},
+  "languageVariations": [
+    "search for *.ts files in src directory",
+    "find file",
+    "search directory",
+    "search files",
+    "locate file",
+    "find folder",
+    "locate folder",
+    "where is",
+    "tell me the path"
+  ],
+  "relatedTools": []
+}

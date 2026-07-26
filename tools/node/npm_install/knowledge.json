@@ -1,0 +1,38 @@
+{
+  "toolId": "node.npm_install",
+  "aliases": [
+    "npm install",
+    "install node packages",
+    "npm i"
+  ],
+  "synonyms": [
+    "please npm install",
+    "please install node packages",
+    "please npm i"
+  ],
+  "commonUserWording": [
+    "npm install axios",
+    "could you npm install axios",
+    "npm install",
+    "install node packages",
+    "npm i"
+  ],
+  "commonMistakes": [],
+  "entityHints": {
+    "package": [
+      "test_value"
+    ],
+    "global": [
+      "test_value"
+    ]
+  },
+  "deviceNamingPatterns": [],
+  "commonAbbreviations": {},
+  "languageVariations": [
+    "npm install axios",
+    "npm install",
+    "install node packages",
+    "npm i"
+  ],
+  "relatedTools": []
+}

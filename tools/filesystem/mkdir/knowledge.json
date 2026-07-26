@@ -1,0 +1,67 @@
+{
+  "toolId": "filesystem.mkdir",
+  "aliases": [
+    "make folder",
+    "create folder",
+    "new folder",
+    "mkdir",
+    "make directory",
+    "create directory",
+    "new dir",
+    "create dir",
+    "make a new folder",
+    "create a new folder",
+    "make new directory"
+  ],
+  "synonyms": [
+    "please make folder",
+    "please create folder",
+    "please new folder",
+    "please mkdir",
+    "please make directory",
+    "please create directory",
+    "please new dir",
+    "please create dir",
+    "please make a new folder",
+    "please create a new folder",
+    "please make new directory"
+  ],
+  "commonUserWording": [
+    "make a new folder named AAAAAAAA in Downloads",
+    "could you make a new folder named AAAAAAAA in Downloads",
+    "make folder",
+    "create folder",
+    "new folder",
+    "mkdir",
+    "make directory",
+    "create directory",
+    "new dir",
+    "create dir",
+    "make a new folder",
+    "create a new folder",
+    "make new directory"
+  ],
+  "commonMistakes": [],
+  "entityHints": {
+    "path": [
+      "/Users/shared/file.json"
+    ]
+  },
+  "deviceNamingPatterns": [],
+  "commonAbbreviations": {},
+  "languageVariations": [
+    "make a new folder named AAAAAAAA in Downloads",
+    "make folder",
+    "create folder",
+    "new folder",
+    "mkdir",
+    "make directory",
+    "create directory",
+    "new dir",
+    "create dir",
+    "make a new folder",
+    "create a new folder",
+    "make new directory"
+  ],
+  "relatedTools": []
+}

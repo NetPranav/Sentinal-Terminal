@@ -1,0 +1,24 @@
+{
+  "toolId": "node.npm_install",
+  "version": "1.0.0",
+  "description": "Executes native driver for Install NPM Dependencies.",
+  "steps": [
+    {
+      "id": "step_exec_main",
+      "name": "Execute Install NPM Dependencies",
+      "type": "ExecuteCapability",
+      "capabilityId": "node.npm_install",
+      "parameters": {
+        "package": "{{package}}",
+        "global": "{{global}}"
+      },
+      "dependencies": [],
+      "onError": "fail"
+    }
+  ],
+  "successCondition": "step:step_exec_main:success",
+  "errorHandling": {
+    "strategy": "fail_fast",
+    "maxRetries": 0
+  }
+}

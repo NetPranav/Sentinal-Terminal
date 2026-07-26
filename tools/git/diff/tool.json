@@ -1,0 +1,45 @@
+{
+  "id": "git.diff",
+  "version": "1.0.0",
+  "displayName": "View Git Workspace Diff",
+  "description": "Displays file modification differences between workspace, index, or branches.",
+  "domain": "git",
+  "category": "Git",
+  "tags": [
+    "git",
+    "diff",
+    "git.diff",
+    "view",
+    "workspace",
+    "show",
+    "check"
+  ],
+  "aliases": [
+    "git diff",
+    "show git diff",
+    "check file changes"
+  ],
+  "supportedPlatforms": [
+    "macos",
+    "windows",
+    "linux"
+  ],
+  "requiredPermissions": [
+    "ShellExecution"
+  ],
+  "securityRisk": "SAFE",
+  "parameters": [],
+  "optionalParameters": [
+    {
+      "name": "target",
+      "type": "string",
+      "description": "Optional branch or commit to diff against",
+      "required": false
+    }
+  ],
+  "estimatedExecutionTime": "1s",
+  "confirmationRequired": false,
+  "rollbackAvailable": false,
+  "verificationSupported": true,
+  "deprecationStatus": "stable"
+}

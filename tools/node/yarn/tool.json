@@ -1,0 +1,44 @@
+{
+  "id": "node.yarn",
+  "version": "1.0.0",
+  "displayName": "Manage Packages with Yarn",
+  "description": "Executes package operations or script running via Yarn package manager.",
+  "domain": "node",
+  "category": "Node",
+  "tags": [
+    "node",
+    "yarn",
+    "node.yarn",
+    "manage",
+    "packages",
+    "with"
+  ],
+  "aliases": [
+    "yarn install",
+    "yarn add",
+    "yarn build"
+  ],
+  "supportedPlatforms": [
+    "macos",
+    "windows",
+    "linux"
+  ],
+  "requiredPermissions": [
+    "ShellExecution"
+  ],
+  "securityRisk": "LOW",
+  "parameters": [
+    {
+      "name": "command",
+      "type": "string",
+      "description": "Yarn command string e.g. add, install, build",
+      "required": true
+    }
+  ],
+  "optionalParameters": [],
+  "estimatedExecutionTime": "2s",
+  "confirmationRequired": false,
+  "rollbackAvailable": false,
+  "verificationSupported": true,
+  "deprecationStatus": "stable"
+}

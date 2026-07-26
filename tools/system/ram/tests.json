@@ -1,0 +1,16 @@
+{
+  "toolId": "system.ram",
+  "tests": [
+    {
+      "id": "system-ram-test-1",
+      "userRequest": "check ram usage",
+      "expectedIntent": {
+        "domain": "system",
+        "action": "ram"
+      },
+      "expectedToolId": "system.ram",
+      "expectedEntities": {},
+      "description": "Automated test case for Inspect RAM Memory Capacity"
+    }
+  ]
+}

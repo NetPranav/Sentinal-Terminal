@@ -1,0 +1,38 @@
+{
+  "toolId": "filesystem.grep",
+  "aliases": [
+    "grep files",
+    "search content in files",
+    "find text in files"
+  ],
+  "synonyms": [
+    "please grep files",
+    "please search content in files",
+    "please find text in files"
+  ],
+  "commonUserWording": [
+    "search by content for TODO in src",
+    "could you search by content for TODO in src",
+    "grep files",
+    "search content in files",
+    "find text in files"
+  ],
+  "commonMistakes": [],
+  "entityHints": {
+    "path": [
+      "/Users/shared/file.json"
+    ],
+    "query": [
+      "test_value"
+    ]
+  },
+  "deviceNamingPatterns": [],
+  "commonAbbreviations": {},
+  "languageVariations": [
+    "search by content for TODO in src",
+    "grep files",
+    "search content in files",
+    "find text in files"
+  ],
+  "relatedTools": []
+}

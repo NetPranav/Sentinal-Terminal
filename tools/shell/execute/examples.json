@@ -1,0 +1,16 @@
+{
+  "toolId": "shell.execute",
+  "examples": [
+    {
+      "input": "run shell command ls -l",
+      "expectedIntent": {
+        "domain": "shell",
+        "action": "execute"
+      },
+      "expectedEntities": {
+        "command": "sample_val"
+      },
+      "description": "Example execution of Execute Terminal Shell Command"
+    }
+  ]
+}

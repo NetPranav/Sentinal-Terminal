@@ -1,0 +1,45 @@
+{
+  "id": "network.wifi.on",
+  "version": "1.0.0",
+  "displayName": "Turn Wi-Fi On",
+  "description": "Enables system Wi-Fi wireless networking radio interface.",
+  "domain": "network",
+  "category": "Networking",
+  "tags": [
+    "network",
+    "wifi.on",
+    "wifi",
+    "on",
+    "network.wifi.on",
+    "turn",
+    "wi-fi",
+    "enable",
+    "start",
+    "activate"
+  ],
+  "aliases": [
+    "turn on wifi",
+    "enable wifi",
+    "start wifi",
+    "turn my wifi on",
+    "wifi on",
+    "turn the wifi on",
+    "activate wifi"
+  ],
+  "supportedPlatforms": [
+    "macos",
+    "windows",
+    "linux"
+  ],
+  "requiredPermissions": [
+    "ShellExecution"
+  ],
+  "securityRisk": "SAFE",
+  "parameters": [],
+  "optionalParameters": [],
+  "estimatedExecutionTime": "1s",
+  "confirmationRequired": false,
+  "rollbackAvailable": false,
+  "verificationSupported": true,
+  "deprecationStatus": "stable"
+}

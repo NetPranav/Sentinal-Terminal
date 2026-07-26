@@ -1,0 +1,16 @@
+{
+  "toolId": "filesystem.disk_usage",
+  "tests": [
+    {
+      "id": "filesystem-disk_usage-test-1",
+      "userRequest": "check disk usage for /Users",
+      "expectedIntent": {
+        "domain": "filesystem",
+        "action": "disk_usage"
+      },
+      "expectedToolId": "filesystem.disk_usage",
+      "expectedEntities": {},
+      "description": "Automated test case for Check Disk Capacity and Usage"
+    }
+  ]
+}

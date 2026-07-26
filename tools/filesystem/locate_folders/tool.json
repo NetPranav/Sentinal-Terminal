@@ -1,0 +1,45 @@
+{
+  "id": "filesystem.locate_folders",
+  "version": "1.0.0",
+  "displayName": "Locate Specific Folders",
+  "description": "Finds directory paths across the operating system filesystem.",
+  "domain": "filesystem",
+  "category": "Filesystem",
+  "tags": [
+    "filesystem",
+    "locate_folders",
+    "filesystem.locate",
+    "folders",
+    "locate",
+    "specific",
+    "find"
+  ],
+  "aliases": [
+    "locate folders",
+    "find directory",
+    "locate directory"
+  ],
+  "supportedPlatforms": [
+    "macos",
+    "windows",
+    "linux"
+  ],
+  "requiredPermissions": [
+    "ReadFiles"
+  ],
+  "securityRisk": "SAFE",
+  "parameters": [
+    {
+      "name": "name",
+      "type": "string",
+      "description": "Folder name or substring",
+      "required": true
+    }
+  ],
+  "optionalParameters": [],
+  "estimatedExecutionTime": "1s",
+  "confirmationRequired": false,
+  "rollbackAvailable": false,
+  "verificationSupported": true,
+  "deprecationStatus": "stable"
+}

@@ -1,0 +1,14 @@
+{
+  "toolId": "node.npm_install",
+  "examples": [
+    {
+      "input": "npm install axios",
+      "expectedIntent": {
+        "domain": "node",
+        "action": "npm_install"
+      },
+      "expectedEntities": {},
+      "description": "Example execution of Install NPM Dependencies"
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "toolId": "node.npm_run",
+  "tests": [
+    {
+      "id": "node-npm_run-test-1",
+      "userRequest": "npm run build",
+      "expectedIntent": {
+        "domain": "node",
+        "action": "npm_run"
+      },
+      "expectedToolId": "node.npm_run",
+      "expectedEntities": {
+        "script": "sample_val"
+      },
+      "description": "Automated test case for Execute NPM Script"
+    }
+  ]
+}

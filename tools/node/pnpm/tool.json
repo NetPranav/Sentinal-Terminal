@@ -1,0 +1,44 @@
+{
+  "id": "node.pnpm",
+  "version": "1.0.0",
+  "displayName": "Run PNPM Operation",
+  "description": "Executes fast disk-efficient package management command via pnpm CLI.",
+  "domain": "node",
+  "category": "Node",
+  "tags": [
+    "node",
+    "pnpm",
+    "node.pnpm",
+    "run",
+    "operation",
+    "use"
+  ],
+  "aliases": [
+    "pnpm install",
+    "pnpm run",
+    "use pnpm"
+  ],
+  "supportedPlatforms": [
+    "macos",
+    "windows",
+    "linux"
+  ],
+  "requiredPermissions": [
+    "ShellExecution"
+  ],
+  "securityRisk": "LOW",
+  "parameters": [
+    {
+      "name": "command",
+      "type": "string",
+      "description": "pnpm command argument e.g. install, run build, add",
+      "required": true
+    }
+  ],
+  "optionalParameters": [],
+  "estimatedExecutionTime": "2s",
+  "confirmationRequired": false,
+  "rollbackAvailable": false,
+  "verificationSupported": true,
+  "deprecationStatus": "stable"
+}

@@ -1,0 +1,35 @@
+{
+  "toolId": "browser.new_tab",
+  "aliases": [
+    "open new tab",
+    "new browser tab",
+    "create tab"
+  ],
+  "synonyms": [
+    "please open new tab",
+    "please new browser tab",
+    "please create tab"
+  ],
+  "commonUserWording": [
+    "open new tab with github.com",
+    "could you open new tab with github.com",
+    "open new tab",
+    "new browser tab",
+    "create tab"
+  ],
+  "commonMistakes": [],
+  "entityHints": {
+    "url": [
+      "test_value"
+    ]
+  },
+  "deviceNamingPatterns": [],
+  "commonAbbreviations": {},
+  "languageVariations": [
+    "open new tab with github.com",
+    "open new tab",
+    "new browser tab",
+    "create tab"
+  ],
+  "relatedTools": []
+}

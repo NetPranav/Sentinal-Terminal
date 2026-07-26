@@ -1,0 +1,94 @@
+import { invoke } from '@tauri-apps/api/core';
+import { listen } from '@tauri-apps/api/event';
+
+export interface PtyOutputEvent {
+  session_id: string;
+  data: number[]; // Sent as array of u8 from Rust
+}
+
+export type TerminalOutputCallback = (data: Uint8Array) => void;
+
+export class SessionManager {
+  private static instance: SessionManager;
+  private outputListeners: Map<string, TerminalOutputCallback[]> = new Map();
+  private sessionBuffers: Map<string, Uint8Array[]> = new Map();
+
+  private constructor() {
+    this.initListeners();
+  }
+
+  public static getInstance(): SessionManager {
+    if (!SessionManager.instance) {
+      SessionManager.instance = new SessionManager();
+    }
+    return SessionManager.instance;
+  }
+
+  private async initListeners() {
+    await listen<PtyOutputEvent>('pty-output', (event) => {
+      const { session_id, data } = event.payload;
+      const u8Data = new Uint8Array(data);
+
+      // Buffer incoming output so it persists across pane splitting and React component remounts
+      if (!this.sessionBuffers.has(session_id)) {
+        this.sessionBuffers.set(session_id, []);
+      }
+      const buffer = this.sessionBuffers.get(session_id)!;
+      buffer.push(u8Data);
+      // Limit buffer to last 1000 chunks (~500KB) to prevent excessive RAM usage over long running sessions
+      if (buffer.length > 1000) {
+        buffer.shift();
+      }
+
+      const callbacks = this.outputListeners.get(session_id);
+      if (callbacks) {
+        callbacks.forEach(cb => cb(u8Data));
+      }
+    });
+
+    await listen<string>('pty-exit', (event) => {
+      const session_id = event.payload;
+      this.outputListeners.delete(session_id);
+      this.sessionBuffers.delete(session_id);
+    });
+  }
+
+  public async createSession(rows: number, cols: number): Promise<string> {
+    const sessionId = await invoke<string>('spawn_pty', { rows, cols });
+    this.outputListeners.set(sessionId, []);
+    this.sessionBuffers.set(sessionId, []);
+    return sessionId;
+  }
+
+  public onOutput(sessionId: string, callback: TerminalOutputCallback): void {
+    const callbacks = this.outputListeners.get(sessionId);
+    if (callbacks && !callbacks.includes(callback)) {
+      callbacks.push(callback);
+    }
+    // Replay existing buffered output immediately so screen contents restore on component mount/split
+    const existingBuffer = this.sessionBuffers.get(sessionId);
+    if (existingBuffer && existingBuffer.length > 0) {
+      existingBuffer.forEach(chunk => callback(chunk));
+    }
+  }
+
+  public offOutput(sessionId: string, callback: TerminalOutputCallback): void {
+    const callbacks = this.outputListeners.get(sessionId);
+    if (callbacks) {
+      this.outputListeners.set(sessionId, callbacks.filter(cb => cb !== callback));
+    }
+  }
+
+  public async write(sessionId: string, data: string): Promise<void> {
+    await invoke('write_pty', { sessionId, data });
+  }
+
+  public async resize(sessionId: string, rows: number, cols: number): Promise<void> {
+    await invoke('resize_pty', { sessionId, rows, cols });
+  }
+
+  public async kill(sessionId: string): Promise<void> {
+    await invoke('kill_pty', { sessionId });
+    this.outputListeners.delete(sessionId);
+  }
+}

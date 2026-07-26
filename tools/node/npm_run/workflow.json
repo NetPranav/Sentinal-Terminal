@@ -1,0 +1,24 @@
+{
+  "toolId": "node.npm_run",
+  "version": "1.0.0",
+  "description": "Executes native driver for Execute NPM Script.",
+  "steps": [
+    {
+      "id": "step_exec_main",
+      "name": "Execute Execute NPM Script",
+      "type": "ExecuteCapability",
+      "capabilityId": "node.npm_run",
+      "parameters": {
+        "script": "{{script}}",
+        "args": "{{args}}"
+      },
+      "dependencies": [],
+      "onError": "fail"
+    }
+  ],
+  "successCondition": "step:step_exec_main:success",
+  "errorHandling": {
+    "strategy": "fail_fast",
+    "maxRetries": 0
+  }
+}

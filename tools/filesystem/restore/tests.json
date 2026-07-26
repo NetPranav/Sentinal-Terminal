@@ -1,0 +1,18 @@
+{
+  "toolId": "filesystem.restore",
+  "tests": [
+    {
+      "id": "filesystem-restore-test-1",
+      "userRequest": "restore file document.docx",
+      "expectedIntent": {
+        "domain": "filesystem",
+        "action": "restore"
+      },
+      "expectedToolId": "filesystem.restore",
+      "expectedEntities": {
+        "name": "sample_val"
+      },
+      "description": "Automated test case for Restore File from Trash"
+    }
+  ]
+}

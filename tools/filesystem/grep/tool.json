@@ -1,0 +1,52 @@
+{
+  "id": "filesystem.grep",
+  "version": "1.0.0",
+  "displayName": "Search by File Content",
+  "description": "Searches inside text files for matching regex patterns or literal strings.",
+  "domain": "filesystem",
+  "category": "Filesystem",
+  "tags": [
+    "filesystem",
+    "grep",
+    "filesystem.grep",
+    "search",
+    "by",
+    "file",
+    "content",
+    "find"
+  ],
+  "aliases": [
+    "grep files",
+    "search content in files",
+    "find text in files"
+  ],
+  "supportedPlatforms": [
+    "macos",
+    "windows",
+    "linux"
+  ],
+  "requiredPermissions": [
+    "ReadFiles"
+  ],
+  "securityRisk": "SAFE",
+  "parameters": [
+    {
+      "name": "path",
+      "type": "string",
+      "description": "Directory or file path to search inside",
+      "required": true
+    },
+    {
+      "name": "query",
+      "type": "string",
+      "description": "String or regex pattern to match",
+      "required": true
+    }
+  ],
+  "optionalParameters": [],
+  "estimatedExecutionTime": "1s",
+  "confirmationRequired": false,
+  "rollbackAvailable": false,
+  "verificationSupported": true,
+  "deprecationStatus": "stable"
+}

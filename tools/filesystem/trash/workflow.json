@@ -1,0 +1,23 @@
+{
+  "toolId": "filesystem.trash",
+  "version": "1.0.0",
+  "description": "Executes native driver for Move to System Trash.",
+  "steps": [
+    {
+      "id": "step_exec_main",
+      "name": "Execute Move to System Trash",
+      "type": "ExecuteCapability",
+      "capabilityId": "filesystem.trash",
+      "parameters": {
+        "path": "{{path}}"
+      },
+      "dependencies": [],
+      "onError": "fail"
+    }
+  ],
+  "successCondition": "step:step_exec_main:success",
+  "errorHandling": {
+    "strategy": "fail_fast",
+    "maxRetries": 0
+  }
+}

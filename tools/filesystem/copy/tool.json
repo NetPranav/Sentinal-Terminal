@@ -1,0 +1,52 @@
+{
+  "id": "filesystem.copy",
+  "version": "1.0.0",
+  "displayName": "Copy File or Directory",
+  "description": "Copies a source file or directory to a destination path using native filesystem APIs.",
+  "domain": "filesystem",
+  "category": "Filesystem",
+  "tags": [
+    "filesystem",
+    "copy",
+    "filesystem.copy",
+    "file",
+    "or",
+    "directory",
+    "duplicate",
+    "cp"
+  ],
+  "aliases": [
+    "copy file",
+    "duplicate file",
+    "cp file"
+  ],
+  "supportedPlatforms": [
+    "macos",
+    "windows",
+    "linux"
+  ],
+  "requiredPermissions": [
+    "ReadFiles"
+  ],
+  "securityRisk": "LOW",
+  "parameters": [
+    {
+      "name": "source",
+      "type": "string",
+      "description": "Source path to copy",
+      "required": true
+    },
+    {
+      "name": "destination",
+      "type": "string",
+      "description": "Target destination path",
+      "required": true
+    }
+  ],
+  "optionalParameters": [],
+  "estimatedExecutionTime": "2s",
+  "confirmationRequired": false,
+  "rollbackAvailable": true,
+  "verificationSupported": true,
+  "deprecationStatus": "stable"
+}

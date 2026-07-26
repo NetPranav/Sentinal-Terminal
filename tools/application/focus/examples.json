@@ -1,0 +1,16 @@
+{
+  "toolId": "application.focus",
+  "examples": [
+    {
+      "input": "focus VSCode",
+      "expectedIntent": {
+        "domain": "application",
+        "action": "focus"
+      },
+      "expectedEntities": {
+        "app": "sample_val"
+      },
+      "description": "Example execution of Focus Application Window"
+    }
+  ]
+}

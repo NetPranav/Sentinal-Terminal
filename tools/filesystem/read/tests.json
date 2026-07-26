@@ -1,0 +1,18 @@
+{
+  "toolId": "filesystem.read",
+  "tests": [
+    {
+      "id": "filesystem-read-test-1",
+      "userRequest": "read package.json",
+      "expectedIntent": {
+        "domain": "filesystem",
+        "action": "read"
+      },
+      "expectedToolId": "filesystem.read",
+      "expectedEntities": {
+        "path": "/test/path.txt"
+      },
+      "description": "Automated test case for Read File Content"
+    }
+  ]
+}

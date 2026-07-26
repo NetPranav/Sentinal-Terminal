@@ -1,0 +1,54 @@
+{
+  "id": "filesystem.compress",
+  "version": "1.0.0",
+  "displayName": "Compress Files to Archive",
+  "description": "Compresses files or directories into a zip or tar archive.",
+  "domain": "filesystem",
+  "category": "Filesystem",
+  "tags": [
+    "filesystem",
+    "compress",
+    "filesystem.compress",
+    "files",
+    "to",
+    "archive",
+    "zip",
+    "create",
+    "tar"
+  ],
+  "aliases": [
+    "zip folder",
+    "compress files",
+    "create archive",
+    "tar folder"
+  ],
+  "supportedPlatforms": [
+    "macos",
+    "windows",
+    "linux"
+  ],
+  "requiredPermissions": [
+    "ReadFiles"
+  ],
+  "securityRisk": "LOW",
+  "parameters": [
+    {
+      "name": "source",
+      "type": "string",
+      "description": "Directory or files to compress",
+      "required": true
+    },
+    {
+      "name": "archiveName",
+      "type": "string",
+      "description": "Name of destination zip/tar archive",
+      "required": true
+    }
+  ],
+  "optionalParameters": [],
+  "estimatedExecutionTime": "2s",
+  "confirmationRequired": false,
+  "rollbackAvailable": false,
+  "verificationSupported": true,
+  "deprecationStatus": "stable"
+}

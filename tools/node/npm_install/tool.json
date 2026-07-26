@@ -1,0 +1,51 @@
+{
+  "id": "node.npm_install",
+  "version": "1.0.0",
+  "displayName": "Install NPM Dependencies",
+  "description": "Installs project node_modules dependencies or specific NPM package.",
+  "domain": "node",
+  "category": "Node",
+  "tags": [
+    "node",
+    "npm_install",
+    "node.npm",
+    "install",
+    "npm",
+    "dependencies"
+  ],
+  "aliases": [
+    "npm install",
+    "install node packages",
+    "npm i"
+  ],
+  "supportedPlatforms": [
+    "macos",
+    "windows",
+    "linux"
+  ],
+  "requiredPermissions": [
+    "ShellExecution"
+  ],
+  "securityRisk": "LOW",
+  "parameters": [],
+  "optionalParameters": [
+    {
+      "name": "package",
+      "type": "string",
+      "description": "Optional package name to add (if omitted installs all from package.json)",
+      "required": false
+    },
+    {
+      "name": "global",
+      "type": "boolean",
+      "description": "Install package globally (-g)",
+      "required": false,
+      "default": false
+    }
+  ],
+  "estimatedExecutionTime": "2s",
+  "confirmationRequired": false,
+  "rollbackAvailable": false,
+  "verificationSupported": true,
+  "deprecationStatus": "stable"
+}

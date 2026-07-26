@@ -1,0 +1,54 @@
+{
+  "id": "git.checkout",
+  "version": "1.0.0",
+  "displayName": "Checkout Git Branch or Commit",
+  "description": "Switches working tree to a target git branch, commit hash, or tag.",
+  "domain": "git",
+  "category": "Git",
+  "tags": [
+    "git",
+    "checkout",
+    "git.checkout",
+    "branch",
+    "or",
+    "commit",
+    "switch",
+    "change"
+  ],
+  "aliases": [
+    "git checkout",
+    "switch branch",
+    "change git branch"
+  ],
+  "supportedPlatforms": [
+    "macos",
+    "windows",
+    "linux"
+  ],
+  "requiredPermissions": [
+    "ShellExecution"
+  ],
+  "securityRisk": "LOW",
+  "parameters": [
+    {
+      "name": "target",
+      "type": "string",
+      "description": "Branch name, tag, or commit SHA to checkout",
+      "required": true
+    }
+  ],
+  "optionalParameters": [
+    {
+      "name": "create",
+      "type": "boolean",
+      "description": "Create branch if non existent (-b)",
+      "required": false,
+      "default": false
+    }
+  ],
+  "estimatedExecutionTime": "2s",
+  "confirmationRequired": false,
+  "rollbackAvailable": false,
+  "verificationSupported": true,
+  "deprecationStatus": "stable"
+}

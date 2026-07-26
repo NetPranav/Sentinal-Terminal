@@ -1,0 +1,35 @@
+{
+  "toolId": "filesystem.locate_folders",
+  "aliases": [
+    "locate folders",
+    "find directory",
+    "locate directory"
+  ],
+  "synonyms": [
+    "please locate folders",
+    "please find directory",
+    "please locate directory"
+  ],
+  "commonUserWording": [
+    "locate folders named node_modules",
+    "could you locate folders named node_modules",
+    "locate folders",
+    "find directory",
+    "locate directory"
+  ],
+  "commonMistakes": [],
+  "entityHints": {
+    "name": [
+      "test_value"
+    ]
+  },
+  "deviceNamingPatterns": [],
+  "commonAbbreviations": {},
+  "languageVariations": [
+    "locate folders named node_modules",
+    "locate folders",
+    "find directory",
+    "locate directory"
+  ],
+  "relatedTools": []
+}

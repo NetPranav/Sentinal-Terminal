@@ -1,0 +1,50 @@
+{
+  "id": "filesystem.disk_usage",
+  "version": "1.0.0",
+  "displayName": "Check Disk Capacity and Usage",
+  "description": "Queries available storage space and folder size usage statistics (df/du).",
+  "domain": "filesystem",
+  "category": "Filesystem",
+  "tags": [
+    "filesystem",
+    "disk_usage",
+    "filesystem.disk",
+    "usage",
+    "check",
+    "disk",
+    "capacity",
+    "and",
+    "folder",
+    "du"
+  ],
+  "aliases": [
+    "check disk usage",
+    "folder size",
+    "disk space available",
+    "du h"
+  ],
+  "supportedPlatforms": [
+    "macos",
+    "windows",
+    "linux"
+  ],
+  "requiredPermissions": [
+    "ReadFiles"
+  ],
+  "securityRisk": "SAFE",
+  "parameters": [],
+  "optionalParameters": [
+    {
+      "name": "path",
+      "type": "string",
+      "description": "Directory or mount path to analyze",
+      "required": false,
+      "default": "/"
+    }
+  ],
+  "estimatedExecutionTime": "1s",
+  "confirmationRequired": false,
+  "rollbackAvailable": false,
+  "verificationSupported": true,
+  "deprecationStatus": "stable"
+}

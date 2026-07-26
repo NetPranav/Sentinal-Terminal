@@ -1,0 +1,14 @@
+{
+  "toolId": "network.wifi.scan",
+  "examples": [
+    {
+      "input": "scan available wifi networks",
+      "expectedIntent": {
+        "domain": "network",
+        "action": "wifi.scan"
+      },
+      "expectedEntities": {},
+      "description": "Example execution of Scan Wi-Fi Networks"
+    }
+  ]
+}

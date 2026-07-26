@@ -1,0 +1,39 @@
+{
+  "toolId": "browser.navigate",
+  "aliases": [
+    "go to website",
+    "open url",
+    "navigate to",
+    "visit url"
+  ],
+  "synonyms": [
+    "please go to website",
+    "please open url",
+    "please navigate to",
+    "please visit url"
+  ],
+  "commonUserWording": [
+    "go to youtube.com",
+    "could you go to youtube.com",
+    "go to website",
+    "open url",
+    "navigate to",
+    "visit url"
+  ],
+  "commonMistakes": [],
+  "entityHints": {
+    "url": [
+      "test_value"
+    ]
+  },
+  "deviceNamingPatterns": [],
+  "commonAbbreviations": {},
+  "languageVariations": [
+    "go to youtube.com",
+    "go to website",
+    "open url",
+    "navigate to",
+    "visit url"
+  ],
+  "relatedTools": []
+}

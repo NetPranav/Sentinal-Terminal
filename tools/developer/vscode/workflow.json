@@ -1,0 +1,23 @@
+{
+  "toolId": "developer.vscode",
+  "version": "1.0.0",
+  "description": "Executes native driver for Open in Visual Studio Code.",
+  "steps": [
+    {
+      "id": "step_exec_main",
+      "name": "Execute Open in Visual Studio Code",
+      "type": "ExecuteCapability",
+      "capabilityId": "developer.vscode",
+      "parameters": {
+        "path": "{{path}}"
+      },
+      "dependencies": [],
+      "onError": "fail"
+    }
+  ],
+  "successCondition": "step:step_exec_main:success",
+  "errorHandling": {
+    "strategy": "fail_fast",
+    "maxRetries": 0
+  }
+}

@@ -1,0 +1,42 @@
+{
+  "toolId": "system.processes",
+  "aliases": [
+    "show running processes",
+    "top processes",
+    "list background tasks",
+    "activity monitor"
+  ],
+  "synonyms": [
+    "please show running processes",
+    "please top processes",
+    "please list background tasks",
+    "please activity monitor"
+  ],
+  "commonUserWording": [
+    "show top 10 processes by cpu usage",
+    "could you show top 10 processes by cpu usage",
+    "show running processes",
+    "top processes",
+    "list background tasks",
+    "activity monitor"
+  ],
+  "commonMistakes": [],
+  "entityHints": {
+    "sort": [
+      "test_value"
+    ],
+    "count": [
+      "test_value"
+    ]
+  },
+  "deviceNamingPatterns": [],
+  "commonAbbreviations": {},
+  "languageVariations": [
+    "show top 10 processes by cpu usage",
+    "show running processes",
+    "top processes",
+    "list background tasks",
+    "activity monitor"
+  ],
+  "relatedTools": []
+}

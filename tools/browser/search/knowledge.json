@@ -1,0 +1,42 @@
+{
+  "toolId": "browser.search",
+  "aliases": [
+    "search for",
+    "google for",
+    "find online",
+    "search web"
+  ],
+  "synonyms": [
+    "please search for",
+    "please google for",
+    "please find online",
+    "please search web"
+  ],
+  "commonUserWording": [
+    "search for AI tutorials on youtube",
+    "could you search for AI tutorials on youtube",
+    "search for",
+    "google for",
+    "find online",
+    "search web"
+  ],
+  "commonMistakes": [],
+  "entityHints": {
+    "query": [
+      "test_value"
+    ],
+    "engine": [
+      "test_value"
+    ]
+  },
+  "deviceNamingPatterns": [],
+  "commonAbbreviations": {},
+  "languageVariations": [
+    "search for AI tutorials on youtube",
+    "search for",
+    "google for",
+    "find online",
+    "search web"
+  ],
+  "relatedTools": []
+}

@@ -1,0 +1,39 @@
+{
+  "toolId": "application.uninstall",
+  "aliases": [
+    "uninstall app",
+    "remove package",
+    "brew uninstall",
+    "delete app program"
+  ],
+  "synonyms": [
+    "please uninstall app",
+    "please remove package",
+    "please brew uninstall",
+    "please delete app program"
+  ],
+  "commonUserWording": [
+    "uninstall package wget",
+    "could you uninstall package wget",
+    "uninstall app",
+    "remove package",
+    "brew uninstall",
+    "delete app program"
+  ],
+  "commonMistakes": [],
+  "entityHints": {
+    "package": [
+      "test_value"
+    ]
+  },
+  "deviceNamingPatterns": [],
+  "commonAbbreviations": {},
+  "languageVariations": [
+    "uninstall package wget",
+    "uninstall app",
+    "remove package",
+    "brew uninstall",
+    "delete app program"
+  ],
+  "relatedTools": []
+}

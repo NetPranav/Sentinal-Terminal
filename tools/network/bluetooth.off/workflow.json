@@ -1,0 +1,21 @@
+{
+  "toolId": "network.bluetooth.off",
+  "version": "1.0.0",
+  "description": "Executes native driver for Turn Bluetooth Off.",
+  "steps": [
+    {
+      "id": "step_exec_main",
+      "name": "Execute Turn Bluetooth Off",
+      "type": "ExecuteCapability",
+      "capabilityId": "network.bluetooth.off",
+      "parameters": {},
+      "dependencies": [],
+      "onError": "fail"
+    }
+  ],
+  "successCondition": "step:step_exec_main:success",
+  "errorHandling": {
+    "strategy": "fail_fast",
+    "maxRetries": 1
+  }
+}

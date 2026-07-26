@@ -1,0 +1,39 @@
+{
+  "toolId": "filesystem.trash",
+  "aliases": [
+    "move to trash",
+    "trash file",
+    "send to bin",
+    "delete to recycle bin"
+  ],
+  "synonyms": [
+    "please move to trash",
+    "please trash file",
+    "please send to bin",
+    "please delete to recycle bin"
+  ],
+  "commonUserWording": [
+    "trash file old_dump.sql",
+    "could you trash file old_dump.sql",
+    "move to trash",
+    "trash file",
+    "send to bin",
+    "delete to recycle bin"
+  ],
+  "commonMistakes": [],
+  "entityHints": {
+    "path": [
+      "/Users/shared/file.json"
+    ]
+  },
+  "deviceNamingPatterns": [],
+  "commonAbbreviations": {},
+  "languageVariations": [
+    "trash file old_dump.sql",
+    "move to trash",
+    "trash file",
+    "send to bin",
+    "delete to recycle bin"
+  ],
+  "relatedTools": []
+}

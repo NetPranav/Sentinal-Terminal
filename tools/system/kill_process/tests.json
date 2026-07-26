@@ -1,0 +1,18 @@
+{
+  "toolId": "system.kill_process",
+  "tests": [
+    {
+      "id": "system-kill_process-test-1",
+      "userRequest": "kill process node",
+      "expectedIntent": {
+        "domain": "system",
+        "action": "kill_process"
+      },
+      "expectedToolId": "system.kill_process",
+      "expectedEntities": {
+        "process": "sample_val"
+      },
+      "description": "Automated test case for Kill System Process"
+    }
+  ]
+}

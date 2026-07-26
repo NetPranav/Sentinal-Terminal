@@ -1,0 +1,56 @@
+{
+  "id": "filesystem.permissions",
+  "version": "1.0.0",
+  "displayName": "Inspect or Modify File Permissions",
+  "description": "Queries or updates Unix filesystem POSIX read/write/execute permissions (chmod/chown).",
+  "domain": "filesystem",
+  "category": "Filesystem",
+  "tags": [
+    "filesystem",
+    "permissions",
+    "filesystem.permissions",
+    "inspect",
+    "or",
+    "modify",
+    "file",
+    "change",
+    "chmod",
+    "chown"
+  ],
+  "aliases": [
+    "change permissions",
+    "chmod",
+    "chown",
+    "file permissions"
+  ],
+  "supportedPlatforms": [
+    "macos",
+    "windows",
+    "linux"
+  ],
+  "requiredPermissions": [
+    "ReadFiles"
+  ],
+  "securityRisk": "MEDIUM",
+  "parameters": [
+    {
+      "name": "path",
+      "type": "string",
+      "description": "Target file or directory path",
+      "required": true
+    }
+  ],
+  "optionalParameters": [
+    {
+      "name": "mode",
+      "type": "string",
+      "description": "Octal or symbol mode e.g. 755 or +x",
+      "required": false
+    }
+  ],
+  "estimatedExecutionTime": "2s",
+  "confirmationRequired": false,
+  "rollbackAvailable": false,
+  "verificationSupported": true,
+  "deprecationStatus": "stable"
+}

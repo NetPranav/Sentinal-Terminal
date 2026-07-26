@@ -1,0 +1,46 @@
+{
+  "id": "developer.terminal",
+  "version": "1.0.0",
+  "displayName": "Launch Standalone Terminal",
+  "description": "Spawns a new native GUI Terminal emulator window (Terminal.app, iTerm2, Alacritty) at path.",
+  "domain": "developer",
+  "category": "Developer",
+  "tags": [
+    "developer",
+    "terminal",
+    "developer.terminal",
+    "launch",
+    "standalone",
+    "open",
+    "new"
+  ],
+  "aliases": [
+    "open terminal window",
+    "new terminal here",
+    "launch terminal at folder"
+  ],
+  "supportedPlatforms": [
+    "macos",
+    "windows",
+    "linux"
+  ],
+  "requiredPermissions": [
+    "ShellExecution"
+  ],
+  "securityRisk": "SAFE",
+  "parameters": [],
+  "optionalParameters": [
+    {
+      "name": "path",
+      "type": "string",
+      "description": "Starting working directory path for new terminal",
+      "required": false,
+      "default": "."
+    }
+  ],
+  "estimatedExecutionTime": "1s",
+  "confirmationRequired": false,
+  "rollbackAvailable": false,
+  "verificationSupported": true,
+  "deprecationStatus": "stable"
+}

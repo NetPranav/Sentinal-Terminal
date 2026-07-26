@@ -1,0 +1,40 @@
+{
+  "id": "system.temperature",
+  "version": "1.0.0",
+  "displayName": "Check Thermal Sensors",
+  "description": "Queries CPU core thermal diode and fan cooling subsystem temperature metrics.",
+  "domain": "system",
+  "category": "System",
+  "tags": [
+    "system",
+    "temperature",
+    "system.temperature",
+    "check",
+    "thermal",
+    "sensors",
+    "cpu",
+    "is"
+  ],
+  "aliases": [
+    "check computer temperature",
+    "cpu temp",
+    "thermal sensors",
+    "is computer running hot"
+  ],
+  "supportedPlatforms": [
+    "macos",
+    "windows",
+    "linux"
+  ],
+  "requiredPermissions": [
+    "ShellExecution"
+  ],
+  "securityRisk": "SAFE",
+  "parameters": [],
+  "optionalParameters": [],
+  "estimatedExecutionTime": "1s",
+  "confirmationRequired": false,
+  "rollbackAvailable": false,
+  "verificationSupported": true,
+  "deprecationStatus": "stable"
+}

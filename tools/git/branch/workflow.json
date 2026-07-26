@@ -1,0 +1,24 @@
+{
+  "toolId": "git.branch",
+  "version": "1.0.0",
+  "description": "Executes native driver for Manage Git Branches.",
+  "steps": [
+    {
+      "id": "step_exec_main",
+      "name": "Execute Manage Git Branches",
+      "type": "ExecuteCapability",
+      "capabilityId": "git.branch",
+      "parameters": {
+        "operation": "{{operation}}",
+        "name": "{{name}}"
+      },
+      "dependencies": [],
+      "onError": "fail"
+    }
+  ],
+  "successCondition": "step:step_exec_main:success",
+  "errorHandling": {
+    "strategy": "fail_fast",
+    "maxRetries": 0
+  }
+}

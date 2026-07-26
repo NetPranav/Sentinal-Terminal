@@ -1,0 +1,16 @@
+{
+  "toolId": "node.yarn",
+  "examples": [
+    {
+      "input": "yarn install packages",
+      "expectedIntent": {
+        "domain": "node",
+        "action": "yarn"
+      },
+      "expectedEntities": {
+        "command": "sample_val"
+      },
+      "description": "Example execution of Manage Packages with Yarn"
+    }
+  ]
+}

@@ -1,0 +1,35 @@
+{
+  "toolId": "filesystem.locate_files",
+  "aliases": [
+    "locate files",
+    "find files across system",
+    "where is file"
+  ],
+  "synonyms": [
+    "please locate files",
+    "please find files across system",
+    "please where is file"
+  ],
+  "commonUserWording": [
+    "locate files named id_rsa",
+    "could you locate files named id_rsa",
+    "locate files",
+    "find files across system",
+    "where is file"
+  ],
+  "commonMistakes": [],
+  "entityHints": {
+    "name": [
+      "test_value"
+    ]
+  },
+  "deviceNamingPatterns": [],
+  "commonAbbreviations": {},
+  "languageVariations": [
+    "locate files named id_rsa",
+    "locate files",
+    "find files across system",
+    "where is file"
+  ],
+  "relatedTools": []
+}

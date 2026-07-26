@@ -1,0 +1,38 @@
+{
+  "toolId": "docker.compose_up",
+  "aliases": [
+    "docker compose up",
+    "start docker stack",
+    "compose up"
+  ],
+  "synonyms": [
+    "please docker compose up",
+    "please start docker stack",
+    "please compose up"
+  ],
+  "commonUserWording": [
+    "start docker compose up detached",
+    "could you start docker compose up detached",
+    "docker compose up",
+    "start docker stack",
+    "compose up"
+  ],
+  "commonMistakes": [],
+  "entityHints": {
+    "detach": [
+      "test_value"
+    ],
+    "file": [
+      "test_value"
+    ]
+  },
+  "deviceNamingPatterns": [],
+  "commonAbbreviations": {},
+  "languageVariations": [
+    "start docker compose up detached",
+    "docker compose up",
+    "start docker stack",
+    "compose up"
+  ],
+  "relatedTools": []
+}

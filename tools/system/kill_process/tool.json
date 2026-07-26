@@ -1,0 +1,55 @@
+{
+  "id": "system.kill_process",
+  "version": "1.0.0",
+  "displayName": "Kill System Process",
+  "description": "Terminates an active system process or background task by process name or PID.",
+  "domain": "system",
+  "category": "System",
+  "tags": [
+    "system",
+    "kill_process",
+    "system.kill",
+    "process",
+    "kill",
+    "terminate",
+    "stop",
+    "end",
+    "killall",
+    "pkill",
+    "force"
+  ],
+  "aliases": [
+    "kill process",
+    "kill any process",
+    "terminate process",
+    "stop process",
+    "end task",
+    "killall",
+    "pkill",
+    "force kill",
+    "kill"
+  ],
+  "supportedPlatforms": [
+    "macos",
+    "windows",
+    "linux"
+  ],
+  "requiredPermissions": [
+    "ShellExecution"
+  ],
+  "securityRisk": "HIGH",
+  "parameters": [
+    {
+      "name": "process",
+      "type": "string",
+      "description": "Process name or PID to terminate",
+      "required": true
+    }
+  ],
+  "optionalParameters": [],
+  "estimatedExecutionTime": "2s",
+  "confirmationRequired": true,
+  "rollbackAvailable": false,
+  "verificationSupported": true,
+  "deprecationStatus": "stable"
+}

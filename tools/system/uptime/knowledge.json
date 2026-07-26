@@ -1,0 +1,31 @@
+{
+  "toolId": "system.uptime",
+  "aliases": [
+    "system uptime",
+    "how long has computer been running",
+    "check boot duration"
+  ],
+  "synonyms": [
+    "please system uptime",
+    "please how long has computer been running",
+    "please check boot duration"
+  ],
+  "commonUserWording": [
+    "check system uptime",
+    "could you check system uptime",
+    "system uptime",
+    "how long has computer been running",
+    "check boot duration"
+  ],
+  "commonMistakes": [],
+  "entityHints": {},
+  "deviceNamingPatterns": [],
+  "commonAbbreviations": {},
+  "languageVariations": [
+    "check system uptime",
+    "system uptime",
+    "how long has computer been running",
+    "check boot duration"
+  ],
+  "relatedTools": []
+}

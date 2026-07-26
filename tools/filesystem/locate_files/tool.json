@@ -1,0 +1,46 @@
+{
+  "id": "filesystem.locate_files",
+  "version": "1.0.0",
+  "displayName": "Locate Specific Files",
+  "description": "Fast file location lookup across the OS filesystem by filename.",
+  "domain": "filesystem",
+  "category": "Filesystem",
+  "tags": [
+    "filesystem",
+    "locate_files",
+    "filesystem.locate",
+    "files",
+    "locate",
+    "specific",
+    "find",
+    "where"
+  ],
+  "aliases": [
+    "locate files",
+    "find files across system",
+    "where is file"
+  ],
+  "supportedPlatforms": [
+    "macos",
+    "windows",
+    "linux"
+  ],
+  "requiredPermissions": [
+    "ReadFiles"
+  ],
+  "securityRisk": "SAFE",
+  "parameters": [
+    {
+      "name": "name",
+      "type": "string",
+      "description": "Target filename or substring",
+      "required": true
+    }
+  ],
+  "optionalParameters": [],
+  "estimatedExecutionTime": "1s",
+  "confirmationRequired": false,
+  "rollbackAvailable": false,
+  "verificationSupported": true,
+  "deprecationStatus": "stable"
+}

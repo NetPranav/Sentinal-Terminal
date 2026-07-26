@@ -1,0 +1,14 @@
+{
+  "toolId": "system.storage",
+  "examples": [
+    {
+      "input": "check storage drives and health",
+      "expectedIntent": {
+        "domain": "system",
+        "action": "storage"
+      },
+      "expectedEntities": {},
+      "description": "Example execution of Inspect Storage Health & Volumes"
+    }
+  ]
+}

@@ -1,0 +1,35 @@
+{
+  "toolId": "filesystem.duplicate",
+  "aliases": [
+    "duplicate file",
+    "clone file locally",
+    "make copy of"
+  ],
+  "synonyms": [
+    "please duplicate file",
+    "please clone file locally",
+    "please make copy of"
+  ],
+  "commonUserWording": [
+    "duplicate config.json",
+    "could you duplicate config.json",
+    "duplicate file",
+    "clone file locally",
+    "make copy of"
+  ],
+  "commonMistakes": [],
+  "entityHints": {
+    "path": [
+      "/Users/shared/file.json"
+    ]
+  },
+  "deviceNamingPatterns": [],
+  "commonAbbreviations": {},
+  "languageVariations": [
+    "duplicate config.json",
+    "duplicate file",
+    "clone file locally",
+    "make copy of"
+  ],
+  "relatedTools": []
+}

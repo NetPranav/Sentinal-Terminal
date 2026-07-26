@@ -1,0 +1,55 @@
+{
+  "id": "filesystem.extract",
+  "version": "1.0.0",
+  "displayName": "Extract Archive File",
+  "description": "Extracts contents from a zip, tar, or compressed archive file into target directory.",
+  "domain": "filesystem",
+  "category": "Filesystem",
+  "tags": [
+    "filesystem",
+    "extract",
+    "filesystem.extract",
+    "archive",
+    "file",
+    "unzip",
+    "untar",
+    "decompress"
+  ],
+  "aliases": [
+    "unzip file",
+    "extract archive",
+    "untar file",
+    "decompress archive"
+  ],
+  "supportedPlatforms": [
+    "macos",
+    "windows",
+    "linux"
+  ],
+  "requiredPermissions": [
+    "ReadFiles"
+  ],
+  "securityRisk": "LOW",
+  "parameters": [
+    {
+      "name": "archivePath",
+      "type": "string",
+      "description": "Path to zip/tar archive file",
+      "required": true
+    }
+  ],
+  "optionalParameters": [
+    {
+      "name": "destination",
+      "type": "string",
+      "description": "Target directory for extracted files",
+      "required": false,
+      "default": "."
+    }
+  ],
+  "estimatedExecutionTime": "2s",
+  "confirmationRequired": false,
+  "rollbackAvailable": false,
+  "verificationSupported": true,
+  "deprecationStatus": "stable"
+}

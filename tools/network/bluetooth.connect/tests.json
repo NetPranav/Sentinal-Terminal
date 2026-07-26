@@ -1,0 +1,18 @@
+{
+  "toolId": "network.bluetooth.connect",
+  "tests": [
+    {
+      "id": "network-bluetooth.connect-test-1",
+      "userRequest": "connect bluetooth device AirPods Pro",
+      "expectedIntent": {
+        "domain": "network",
+        "action": "bluetooth.connect"
+      },
+      "expectedToolId": "network.bluetooth.connect",
+      "expectedEntities": {
+        "device": "sample_val"
+      },
+      "description": "Automated test case for Connect to Bluetooth Device"
+    }
+  ]
+}

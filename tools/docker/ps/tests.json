@@ -1,0 +1,16 @@
+{
+  "toolId": "docker.ps",
+  "tests": [
+    {
+      "id": "docker-ps-test-1",
+      "userRequest": "list running docker containers",
+      "expectedIntent": {
+        "domain": "docker",
+        "action": "ps"
+      },
+      "expectedToolId": "docker.ps",
+      "expectedEntities": {},
+      "description": "Automated test case for List Running Docker Containers"
+    }
+  ]
+}

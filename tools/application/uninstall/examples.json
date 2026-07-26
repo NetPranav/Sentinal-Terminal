@@ -1,0 +1,16 @@
+{
+  "toolId": "application.uninstall",
+  "examples": [
+    {
+      "input": "uninstall package wget",
+      "expectedIntent": {
+        "domain": "application",
+        "action": "uninstall"
+      },
+      "expectedEntities": {
+        "package": "sample_val"
+      },
+      "description": "Example execution of Uninstall Desktop Application"
+    }
+  ]
+}

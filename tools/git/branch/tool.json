@@ -1,0 +1,52 @@
+{
+  "id": "git.branch",
+  "version": "1.0.0",
+  "displayName": "Manage Git Branches",
+  "description": "Lists existing branches, creates new branch, or deletes branch.",
+  "domain": "git",
+  "category": "Git",
+  "tags": [
+    "git",
+    "branch",
+    "git.branch",
+    "manage",
+    "branches",
+    "list",
+    "show"
+  ],
+  "aliases": [
+    "git branch",
+    "list branches",
+    "show git branches"
+  ],
+  "supportedPlatforms": [
+    "macos",
+    "windows",
+    "linux"
+  ],
+  "requiredPermissions": [
+    "ShellExecution"
+  ],
+  "securityRisk": "LOW",
+  "parameters": [],
+  "optionalParameters": [
+    {
+      "name": "operation",
+      "type": "string",
+      "description": "Branch action: list, create, or delete",
+      "required": false,
+      "default": "list"
+    },
+    {
+      "name": "name",
+      "type": "string",
+      "description": "Target branch name for create or delete",
+      "required": false
+    }
+  ],
+  "estimatedExecutionTime": "2s",
+  "confirmationRequired": false,
+  "rollbackAvailable": false,
+  "verificationSupported": true,
+  "deprecationStatus": "stable"
+}

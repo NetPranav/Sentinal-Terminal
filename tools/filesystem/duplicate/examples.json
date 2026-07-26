@@ -1,0 +1,16 @@
+{
+  "toolId": "filesystem.duplicate",
+  "examples": [
+    {
+      "input": "duplicate config.json",
+      "expectedIntent": {
+        "domain": "filesystem",
+        "action": "duplicate"
+      },
+      "expectedEntities": {
+        "path": "/test/path.txt"
+      },
+      "description": "Example execution of Duplicate File or Directory"
+    }
+  ]
+}

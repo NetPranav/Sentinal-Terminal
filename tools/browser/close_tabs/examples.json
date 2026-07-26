@@ -1,0 +1,14 @@
+{
+  "toolId": "browser.close_tabs",
+  "examples": [
+    {
+      "input": "close current browser tab",
+      "expectedIntent": {
+        "domain": "browser",
+        "action": "close_tabs"
+      },
+      "expectedEntities": {},
+      "description": "Example execution of Close Browser Tabs"
+    }
+  ]
+}

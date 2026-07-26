@@ -1,0 +1,35 @@
+{
+  "toolId": "browser.bookmarks",
+  "aliases": [
+    "show bookmarks",
+    "find bookmark",
+    "browser favorites"
+  ],
+  "synonyms": [
+    "please show bookmarks",
+    "please find bookmark",
+    "please browser favorites"
+  ],
+  "commonUserWording": [
+    "show bookmarks for sentinel",
+    "could you show bookmarks for sentinel",
+    "show bookmarks",
+    "find bookmark",
+    "browser favorites"
+  ],
+  "commonMistakes": [],
+  "entityHints": {
+    "filter": [
+      "test_value"
+    ]
+  },
+  "deviceNamingPatterns": [],
+  "commonAbbreviations": {},
+  "languageVariations": [
+    "show bookmarks for sentinel",
+    "show bookmarks",
+    "find bookmark",
+    "browser favorites"
+  ],
+  "relatedTools": []
+}

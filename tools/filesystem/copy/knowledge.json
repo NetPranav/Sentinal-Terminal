@@ -1,0 +1,38 @@
+{
+  "toolId": "filesystem.copy",
+  "aliases": [
+    "copy file",
+    "duplicate file",
+    "cp file"
+  ],
+  "synonyms": [
+    "please copy file",
+    "please duplicate file",
+    "please cp file"
+  ],
+  "commonUserWording": [
+    "copy config.json to config.bak",
+    "could you copy config.json to config.bak",
+    "copy file",
+    "duplicate file",
+    "cp file"
+  ],
+  "commonMistakes": [],
+  "entityHints": {
+    "source": [
+      "test_value"
+    ],
+    "destination": [
+      "test_value"
+    ]
+  },
+  "deviceNamingPatterns": [],
+  "commonAbbreviations": {},
+  "languageVariations": [
+    "copy config.json to config.bak",
+    "copy file",
+    "duplicate file",
+    "cp file"
+  ],
+  "relatedTools": []
+}

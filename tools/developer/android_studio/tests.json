@@ -1,0 +1,16 @@
+{
+  "toolId": "developer.android_studio",
+  "tests": [
+    {
+      "id": "developer-android_studio-test-1",
+      "userRequest": "open mobile project in android studio",
+      "expectedIntent": {
+        "domain": "developer",
+        "action": "android_studio"
+      },
+      "expectedToolId": "developer.android_studio",
+      "expectedEntities": {},
+      "description": "Automated test case for Open in Android Studio"
+    }
+  ]
+}

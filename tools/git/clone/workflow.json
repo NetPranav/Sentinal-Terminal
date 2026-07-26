@@ -1,0 +1,24 @@
+{
+  "toolId": "git.clone",
+  "version": "1.0.0",
+  "description": "Executes native driver for Clone Git Repository.",
+  "steps": [
+    {
+      "id": "step_exec_main",
+      "name": "Execute Clone Git Repository",
+      "type": "ExecuteCapability",
+      "capabilityId": "git.clone",
+      "parameters": {
+        "url": "{{url}}",
+        "directory": "{{directory}}"
+      },
+      "dependencies": [],
+      "onError": "fail"
+    }
+  ],
+  "successCondition": "step:step_exec_main:success",
+  "errorHandling": {
+    "strategy": "fail_fast",
+    "maxRetries": 0
+  }
+}

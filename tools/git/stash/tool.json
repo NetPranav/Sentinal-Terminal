@@ -1,0 +1,45 @@
+{
+  "id": "git.stash",
+  "version": "1.0.0",
+  "displayName": "Stash Workspace Modifications",
+  "description": "Stashes uncommitted modified files or applies recently stored stash.",
+  "domain": "git",
+  "category": "Git",
+  "tags": [
+    "git",
+    "stash",
+    "git.stash",
+    "workspace",
+    "modifications",
+    "pop"
+  ],
+  "aliases": [
+    "git stash",
+    "stash changes",
+    "pop git stash"
+  ],
+  "supportedPlatforms": [
+    "macos",
+    "windows",
+    "linux"
+  ],
+  "requiredPermissions": [
+    "ShellExecution"
+  ],
+  "securityRisk": "LOW",
+  "parameters": [],
+  "optionalParameters": [
+    {
+      "name": "operation",
+      "type": "string",
+      "description": "Stash operation: save, pop, list, or clear",
+      "required": false,
+      "default": "save"
+    }
+  ],
+  "estimatedExecutionTime": "2s",
+  "confirmationRequired": false,
+  "rollbackAvailable": false,
+  "verificationSupported": true,
+  "deprecationStatus": "stable"
+}

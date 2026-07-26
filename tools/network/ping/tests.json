@@ -1,0 +1,18 @@
+{
+  "toolId": "network.ping",
+  "tests": [
+    {
+      "id": "network-ping-test-1",
+      "userRequest": "ping host google.com",
+      "expectedIntent": {
+        "domain": "network",
+        "action": "ping"
+      },
+      "expectedToolId": "network.ping",
+      "expectedEntities": {
+        "host": "sample_val"
+      },
+      "description": "Automated test case for Ping Network Host"
+    }
+  ]
+}

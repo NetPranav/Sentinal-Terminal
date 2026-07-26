@@ -1,0 +1,16 @@
+{
+  "toolId": "python.run_script",
+  "examples": [
+    {
+      "input": "run python script generate_data.py",
+      "expectedIntent": {
+        "domain": "python",
+        "action": "run_script"
+      },
+      "expectedEntities": {
+        "script": "sample_val"
+      },
+      "description": "Example execution of Execute Python Script"
+    }
+  ]
+}

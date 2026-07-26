@@ -1,0 +1,14 @@
+{
+  "toolId": "network.bluetooth.off",
+  "examples": [
+    {
+      "input": "turn bluetooth off",
+      "expectedIntent": {
+        "domain": "network",
+        "action": "bluetooth.off"
+      },
+      "expectedEntities": {},
+      "description": "Example execution of Turn Bluetooth Off"
+    }
+  ]
+}

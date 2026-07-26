@@ -1,0 +1,50 @@
+{
+  "id": "git.clone",
+  "version": "1.0.0",
+  "displayName": "Clone Git Repository",
+  "description": "Closes remote Git repository URL into local workspace directory.",
+  "domain": "git",
+  "category": "Git",
+  "tags": [
+    "git",
+    "clone",
+    "git.clone",
+    "repository",
+    "download"
+  ],
+  "aliases": [
+    "git clone",
+    "clone repository",
+    "download repo"
+  ],
+  "supportedPlatforms": [
+    "macos",
+    "windows",
+    "linux"
+  ],
+  "requiredPermissions": [
+    "ShellExecution"
+  ],
+  "securityRisk": "LOW",
+  "parameters": [
+    {
+      "name": "url",
+      "type": "string",
+      "description": "Repository Git URL",
+      "required": true
+    }
+  ],
+  "optionalParameters": [
+    {
+      "name": "directory",
+      "type": "string",
+      "description": "Target local directory path",
+      "required": false
+    }
+  ],
+  "estimatedExecutionTime": "2s",
+  "confirmationRequired": false,
+  "rollbackAvailable": false,
+  "verificationSupported": true,
+  "deprecationStatus": "stable"
+}

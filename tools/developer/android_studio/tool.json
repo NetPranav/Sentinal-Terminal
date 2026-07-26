@@ -1,0 +1,47 @@
+{
+  "id": "developer.android_studio",
+  "version": "1.0.0",
+  "displayName": "Open in Android Studio",
+  "description": "Launches Google Android Studio IDE environment on target Android workspace.",
+  "domain": "developer",
+  "category": "Developer",
+  "tags": [
+    "developer",
+    "android_studio",
+    "developer.android",
+    "studio",
+    "open",
+    "in",
+    "android",
+    "launch"
+  ],
+  "aliases": [
+    "open in android studio",
+    "launch android studio",
+    "open android project"
+  ],
+  "supportedPlatforms": [
+    "macos",
+    "windows",
+    "linux"
+  ],
+  "requiredPermissions": [
+    "ShellExecution"
+  ],
+  "securityRisk": "SAFE",
+  "parameters": [],
+  "optionalParameters": [
+    {
+      "name": "path",
+      "type": "string",
+      "description": "Android project directory path",
+      "required": false,
+      "default": "."
+    }
+  ],
+  "estimatedExecutionTime": "1s",
+  "confirmationRequired": false,
+  "rollbackAvailable": false,
+  "verificationSupported": true,
+  "deprecationStatus": "stable"
+}

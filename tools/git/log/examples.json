@@ -1,0 +1,14 @@
+{
+  "toolId": "git.log",
+  "examples": [
+    {
+      "input": "show git log for last 10 commits",
+      "expectedIntent": {
+        "domain": "git",
+        "action": "log"
+      },
+      "expectedEntities": {},
+      "description": "Example execution of Inspect Git Commit History"
+    }
+  ]
+}

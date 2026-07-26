@@ -1,0 +1,52 @@
+{
+  "id": "docker.exec",
+  "version": "1.0.0",
+  "displayName": "Execute Command inside Container",
+  "description": "Executes an interactive shell command or instruction inside a running Docker container.",
+  "domain": "docker",
+  "category": "Docker",
+  "tags": [
+    "docker",
+    "exec",
+    "docker.exec",
+    "execute",
+    "command",
+    "inside",
+    "container",
+    "run"
+  ],
+  "aliases": [
+    "docker exec",
+    "run in container",
+    "exec into container"
+  ],
+  "supportedPlatforms": [
+    "macos",
+    "windows",
+    "linux"
+  ],
+  "requiredPermissions": [
+    "ShellExecution"
+  ],
+  "securityRisk": "MEDIUM",
+  "parameters": [
+    {
+      "name": "container",
+      "type": "string",
+      "description": "Target container ID or name",
+      "required": true
+    },
+    {
+      "name": "command",
+      "type": "string",
+      "description": "Shell command string to run inside container",
+      "required": true
+    }
+  ],
+  "optionalParameters": [],
+  "estimatedExecutionTime": "2s",
+  "confirmationRequired": false,
+  "rollbackAvailable": false,
+  "verificationSupported": true,
+  "deprecationStatus": "stable"
+}

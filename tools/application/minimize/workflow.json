@@ -1,0 +1,23 @@
+{
+  "toolId": "application.minimize",
+  "version": "1.0.0",
+  "description": "Executes native driver for Minimize Application Window.",
+  "steps": [
+    {
+      "id": "step_exec_main",
+      "name": "Execute Minimize Application Window",
+      "type": "ExecuteCapability",
+      "capabilityId": "application.minimize",
+      "parameters": {
+        "app": "{{app}}"
+      },
+      "dependencies": [],
+      "onError": "fail"
+    }
+  ],
+  "successCondition": "step:step_exec_main:success",
+  "errorHandling": {
+    "strategy": "fail_fast",
+    "maxRetries": 0
+  }
+}

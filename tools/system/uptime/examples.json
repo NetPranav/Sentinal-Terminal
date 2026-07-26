@@ -1,0 +1,14 @@
+{
+  "toolId": "system.uptime",
+  "examples": [
+    {
+      "input": "check system uptime",
+      "expectedIntent": {
+        "domain": "system",
+        "action": "uptime"
+      },
+      "expectedEntities": {},
+      "description": "Example execution of Query System Uptime Duration"
+    }
+  ]
+}

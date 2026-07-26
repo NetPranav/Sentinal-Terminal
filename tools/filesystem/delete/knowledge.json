@@ -1,0 +1,39 @@
+{
+  "toolId": "filesystem.delete",
+  "aliases": [
+    "delete file",
+    "remove file",
+    "rm file",
+    "delete folder"
+  ],
+  "synonyms": [
+    "please delete file",
+    "please remove file",
+    "please rm file",
+    "please delete folder"
+  ],
+  "commonUserWording": [
+    "delete file temp.log",
+    "could you delete file temp.log",
+    "delete file",
+    "remove file",
+    "rm file",
+    "delete folder"
+  ],
+  "commonMistakes": [],
+  "entityHints": {
+    "path": [
+      "/Users/shared/file.json"
+    ]
+  },
+  "deviceNamingPatterns": [],
+  "commonAbbreviations": {},
+  "languageVariations": [
+    "delete file temp.log",
+    "delete file",
+    "remove file",
+    "rm file",
+    "delete folder"
+  ],
+  "relatedTools": []
+}

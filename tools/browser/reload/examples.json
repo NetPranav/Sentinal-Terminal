@@ -1,0 +1,14 @@
+{
+  "toolId": "browser.reload",
+  "examples": [
+    {
+      "input": "refresh browser tab",
+      "expectedIntent": {
+        "domain": "browser",
+        "action": "reload"
+      },
+      "expectedEntities": {},
+      "description": "Example execution of Reload Active Browser Tab"
+    }
+  ]
+}

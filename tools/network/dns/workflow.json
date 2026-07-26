@@ -1,0 +1,24 @@
+{
+  "toolId": "network.dns",
+  "version": "1.0.0",
+  "description": "Executes native driver for Query DNS Domain Records.",
+  "steps": [
+    {
+      "id": "step_exec_main",
+      "name": "Execute Query DNS Domain Records",
+      "type": "ExecuteCapability",
+      "capabilityId": "network.dns",
+      "parameters": {
+        "domain": "{{domain}}",
+        "recordType": "{{recordType}}"
+      },
+      "dependencies": [],
+      "onError": "fail"
+    }
+  ],
+  "successCondition": "step:step_exec_main:success",
+  "errorHandling": {
+    "strategy": "fail_fast",
+    "maxRetries": 1
+  }
+}

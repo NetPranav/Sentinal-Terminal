@@ -1,0 +1,16 @@
+{
+  "toolId": "system.battery",
+  "tests": [
+    {
+      "id": "system-battery-test-1",
+      "userRequest": "check battery status",
+      "expectedIntent": {
+        "domain": "system",
+        "action": "battery"
+      },
+      "expectedToolId": "system.battery",
+      "expectedEntities": {},
+      "description": "Automated test case for Check Battery Level & Power Status"
+    }
+  ]
+}

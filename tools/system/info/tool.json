@@ -1,0 +1,47 @@
+{
+  "id": "system.info",
+  "version": "1.0.0",
+  "displayName": "Get System Diagnostic Info",
+  "description": "Retrieves OS platform, kernel version, machine architecture, computer specs and uptime metrics.",
+  "domain": "system",
+  "category": "System",
+  "tags": [
+    "system",
+    "info",
+    "system.info",
+    "get",
+    "diagnostic",
+    "show",
+    "machine",
+    "uname",
+    "sysinfo",
+    "what",
+    "computer"
+  ],
+  "aliases": [
+    "system info",
+    "show os version",
+    "machine diagnostics",
+    "uname status",
+    "sysinfo",
+    "what are my computer specs?",
+    "what are my computer specs",
+    "computer specs"
+  ],
+  "supportedPlatforms": [
+    "macos",
+    "windows",
+    "linux"
+  ],
+  "requiredPermissions": [
+    "ShellExecution"
+  ],
+  "securityRisk": "SAFE",
+  "parameters": [],
+  "optionalParameters": [],
+  "estimatedExecutionTime": "1s",
+  "confirmationRequired": false,
+  "rollbackAvailable": false,
+  "verificationSupported": true,
+  "deprecationStatus": "stable"
+}

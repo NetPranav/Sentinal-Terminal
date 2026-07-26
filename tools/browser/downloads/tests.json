@@ -1,0 +1,16 @@
+{
+  "toolId": "browser.downloads",
+  "tests": [
+    {
+      "id": "browser-downloads-test-1",
+      "userRequest": "show 5 recent browser downloads",
+      "expectedIntent": {
+        "domain": "browser",
+        "action": "downloads"
+      },
+      "expectedToolId": "browser.downloads",
+      "expectedEntities": {},
+      "description": "Automated test case for Check Browser Downloads"
+    }
+  ]
+}

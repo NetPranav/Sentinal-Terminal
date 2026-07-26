@@ -1,0 +1,16 @@
+{
+  "toolId": "node.pnpm",
+  "examples": [
+    {
+      "input": "pnpm install dependencies",
+      "expectedIntent": {
+        "domain": "node",
+        "action": "pnpm"
+      },
+      "expectedEntities": {
+        "command": "sample_val"
+      },
+      "description": "Example execution of Run PNPM Operation"
+    }
+  ]
+}

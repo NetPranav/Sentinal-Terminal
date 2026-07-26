@@ -1,0 +1,16 @@
+{
+  "toolId": "filesystem.trash",
+  "examples": [
+    {
+      "input": "trash file old_dump.sql",
+      "expectedIntent": {
+        "domain": "filesystem",
+        "action": "trash"
+      },
+      "expectedEntities": {
+        "path": "/test/path.txt"
+      },
+      "description": "Example execution of Move to System Trash"
+    }
+  ]
+}

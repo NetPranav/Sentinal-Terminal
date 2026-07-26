@@ -1,0 +1,24 @@
+{
+  "toolId": "filesystem.move",
+  "version": "1.0.0",
+  "description": "Executes native driver for Move File or Directory.",
+  "steps": [
+    {
+      "id": "step_exec_main",
+      "name": "Execute Move File or Directory",
+      "type": "ExecuteCapability",
+      "capabilityId": "filesystem.move",
+      "parameters": {
+        "source": "{{source}}",
+        "destination": "{{destination}}"
+      },
+      "dependencies": [],
+      "onError": "fail"
+    }
+  ],
+  "successCondition": "step:step_exec_main:success",
+  "errorHandling": {
+    "strategy": "fail_fast",
+    "maxRetries": 0
+  }
+}

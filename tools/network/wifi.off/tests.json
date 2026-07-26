@@ -1,0 +1,16 @@
+{
+  "toolId": "network.wifi.off",
+  "tests": [
+    {
+      "id": "network-wifi.off-test-1",
+      "userRequest": "turn the wifi off",
+      "expectedIntent": {
+        "domain": "network",
+        "action": "wifi.off"
+      },
+      "expectedToolId": "network.wifi.off",
+      "expectedEntities": {},
+      "description": "Automated test case for Turn Wi-Fi Off"
+    }
+  ]
+}

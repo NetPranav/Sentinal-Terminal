@@ -1,0 +1,23 @@
+{
+  "toolId": "docker.ps",
+  "version": "1.0.0",
+  "description": "Executes native driver for List Running Docker Containers.",
+  "steps": [
+    {
+      "id": "step_exec_main",
+      "name": "Execute List Running Docker Containers",
+      "type": "ExecuteCapability",
+      "capabilityId": "docker.ps",
+      "parameters": {
+        "all": "{{all}}"
+      },
+      "dependencies": [],
+      "onError": "fail"
+    }
+  ],
+  "successCondition": "step:step_exec_main:success",
+  "errorHandling": {
+    "strategy": "fail_fast",
+    "maxRetries": 0
+  }
+}

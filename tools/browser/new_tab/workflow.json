@@ -1,0 +1,23 @@
+{
+  "toolId": "browser.new_tab",
+  "version": "1.0.0",
+  "description": "Executes native driver for Open New Browser Tab.",
+  "steps": [
+    {
+      "id": "step_exec_main",
+      "name": "Execute Open New Browser Tab",
+      "type": "ExecuteCapability",
+      "capabilityId": "browser.new_tab",
+      "parameters": {
+        "url": "{{url}}"
+      },
+      "dependencies": [],
+      "onError": "fail"
+    }
+  ],
+  "successCondition": "step:step_exec_main:success",
+  "errorHandling": {
+    "strategy": "fail_fast",
+    "maxRetries": 0
+  }
+}

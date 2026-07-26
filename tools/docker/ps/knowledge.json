@@ -1,0 +1,35 @@
+{
+  "toolId": "docker.ps",
+  "aliases": [
+    "docker ps",
+    "list docker containers",
+    "show running containers"
+  ],
+  "synonyms": [
+    "please docker ps",
+    "please list docker containers",
+    "please show running containers"
+  ],
+  "commonUserWording": [
+    "list running docker containers",
+    "could you list running docker containers",
+    "docker ps",
+    "list docker containers",
+    "show running containers"
+  ],
+  "commonMistakes": [],
+  "entityHints": {
+    "all": [
+      "test_value"
+    ]
+  },
+  "deviceNamingPatterns": [],
+  "commonAbbreviations": {},
+  "languageVariations": [
+    "list running docker containers",
+    "docker ps",
+    "list docker containers",
+    "show running containers"
+  ],
+  "relatedTools": []
+}

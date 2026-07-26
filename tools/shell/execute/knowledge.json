@@ -1,0 +1,42 @@
+{
+  "toolId": "shell.execute",
+  "aliases": [
+    "run command",
+    "execute shell",
+    "terminal exec",
+    "bash command"
+  ],
+  "synonyms": [
+    "please run command",
+    "please execute shell",
+    "please terminal exec",
+    "please bash command"
+  ],
+  "commonUserWording": [
+    "run shell command ls -l",
+    "could you run shell command ls -l",
+    "run command",
+    "execute shell",
+    "terminal exec",
+    "bash command"
+  ],
+  "commonMistakes": [],
+  "entityHints": {
+    "command": [
+      "test_value"
+    ],
+    "cwd": [
+      "test_value"
+    ]
+  },
+  "deviceNamingPatterns": [],
+  "commonAbbreviations": {},
+  "languageVariations": [
+    "run shell command ls -l",
+    "run command",
+    "execute shell",
+    "terminal exec",
+    "bash command"
+  ],
+  "relatedTools": []
+}

@@ -1,0 +1,14 @@
+{
+  "toolId": "git.stash",
+  "examples": [
+    {
+      "input": "git stash save uncommitted work",
+      "expectedIntent": {
+        "domain": "git",
+        "action": "stash"
+      },
+      "expectedEntities": {},
+      "description": "Example execution of Stash Workspace Modifications"
+    }
+  ]
+}

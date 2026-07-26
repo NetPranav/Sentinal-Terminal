@@ -1,0 +1,38 @@
+{
+  "toolId": "python.pip_install",
+  "aliases": [
+    "pip install",
+    "install python library",
+    "pip add package"
+  ],
+  "synonyms": [
+    "please pip install",
+    "please install python library",
+    "please pip add package"
+  ],
+  "commonUserWording": [
+    "pip install numpy",
+    "could you pip install numpy",
+    "pip install",
+    "install python library",
+    "pip add package"
+  ],
+  "commonMistakes": [],
+  "entityHints": {
+    "package": [
+      "test_value"
+    ],
+    "upgrade": [
+      "test_value"
+    ]
+  },
+  "deviceNamingPatterns": [],
+  "commonAbbreviations": {},
+  "languageVariations": [
+    "pip install numpy",
+    "pip install",
+    "install python library",
+    "pip add package"
+  ],
+  "relatedTools": []
+}

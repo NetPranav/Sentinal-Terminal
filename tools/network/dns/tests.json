@@ -1,0 +1,18 @@
+{
+  "toolId": "network.dns",
+  "tests": [
+    {
+      "id": "network-dns-test-1",
+      "userRequest": "lookup dns records for openai.com",
+      "expectedIntent": {
+        "domain": "network",
+        "action": "dns"
+      },
+      "expectedToolId": "network.dns",
+      "expectedEntities": {
+        "domain": "sample_val"
+      },
+      "description": "Automated test case for Query DNS Domain Records"
+    }
+  ]
+}

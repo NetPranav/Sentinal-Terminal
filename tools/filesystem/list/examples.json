@@ -1,0 +1,16 @@
+{
+  "toolId": "filesystem.list",
+  "examples": [
+    {
+      "input": "list files in /tmp",
+      "expectedIntent": {
+        "domain": "filesystem",
+        "action": "list"
+      },
+      "expectedEntities": {
+        "path": "/test/path.txt"
+      },
+      "description": "Example execution of List Directory Contents"
+    }
+  ]
+}

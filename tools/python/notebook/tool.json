@@ -1,0 +1,47 @@
+{
+  "id": "python.notebook",
+  "version": "1.0.0",
+  "displayName": "Launch Jupyter Notebook",
+  "description": "Starts Jupyter Notebook or Lab interactive data science server in current folder.",
+  "domain": "python",
+  "category": "Python",
+  "tags": [
+    "python",
+    "notebook",
+    "python.notebook",
+    "launch",
+    "jupyter",
+    "start",
+    "run",
+    "open"
+  ],
+  "aliases": [
+    "start jupyter notebook",
+    "run jupyter lab",
+    "open python notebook"
+  ],
+  "supportedPlatforms": [
+    "macos",
+    "windows",
+    "linux"
+  ],
+  "requiredPermissions": [
+    "ShellExecution"
+  ],
+  "securityRisk": "SAFE",
+  "parameters": [],
+  "optionalParameters": [
+    {
+      "name": "lab",
+      "type": "boolean",
+      "description": "Launch modern JupyterLab UI instead of classic Notebook",
+      "required": false,
+      "default": true
+    }
+  ],
+  "estimatedExecutionTime": "1s",
+  "confirmationRequired": false,
+  "rollbackAvailable": false,
+  "verificationSupported": true,
+  "deprecationStatus": "stable"
+}

@@ -1,0 +1,14 @@
+{
+  "toolId": "git.branch",
+  "examples": [
+    {
+      "input": "list git branches",
+      "expectedIntent": {
+        "domain": "git",
+        "action": "branch"
+      },
+      "expectedEntities": {},
+      "description": "Example execution of Manage Git Branches"
+    }
+  ]
+}

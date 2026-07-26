@@ -1,0 +1,45 @@
+{
+  "id": "browser.downloads",
+  "version": "1.0.0",
+  "displayName": "Check Browser Downloads",
+  "description": "Lists recent files downloaded via the system web browser.",
+  "domain": "browser",
+  "category": "Web",
+  "tags": [
+    "browser",
+    "downloads",
+    "browser.downloads",
+    "check",
+    "show",
+    "recent"
+  ],
+  "aliases": [
+    "show downloads",
+    "recent downloads",
+    "browser download history"
+  ],
+  "supportedPlatforms": [
+    "macos",
+    "windows",
+    "linux"
+  ],
+  "requiredPermissions": [
+    "ShellExecution"
+  ],
+  "securityRisk": "SAFE",
+  "parameters": [],
+  "optionalParameters": [
+    {
+      "name": "limit",
+      "type": "number",
+      "description": "Maximum number of downloads to list",
+      "required": false,
+      "default": 10
+    }
+  ],
+  "estimatedExecutionTime": "1s",
+  "confirmationRequired": false,
+  "rollbackAvailable": false,
+  "verificationSupported": true,
+  "deprecationStatus": "stable"
+}

@@ -1,0 +1,24 @@
+{
+  "toolId": "filesystem.compress",
+  "version": "1.0.0",
+  "description": "Executes native driver for Compress Files to Archive.",
+  "steps": [
+    {
+      "id": "step_exec_main",
+      "name": "Execute Compress Files to Archive",
+      "type": "ExecuteCapability",
+      "capabilityId": "filesystem.compress",
+      "parameters": {
+        "source": "{{source}}",
+        "archiveName": "{{archiveName}}"
+      },
+      "dependencies": [],
+      "onError": "fail"
+    }
+  ],
+  "successCondition": "step:step_exec_main:success",
+  "errorHandling": {
+    "strategy": "fail_fast",
+    "maxRetries": 0
+  }
+}

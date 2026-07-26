@@ -1,0 +1,16 @@
+{
+  "toolId": "developer.cursor",
+  "tests": [
+    {
+      "id": "developer-cursor-test-1",
+      "userRequest": "open workspace in cursor",
+      "expectedIntent": {
+        "domain": "developer",
+        "action": "cursor"
+      },
+      "expectedToolId": "developer.cursor",
+      "expectedEntities": {},
+      "description": "Automated test case for Open in Cursor AI IDE"
+    }
+  ]
+}

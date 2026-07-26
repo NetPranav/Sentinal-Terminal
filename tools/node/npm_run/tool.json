@@ -1,0 +1,52 @@
+{
+  "id": "node.npm_run",
+  "version": "1.0.0",
+  "displayName": "Execute NPM Script",
+  "description": "Runs script command defined in package.json (e.g. build, test, dev, lint).",
+  "domain": "node",
+  "category": "Node",
+  "tags": [
+    "node",
+    "npm_run",
+    "node.npm",
+    "run",
+    "execute",
+    "npm",
+    "script"
+  ],
+  "aliases": [
+    "npm run",
+    "run npm script",
+    "execute package script"
+  ],
+  "supportedPlatforms": [
+    "macos",
+    "windows",
+    "linux"
+  ],
+  "requiredPermissions": [
+    "ShellExecution"
+  ],
+  "securityRisk": "LOW",
+  "parameters": [
+    {
+      "name": "script",
+      "type": "string",
+      "description": "Script target name to run",
+      "required": true
+    }
+  ],
+  "optionalParameters": [
+    {
+      "name": "args",
+      "type": "array",
+      "description": "Additional CLI flag arguments",
+      "required": false
+    }
+  ],
+  "estimatedExecutionTime": "2s",
+  "confirmationRequired": false,
+  "rollbackAvailable": false,
+  "verificationSupported": true,
+  "deprecationStatus": "stable"
+}

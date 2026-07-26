@@ -1,0 +1,16 @@
+{
+  "toolId": "filesystem.locate_folders",
+  "examples": [
+    {
+      "input": "locate folders named node_modules",
+      "expectedIntent": {
+        "domain": "filesystem",
+        "action": "locate_folders"
+      },
+      "expectedEntities": {
+        "name": "sample_val"
+      },
+      "description": "Example execution of Locate Specific Folders"
+    }
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "toolId": "git.clone",
+  "examples": [
+    {
+      "input": "clone repository https://github.com/torvalds/linux",
+      "expectedIntent": {
+        "domain": "git",
+        "action": "clone"
+      },
+      "expectedEntities": {
+        "url": "sample_val"
+      },
+      "description": "Example execution of Clone Git Repository"
+    }
+  ]
+}

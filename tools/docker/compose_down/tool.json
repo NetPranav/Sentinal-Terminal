@@ -1,0 +1,53 @@
+{
+  "id": "docker.compose_down",
+  "version": "1.0.0",
+  "displayName": "Stop Docker Compose Stack",
+  "description": "Stops and removes containers, networks, and volumes created by Docker Compose.",
+  "domain": "docker",
+  "category": "Docker",
+  "tags": [
+    "docker",
+    "compose_down",
+    "docker.compose",
+    "down",
+    "stop",
+    "compose",
+    "stack"
+  ],
+  "aliases": [
+    "docker compose down",
+    "stop docker stack",
+    "compose down"
+  ],
+  "supportedPlatforms": [
+    "macos",
+    "windows",
+    "linux"
+  ],
+  "requiredPermissions": [
+    "ShellExecution"
+  ],
+  "securityRisk": "LOW",
+  "parameters": [],
+  "optionalParameters": [
+    {
+      "name": "volumes",
+      "type": "boolean",
+      "description": "Remove associated named volumes (-v)",
+      "required": false,
+      "default": false
+    },
+    {
+      "name": "file",
+      "type": "string",
+      "description": "Path to docker-compose file",
+      "required": false,
+      "default": "docker-compose.yml"
+    }
+  ],
+  "estimatedExecutionTime": "2s",
+  "confirmationRequired": false,
+  "rollbackAvailable": false,
+  "verificationSupported": true,
+  "deprecationStatus": "stable"
+}

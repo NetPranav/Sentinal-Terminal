@@ -1,0 +1,58 @@
+{
+  "toolId": "network.wifi.connect",
+  "aliases": [
+    "connect wifi",
+    "join wifi network",
+    "wifi connect",
+    "connect me to",
+    "connect to network",
+    "join network",
+    "connect it to",
+    "connect to wifi"
+  ],
+  "synonyms": [
+    "please connect wifi",
+    "please join wifi network",
+    "please wifi connect",
+    "please connect me to",
+    "please connect to network",
+    "please join network",
+    "please connect it to",
+    "please connect to wifi"
+  ],
+  "commonUserWording": [
+    "connect wifi to Home-WiFi-5G",
+    "could you connect wifi to Home-WiFi-5G",
+    "connect wifi",
+    "join wifi network",
+    "wifi connect",
+    "connect me to",
+    "connect to network",
+    "join network",
+    "connect it to",
+    "connect to wifi"
+  ],
+  "commonMistakes": [],
+  "entityHints": {
+    "ssid": [
+      "test_value"
+    ],
+    "password": [
+      "test_value"
+    ]
+  },
+  "deviceNamingPatterns": [],
+  "commonAbbreviations": {},
+  "languageVariations": [
+    "connect wifi to Home-WiFi-5G",
+    "connect wifi",
+    "join wifi network",
+    "wifi connect",
+    "connect me to",
+    "connect to network",
+    "join network",
+    "connect it to",
+    "connect to wifi"
+  ],
+  "relatedTools": []
+}

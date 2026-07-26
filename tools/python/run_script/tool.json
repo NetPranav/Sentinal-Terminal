@@ -1,0 +1,52 @@
+{
+  "id": "python.run_script",
+  "version": "1.0.0",
+  "displayName": "Execute Python Script",
+  "description": "Runs Python `.py` script file or code command using Python 3 interpreter.",
+  "domain": "python",
+  "category": "Python",
+  "tags": [
+    "python",
+    "run_script",
+    "python.run",
+    "script",
+    "execute",
+    "run",
+    "python3"
+  ],
+  "aliases": [
+    "run python script",
+    "python3 run",
+    "execute python code"
+  ],
+  "supportedPlatforms": [
+    "macos",
+    "windows",
+    "linux"
+  ],
+  "requiredPermissions": [
+    "ShellExecution"
+  ],
+  "securityRisk": "LOW",
+  "parameters": [
+    {
+      "name": "script",
+      "type": "string",
+      "description": "Path to python `.py` script file or code string",
+      "required": true
+    }
+  ],
+  "optionalParameters": [
+    {
+      "name": "args",
+      "type": "array",
+      "description": "CLI arguments passed into script",
+      "required": false
+    }
+  ],
+  "estimatedExecutionTime": "2s",
+  "confirmationRequired": false,
+  "rollbackAvailable": false,
+  "verificationSupported": true,
+  "deprecationStatus": "stable"
+}

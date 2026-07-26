@@ -1,0 +1,23 @@
+{
+  "toolId": "application.close",
+  "version": "1.0.0",
+  "description": "Executes native driver for Close Desktop Application.",
+  "steps": [
+    {
+      "id": "step_exec_main",
+      "name": "Execute Close Desktop Application",
+      "type": "ExecuteCapability",
+      "capabilityId": "application.close",
+      "parameters": {
+        "app": "{{app}}"
+      },
+      "dependencies": [],
+      "onError": "fail"
+    }
+  ],
+  "successCondition": "step:step_exec_main:success",
+  "errorHandling": {
+    "strategy": "fail_fast",
+    "maxRetries": 0
+  }
+}

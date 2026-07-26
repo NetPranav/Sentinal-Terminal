@@ -1,0 +1,24 @@
+{
+  "toolId": "docker.exec",
+  "version": "1.0.0",
+  "description": "Executes native driver for Execute Command inside Container.",
+  "steps": [
+    {
+      "id": "step_exec_main",
+      "name": "Execute Execute Command inside Container",
+      "type": "ExecuteCapability",
+      "capabilityId": "docker.exec",
+      "parameters": {
+        "container": "{{container}}",
+        "command": "{{command}}"
+      },
+      "dependencies": [],
+      "onError": "fail"
+    }
+  ],
+  "successCondition": "step:step_exec_main:success",
+  "errorHandling": {
+    "strategy": "fail_fast",
+    "maxRetries": 0
+  }
+}

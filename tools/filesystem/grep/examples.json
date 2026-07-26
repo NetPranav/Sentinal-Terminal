@@ -1,0 +1,17 @@
+{
+  "toolId": "filesystem.grep",
+  "examples": [
+    {
+      "input": "search by content for TODO in src",
+      "expectedIntent": {
+        "domain": "filesystem",
+        "action": "grep"
+      },
+      "expectedEntities": {
+        "path": "/test/path.txt",
+        "query": "sample_val"
+      },
+      "description": "Example execution of Search by File Content"
+    }
+  ]
+}

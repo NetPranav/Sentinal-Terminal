@@ -1,0 +1,16 @@
+{
+  "toolId": "network.wifi.scan",
+  "tests": [
+    {
+      "id": "network-wifi.scan-test-1",
+      "userRequest": "scan available wifi networks",
+      "expectedIntent": {
+        "domain": "network",
+        "action": "wifi.scan"
+      },
+      "expectedToolId": "network.wifi.scan",
+      "expectedEntities": {},
+      "description": "Automated test case for Scan Wi-Fi Networks"
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "toolId": "system.temperature",
+  "examples": [
+    {
+      "input": "check system cpu temperature",
+      "expectedIntent": {
+        "domain": "system",
+        "action": "temperature"
+      },
+      "expectedEntities": {},
+      "description": "Example execution of Check Thermal Sensors"
+    }
+  ]
+}

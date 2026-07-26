@@ -1,0 +1,42 @@
+{
+  "toolId": "network.ping",
+  "aliases": [
+    "ping host",
+    "test connection to",
+    "check network ping",
+    "ping"
+  ],
+  "synonyms": [
+    "please ping host",
+    "please test connection to",
+    "please check network ping",
+    "please ping"
+  ],
+  "commonUserWording": [
+    "ping host google.com",
+    "could you ping host google.com",
+    "ping host",
+    "test connection to",
+    "check network ping",
+    "ping"
+  ],
+  "commonMistakes": [],
+  "entityHints": {
+    "host": [
+      "test_value"
+    ],
+    "count": [
+      "test_value"
+    ]
+  },
+  "deviceNamingPatterns": [],
+  "commonAbbreviations": {},
+  "languageVariations": [
+    "ping host google.com",
+    "ping host",
+    "test connection to",
+    "check network ping",
+    "ping"
+  ],
+  "relatedTools": []
+}

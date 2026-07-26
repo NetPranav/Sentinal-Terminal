@@ -1,0 +1,51 @@
+{
+  "toolId": "network.wifi.off",
+  "aliases": [
+    "turn off wifi",
+    "disable wifi",
+    "stop wifi",
+    "turn my wifi off",
+    "wifi off",
+    "turn the wifi off",
+    "disconnect wifi",
+    "turn wifi off"
+  ],
+  "synonyms": [
+    "please turn off wifi",
+    "please disable wifi",
+    "please stop wifi",
+    "please turn my wifi off",
+    "please wifi off",
+    "please turn the wifi off",
+    "please disconnect wifi",
+    "please turn wifi off"
+  ],
+  "commonUserWording": [
+    "turn the wifi off",
+    "could you turn the wifi off",
+    "turn off wifi",
+    "disable wifi",
+    "stop wifi",
+    "turn my wifi off",
+    "wifi off",
+    "turn the wifi off",
+    "disconnect wifi",
+    "turn wifi off"
+  ],
+  "commonMistakes": [],
+  "entityHints": {},
+  "deviceNamingPatterns": [],
+  "commonAbbreviations": {},
+  "languageVariations": [
+    "turn the wifi off",
+    "turn off wifi",
+    "disable wifi",
+    "stop wifi",
+    "turn my wifi off",
+    "wifi off",
+    "turn the wifi off",
+    "disconnect wifi",
+    "turn wifi off"
+  ],
+  "relatedTools": []
+}

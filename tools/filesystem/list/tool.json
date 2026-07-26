@@ -1,0 +1,48 @@
+{
+  "id": "filesystem.list",
+  "version": "1.0.0",
+  "displayName": "List Directory Contents",
+  "description": "Lists files and folders in target directory path.",
+  "domain": "filesystem",
+  "category": "Filesystem",
+  "tags": [
+    "filesystem",
+    "list",
+    "filesystem.list",
+    "directory",
+    "contents",
+    "ls",
+    "dir",
+    "show"
+  ],
+  "aliases": [
+    "list files",
+    "ls",
+    "dir",
+    "show directory",
+    "list directory"
+  ],
+  "supportedPlatforms": [
+    "macos",
+    "windows",
+    "linux"
+  ],
+  "requiredPermissions": [
+    "ReadFiles"
+  ],
+  "securityRisk": "SAFE",
+  "parameters": [
+    {
+      "name": "path",
+      "type": "string",
+      "description": "Directory path to list",
+      "required": true
+    }
+  ],
+  "optionalParameters": [],
+  "estimatedExecutionTime": "1s",
+  "confirmationRequired": false,
+  "rollbackAvailable": false,
+  "verificationSupported": true,
+  "deprecationStatus": "stable"
+}

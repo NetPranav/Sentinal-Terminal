@@ -1,0 +1,16 @@
+{
+  "toolId": "network.ports",
+  "tests": [
+    {
+      "id": "network-ports-test-1",
+      "userRequest": "check open network ports",
+      "expectedIntent": {
+        "domain": "network",
+        "action": "ports"
+      },
+      "expectedToolId": "network.ports",
+      "expectedEntities": {},
+      "description": "Automated test case for Inspect Open Network Ports"
+    }
+  ]
+}

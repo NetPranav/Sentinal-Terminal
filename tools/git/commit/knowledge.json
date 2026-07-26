@@ -1,0 +1,38 @@
+{
+  "toolId": "git.commit",
+  "aliases": [
+    "git commit",
+    "commit changes",
+    "save git changes"
+  ],
+  "synonyms": [
+    "please git commit",
+    "please commit changes",
+    "please save git changes"
+  ],
+  "commonUserWording": [
+    "commit changes with message \"Fix login validation\"",
+    "could you commit changes with message \"Fix login validation\"",
+    "git commit",
+    "commit changes",
+    "save git changes"
+  ],
+  "commonMistakes": [],
+  "entityHints": {
+    "message": [
+      "test_value"
+    ],
+    "all": [
+      "test_value"
+    ]
+  },
+  "deviceNamingPatterns": [],
+  "commonAbbreviations": {},
+  "languageVariations": [
+    "commit changes with message \"Fix login validation\"",
+    "git commit",
+    "commit changes",
+    "save git changes"
+  ],
+  "relatedTools": []
+}

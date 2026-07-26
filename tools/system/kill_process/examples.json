@@ -1,0 +1,16 @@
+{
+  "toolId": "system.kill_process",
+  "examples": [
+    {
+      "input": "kill process node",
+      "expectedIntent": {
+        "domain": "system",
+        "action": "kill_process"
+      },
+      "expectedEntities": {
+        "process": "sample_val"
+      },
+      "description": "Example execution of Kill System Process"
+    }
+  ]
+}

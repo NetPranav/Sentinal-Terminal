@@ -1,0 +1,41 @@
+{
+  "toolId": "network.bluetooth.connect",
+  "aliases": [
+    "connect bluetooth device",
+    "pair bluetooth headphones",
+    "connect airpods",
+    "connect bluetooth"
+  ],
+  "synonyms": [
+    "please connect bluetooth device",
+    "please pair bluetooth headphones",
+    "please connect airpods",
+    "please connect bluetooth"
+  ],
+  "commonUserWording": [
+    "connect bluetooth device AirPods Pro",
+    "could you connect bluetooth device AirPods Pro",
+    "connect bluetooth device",
+    "pair bluetooth headphones",
+    "connect airpods",
+    "connect bluetooth"
+  ],
+  "commonMistakes": [],
+  "entityHints": {
+    "device": [
+      "test_value"
+    ]
+  },
+  "deviceNamingPatterns": [],
+  "commonAbbreviations": {
+    "bt": "bluetooth"
+  },
+  "languageVariations": [
+    "connect bluetooth device AirPods Pro",
+    "connect bluetooth device",
+    "pair bluetooth headphones",
+    "connect airpods",
+    "connect bluetooth"
+  ],
+  "relatedTools": []
+}

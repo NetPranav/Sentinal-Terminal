@@ -1,0 +1,21 @@
+{
+  "toolId": "network.wifi.on",
+  "version": "1.0.0",
+  "description": "Executes native driver for Turn Wi-Fi On.",
+  "steps": [
+    {
+      "id": "step_exec_main",
+      "name": "Execute Turn Wi-Fi On",
+      "type": "ExecuteCapability",
+      "capabilityId": "network.wifi.on",
+      "parameters": {},
+      "dependencies": [],
+      "onError": "fail"
+    }
+  ],
+  "successCondition": "step:step_exec_main:success",
+  "errorHandling": {
+    "strategy": "fail_fast",
+    "maxRetries": 1
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "toolId": "developer.ssh",
+  "tests": [
+    {
+      "id": "developer-ssh-test-1",
+      "userRequest": "ssh connect to admin@production-server",
+      "expectedIntent": {
+        "domain": "developer",
+        "action": "ssh"
+      },
+      "expectedToolId": "developer.ssh",
+      "expectedEntities": {
+        "target": "sample_val"
+      },
+      "description": "Automated test case for Connect via SSH Remote Session"
+    }
+  ]
+}

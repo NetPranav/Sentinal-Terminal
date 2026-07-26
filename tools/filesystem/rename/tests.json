@@ -1,0 +1,19 @@
+{
+  "toolId": "filesystem.rename",
+  "tests": [
+    {
+      "id": "filesystem-rename-test-1",
+      "userRequest": "rename file old.json to new.json",
+      "expectedIntent": {
+        "domain": "filesystem",
+        "action": "rename"
+      },
+      "expectedToolId": "filesystem.rename",
+      "expectedEntities": {
+        "path": "/test/path.txt",
+        "newName": "sample_val"
+      },
+      "description": "Automated test case for Rename File or Directory"
+    }
+  ]
+}

@@ -1,0 +1,24 @@
+{
+  "toolId": "network.ping",
+  "version": "1.0.0",
+  "description": "Executes native driver for Ping Network Host.",
+  "steps": [
+    {
+      "id": "step_exec_main",
+      "name": "Execute Ping Network Host",
+      "type": "ExecuteCapability",
+      "capabilityId": "network.ping",
+      "parameters": {
+        "host": "{{host}}",
+        "count": "{{count}}"
+      },
+      "dependencies": [],
+      "onError": "fail"
+    }
+  ],
+  "successCondition": "step:step_exec_main:success",
+  "errorHandling": {
+    "strategy": "fail_fast",
+    "maxRetries": 1
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "toolId": "docker.images",
+  "aliases": [
+    "docker images",
+    "list docker images",
+    "show local images"
+  ],
+  "synonyms": [
+    "please docker images",
+    "please list docker images",
+    "please show local images"
+  ],
+  "commonUserWording": [
+    "show local docker images",
+    "could you show local docker images",
+    "docker images",
+    "list docker images",
+    "show local images"
+  ],
+  "commonMistakes": [],
+  "entityHints": {},
+  "deviceNamingPatterns": [],
+  "commonAbbreviations": {},
+  "languageVariations": [
+    "show local docker images",
+    "docker images",
+    "list docker images",
+    "show local images"
+  ],
+  "relatedTools": []
+}

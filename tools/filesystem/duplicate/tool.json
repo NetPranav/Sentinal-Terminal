@@ -1,0 +1,46 @@
+{
+  "id": "filesystem.duplicate",
+  "version": "1.0.0",
+  "displayName": "Duplicate File or Directory",
+  "description": "Creates an immediate duplicated copy of a file or folder with timestamp or copy suffix.",
+  "domain": "filesystem",
+  "category": "Filesystem",
+  "tags": [
+    "filesystem",
+    "duplicate",
+    "filesystem.duplicate",
+    "file",
+    "or",
+    "directory",
+    "clone",
+    "make"
+  ],
+  "aliases": [
+    "duplicate file",
+    "clone file locally",
+    "make copy of"
+  ],
+  "supportedPlatforms": [
+    "macos",
+    "windows",
+    "linux"
+  ],
+  "requiredPermissions": [
+    "ReadFiles"
+  ],
+  "securityRisk": "LOW",
+  "parameters": [
+    {
+      "name": "path",
+      "type": "string",
+      "description": "File or folder path to duplicate",
+      "required": true
+    }
+  ],
+  "optionalParameters": [],
+  "estimatedExecutionTime": "2s",
+  "confirmationRequired": false,
+  "rollbackAvailable": true,
+  "verificationSupported": true,
+  "deprecationStatus": "stable"
+}

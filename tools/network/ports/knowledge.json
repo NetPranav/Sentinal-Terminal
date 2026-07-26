@@ -1,0 +1,43 @@
+{
+  "toolId": "network.ports",
+  "aliases": [
+    "list listening ports",
+    "open ports",
+    "check port usage",
+    "what is using port",
+    "network ports"
+  ],
+  "synonyms": [
+    "please list listening ports",
+    "please open ports",
+    "please check port usage",
+    "please what is using port",
+    "please network ports"
+  ],
+  "commonUserWording": [
+    "check open network ports",
+    "could you check open network ports",
+    "list listening ports",
+    "open ports",
+    "check port usage",
+    "what is using port",
+    "network ports"
+  ],
+  "commonMistakes": [],
+  "entityHints": {
+    "port": [
+      "test_value"
+    ]
+  },
+  "deviceNamingPatterns": [],
+  "commonAbbreviations": {},
+  "languageVariations": [
+    "check open network ports",
+    "list listening ports",
+    "open ports",
+    "check port usage",
+    "what is using port",
+    "network ports"
+  ],
+  "relatedTools": []
+}

@@ -1,0 +1,41 @@
+{
+  "toolId": "network.bluetooth.off",
+  "aliases": [
+    "turn off bluetooth",
+    "disable bluetooth",
+    "stop bluetooth",
+    "turn bluetooth off",
+    "bluetooth off"
+  ],
+  "synonyms": [
+    "please turn off bluetooth",
+    "please disable bluetooth",
+    "please stop bluetooth",
+    "please turn bluetooth off",
+    "please bluetooth off"
+  ],
+  "commonUserWording": [
+    "turn bluetooth off",
+    "could you turn bluetooth off",
+    "turn off bluetooth",
+    "disable bluetooth",
+    "stop bluetooth",
+    "turn bluetooth off",
+    "bluetooth off"
+  ],
+  "commonMistakes": [],
+  "entityHints": {},
+  "deviceNamingPatterns": [],
+  "commonAbbreviations": {
+    "bt": "bluetooth"
+  },
+  "languageVariations": [
+    "turn bluetooth off",
+    "turn off bluetooth",
+    "disable bluetooth",
+    "stop bluetooth",
+    "turn bluetooth off",
+    "bluetooth off"
+  ],
+  "relatedTools": []
+}

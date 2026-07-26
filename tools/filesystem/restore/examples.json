@@ -1,0 +1,16 @@
+{
+  "toolId": "filesystem.restore",
+  "examples": [
+    {
+      "input": "restore file document.docx",
+      "expectedIntent": {
+        "domain": "filesystem",
+        "action": "restore"
+      },
+      "expectedEntities": {
+        "name": "sample_val"
+      },
+      "description": "Example execution of Restore File from Trash"
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "toolId": "docker.restart",
+  "version": "1.0.0",
+  "description": "Executes native driver for Restart Docker Container.",
+  "steps": [
+    {
+      "id": "step_exec_main",
+      "name": "Execute Restart Docker Container",
+      "type": "ExecuteCapability",
+      "capabilityId": "docker.restart",
+      "parameters": {
+        "container": "{{container}}"
+      },
+      "dependencies": [],
+      "onError": "fail"
+    }
+  ],
+  "successCondition": "step:step_exec_main:success",
+  "errorHandling": {
+    "strategy": "fail_fast",
+    "maxRetries": 0
+  }
+}

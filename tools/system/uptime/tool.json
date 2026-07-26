@@ -1,0 +1,38 @@
+{
+  "id": "system.uptime",
+  "version": "1.0.0",
+  "displayName": "Query System Uptime Duration",
+  "description": "Displays time elapsed since last operating system boot and average system loads.",
+  "domain": "system",
+  "category": "System",
+  "tags": [
+    "system",
+    "uptime",
+    "system.uptime",
+    "query",
+    "duration",
+    "how",
+    "check"
+  ],
+  "aliases": [
+    "system uptime",
+    "how long has computer been running",
+    "check boot duration"
+  ],
+  "supportedPlatforms": [
+    "macos",
+    "windows",
+    "linux"
+  ],
+  "requiredPermissions": [
+    "ShellExecution"
+  ],
+  "securityRisk": "SAFE",
+  "parameters": [],
+  "optionalParameters": [],
+  "estimatedExecutionTime": "1s",
+  "confirmationRequired": false,
+  "rollbackAvailable": false,
+  "verificationSupported": true,
+  "deprecationStatus": "stable"
+}

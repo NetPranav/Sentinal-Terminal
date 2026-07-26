@@ -1,0 +1,16 @@
+{
+  "toolId": "node.npm_run",
+  "examples": [
+    {
+      "input": "npm run build",
+      "expectedIntent": {
+        "domain": "node",
+        "action": "npm_run"
+      },
+      "expectedEntities": {
+        "script": "sample_val"
+      },
+      "description": "Example execution of Execute NPM Script"
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "toolId": "filesystem.disk_usage",
+  "examples": [
+    {
+      "input": "check disk usage for /Users",
+      "expectedIntent": {
+        "domain": "filesystem",
+        "action": "disk_usage"
+      },
+      "expectedEntities": {},
+      "description": "Example execution of Check Disk Capacity and Usage"
+    }
+  ]
+}

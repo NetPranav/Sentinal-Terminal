@@ -1,0 +1,16 @@
+{
+  "toolId": "network.bluetooth.on",
+  "tests": [
+    {
+      "id": "network-bluetooth.on-test-1",
+      "userRequest": "turn my bluetooth on",
+      "expectedIntent": {
+        "domain": "network",
+        "action": "bluetooth.on"
+      },
+      "expectedToolId": "network.bluetooth.on",
+      "expectedEntities": {},
+      "description": "Automated test case for Turn Bluetooth On"
+    }
+  ]
+}

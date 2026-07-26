@@ -1,0 +1,37 @@
+{
+  "id": "browser.reload",
+  "version": "1.0.0",
+  "displayName": "Reload Active Browser Tab",
+  "description": "Reloads or refreshes the current active web page inside the default browser.",
+  "domain": "browser",
+  "category": "Web",
+  "tags": [
+    "browser",
+    "reload",
+    "browser.reload",
+    "active",
+    "tab",
+    "refresh"
+  ],
+  "aliases": [
+    "reload page",
+    "refresh browser",
+    "refresh web page"
+  ],
+  "supportedPlatforms": [
+    "macos",
+    "windows",
+    "linux"
+  ],
+  "requiredPermissions": [
+    "ShellExecution"
+  ],
+  "securityRisk": "SAFE",
+  "parameters": [],
+  "optionalParameters": [],
+  "estimatedExecutionTime": "1s",
+  "confirmationRequired": false,
+  "rollbackAvailable": false,
+  "verificationSupported": true,
+  "deprecationStatus": "stable"
+}

@@ -1,0 +1,23 @@
+{
+  "toolId": "python.create_venv",
+  "version": "1.0.0",
+  "description": "Executes native driver for Create Python Virtual Environment.",
+  "steps": [
+    {
+      "id": "step_exec_main",
+      "name": "Execute Create Python Virtual Environment",
+      "type": "ExecuteCapability",
+      "capabilityId": "python.create_venv",
+      "parameters": {
+        "directory": "{{directory}}"
+      },
+      "dependencies": [],
+      "onError": "fail"
+    }
+  ],
+  "successCondition": "step:step_exec_main:success",
+  "errorHandling": {
+    "strategy": "fail_fast",
+    "maxRetries": 0
+  }
+}

@@ -1,0 +1,46 @@
+{
+  "id": "application.open",
+  "version": "1.0.0",
+  "displayName": "Open Desktop Application",
+  "description": "Opens a system desktop application using native launchers (Launch Services).",
+  "domain": "application",
+  "category": "Desktop",
+  "tags": [
+    "application",
+    "open",
+    "application.open",
+    "desktop",
+    "launch",
+    "run",
+    "start"
+  ],
+  "aliases": [
+    "open app",
+    "launch app",
+    "run program",
+    "start application"
+  ],
+  "supportedPlatforms": [
+    "macos",
+    "windows",
+    "linux"
+  ],
+  "requiredPermissions": [
+    "ShellExecution"
+  ],
+  "securityRisk": "SAFE",
+  "parameters": [
+    {
+      "name": "app",
+      "type": "string",
+      "description": "Application name or bundle path",
+      "required": true
+    }
+  ],
+  "optionalParameters": [],
+  "estimatedExecutionTime": "1s",
+  "confirmationRequired": false,
+  "rollbackAvailable": false,
+  "verificationSupported": true,
+  "deprecationStatus": "stable"
+}

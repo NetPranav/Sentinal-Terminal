@@ -1,0 +1,31 @@
+{
+  "toolId": "git.merge",
+  "aliases": [
+    "git merge",
+    "merge branch into current"
+  ],
+  "synonyms": [
+    "please git merge",
+    "please merge branch into current"
+  ],
+  "commonUserWording": [
+    "merge branch develop",
+    "could you merge branch develop",
+    "git merge",
+    "merge branch into current"
+  ],
+  "commonMistakes": [],
+  "entityHints": {
+    "branch": [
+      "test_value"
+    ]
+  },
+  "deviceNamingPatterns": [],
+  "commonAbbreviations": {},
+  "languageVariations": [
+    "merge branch develop",
+    "git merge",
+    "merge branch into current"
+  ],
+  "relatedTools": []
+}

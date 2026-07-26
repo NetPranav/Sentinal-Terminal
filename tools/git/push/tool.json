@@ -1,0 +1,51 @@
+{
+  "id": "git.push",
+  "version": "1.0.0",
+  "displayName": "Push Git Commits",
+  "description": "Pushes local branch commits to remote repository origin server.",
+  "domain": "git",
+  "category": "Git",
+  "tags": [
+    "git",
+    "push",
+    "git.push",
+    "commits",
+    "upload"
+  ],
+  "aliases": [
+    "git push",
+    "push changes",
+    "push to origin",
+    "upload commits"
+  ],
+  "supportedPlatforms": [
+    "macos",
+    "windows",
+    "linux"
+  ],
+  "requiredPermissions": [
+    "ShellExecution"
+  ],
+  "securityRisk": "MEDIUM",
+  "parameters": [],
+  "optionalParameters": [
+    {
+      "name": "remote",
+      "type": "string",
+      "description": "Target remote name",
+      "required": false,
+      "default": "origin"
+    },
+    {
+      "name": "branch",
+      "type": "string",
+      "description": "Target branch name",
+      "required": false
+    }
+  ],
+  "estimatedExecutionTime": "2s",
+  "confirmationRequired": false,
+  "rollbackAvailable": false,
+  "verificationSupported": true,
+  "deprecationStatus": "stable"
+}

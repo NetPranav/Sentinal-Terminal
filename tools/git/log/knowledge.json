@@ -1,0 +1,35 @@
+{
+  "toolId": "git.log",
+  "aliases": [
+    "git log",
+    "show git history",
+    "view recent commits"
+  ],
+  "synonyms": [
+    "please git log",
+    "please show git history",
+    "please view recent commits"
+  ],
+  "commonUserWording": [
+    "show git log for last 10 commits",
+    "could you show git log for last 10 commits",
+    "git log",
+    "show git history",
+    "view recent commits"
+  ],
+  "commonMistakes": [],
+  "entityHints": {
+    "maxCount": [
+      "test_value"
+    ]
+  },
+  "deviceNamingPatterns": [],
+  "commonAbbreviations": {},
+  "languageVariations": [
+    "show git log for last 10 commits",
+    "git log",
+    "show git history",
+    "view recent commits"
+  ],
+  "relatedTools": []
+}

@@ -1,0 +1,35 @@
+{
+  "toolId": "node.bun",
+  "aliases": [
+    "bun run",
+    "bun install",
+    "use bun runtime"
+  ],
+  "synonyms": [
+    "please bun run",
+    "please bun install",
+    "please use bun runtime"
+  ],
+  "commonUserWording": [
+    "bun run server.ts",
+    "could you bun run server.ts",
+    "bun run",
+    "bun install",
+    "use bun runtime"
+  ],
+  "commonMistakes": [],
+  "entityHints": {
+    "command": [
+      "test_value"
+    ]
+  },
+  "deviceNamingPatterns": [],
+  "commonAbbreviations": {},
+  "languageVariations": [
+    "bun run server.ts",
+    "bun run",
+    "bun install",
+    "use bun runtime"
+  ],
+  "relatedTools": []
+}

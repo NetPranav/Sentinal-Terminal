@@ -1,0 +1,23 @@
+{
+  "toolId": "node.yarn",
+  "version": "1.0.0",
+  "description": "Executes native driver for Manage Packages with Yarn.",
+  "steps": [
+    {
+      "id": "step_exec_main",
+      "name": "Execute Manage Packages with Yarn",
+      "type": "ExecuteCapability",
+      "capabilityId": "node.yarn",
+      "parameters": {
+        "command": "{{command}}"
+      },
+      "dependencies": [],
+      "onError": "fail"
+    }
+  ],
+  "successCondition": "step:step_exec_main:success",
+  "errorHandling": {
+    "strategy": "fail_fast",
+    "maxRetries": 0
+  }
+}

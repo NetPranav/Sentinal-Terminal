@@ -1,0 +1,16 @@
+{
+  "toolId": "application.install",
+  "examples": [
+    {
+      "input": "install app ffmpeg",
+      "expectedIntent": {
+        "domain": "application",
+        "action": "install"
+      },
+      "expectedEntities": {
+        "package": "sample_val"
+      },
+      "description": "Example execution of Install Desktop Package or App"
+    }
+  ]
+}

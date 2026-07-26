@@ -1,0 +1,16 @@
+{
+  "toolId": "system.gpu",
+  "tests": [
+    {
+      "id": "system-gpu-test-1",
+      "userRequest": "check gpu status",
+      "expectedIntent": {
+        "domain": "system",
+        "action": "gpu"
+      },
+      "expectedToolId": "system.gpu",
+      "expectedEntities": {},
+      "description": "Automated test case for Inspect GPU Acceleration Status"
+    }
+  ]
+}

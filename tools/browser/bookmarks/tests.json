@@ -1,0 +1,16 @@
+{
+  "toolId": "browser.bookmarks",
+  "tests": [
+    {
+      "id": "browser-bookmarks-test-1",
+      "userRequest": "show bookmarks for sentinel",
+      "expectedIntent": {
+        "domain": "browser",
+        "action": "bookmarks"
+      },
+      "expectedToolId": "browser.bookmarks",
+      "expectedEntities": {},
+      "description": "Automated test case for Inspect Browser Bookmarks"
+    }
+  ]
+}

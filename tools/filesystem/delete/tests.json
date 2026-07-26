@@ -1,0 +1,18 @@
+{
+  "toolId": "filesystem.delete",
+  "tests": [
+    {
+      "id": "filesystem-delete-test-1",
+      "userRequest": "delete file temp.log",
+      "expectedIntent": {
+        "domain": "filesystem",
+        "action": "delete"
+      },
+      "expectedToolId": "filesystem.delete",
+      "expectedEntities": {
+        "path": "/test/path.txt"
+      },
+      "description": "Automated test case for Permanently Delete File or Folder"
+    }
+  ]
+}

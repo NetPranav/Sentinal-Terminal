@@ -1,0 +1,21 @@
+{
+  "toolId": "system.gpu",
+  "version": "1.0.0",
+  "description": "Executes native driver for Inspect GPU Acceleration Status.",
+  "steps": [
+    {
+      "id": "step_exec_main",
+      "name": "Execute Inspect GPU Acceleration Status",
+      "type": "ExecuteCapability",
+      "capabilityId": "system.gpu",
+      "parameters": {},
+      "dependencies": [],
+      "onError": "fail"
+    }
+  ],
+  "successCondition": "step:step_exec_main:success",
+  "errorHandling": {
+    "strategy": "fail_fast",
+    "maxRetries": 0
+  }
+}

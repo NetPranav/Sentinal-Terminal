@@ -1,0 +1,35 @@
+{
+  "toolId": "docker.stop",
+  "aliases": [
+    "docker stop",
+    "stop container",
+    "halt docker container"
+  ],
+  "synonyms": [
+    "please docker stop",
+    "please stop container",
+    "please halt docker container"
+  ],
+  "commonUserWording": [
+    "stop docker container postgres_dev",
+    "could you stop docker container postgres_dev",
+    "docker stop",
+    "stop container",
+    "halt docker container"
+  ],
+  "commonMistakes": [],
+  "entityHints": {
+    "container": [
+      "test_value"
+    ]
+  },
+  "deviceNamingPatterns": [],
+  "commonAbbreviations": {},
+  "languageVariations": [
+    "stop docker container postgres_dev",
+    "docker stop",
+    "stop container",
+    "halt docker container"
+  ],
+  "relatedTools": []
+}

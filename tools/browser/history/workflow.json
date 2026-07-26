@@ -1,0 +1,23 @@
+{
+  "toolId": "browser.history",
+  "version": "1.0.0",
+  "description": "Executes native driver for Query Browser History.",
+  "steps": [
+    {
+      "id": "step_exec_main",
+      "name": "Execute Query Browser History",
+      "type": "ExecuteCapability",
+      "capabilityId": "browser.history",
+      "parameters": {
+        "query": "{{query}}"
+      },
+      "dependencies": [],
+      "onError": "fail"
+    }
+  ],
+  "successCondition": "step:step_exec_main:success",
+  "errorHandling": {
+    "strategy": "fail_fast",
+    "maxRetries": 0
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "toolId": "network.bluetooth.list",
+  "examples": [
+    {
+      "input": "show me all the bluetooth devices",
+      "expectedIntent": {
+        "domain": "network",
+        "action": "bluetooth.list"
+      },
+      "expectedEntities": {},
+      "description": "Example execution of List Bluetooth Devices"
+    }
+  ]
+}

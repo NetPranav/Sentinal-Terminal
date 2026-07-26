@@ -1,0 +1,16 @@
+{
+  "toolId": "filesystem.delete",
+  "examples": [
+    {
+      "input": "delete file temp.log",
+      "expectedIntent": {
+        "domain": "filesystem",
+        "action": "delete"
+      },
+      "expectedEntities": {
+        "path": "/test/path.txt"
+      },
+      "description": "Example execution of Permanently Delete File or Folder"
+    }
+  ]
+}

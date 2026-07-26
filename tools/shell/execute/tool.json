@@ -1,0 +1,53 @@
+{
+  "id": "shell.execute",
+  "version": "1.0.0",
+  "displayName": "Execute Terminal Shell Command",
+  "description": "Executes standard Unix command or shell instruction inside interactive terminal session.",
+  "domain": "shell",
+  "category": "Shell",
+  "tags": [
+    "shell",
+    "execute",
+    "shell.execute",
+    "terminal",
+    "command",
+    "run",
+    "bash"
+  ],
+  "aliases": [
+    "run command",
+    "execute shell",
+    "terminal exec",
+    "bash command"
+  ],
+  "supportedPlatforms": [
+    "macos",
+    "windows",
+    "linux"
+  ],
+  "requiredPermissions": [
+    "ShellExecution"
+  ],
+  "securityRisk": "MEDIUM",
+  "parameters": [
+    {
+      "name": "command",
+      "type": "string",
+      "description": "Command line parameter string to run",
+      "required": true
+    }
+  ],
+  "optionalParameters": [
+    {
+      "name": "cwd",
+      "type": "string",
+      "description": "Working directory path",
+      "required": false
+    }
+  ],
+  "estimatedExecutionTime": "2s",
+  "confirmationRequired": false,
+  "rollbackAvailable": false,
+  "verificationSupported": true,
+  "deprecationStatus": "stable"
+}

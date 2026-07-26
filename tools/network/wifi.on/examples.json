@@ -1,0 +1,14 @@
+{
+  "toolId": "network.wifi.on",
+  "examples": [
+    {
+      "input": "turn the wifi on",
+      "expectedIntent": {
+        "domain": "network",
+        "action": "wifi.on"
+      },
+      "expectedEntities": {},
+      "description": "Example execution of Turn Wi-Fi On"
+    }
+  ]
+}

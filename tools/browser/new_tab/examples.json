@@ -1,0 +1,14 @@
+{
+  "toolId": "browser.new_tab",
+  "examples": [
+    {
+      "input": "open new tab with github.com",
+      "expectedIntent": {
+        "domain": "browser",
+        "action": "new_tab"
+      },
+      "expectedEntities": {},
+      "description": "Example execution of Open New Browser Tab"
+    }
+  ]
+}

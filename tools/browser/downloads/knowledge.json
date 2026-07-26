@@ -1,0 +1,35 @@
+{
+  "toolId": "browser.downloads",
+  "aliases": [
+    "show downloads",
+    "recent downloads",
+    "browser download history"
+  ],
+  "synonyms": [
+    "please show downloads",
+    "please recent downloads",
+    "please browser download history"
+  ],
+  "commonUserWording": [
+    "show 5 recent browser downloads",
+    "could you show 5 recent browser downloads",
+    "show downloads",
+    "recent downloads",
+    "browser download history"
+  ],
+  "commonMistakes": [],
+  "entityHints": {
+    "limit": [
+      "test_value"
+    ]
+  },
+  "deviceNamingPatterns": [],
+  "commonAbbreviations": {},
+  "languageVariations": [
+    "show 5 recent browser downloads",
+    "show downloads",
+    "recent downloads",
+    "browser download history"
+  ],
+  "relatedTools": []
+}

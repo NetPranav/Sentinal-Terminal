@@ -1,0 +1,39 @@
+{
+  "toolId": "network.interfaces",
+  "aliases": [
+    "list network interfaces",
+    "show adapters",
+    "ifconfig status",
+    "ip link show",
+    "network interfaces"
+  ],
+  "synonyms": [
+    "please list network interfaces",
+    "please show adapters",
+    "please ifconfig status",
+    "please ip link show",
+    "please network interfaces"
+  ],
+  "commonUserWording": [
+    "show network interfaces",
+    "could you show network interfaces",
+    "list network interfaces",
+    "show adapters",
+    "ifconfig status",
+    "ip link show",
+    "network interfaces"
+  ],
+  "commonMistakes": [],
+  "entityHints": {},
+  "deviceNamingPatterns": [],
+  "commonAbbreviations": {},
+  "languageVariations": [
+    "show network interfaces",
+    "list network interfaces",
+    "show adapters",
+    "ifconfig status",
+    "ip link show",
+    "network interfaces"
+  ],
+  "relatedTools": []
+}

@@ -1,0 +1,35 @@
+{
+  "toolId": "system.gpu",
+  "aliases": [
+    "gpu usage",
+    "graphics card status",
+    "check gpu",
+    "video card diagnostics"
+  ],
+  "synonyms": [
+    "please gpu usage",
+    "please graphics card status",
+    "please check gpu",
+    "please video card diagnostics"
+  ],
+  "commonUserWording": [
+    "check gpu status",
+    "could you check gpu status",
+    "gpu usage",
+    "graphics card status",
+    "check gpu",
+    "video card diagnostics"
+  ],
+  "commonMistakes": [],
+  "entityHints": {},
+  "deviceNamingPatterns": [],
+  "commonAbbreviations": {},
+  "languageVariations": [
+    "check gpu status",
+    "gpu usage",
+    "graphics card status",
+    "check gpu",
+    "video card diagnostics"
+  ],
+  "relatedTools": []
+}

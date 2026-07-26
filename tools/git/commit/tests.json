@@ -1,0 +1,18 @@
+{
+  "toolId": "git.commit",
+  "tests": [
+    {
+      "id": "git-commit-test-1",
+      "userRequest": "commit changes with message \"Fix login validation\"",
+      "expectedIntent": {
+        "domain": "git",
+        "action": "commit"
+      },
+      "expectedToolId": "git.commit",
+      "expectedEntities": {
+        "message": "sample_val"
+      },
+      "description": "Automated test case for Record Git Commit"
+    }
+  ]
+}

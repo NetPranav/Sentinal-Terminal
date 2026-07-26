@@ -1,0 +1,16 @@
+{
+  "toolId": "git.pull",
+  "tests": [
+    {
+      "id": "git-pull-test-1",
+      "userRequest": "pull changes from origin develop",
+      "expectedIntent": {
+        "domain": "git",
+        "action": "pull"
+      },
+      "expectedToolId": "git.pull",
+      "expectedEntities": {},
+      "description": "Automated test case for Pull Remote Git Changes"
+    }
+  ]
+}

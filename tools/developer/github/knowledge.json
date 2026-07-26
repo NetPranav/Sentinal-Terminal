@@ -1,0 +1,39 @@
+{
+  "toolId": "developer.github",
+  "aliases": [
+    "github cli",
+    "gh command",
+    "check github pull requests",
+    "open repo on github"
+  ],
+  "synonyms": [
+    "please github cli",
+    "please gh command",
+    "please check github pull requests",
+    "please open repo on github"
+  ],
+  "commonUserWording": [
+    "github cli command pr list",
+    "could you github cli command pr list",
+    "github cli",
+    "gh command",
+    "check github pull requests",
+    "open repo on github"
+  ],
+  "commonMistakes": [],
+  "entityHints": {
+    "command": [
+      "test_value"
+    ]
+  },
+  "deviceNamingPatterns": [],
+  "commonAbbreviations": {},
+  "languageVariations": [
+    "github cli command pr list",
+    "github cli",
+    "gh command",
+    "check github pull requests",
+    "open repo on github"
+  ],
+  "relatedTools": []
+}

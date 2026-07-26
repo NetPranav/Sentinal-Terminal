@@ -1,0 +1,16 @@
+{
+  "toolId": "network.bluetooth.list",
+  "tests": [
+    {
+      "id": "network-bluetooth.list-test-1",
+      "userRequest": "show me all the bluetooth devices",
+      "expectedIntent": {
+        "domain": "network",
+        "action": "bluetooth.list"
+      },
+      "expectedToolId": "network.bluetooth.list",
+      "expectedEntities": {},
+      "description": "Automated test case for List Bluetooth Devices"
+    }
+  ]
+}

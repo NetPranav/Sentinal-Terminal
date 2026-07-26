@@ -1,0 +1,21 @@
+{
+  "toolId": "browser.reload",
+  "version": "1.0.0",
+  "description": "Executes native driver for Reload Active Browser Tab.",
+  "steps": [
+    {
+      "id": "step_exec_main",
+      "name": "Execute Reload Active Browser Tab",
+      "type": "ExecuteCapability",
+      "capabilityId": "browser.reload",
+      "parameters": {},
+      "dependencies": [],
+      "onError": "fail"
+    }
+  ],
+  "successCondition": "step:step_exec_main:success",
+  "errorHandling": {
+    "strategy": "fail_fast",
+    "maxRetries": 0
+  }
+}

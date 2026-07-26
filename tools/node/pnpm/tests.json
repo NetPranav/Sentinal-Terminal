@@ -1,0 +1,18 @@
+{
+  "toolId": "node.pnpm",
+  "tests": [
+    {
+      "id": "node-pnpm-test-1",
+      "userRequest": "pnpm install dependencies",
+      "expectedIntent": {
+        "domain": "node",
+        "action": "pnpm"
+      },
+      "expectedToolId": "node.pnpm",
+      "expectedEntities": {
+        "command": "sample_val"
+      },
+      "description": "Automated test case for Run PNPM Operation"
+    }
+  ]
+}

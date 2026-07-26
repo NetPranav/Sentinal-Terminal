@@ -1,0 +1,18 @@
+{
+  "toolId": "node.bun",
+  "tests": [
+    {
+      "id": "node-bun-test-1",
+      "userRequest": "bun run server.ts",
+      "expectedIntent": {
+        "domain": "node",
+        "action": "bun"
+      },
+      "expectedToolId": "node.bun",
+      "expectedEntities": {
+        "command": "sample_val"
+      },
+      "description": "Automated test case for Execute via Bun Runtime"
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "toolId": "network.ports",
+  "version": "1.0.0",
+  "description": "Executes native driver for Inspect Open Network Ports.",
+  "steps": [
+    {
+      "id": "step_exec_main",
+      "name": "Execute Inspect Open Network Ports",
+      "type": "ExecuteCapability",
+      "capabilityId": "network.ports",
+      "parameters": {
+        "port": "{{port}}"
+      },
+      "dependencies": [],
+      "onError": "fail"
+    }
+  ],
+  "successCondition": "step:step_exec_main:success",
+  "errorHandling": {
+    "strategy": "fail_fast",
+    "maxRetries": 1
+  }
+}

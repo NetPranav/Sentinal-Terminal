@@ -1,0 +1,16 @@
+{
+  "toolId": "filesystem.recent_files",
+  "tests": [
+    {
+      "id": "filesystem-recent_files-test-1",
+      "userRequest": "show 10 recent files",
+      "expectedIntent": {
+        "domain": "filesystem",
+        "action": "recent_files"
+      },
+      "expectedToolId": "filesystem.recent_files",
+      "expectedEntities": {},
+      "description": "Automated test case for Query Recently Modified Files"
+    }
+  ]
+}

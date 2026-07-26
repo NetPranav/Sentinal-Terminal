@@ -1,0 +1,24 @@
+{
+  "toolId": "docker.compose_down",
+  "version": "1.0.0",
+  "description": "Executes native driver for Stop Docker Compose Stack.",
+  "steps": [
+    {
+      "id": "step_exec_main",
+      "name": "Execute Stop Docker Compose Stack",
+      "type": "ExecuteCapability",
+      "capabilityId": "docker.compose_down",
+      "parameters": {
+        "volumes": "{{volumes}}",
+        "file": "{{file}}"
+      },
+      "dependencies": [],
+      "onError": "fail"
+    }
+  ],
+  "successCondition": "step:step_exec_main:success",
+  "errorHandling": {
+    "strategy": "fail_fast",
+    "maxRetries": 0
+  }
+}

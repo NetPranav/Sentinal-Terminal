@@ -1,0 +1,48 @@
+{
+  "id": "developer.github",
+  "version": "1.0.0",
+  "displayName": "Interact with GitHub CLI",
+  "description": "Executes GitHub repository workflows via official `gh` CLI or opens repository in web.",
+  "domain": "developer",
+  "category": "Developer",
+  "tags": [
+    "developer",
+    "github",
+    "developer.github",
+    "interact",
+    "with",
+    "cli",
+    "gh",
+    "check",
+    "open"
+  ],
+  "aliases": [
+    "github cli",
+    "gh command",
+    "check github pull requests",
+    "open repo on github"
+  ],
+  "supportedPlatforms": [
+    "macos",
+    "windows",
+    "linux"
+  ],
+  "requiredPermissions": [
+    "ShellExecution"
+  ],
+  "securityRisk": "LOW",
+  "parameters": [
+    {
+      "name": "command",
+      "type": "string",
+      "description": "GitHub workflow command e.g. pr create, issue list, repo view",
+      "required": true
+    }
+  ],
+  "optionalParameters": [],
+  "estimatedExecutionTime": "2s",
+  "confirmationRequired": false,
+  "rollbackAvailable": false,
+  "verificationSupported": true,
+  "deprecationStatus": "stable"
+}

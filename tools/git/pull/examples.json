@@ -1,0 +1,14 @@
+{
+  "toolId": "git.pull",
+  "examples": [
+    {
+      "input": "pull changes from origin develop",
+      "expectedIntent": {
+        "domain": "git",
+        "action": "pull"
+      },
+      "expectedEntities": {},
+      "description": "Example execution of Pull Remote Git Changes"
+    }
+  ]
+}

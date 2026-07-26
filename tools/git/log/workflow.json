@@ -1,0 +1,23 @@
+{
+  "toolId": "git.log",
+  "version": "1.0.0",
+  "description": "Executes native driver for Inspect Git Commit History.",
+  "steps": [
+    {
+      "id": "step_exec_main",
+      "name": "Execute Inspect Git Commit History",
+      "type": "ExecuteCapability",
+      "capabilityId": "git.log",
+      "parameters": {
+        "maxCount": "{{maxCount}}"
+      },
+      "dependencies": [],
+      "onError": "fail"
+    }
+  ],
+  "successCondition": "step:step_exec_main:success",
+  "errorHandling": {
+    "strategy": "fail_fast",
+    "maxRetries": 0
+  }
+}

@@ -1,0 +1,38 @@
+{
+  "toolId": "developer.ssh",
+  "aliases": [
+    "ssh connect",
+    "open ssh session",
+    "remote shell connect"
+  ],
+  "synonyms": [
+    "please ssh connect",
+    "please open ssh session",
+    "please remote shell connect"
+  ],
+  "commonUserWording": [
+    "ssh connect to admin@production-server",
+    "could you ssh connect to admin@production-server",
+    "ssh connect",
+    "open ssh session",
+    "remote shell connect"
+  ],
+  "commonMistakes": [],
+  "entityHints": {
+    "target": [
+      "test_value"
+    ],
+    "port": [
+      "test_value"
+    ]
+  },
+  "deviceNamingPatterns": [],
+  "commonAbbreviations": {},
+  "languageVariations": [
+    "ssh connect to admin@production-server",
+    "ssh connect",
+    "open ssh session",
+    "remote shell connect"
+  ],
+  "relatedTools": []
+}

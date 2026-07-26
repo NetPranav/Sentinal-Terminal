@@ -1,0 +1,23 @@
+{
+  "toolId": "developer.cursor",
+  "version": "1.0.0",
+  "description": "Executes native driver for Open in Cursor AI IDE.",
+  "steps": [
+    {
+      "id": "step_exec_main",
+      "name": "Execute Open in Cursor AI IDE",
+      "type": "ExecuteCapability",
+      "capabilityId": "developer.cursor",
+      "parameters": {
+        "path": "{{path}}"
+      },
+      "dependencies": [],
+      "onError": "fail"
+    }
+  ],
+  "successCondition": "step:step_exec_main:success",
+  "errorHandling": {
+    "strategy": "fail_fast",
+    "maxRetries": 0
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "toolId": "filesystem.extract",
+  "tests": [
+    {
+      "id": "filesystem-extract-test-1",
+      "userRequest": "extract build.zip into ./dist",
+      "expectedIntent": {
+        "domain": "filesystem",
+        "action": "extract"
+      },
+      "expectedToolId": "filesystem.extract",
+      "expectedEntities": {
+        "archivePath": "sample_val"
+      },
+      "description": "Automated test case for Extract Archive File"
+    }
+  ]
+}

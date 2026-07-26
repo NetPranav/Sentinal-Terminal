@@ -1,0 +1,23 @@
+{
+  "toolId": "browser.close_tabs",
+  "version": "1.0.0",
+  "description": "Executes native driver for Close Browser Tabs.",
+  "steps": [
+    {
+      "id": "step_exec_main",
+      "name": "Execute Close Browser Tabs",
+      "type": "ExecuteCapability",
+      "capabilityId": "browser.close_tabs",
+      "parameters": {
+        "target": "{{target}}"
+      },
+      "dependencies": [],
+      "onError": "fail"
+    }
+  ],
+  "successCondition": "step:step_exec_main:success",
+  "errorHandling": {
+    "strategy": "fail_fast",
+    "maxRetries": 0
+  }
+}

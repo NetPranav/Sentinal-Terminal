@@ -1,0 +1,16 @@
+{
+  "toolId": "network.ip",
+  "tests": [
+    {
+      "id": "network-ip-test-1",
+      "userRequest": "what is my public ip address",
+      "expectedIntent": {
+        "domain": "network",
+        "action": "ip"
+      },
+      "expectedToolId": "network.ip",
+      "expectedEntities": {},
+      "description": "Automated test case for Resolve System IP Addresses"
+    }
+  ]
+}

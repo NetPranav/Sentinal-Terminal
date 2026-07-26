@@ -1,0 +1,16 @@
+{
+  "toolId": "network.ping",
+  "examples": [
+    {
+      "input": "ping host google.com",
+      "expectedIntent": {
+        "domain": "network",
+        "action": "ping"
+      },
+      "expectedEntities": {
+        "host": "sample_val"
+      },
+      "description": "Example execution of Ping Network Host"
+    }
+  ]
+}

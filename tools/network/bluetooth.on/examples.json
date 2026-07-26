@@ -1,0 +1,14 @@
+{
+  "toolId": "network.bluetooth.on",
+  "examples": [
+    {
+      "input": "turn my bluetooth on",
+      "expectedIntent": {
+        "domain": "network",
+        "action": "bluetooth.on"
+      },
+      "expectedEntities": {},
+      "description": "Example execution of Turn Bluetooth On"
+    }
+  ]
+}

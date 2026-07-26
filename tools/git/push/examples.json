@@ -1,0 +1,14 @@
+{
+  "toolId": "git.push",
+  "examples": [
+    {
+      "input": "git push to origin main",
+      "expectedIntent": {
+        "domain": "git",
+        "action": "push"
+      },
+      "expectedEntities": {},
+      "description": "Example execution of Push Git Commits"
+    }
+  ]
+}

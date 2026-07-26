@@ -1,0 +1,48 @@
+{
+  "id": "filesystem.recent_files",
+  "version": "1.0.0",
+  "displayName": "Query Recently Modified Files",
+  "description": "Retrieves a list of files recently created, modified, or accessed across the system.",
+  "domain": "filesystem",
+  "category": "Filesystem",
+  "tags": [
+    "filesystem",
+    "recent_files",
+    "filesystem.recent",
+    "files",
+    "query",
+    "recently",
+    "modified",
+    "recent",
+    "show"
+  ],
+  "aliases": [
+    "recent files",
+    "show latest modified files",
+    "recently opened files"
+  ],
+  "supportedPlatforms": [
+    "macos",
+    "windows",
+    "linux"
+  ],
+  "requiredPermissions": [
+    "ReadFiles"
+  ],
+  "securityRisk": "SAFE",
+  "parameters": [],
+  "optionalParameters": [
+    {
+      "name": "count",
+      "type": "number",
+      "description": "Maximum number of recent files to list",
+      "required": false,
+      "default": 20
+    }
+  ],
+  "estimatedExecutionTime": "1s",
+  "confirmationRequired": false,
+  "rollbackAvailable": false,
+  "verificationSupported": true,
+  "deprecationStatus": "stable"
+}

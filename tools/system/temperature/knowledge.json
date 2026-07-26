@@ -1,0 +1,35 @@
+{
+  "toolId": "system.temperature",
+  "aliases": [
+    "check computer temperature",
+    "cpu temp",
+    "thermal sensors",
+    "is computer running hot"
+  ],
+  "synonyms": [
+    "please check computer temperature",
+    "please cpu temp",
+    "please thermal sensors",
+    "please is computer running hot"
+  ],
+  "commonUserWording": [
+    "check system cpu temperature",
+    "could you check system cpu temperature",
+    "check computer temperature",
+    "cpu temp",
+    "thermal sensors",
+    "is computer running hot"
+  ],
+  "commonMistakes": [],
+  "entityHints": {},
+  "deviceNamingPatterns": [],
+  "commonAbbreviations": {},
+  "languageVariations": [
+    "check system cpu temperature",
+    "check computer temperature",
+    "cpu temp",
+    "thermal sensors",
+    "is computer running hot"
+  ],
+  "relatedTools": []
+}

@@ -1,0 +1,35 @@
+{
+  "toolId": "application.minimize",
+  "aliases": [
+    "minimize app",
+    "hide application window",
+    "minimize program"
+  ],
+  "synonyms": [
+    "please minimize app",
+    "please hide application window",
+    "please minimize program"
+  ],
+  "commonUserWording": [
+    "minimize Spotify",
+    "could you minimize Spotify",
+    "minimize app",
+    "hide application window",
+    "minimize program"
+  ],
+  "commonMistakes": [],
+  "entityHints": {
+    "app": [
+      "test_value"
+    ]
+  },
+  "deviceNamingPatterns": [],
+  "commonAbbreviations": {},
+  "languageVariations": [
+    "minimize Spotify",
+    "minimize app",
+    "hide application window",
+    "minimize program"
+  ],
+  "relatedTools": []
+}

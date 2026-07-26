@@ -1,0 +1,16 @@
+{
+  "toolId": "filesystem.read",
+  "examples": [
+    {
+      "input": "read package.json",
+      "expectedIntent": {
+        "domain": "filesystem",
+        "action": "read"
+      },
+      "expectedEntities": {
+        "path": "/test/path.txt"
+      },
+      "description": "Example execution of Read File Content"
+    }
+  ]
+}

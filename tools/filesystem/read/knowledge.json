@@ -1,0 +1,39 @@
+{
+  "toolId": "filesystem.read",
+  "aliases": [
+    "read file",
+    "cat file",
+    "view file",
+    "show file contents"
+  ],
+  "synonyms": [
+    "please read file",
+    "please cat file",
+    "please view file",
+    "please show file contents"
+  ],
+  "commonUserWording": [
+    "read package.json",
+    "could you read package.json",
+    "read file",
+    "cat file",
+    "view file",
+    "show file contents"
+  ],
+  "commonMistakes": [],
+  "entityHints": {
+    "path": [
+      "/Users/shared/file.json"
+    ]
+  },
+  "deviceNamingPatterns": [],
+  "commonAbbreviations": {},
+  "languageVariations": [
+    "read package.json",
+    "read file",
+    "cat file",
+    "view file",
+    "show file contents"
+  ],
+  "relatedTools": []
+}

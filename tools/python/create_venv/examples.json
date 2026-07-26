@@ -1,0 +1,14 @@
+{
+  "toolId": "python.create_venv",
+  "examples": [
+    {
+      "input": "create venv in directory .venv",
+      "expectedIntent": {
+        "domain": "python",
+        "action": "create_venv"
+      },
+      "expectedEntities": {},
+      "description": "Example execution of Create Python Virtual Environment"
+    }
+  ]
+}

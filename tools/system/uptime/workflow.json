@@ -1,0 +1,21 @@
+{
+  "toolId": "system.uptime",
+  "version": "1.0.0",
+  "description": "Executes native driver for Query System Uptime Duration.",
+  "steps": [
+    {
+      "id": "step_exec_main",
+      "name": "Execute Query System Uptime Duration",
+      "type": "ExecuteCapability",
+      "capabilityId": "system.uptime",
+      "parameters": {},
+      "dependencies": [],
+      "onError": "fail"
+    }
+  ],
+  "successCondition": "step:step_exec_main:success",
+  "errorHandling": {
+    "strategy": "fail_fast",
+    "maxRetries": 0
+  }
+}

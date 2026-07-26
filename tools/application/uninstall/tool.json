@@ -1,0 +1,46 @@
+{
+  "id": "application.uninstall",
+  "version": "1.0.0",
+  "displayName": "Uninstall Desktop Application",
+  "description": "Uninstalls or removes software package via system package manager or App cleaner.",
+  "domain": "application",
+  "category": "Desktop",
+  "tags": [
+    "application",
+    "uninstall",
+    "application.uninstall",
+    "desktop",
+    "remove",
+    "brew",
+    "delete"
+  ],
+  "aliases": [
+    "uninstall app",
+    "remove package",
+    "brew uninstall",
+    "delete app program"
+  ],
+  "supportedPlatforms": [
+    "macos",
+    "windows",
+    "linux"
+  ],
+  "requiredPermissions": [
+    "ShellExecution"
+  ],
+  "securityRisk": "HIGH",
+  "parameters": [
+    {
+      "name": "package",
+      "type": "string",
+      "description": "Package or application name to remove",
+      "required": true
+    }
+  ],
+  "optionalParameters": [],
+  "estimatedExecutionTime": "2s",
+  "confirmationRequired": true,
+  "rollbackAvailable": false,
+  "verificationSupported": true,
+  "deprecationStatus": "stable"
+}

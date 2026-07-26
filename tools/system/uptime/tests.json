@@ -1,0 +1,16 @@
+{
+  "toolId": "system.uptime",
+  "tests": [
+    {
+      "id": "system-uptime-test-1",
+      "userRequest": "check system uptime",
+      "expectedIntent": {
+        "domain": "system",
+        "action": "uptime"
+      },
+      "expectedToolId": "system.uptime",
+      "expectedEntities": {},
+      "description": "Automated test case for Query System Uptime Duration"
+    }
+  ]
+}

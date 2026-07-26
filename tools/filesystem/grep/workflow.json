@@ -1,0 +1,24 @@
+{
+  "toolId": "filesystem.grep",
+  "version": "1.0.0",
+  "description": "Executes native driver for Search by File Content.",
+  "steps": [
+    {
+      "id": "step_exec_main",
+      "name": "Execute Search by File Content",
+      "type": "ExecuteCapability",
+      "capabilityId": "filesystem.grep",
+      "parameters": {
+        "path": "{{path}}",
+        "query": "{{query}}"
+      },
+      "dependencies": [],
+      "onError": "fail"
+    }
+  ],
+  "successCondition": "step:step_exec_main:success",
+  "errorHandling": {
+    "strategy": "fail_fast",
+    "maxRetries": 0
+  }
+}

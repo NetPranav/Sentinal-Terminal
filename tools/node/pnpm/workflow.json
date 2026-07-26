@@ -1,0 +1,23 @@
+{
+  "toolId": "node.pnpm",
+  "version": "1.0.0",
+  "description": "Executes native driver for Run PNPM Operation.",
+  "steps": [
+    {
+      "id": "step_exec_main",
+      "name": "Execute Run PNPM Operation",
+      "type": "ExecuteCapability",
+      "capabilityId": "node.pnpm",
+      "parameters": {
+        "command": "{{command}}"
+      },
+      "dependencies": [],
+      "onError": "fail"
+    }
+  ],
+  "successCondition": "step:step_exec_main:success",
+  "errorHandling": {
+    "strategy": "fail_fast",
+    "maxRetries": 0
+  }
+}

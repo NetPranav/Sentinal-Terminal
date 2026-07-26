@@ -1,0 +1,16 @@
+{
+  "toolId": "browser.close_tabs",
+  "tests": [
+    {
+      "id": "browser-close_tabs-test-1",
+      "userRequest": "close current browser tab",
+      "expectedIntent": {
+        "domain": "browser",
+        "action": "close_tabs"
+      },
+      "expectedToolId": "browser.close_tabs",
+      "expectedEntities": {},
+      "description": "Automated test case for Close Browser Tabs"
+    }
+  ]
+}

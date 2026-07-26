@@ -1,0 +1,35 @@
+{
+  "toolId": "application.focus",
+  "aliases": [
+    "focus app",
+    "switch to application",
+    "bring to front"
+  ],
+  "synonyms": [
+    "please focus app",
+    "please switch to application",
+    "please bring to front"
+  ],
+  "commonUserWording": [
+    "focus VSCode",
+    "could you focus VSCode",
+    "focus app",
+    "switch to application",
+    "bring to front"
+  ],
+  "commonMistakes": [],
+  "entityHints": {
+    "app": [
+      "test_value"
+    ]
+  },
+  "deviceNamingPatterns": [],
+  "commonAbbreviations": {},
+  "languageVariations": [
+    "focus VSCode",
+    "focus app",
+    "switch to application",
+    "bring to front"
+  ],
+  "relatedTools": []
+}

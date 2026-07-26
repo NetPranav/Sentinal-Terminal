@@ -1,0 +1,16 @@
+{
+  "toolId": "network.wifi.connect",
+  "examples": [
+    {
+      "input": "connect wifi to Home-WiFi-5G",
+      "expectedIntent": {
+        "domain": "network",
+        "action": "wifi.connect"
+      },
+      "expectedEntities": {
+        "ssid": "sample_val"
+      },
+      "description": "Example execution of Connect to Wi-Fi Network"
+    }
+  ]
+}

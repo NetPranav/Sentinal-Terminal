@@ -1,0 +1,16 @@
+{
+  "toolId": "git.push",
+  "tests": [
+    {
+      "id": "git-push-test-1",
+      "userRequest": "git push to origin main",
+      "expectedIntent": {
+        "domain": "git",
+        "action": "push"
+      },
+      "expectedToolId": "git.push",
+      "expectedEntities": {},
+      "description": "Automated test case for Push Git Commits"
+    }
+  ]
+}

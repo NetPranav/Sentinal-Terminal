@@ -1,0 +1,38 @@
+{
+  "toolId": "git.branch",
+  "aliases": [
+    "git branch",
+    "list branches",
+    "show git branches"
+  ],
+  "synonyms": [
+    "please git branch",
+    "please list branches",
+    "please show git branches"
+  ],
+  "commonUserWording": [
+    "list git branches",
+    "could you list git branches",
+    "git branch",
+    "list branches",
+    "show git branches"
+  ],
+  "commonMistakes": [],
+  "entityHints": {
+    "operation": [
+      "test_value"
+    ],
+    "name": [
+      "test_value"
+    ]
+  },
+  "deviceNamingPatterns": [],
+  "commonAbbreviations": {},
+  "languageVariations": [
+    "list git branches",
+    "git branch",
+    "list branches",
+    "show git branches"
+  ],
+  "relatedTools": []
+}

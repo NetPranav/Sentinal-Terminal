@@ -1,0 +1,44 @@
+{
+  "id": "application.focus",
+  "version": "1.0.0",
+  "displayName": "Focus Application Window",
+  "description": "Brings a desktop application window to the foreground screen focus.",
+  "domain": "application",
+  "category": "Desktop",
+  "tags": [
+    "application",
+    "focus",
+    "application.focus",
+    "window",
+    "switch",
+    "bring"
+  ],
+  "aliases": [
+    "focus app",
+    "switch to application",
+    "bring to front"
+  ],
+  "supportedPlatforms": [
+    "macos",
+    "windows",
+    "linux"
+  ],
+  "requiredPermissions": [
+    "ShellExecution"
+  ],
+  "securityRisk": "SAFE",
+  "parameters": [
+    {
+      "name": "app",
+      "type": "string",
+      "description": "Application name to focus",
+      "required": true
+    }
+  ],
+  "optionalParameters": [],
+  "estimatedExecutionTime": "1s",
+  "confirmationRequired": false,
+  "rollbackAvailable": false,
+  "verificationSupported": true,
+  "deprecationStatus": "stable"
+}

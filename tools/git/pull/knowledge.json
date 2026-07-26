@@ -1,0 +1,38 @@
+{
+  "toolId": "git.pull",
+  "aliases": [
+    "git pull",
+    "pull changes",
+    "fetch repository updates"
+  ],
+  "synonyms": [
+    "please git pull",
+    "please pull changes",
+    "please fetch repository updates"
+  ],
+  "commonUserWording": [
+    "pull changes from origin develop",
+    "could you pull changes from origin develop",
+    "git pull",
+    "pull changes",
+    "fetch repository updates"
+  ],
+  "commonMistakes": [],
+  "entityHints": {
+    "remote": [
+      "test_value"
+    ],
+    "branch": [
+      "test_value"
+    ]
+  },
+  "deviceNamingPatterns": [],
+  "commonAbbreviations": {},
+  "languageVariations": [
+    "pull changes from origin develop",
+    "git pull",
+    "pull changes",
+    "fetch repository updates"
+  ],
+  "relatedTools": []
+}

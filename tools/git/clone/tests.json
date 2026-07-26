@@ -1,0 +1,18 @@
+{
+  "toolId": "git.clone",
+  "tests": [
+    {
+      "id": "git-clone-test-1",
+      "userRequest": "clone repository https://github.com/torvalds/linux",
+      "expectedIntent": {
+        "domain": "git",
+        "action": "clone"
+      },
+      "expectedToolId": "git.clone",
+      "expectedEntities": {
+        "url": "sample_val"
+      },
+      "description": "Automated test case for Clone Git Repository"
+    }
+  ]
+}

@@ -1,0 +1,38 @@
+{
+  "toolId": "git.checkout",
+  "aliases": [
+    "git checkout",
+    "switch branch",
+    "change git branch"
+  ],
+  "synonyms": [
+    "please git checkout",
+    "please switch branch",
+    "please change git branch"
+  ],
+  "commonUserWording": [
+    "switch branch to feature/auth",
+    "could you switch branch to feature/auth",
+    "git checkout",
+    "switch branch",
+    "change git branch"
+  ],
+  "commonMistakes": [],
+  "entityHints": {
+    "target": [
+      "test_value"
+    ],
+    "create": [
+      "test_value"
+    ]
+  },
+  "deviceNamingPatterns": [],
+  "commonAbbreviations": {},
+  "languageVariations": [
+    "switch branch to feature/auth",
+    "git checkout",
+    "switch branch",
+    "change git branch"
+  ],
+  "relatedTools": []
+}

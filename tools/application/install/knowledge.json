@@ -1,0 +1,39 @@
+{
+  "toolId": "application.install",
+  "aliases": [
+    "install app",
+    "brew install",
+    "install package",
+    "setup software"
+  ],
+  "synonyms": [
+    "please install app",
+    "please brew install",
+    "please install package",
+    "please setup software"
+  ],
+  "commonUserWording": [
+    "install app ffmpeg",
+    "could you install app ffmpeg",
+    "install app",
+    "brew install",
+    "install package",
+    "setup software"
+  ],
+  "commonMistakes": [],
+  "entityHints": {
+    "package": [
+      "test_value"
+    ]
+  },
+  "deviceNamingPatterns": [],
+  "commonAbbreviations": {},
+  "languageVariations": [
+    "install app ffmpeg",
+    "install app",
+    "brew install",
+    "install package",
+    "setup software"
+  ],
+  "relatedTools": []
+}

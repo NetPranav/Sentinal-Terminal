@@ -1,0 +1,23 @@
+{
+  "toolId": "application.install",
+  "version": "1.0.0",
+  "description": "Executes native driver for Install Desktop Package or App.",
+  "steps": [
+    {
+      "id": "step_exec_main",
+      "name": "Execute Install Desktop Package or App",
+      "type": "ExecuteCapability",
+      "capabilityId": "application.install",
+      "parameters": {
+        "package": "{{package}}"
+      },
+      "dependencies": [],
+      "onError": "fail"
+    }
+  ],
+  "successCondition": "step:step_exec_main:success",
+  "errorHandling": {
+    "strategy": "fail_fast",
+    "maxRetries": 0
+  }
+}

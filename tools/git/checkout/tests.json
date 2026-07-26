@@ -1,0 +1,18 @@
+{
+  "toolId": "git.checkout",
+  "tests": [
+    {
+      "id": "git-checkout-test-1",
+      "userRequest": "switch branch to feature/auth",
+      "expectedIntent": {
+        "domain": "git",
+        "action": "checkout"
+      },
+      "expectedToolId": "git.checkout",
+      "expectedEntities": {
+        "target": "sample_val"
+      },
+      "description": "Automated test case for Checkout Git Branch or Commit"
+    }
+  ]
+}

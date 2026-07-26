@@ -1,0 +1,42 @@
+{
+  "toolId": "filesystem.compress",
+  "aliases": [
+    "zip folder",
+    "compress files",
+    "create archive",
+    "tar folder"
+  ],
+  "synonyms": [
+    "please zip folder",
+    "please compress files",
+    "please create archive",
+    "please tar folder"
+  ],
+  "commonUserWording": [
+    "compress src to build.zip",
+    "could you compress src to build.zip",
+    "zip folder",
+    "compress files",
+    "create archive",
+    "tar folder"
+  ],
+  "commonMistakes": [],
+  "entityHints": {
+    "source": [
+      "test_value"
+    ],
+    "archiveName": [
+      "test_value"
+    ]
+  },
+  "deviceNamingPatterns": [],
+  "commonAbbreviations": {},
+  "languageVariations": [
+    "compress src to build.zip",
+    "zip folder",
+    "compress files",
+    "create archive",
+    "tar folder"
+  ],
+  "relatedTools": []
+}

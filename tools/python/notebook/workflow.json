@@ -1,0 +1,23 @@
+{
+  "toolId": "python.notebook",
+  "version": "1.0.0",
+  "description": "Executes native driver for Launch Jupyter Notebook.",
+  "steps": [
+    {
+      "id": "step_exec_main",
+      "name": "Execute Launch Jupyter Notebook",
+      "type": "ExecuteCapability",
+      "capabilityId": "python.notebook",
+      "parameters": {
+        "lab": "{{lab}}"
+      },
+      "dependencies": [],
+      "onError": "fail"
+    }
+  ],
+  "successCondition": "step:step_exec_main:success",
+  "errorHandling": {
+    "strategy": "fail_fast",
+    "maxRetries": 0
+  }
+}

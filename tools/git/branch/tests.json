@@ -1,0 +1,16 @@
+{
+  "toolId": "git.branch",
+  "tests": [
+    {
+      "id": "git-branch-test-1",
+      "userRequest": "list git branches",
+      "expectedIntent": {
+        "domain": "git",
+        "action": "branch"
+      },
+      "expectedToolId": "git.branch",
+      "expectedEntities": {},
+      "description": "Automated test case for Manage Git Branches"
+    }
+  ]
+}

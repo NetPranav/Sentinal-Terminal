@@ -1,0 +1,44 @@
+{
+  "id": "docker.stop",
+  "version": "1.0.0",
+  "displayName": "Stop Running Container",
+  "description": "Gracefully stops an actively running Docker container instance.",
+  "domain": "docker",
+  "category": "Docker",
+  "tags": [
+    "docker",
+    "stop",
+    "docker.stop",
+    "running",
+    "container",
+    "halt"
+  ],
+  "aliases": [
+    "docker stop",
+    "stop container",
+    "halt docker container"
+  ],
+  "supportedPlatforms": [
+    "macos",
+    "windows",
+    "linux"
+  ],
+  "requiredPermissions": [
+    "ShellExecution"
+  ],
+  "securityRisk": "LOW",
+  "parameters": [
+    {
+      "name": "container",
+      "type": "string",
+      "description": "Container ID or name to stop",
+      "required": true
+    }
+  ],
+  "optionalParameters": [],
+  "estimatedExecutionTime": "2s",
+  "confirmationRequired": false,
+  "rollbackAvailable": false,
+  "verificationSupported": true,
+  "deprecationStatus": "stable"
+}

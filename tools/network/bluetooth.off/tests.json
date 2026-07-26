@@ -1,0 +1,16 @@
+{
+  "toolId": "network.bluetooth.off",
+  "tests": [
+    {
+      "id": "network-bluetooth.off-test-1",
+      "userRequest": "turn bluetooth off",
+      "expectedIntent": {
+        "domain": "network",
+        "action": "bluetooth.off"
+      },
+      "expectedToolId": "network.bluetooth.off",
+      "expectedEntities": {},
+      "description": "Automated test case for Turn Bluetooth Off"
+    }
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "toolId": "system.storage",
+  "version": "1.0.0",
+  "description": "Executes native driver for Inspect Storage Health & Volumes.",
+  "steps": [
+    {
+      "id": "step_exec_main",
+      "name": "Execute Inspect Storage Health & Volumes",
+      "type": "ExecuteCapability",
+      "capabilityId": "system.storage",
+      "parameters": {},
+      "dependencies": [],
+      "onError": "fail"
+    }
+  ],
+  "successCondition": "step:step_exec_main:success",
+  "errorHandling": {
+    "strategy": "fail_fast",
+    "maxRetries": 0
+  }
+}

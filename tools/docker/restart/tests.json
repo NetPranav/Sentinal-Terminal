@@ -1,0 +1,18 @@
+{
+  "toolId": "docker.restart",
+  "tests": [
+    {
+      "id": "docker-restart-test-1",
+      "userRequest": "restart docker container redis_db",
+      "expectedIntent": {
+        "domain": "docker",
+        "action": "restart"
+      },
+      "expectedToolId": "docker.restart",
+      "expectedEntities": {
+        "container": "sample_val"
+      },
+      "description": "Automated test case for Restart Docker Container"
+    }
+  ]
+}

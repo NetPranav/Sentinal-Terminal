@@ -1,0 +1,14 @@
+{
+  "toolId": "system.ram",
+  "examples": [
+    {
+      "input": "check ram usage",
+      "expectedIntent": {
+        "domain": "system",
+        "action": "ram"
+      },
+      "expectedEntities": {},
+      "description": "Example execution of Inspect RAM Memory Capacity"
+    }
+  ]
+}

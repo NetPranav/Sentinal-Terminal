@@ -1,0 +1,35 @@
+{
+  "toolId": "system.storage",
+  "aliases": [
+    "storage status",
+    "check disk health",
+    "mounted drives",
+    "list partitions"
+  ],
+  "synonyms": [
+    "please storage status",
+    "please check disk health",
+    "please mounted drives",
+    "please list partitions"
+  ],
+  "commonUserWording": [
+    "check storage drives and health",
+    "could you check storage drives and health",
+    "storage status",
+    "check disk health",
+    "mounted drives",
+    "list partitions"
+  ],
+  "commonMistakes": [],
+  "entityHints": {},
+  "deviceNamingPatterns": [],
+  "commonAbbreviations": {},
+  "languageVariations": [
+    "check storage drives and health",
+    "storage status",
+    "check disk health",
+    "mounted drives",
+    "list partitions"
+  ],
+  "relatedTools": []
+}

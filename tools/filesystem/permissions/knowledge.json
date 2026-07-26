@@ -1,0 +1,42 @@
+{
+  "toolId": "filesystem.permissions",
+  "aliases": [
+    "change permissions",
+    "chmod",
+    "chown",
+    "file permissions"
+  ],
+  "synonyms": [
+    "please change permissions",
+    "please chmod",
+    "please chown",
+    "please file permissions"
+  ],
+  "commonUserWording": [
+    "set permissions 755 on script.sh",
+    "could you set permissions 755 on script.sh",
+    "change permissions",
+    "chmod",
+    "chown",
+    "file permissions"
+  ],
+  "commonMistakes": [],
+  "entityHints": {
+    "path": [
+      "/Users/shared/file.json"
+    ],
+    "mode": [
+      "test_value"
+    ]
+  },
+  "deviceNamingPatterns": [],
+  "commonAbbreviations": {},
+  "languageVariations": [
+    "set permissions 755 on script.sh",
+    "change permissions",
+    "chmod",
+    "chown",
+    "file permissions"
+  ],
+  "relatedTools": []
+}

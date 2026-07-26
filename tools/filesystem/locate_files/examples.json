@@ -1,0 +1,16 @@
+{
+  "toolId": "filesystem.locate_files",
+  "examples": [
+    {
+      "input": "locate files named id_rsa",
+      "expectedIntent": {
+        "domain": "filesystem",
+        "action": "locate_files"
+      },
+      "expectedEntities": {
+        "name": "sample_val"
+      },
+      "description": "Example execution of Locate Specific Files"
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "toolId": "filesystem.restore",
+  "version": "1.0.0",
+  "description": "Executes native driver for Restore File from Trash.",
+  "steps": [
+    {
+      "id": "step_exec_main",
+      "name": "Execute Restore File from Trash",
+      "type": "ExecuteCapability",
+      "capabilityId": "filesystem.restore",
+      "parameters": {
+        "name": "{{name}}"
+      },
+      "dependencies": [],
+      "onError": "fail"
+    }
+  ],
+  "successCondition": "step:step_exec_main:success",
+  "errorHandling": {
+    "strategy": "fail_fast",
+    "maxRetries": 0
+  }
+}

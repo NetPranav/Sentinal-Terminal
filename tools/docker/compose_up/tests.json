@@ -1,0 +1,16 @@
+{
+  "toolId": "docker.compose_up",
+  "tests": [
+    {
+      "id": "docker-compose_up-test-1",
+      "userRequest": "start docker compose up detached",
+      "expectedIntent": {
+        "domain": "docker",
+        "action": "compose_up"
+      },
+      "expectedToolId": "docker.compose_up",
+      "expectedEntities": {},
+      "description": "Automated test case for Start Docker Compose Stack"
+    }
+  ]
+}

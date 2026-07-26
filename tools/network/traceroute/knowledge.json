@@ -1,0 +1,39 @@
+{
+  "toolId": "network.traceroute",
+  "aliases": [
+    "traceroute host",
+    "trace network path",
+    "trace hops to",
+    "traceroute"
+  ],
+  "synonyms": [
+    "please traceroute host",
+    "please trace network path",
+    "please trace hops to",
+    "please traceroute"
+  ],
+  "commonUserWording": [
+    "traceroute host github.com",
+    "could you traceroute host github.com",
+    "traceroute host",
+    "trace network path",
+    "trace hops to",
+    "traceroute"
+  ],
+  "commonMistakes": [],
+  "entityHints": {
+    "host": [
+      "test_value"
+    ]
+  },
+  "deviceNamingPatterns": [],
+  "commonAbbreviations": {},
+  "languageVariations": [
+    "traceroute host github.com",
+    "traceroute host",
+    "trace network path",
+    "trace hops to",
+    "traceroute"
+  ],
+  "relatedTools": []
+}

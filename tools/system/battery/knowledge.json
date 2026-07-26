@@ -1,0 +1,35 @@
+{
+  "toolId": "system.battery",
+  "aliases": [
+    "check battery",
+    "battery status",
+    "power level",
+    "how much battery left"
+  ],
+  "synonyms": [
+    "please check battery",
+    "please battery status",
+    "please power level",
+    "please how much battery left"
+  ],
+  "commonUserWording": [
+    "check battery status",
+    "could you check battery status",
+    "check battery",
+    "battery status",
+    "power level",
+    "how much battery left"
+  ],
+  "commonMistakes": [],
+  "entityHints": {},
+  "deviceNamingPatterns": [],
+  "commonAbbreviations": {},
+  "languageVariations": [
+    "check battery status",
+    "check battery",
+    "battery status",
+    "power level",
+    "how much battery left"
+  ],
+  "relatedTools": []
+}

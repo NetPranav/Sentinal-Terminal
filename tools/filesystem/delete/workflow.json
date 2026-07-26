@@ -1,0 +1,23 @@
+{
+  "toolId": "filesystem.delete",
+  "version": "1.0.0",
+  "description": "Executes native driver for Permanently Delete File or Folder.",
+  "steps": [
+    {
+      "id": "step_exec_main",
+      "name": "Execute Permanently Delete File or Folder",
+      "type": "ExecuteCapability",
+      "capabilityId": "filesystem.delete",
+      "parameters": {
+        "path": "{{path}}"
+      },
+      "dependencies": [],
+      "onError": "fail"
+    }
+  ],
+  "successCondition": "step:step_exec_main:success",
+  "errorHandling": {
+    "strategy": "fail_fast",
+    "maxRetries": 0
+  }
+}

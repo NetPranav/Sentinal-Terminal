@@ -1,0 +1,35 @@
+{
+  "toolId": "filesystem.recent_files",
+  "aliases": [
+    "recent files",
+    "show latest modified files",
+    "recently opened files"
+  ],
+  "synonyms": [
+    "please recent files",
+    "please show latest modified files",
+    "please recently opened files"
+  ],
+  "commonUserWording": [
+    "show 10 recent files",
+    "could you show 10 recent files",
+    "recent files",
+    "show latest modified files",
+    "recently opened files"
+  ],
+  "commonMistakes": [],
+  "entityHints": {
+    "count": [
+      "test_value"
+    ]
+  },
+  "deviceNamingPatterns": [],
+  "commonAbbreviations": {},
+  "languageVariations": [
+    "show 10 recent files",
+    "recent files",
+    "show latest modified files",
+    "recently opened files"
+  ],
+  "relatedTools": []
+}

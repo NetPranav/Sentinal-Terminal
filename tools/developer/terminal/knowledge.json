@@ -1,0 +1,35 @@
+{
+  "toolId": "developer.terminal",
+  "aliases": [
+    "open terminal window",
+    "new terminal here",
+    "launch terminal at folder"
+  ],
+  "synonyms": [
+    "please open terminal window",
+    "please new terminal here",
+    "please launch terminal at folder"
+  ],
+  "commonUserWording": [
+    "open terminal window at ./src",
+    "could you open terminal window at ./src",
+    "open terminal window",
+    "new terminal here",
+    "launch terminal at folder"
+  ],
+  "commonMistakes": [],
+  "entityHints": {
+    "path": [
+      "/Users/shared/file.json"
+    ]
+  },
+  "deviceNamingPatterns": [],
+  "commonAbbreviations": {},
+  "languageVariations": [
+    "open terminal window at ./src",
+    "open terminal window",
+    "new terminal here",
+    "launch terminal at folder"
+  ],
+  "relatedTools": []
+}

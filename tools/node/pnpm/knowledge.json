@@ -1,0 +1,35 @@
+{
+  "toolId": "node.pnpm",
+  "aliases": [
+    "pnpm install",
+    "pnpm run",
+    "use pnpm"
+  ],
+  "synonyms": [
+    "please pnpm install",
+    "please pnpm run",
+    "please use pnpm"
+  ],
+  "commonUserWording": [
+    "pnpm install dependencies",
+    "could you pnpm install dependencies",
+    "pnpm install",
+    "pnpm run",
+    "use pnpm"
+  ],
+  "commonMistakes": [],
+  "entityHints": {
+    "command": [
+      "test_value"
+    ]
+  },
+  "deviceNamingPatterns": [],
+  "commonAbbreviations": {},
+  "languageVariations": [
+    "pnpm install dependencies",
+    "pnpm install",
+    "pnpm run",
+    "use pnpm"
+  ],
+  "relatedTools": []
+}

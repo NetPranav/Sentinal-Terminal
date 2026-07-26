@@ -1,0 +1,16 @@
+{
+  "toolId": "filesystem.permissions",
+  "examples": [
+    {
+      "input": "set permissions 755 on script.sh",
+      "expectedIntent": {
+        "domain": "filesystem",
+        "action": "permissions"
+      },
+      "expectedEntities": {
+        "path": "/test/path.txt"
+      },
+      "description": "Example execution of Inspect or Modify File Permissions"
+    }
+  ]
+}

@@ -1,0 +1,43 @@
+{
+  "id": "application.minimize",
+  "version": "1.0.0",
+  "displayName": "Minimize Application Window",
+  "description": "Minimizes application window down to system dock or taskbar.",
+  "domain": "application",
+  "category": "Desktop",
+  "tags": [
+    "application",
+    "minimize",
+    "application.minimize",
+    "window",
+    "hide"
+  ],
+  "aliases": [
+    "minimize app",
+    "hide application window",
+    "minimize program"
+  ],
+  "supportedPlatforms": [
+    "macos",
+    "windows",
+    "linux"
+  ],
+  "requiredPermissions": [
+    "ShellExecution"
+  ],
+  "securityRisk": "SAFE",
+  "parameters": [
+    {
+      "name": "app",
+      "type": "string",
+      "description": "Application name to minimize",
+      "required": true
+    }
+  ],
+  "optionalParameters": [],
+  "estimatedExecutionTime": "1s",
+  "confirmationRequired": false,
+  "rollbackAvailable": false,
+  "verificationSupported": true,
+  "deprecationStatus": "stable"
+}

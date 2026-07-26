@@ -1,0 +1,35 @@
+{
+  "toolId": "browser.history",
+  "aliases": [
+    "browser history",
+    "show visited sites",
+    "search web history"
+  ],
+  "synonyms": [
+    "please browser history",
+    "please show visited sites",
+    "please search web history"
+  ],
+  "commonUserWording": [
+    "search browser history for docs",
+    "could you search browser history for docs",
+    "browser history",
+    "show visited sites",
+    "search web history"
+  ],
+  "commonMistakes": [],
+  "entityHints": {
+    "query": [
+      "test_value"
+    ]
+  },
+  "deviceNamingPatterns": [],
+  "commonAbbreviations": {},
+  "languageVariations": [
+    "search browser history for docs",
+    "browser history",
+    "show visited sites",
+    "search web history"
+  ],
+  "relatedTools": []
+}

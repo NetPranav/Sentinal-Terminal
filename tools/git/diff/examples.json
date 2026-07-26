@@ -1,0 +1,14 @@
+{
+  "toolId": "git.diff",
+  "examples": [
+    {
+      "input": "show git diff for modified files",
+      "expectedIntent": {
+        "domain": "git",
+        "action": "diff"
+      },
+      "expectedEntities": {},
+      "description": "Example execution of View Git Workspace Diff"
+    }
+  ]
+}

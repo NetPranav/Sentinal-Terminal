@@ -1,0 +1,45 @@
+{
+  "id": "application.force_quit",
+  "version": "1.0.0",
+  "displayName": "Force Quit Application",
+  "description": "Instantly terminates an unresponsive desktop application or frozen process (pkill -9).",
+  "domain": "application",
+  "category": "Desktop",
+  "tags": [
+    "application",
+    "force_quit",
+    "application.force",
+    "quit",
+    "force",
+    "kill"
+  ],
+  "aliases": [
+    "force quit app",
+    "kill application",
+    "kill process app",
+    "force close"
+  ],
+  "supportedPlatforms": [
+    "macos",
+    "windows",
+    "linux"
+  ],
+  "requiredPermissions": [
+    "ShellExecution"
+  ],
+  "securityRisk": "HIGH",
+  "parameters": [
+    {
+      "name": "app",
+      "type": "string",
+      "description": "Application name or process ID to force quit",
+      "required": true
+    }
+  ],
+  "optionalParameters": [],
+  "estimatedExecutionTime": "2s",
+  "confirmationRequired": true,
+  "rollbackAvailable": false,
+  "verificationSupported": true,
+  "deprecationStatus": "stable"
+}

@@ -1,0 +1,16 @@
+{
+  "toolId": "developer.vscode",
+  "tests": [
+    {
+      "id": "developer-vscode-test-1",
+      "userRequest": "open current folder in vscode",
+      "expectedIntent": {
+        "domain": "developer",
+        "action": "vscode"
+      },
+      "expectedToolId": "developer.vscode",
+      "expectedEntities": {},
+      "description": "Automated test case for Open in Visual Studio Code"
+    }
+  ]
+}

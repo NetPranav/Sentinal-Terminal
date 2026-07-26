@@ -1,0 +1,16 @@
+{
+  "toolId": "node.npm_install",
+  "tests": [
+    {
+      "id": "node-npm_install-test-1",
+      "userRequest": "npm install axios",
+      "expectedIntent": {
+        "domain": "node",
+        "action": "npm_install"
+      },
+      "expectedToolId": "node.npm_install",
+      "expectedEntities": {},
+      "description": "Automated test case for Install NPM Dependencies"
+    }
+  ]
+}

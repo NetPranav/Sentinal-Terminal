@@ -1,0 +1,14 @@
+{
+  "toolId": "docker.ps",
+  "examples": [
+    {
+      "input": "list running docker containers",
+      "expectedIntent": {
+        "domain": "docker",
+        "action": "ps"
+      },
+      "expectedEntities": {},
+      "description": "Example execution of List Running Docker Containers"
+    }
+  ]
+}

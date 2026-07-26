@@ -1,0 +1,24 @@
+{
+  "toolId": "git.checkout",
+  "version": "1.0.0",
+  "description": "Executes native driver for Checkout Git Branch or Commit.",
+  "steps": [
+    {
+      "id": "step_exec_main",
+      "name": "Execute Checkout Git Branch or Commit",
+      "type": "ExecuteCapability",
+      "capabilityId": "git.checkout",
+      "parameters": {
+        "target": "{{target}}",
+        "create": "{{create}}"
+      },
+      "dependencies": [],
+      "onError": "fail"
+    }
+  ],
+  "successCondition": "step:step_exec_main:success",
+  "errorHandling": {
+    "strategy": "fail_fast",
+    "maxRetries": 0
+  }
+}

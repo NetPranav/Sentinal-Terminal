@@ -1,0 +1,18 @@
+{
+  "toolId": "application.uninstall",
+  "tests": [
+    {
+      "id": "application-uninstall-test-1",
+      "userRequest": "uninstall package wget",
+      "expectedIntent": {
+        "domain": "application",
+        "action": "uninstall"
+      },
+      "expectedToolId": "application.uninstall",
+      "expectedEntities": {
+        "package": "sample_val"
+      },
+      "description": "Automated test case for Uninstall Desktop Application"
+    }
+  ]
+}

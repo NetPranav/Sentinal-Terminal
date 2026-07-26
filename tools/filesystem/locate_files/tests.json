@@ -1,0 +1,18 @@
+{
+  "toolId": "filesystem.locate_files",
+  "tests": [
+    {
+      "id": "filesystem-locate_files-test-1",
+      "userRequest": "locate files named id_rsa",
+      "expectedIntent": {
+        "domain": "filesystem",
+        "action": "locate_files"
+      },
+      "expectedToolId": "filesystem.locate_files",
+      "expectedEntities": {
+        "name": "sample_val"
+      },
+      "description": "Automated test case for Locate Specific Files"
+    }
+  ]
+}

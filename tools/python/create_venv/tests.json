@@ -1,0 +1,16 @@
+{
+  "toolId": "python.create_venv",
+  "tests": [
+    {
+      "id": "python-create_venv-test-1",
+      "userRequest": "create venv in directory .venv",
+      "expectedIntent": {
+        "domain": "python",
+        "action": "create_venv"
+      },
+      "expectedToolId": "python.create_venv",
+      "expectedEntities": {},
+      "description": "Automated test case for Create Python Virtual Environment"
+    }
+  ]
+}

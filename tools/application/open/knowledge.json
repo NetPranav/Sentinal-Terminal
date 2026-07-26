@@ -1,0 +1,39 @@
+{
+  "toolId": "application.open",
+  "aliases": [
+    "open app",
+    "launch app",
+    "run program",
+    "start application"
+  ],
+  "synonyms": [
+    "please open app",
+    "please launch app",
+    "please run program",
+    "please start application"
+  ],
+  "commonUserWording": [
+    "open Chrome",
+    "could you open Chrome",
+    "open app",
+    "launch app",
+    "run program",
+    "start application"
+  ],
+  "commonMistakes": [],
+  "entityHints": {
+    "app": [
+      "test_value"
+    ]
+  },
+  "deviceNamingPatterns": [],
+  "commonAbbreviations": {},
+  "languageVariations": [
+    "open Chrome",
+    "open app",
+    "launch app",
+    "run program",
+    "start application"
+  ],
+  "relatedTools": []
+}

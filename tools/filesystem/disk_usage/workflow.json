@@ -1,0 +1,23 @@
+{
+  "toolId": "filesystem.disk_usage",
+  "version": "1.0.0",
+  "description": "Executes native driver for Check Disk Capacity and Usage.",
+  "steps": [
+    {
+      "id": "step_exec_main",
+      "name": "Execute Check Disk Capacity and Usage",
+      "type": "ExecuteCapability",
+      "capabilityId": "filesystem.disk_usage",
+      "parameters": {
+        "path": "{{path}}"
+      },
+      "dependencies": [],
+      "onError": "fail"
+    }
+  ],
+  "successCondition": "step:step_exec_main:success",
+  "errorHandling": {
+    "strategy": "fail_fast",
+    "maxRetries": 0
+  }
+}

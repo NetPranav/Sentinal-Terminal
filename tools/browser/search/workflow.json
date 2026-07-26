@@ -1,0 +1,24 @@
+{
+  "toolId": "browser.search",
+  "version": "1.0.0",
+  "description": "Executes native driver for Search the Web in Browser.",
+  "steps": [
+    {
+      "id": "step_exec_main",
+      "name": "Execute Search the Web in Browser",
+      "type": "ExecuteCapability",
+      "capabilityId": "browser.search",
+      "parameters": {
+        "query": "{{query}}",
+        "engine": "{{engine}}"
+      },
+      "dependencies": [],
+      "onError": "fail"
+    }
+  ],
+  "successCondition": "step:step_exec_main:success",
+  "errorHandling": {
+    "strategy": "fail_fast",
+    "maxRetries": 0
+  }
+}

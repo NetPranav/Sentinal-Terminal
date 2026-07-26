@@ -1,0 +1,16 @@
+{
+  "toolId": "network.dns",
+  "examples": [
+    {
+      "input": "lookup dns records for openai.com",
+      "expectedIntent": {
+        "domain": "network",
+        "action": "dns"
+      },
+      "expectedEntities": {
+        "domain": "sample_val"
+      },
+      "description": "Example execution of Query DNS Domain Records"
+    }
+  ]
+}

@@ -1,0 +1,45 @@
+{
+  "id": "browser.new_tab",
+  "version": "1.0.0",
+  "displayName": "Open New Browser Tab",
+  "description": "Opens a blank or target URL new tab inside the currently running web browser.",
+  "domain": "browser",
+  "category": "Web",
+  "tags": [
+    "browser",
+    "new_tab",
+    "browser.new",
+    "tab",
+    "open",
+    "new",
+    "create"
+  ],
+  "aliases": [
+    "open new tab",
+    "new browser tab",
+    "create tab"
+  ],
+  "supportedPlatforms": [
+    "macos",
+    "windows",
+    "linux"
+  ],
+  "requiredPermissions": [
+    "ShellExecution"
+  ],
+  "securityRisk": "SAFE",
+  "parameters": [],
+  "optionalParameters": [
+    {
+      "name": "url",
+      "type": "string",
+      "description": "Optional initial URL for new tab",
+      "required": false
+    }
+  ],
+  "estimatedExecutionTime": "1s",
+  "confirmationRequired": false,
+  "rollbackAvailable": false,
+  "verificationSupported": true,
+  "deprecationStatus": "stable"
+}

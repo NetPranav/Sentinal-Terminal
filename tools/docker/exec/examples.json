@@ -1,0 +1,17 @@
+{
+  "toolId": "docker.exec",
+  "examples": [
+    {
+      "input": "docker exec command \"env\" inside container api_server",
+      "expectedIntent": {
+        "domain": "docker",
+        "action": "exec"
+      },
+      "expectedEntities": {
+        "container": "sample_val",
+        "command": "sample_val"
+      },
+      "description": "Example execution of Execute Command inside Container"
+    }
+  ]
+}

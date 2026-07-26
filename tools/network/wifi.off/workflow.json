@@ -1,0 +1,21 @@
+{
+  "toolId": "network.wifi.off",
+  "version": "1.0.0",
+  "description": "Executes native driver for Turn Wi-Fi Off.",
+  "steps": [
+    {
+      "id": "step_exec_main",
+      "name": "Execute Turn Wi-Fi Off",
+      "type": "ExecuteCapability",
+      "capabilityId": "network.wifi.off",
+      "parameters": {},
+      "dependencies": [],
+      "onError": "fail"
+    }
+  ],
+  "successCondition": "step:step_exec_main:success",
+  "errorHandling": {
+    "strategy": "fail_fast",
+    "maxRetries": 1
+  }
+}

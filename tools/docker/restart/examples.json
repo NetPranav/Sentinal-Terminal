@@ -1,0 +1,16 @@
+{
+  "toolId": "docker.restart",
+  "examples": [
+    {
+      "input": "restart docker container redis_db",
+      "expectedIntent": {
+        "domain": "docker",
+        "action": "restart"
+      },
+      "expectedEntities": {
+        "container": "sample_val"
+      },
+      "description": "Example execution of Restart Docker Container"
+    }
+  ]
+}

@@ -1,0 +1,4 @@
+{"prompt": "show bluetooth connections", "intent": {"domain": "network", "action": "list"}, "entities": {}}
+{"prompt": "show me wifi hotspots", "intent": {"domain": "network", "action": "scan"}, "entities": {}}
+{"prompt": "tell me about my cpu and ram", "intent": {"domain": "system", "action": "info"}, "entities": {}}
+{"prompt": "show directory contents of /var/log", "intent": {"domain": "filesystem", "action": "list"}, "entities": {"file_path": "/var/log"}}

@@ -1,0 +1,47 @@
+/**
+ * Provider.ts — Pluggable Model Provider Layer
+ * 
+ * Defines the foundational interface for local and pluggable model inference providers.
+ * Sentinel's planner and intent systems never depend directly on Ollama or Llama.cpp.
+ */
+
+export interface GenerateOptions {
+  temperature?: number;
+  topP?: number;
+  maxTokens?: number;
+  stopSequences?: string[];
+  grammarJsonSchema?: Record<string, any>;
+  format?: 'json' | string;
+}
+
+export interface ProviderResponse {
+  content: string;
+  raw?: any;
+  usage: {
+    promptTokens: number;
+    completionTokens: number;
+    totalTokens: number;
+  };
+  latencyMs: number;
+}
+
+export interface ModelMetadata {
+  id: string;
+  name: string;
+  sizeBytes: number;
+  quantization?: string;
+  parameterCount?: string;
+  modifiedAt?: string;
+  digest?: string;
+}
+
+export interface ModelProvider {
+  readonly providerId: string;
+  readonly providerName: string;
+  
+  isAvailable(): Promise<boolean>;
+  listModels(): Promise<ModelMetadata[]>;
+  hasModel(modelId: string): Promise<boolean>;
+  pullModel(modelId: string, onProgress?: (percent: number, status: string) => void): Promise<boolean>;
+  generate(prompt: string, modelId?: string, options?: GenerateOptions): Promise<ProviderResponse>;
+}

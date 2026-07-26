@@ -1,0 +1,16 @@
+{
+  "toolId": "python.notebook",
+  "tests": [
+    {
+      "id": "python-notebook-test-1",
+      "userRequest": "start jupyter lab",
+      "expectedIntent": {
+        "domain": "python",
+        "action": "notebook"
+      },
+      "expectedToolId": "python.notebook",
+      "expectedEntities": {},
+      "description": "Automated test case for Launch Jupyter Notebook"
+    }
+  ]
+}

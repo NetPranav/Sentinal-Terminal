@@ -1,0 +1,16 @@
+{
+  "toolId": "system.cpu",
+  "tests": [
+    {
+      "id": "system-cpu-test-1",
+      "userRequest": "check cpu usage",
+      "expectedIntent": {
+        "domain": "system",
+        "action": "cpu"
+      },
+      "expectedToolId": "system.cpu",
+      "expectedEntities": {},
+      "description": "Automated test case for Inspect CPU Utilization"
+    }
+  ]
+}

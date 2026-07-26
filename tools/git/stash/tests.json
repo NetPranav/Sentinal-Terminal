@@ -1,0 +1,16 @@
+{
+  "toolId": "git.stash",
+  "tests": [
+    {
+      "id": "git-stash-test-1",
+      "userRequest": "git stash save uncommitted work",
+      "expectedIntent": {
+        "domain": "git",
+        "action": "stash"
+      },
+      "expectedToolId": "git.stash",
+      "expectedEntities": {},
+      "description": "Automated test case for Stash Workspace Modifications"
+    }
+  ]
+}

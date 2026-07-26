@@ -1,0 +1,23 @@
+{
+  "toolId": "network.bluetooth.connect",
+  "version": "1.0.0",
+  "description": "Executes native driver for Connect to Bluetooth Device.",
+  "steps": [
+    {
+      "id": "step_exec_main",
+      "name": "Execute Connect to Bluetooth Device",
+      "type": "ExecuteCapability",
+      "capabilityId": "network.bluetooth.connect",
+      "parameters": {
+        "device": "{{device}}"
+      },
+      "dependencies": [],
+      "onError": "fail"
+    }
+  ],
+  "successCondition": "step:step_exec_main:success",
+  "errorHandling": {
+    "strategy": "fail_fast",
+    "maxRetries": 1
+  }
+}

@@ -1,0 +1,39 @@
+{
+  "toolId": "network.ip",
+  "aliases": [
+    "my ip address",
+    "what is my public ip",
+    "show local ip",
+    "check ip address",
+    "what is my ip"
+  ],
+  "synonyms": [
+    "please my ip address",
+    "please what is my public ip",
+    "please show local ip",
+    "please check ip address",
+    "please what is my ip"
+  ],
+  "commonUserWording": [
+    "what is my public ip address",
+    "could you what is my public ip address",
+    "my ip address",
+    "what is my public ip",
+    "show local ip",
+    "check ip address",
+    "what is my ip"
+  ],
+  "commonMistakes": [],
+  "entityHints": {},
+  "deviceNamingPatterns": [],
+  "commonAbbreviations": {},
+  "languageVariations": [
+    "what is my public ip address",
+    "my ip address",
+    "what is my public ip",
+    "show local ip",
+    "check ip address",
+    "what is my ip"
+  ],
+  "relatedTools": []
+}

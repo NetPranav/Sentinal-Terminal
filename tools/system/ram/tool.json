@@ -1,0 +1,41 @@
+{
+  "id": "system.ram",
+  "version": "1.0.0",
+  "displayName": "Inspect RAM Memory Capacity",
+  "description": "Checks total physical system RAM capacity, actively allocated memory, and free cache.",
+  "domain": "system",
+  "category": "System",
+  "tags": [
+    "system",
+    "ram",
+    "system.ram",
+    "inspect",
+    "memory",
+    "capacity",
+    "check",
+    "free",
+    "how"
+  ],
+  "aliases": [
+    "ram usage",
+    "check memory left",
+    "free memory",
+    "how much ram available"
+  ],
+  "supportedPlatforms": [
+    "macos",
+    "windows",
+    "linux"
+  ],
+  "requiredPermissions": [
+    "ShellExecution"
+  ],
+  "securityRisk": "SAFE",
+  "parameters": [],
+  "optionalParameters": [],
+  "estimatedExecutionTime": "1s",
+  "confirmationRequired": false,
+  "rollbackAvailable": false,
+  "verificationSupported": true,
+  "deprecationStatus": "stable"
+}

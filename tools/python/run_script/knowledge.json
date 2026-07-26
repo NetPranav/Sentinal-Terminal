@@ -1,0 +1,38 @@
+{
+  "toolId": "python.run_script",
+  "aliases": [
+    "run python script",
+    "python3 run",
+    "execute python code"
+  ],
+  "synonyms": [
+    "please run python script",
+    "please python3 run",
+    "please execute python code"
+  ],
+  "commonUserWording": [
+    "run python script generate_data.py",
+    "could you run python script generate_data.py",
+    "run python script",
+    "python3 run",
+    "execute python code"
+  ],
+  "commonMistakes": [],
+  "entityHints": {
+    "script": [
+      "test_value"
+    ],
+    "args": [
+      "test_value"
+    ]
+  },
+  "deviceNamingPatterns": [],
+  "commonAbbreviations": {},
+  "languageVariations": [
+    "run python script generate_data.py",
+    "run python script",
+    "python3 run",
+    "execute python code"
+  ],
+  "relatedTools": []
+}

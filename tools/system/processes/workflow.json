@@ -1,0 +1,24 @@
+{
+  "toolId": "system.processes",
+  "version": "1.0.0",
+  "description": "Executes native driver for Monitor Active OS Processes.",
+  "steps": [
+    {
+      "id": "step_exec_main",
+      "name": "Execute Monitor Active OS Processes",
+      "type": "ExecuteCapability",
+      "capabilityId": "system.processes",
+      "parameters": {
+        "sort": "{{sort}}",
+        "count": "{{count}}"
+      },
+      "dependencies": [],
+      "onError": "fail"
+    }
+  ],
+  "successCondition": "step:step_exec_main:success",
+  "errorHandling": {
+    "strategy": "fail_fast",
+    "maxRetries": 0
+  }
+}

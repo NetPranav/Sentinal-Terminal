@@ -1,0 +1,18 @@
+{
+  "toolId": "browser.search",
+  "tests": [
+    {
+      "id": "browser-search-test-1",
+      "userRequest": "search for AI tutorials on youtube",
+      "expectedIntent": {
+        "domain": "browser",
+        "action": "search"
+      },
+      "expectedToolId": "browser.search",
+      "expectedEntities": {
+        "query": "sample_val"
+      },
+      "description": "Automated test case for Search the Web in Browser"
+    }
+  ]
+}

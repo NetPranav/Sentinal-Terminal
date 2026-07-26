@@ -1,0 +1,47 @@
+{
+  "id": "network.bluetooth.connect",
+  "version": "1.0.0",
+  "displayName": "Connect to Bluetooth Device",
+  "description": "Establishes wireless link to paired Bluetooth headphones, speakers, or peripheral device.",
+  "domain": "network",
+  "category": "Networking",
+  "tags": [
+    "network",
+    "bluetooth.connect",
+    "bluetooth",
+    "connect",
+    "network.bluetooth.connect",
+    "to",
+    "device",
+    "pair"
+  ],
+  "aliases": [
+    "connect bluetooth device",
+    "pair bluetooth headphones",
+    "connect airpods",
+    "connect bluetooth"
+  ],
+  "supportedPlatforms": [
+    "macos",
+    "windows",
+    "linux"
+  ],
+  "requiredPermissions": [
+    "ShellExecution"
+  ],
+  "securityRisk": "LOW",
+  "parameters": [
+    {
+      "name": "device",
+      "type": "string",
+      "description": "Device name or MAC address",
+      "required": true
+    }
+  ],
+  "optionalParameters": [],
+  "estimatedExecutionTime": "2s",
+  "confirmationRequired": false,
+  "rollbackAvailable": false,
+  "verificationSupported": true,
+  "deprecationStatus": "stable"
+}

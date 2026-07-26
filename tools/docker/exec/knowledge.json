@@ -1,0 +1,38 @@
+{
+  "toolId": "docker.exec",
+  "aliases": [
+    "docker exec",
+    "run in container",
+    "exec into container"
+  ],
+  "synonyms": [
+    "please docker exec",
+    "please run in container",
+    "please exec into container"
+  ],
+  "commonUserWording": [
+    "docker exec command \"env\" inside container api_server",
+    "could you docker exec command \"env\" inside container api_server",
+    "docker exec",
+    "run in container",
+    "exec into container"
+  ],
+  "commonMistakes": [],
+  "entityHints": {
+    "container": [
+      "test_value"
+    ],
+    "command": [
+      "test_value"
+    ]
+  },
+  "deviceNamingPatterns": [],
+  "commonAbbreviations": {},
+  "languageVariations": [
+    "docker exec command \"env\" inside container api_server",
+    "docker exec",
+    "run in container",
+    "exec into container"
+  ],
+  "relatedTools": []
+}

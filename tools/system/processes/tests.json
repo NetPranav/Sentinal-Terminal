@@ -1,0 +1,16 @@
+{
+  "toolId": "system.processes",
+  "tests": [
+    {
+      "id": "system-processes-test-1",
+      "userRequest": "show top 10 processes by cpu usage",
+      "expectedIntent": {
+        "domain": "system",
+        "action": "processes"
+      },
+      "expectedToolId": "system.processes",
+      "expectedEntities": {},
+      "description": "Automated test case for Monitor Active OS Processes"
+    }
+  ]
+}

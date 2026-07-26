@@ -1,0 +1,18 @@
+{
+  "toolId": "node.yarn",
+  "tests": [
+    {
+      "id": "node-yarn-test-1",
+      "userRequest": "yarn install packages",
+      "expectedIntent": {
+        "domain": "node",
+        "action": "yarn"
+      },
+      "expectedToolId": "node.yarn",
+      "expectedEntities": {
+        "command": "sample_val"
+      },
+      "description": "Automated test case for Manage Packages with Yarn"
+    }
+  ]
+}

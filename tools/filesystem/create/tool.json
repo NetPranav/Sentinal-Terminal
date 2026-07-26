@@ -1,0 +1,55 @@
+{
+  "id": "filesystem.create",
+  "version": "1.0.0",
+  "displayName": "Create New File",
+  "description": "Creates a new empty file or initializes a file with content on disk.",
+  "domain": "filesystem",
+  "category": "Filesystem",
+  "tags": [
+    "filesystem",
+    "create",
+    "filesystem.create",
+    "new",
+    "file",
+    "make",
+    "touch"
+  ],
+  "aliases": [
+    "create file",
+    "make file",
+    "new file",
+    "touch file",
+    "create a new file",
+    "make new file"
+  ],
+  "supportedPlatforms": [
+    "macos",
+    "windows",
+    "linux"
+  ],
+  "requiredPermissions": [
+    "ReadFiles"
+  ],
+  "securityRisk": "SAFE",
+  "parameters": [
+    {
+      "name": "path",
+      "type": "string",
+      "description": "File path to create",
+      "required": true
+    }
+  ],
+  "optionalParameters": [
+    {
+      "name": "content",
+      "type": "string",
+      "description": "Optional initial file content",
+      "required": false
+    }
+  ],
+  "estimatedExecutionTime": "1s",
+  "confirmationRequired": false,
+  "rollbackAvailable": false,
+  "verificationSupported": true,
+  "deprecationStatus": "stable"
+}

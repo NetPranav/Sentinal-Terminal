@@ -1,0 +1,35 @@
+{
+  "toolId": "application.list_running",
+  "aliases": [
+    "list running apps",
+    "show running applications",
+    "what apps are running",
+    "active apps"
+  ],
+  "synonyms": [
+    "please list running apps",
+    "please show running applications",
+    "please what apps are running",
+    "please active apps"
+  ],
+  "commonUserWording": [
+    "list running applications",
+    "could you list running applications",
+    "list running apps",
+    "show running applications",
+    "what apps are running",
+    "active apps"
+  ],
+  "commonMistakes": [],
+  "entityHints": {},
+  "deviceNamingPatterns": [],
+  "commonAbbreviations": {},
+  "languageVariations": [
+    "list running applications",
+    "list running apps",
+    "show running applications",
+    "what apps are running",
+    "active apps"
+  ],
+  "relatedTools": []
+}

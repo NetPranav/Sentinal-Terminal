@@ -1,0 +1,21 @@
+{
+  "toolId": "system.battery",
+  "version": "1.0.0",
+  "description": "Executes native driver for Check Battery Level & Power Status.",
+  "steps": [
+    {
+      "id": "step_exec_main",
+      "name": "Execute Check Battery Level & Power Status",
+      "type": "ExecuteCapability",
+      "capabilityId": "system.battery",
+      "parameters": {},
+      "dependencies": [],
+      "onError": "fail"
+    }
+  ],
+  "successCondition": "step:step_exec_main:success",
+  "errorHandling": {
+    "strategy": "fail_fast",
+    "maxRetries": 0
+  }
+}

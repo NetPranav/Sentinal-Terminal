@@ -1,0 +1,41 @@
+{
+  "toolId": "network.bluetooth.on",
+  "aliases": [
+    "turn on bluetooth",
+    "enable bluetooth",
+    "start bluetooth",
+    "turn my bluetooth on",
+    "bluetooth on"
+  ],
+  "synonyms": [
+    "please turn on bluetooth",
+    "please enable bluetooth",
+    "please start bluetooth",
+    "please turn my bluetooth on",
+    "please bluetooth on"
+  ],
+  "commonUserWording": [
+    "turn my bluetooth on",
+    "could you turn my bluetooth on",
+    "turn on bluetooth",
+    "enable bluetooth",
+    "start bluetooth",
+    "turn my bluetooth on",
+    "bluetooth on"
+  ],
+  "commonMistakes": [],
+  "entityHints": {},
+  "deviceNamingPatterns": [],
+  "commonAbbreviations": {
+    "bt": "bluetooth"
+  },
+  "languageVariations": [
+    "turn my bluetooth on",
+    "turn on bluetooth",
+    "enable bluetooth",
+    "start bluetooth",
+    "turn my bluetooth on",
+    "bluetooth on"
+  ],
+  "relatedTools": []
+}

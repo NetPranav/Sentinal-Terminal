@@ -1,0 +1,16 @@
+{
+  "toolId": "system.info",
+  "tests": [
+    {
+      "id": "system-info-test-1",
+      "userRequest": "what are my computer specs?",
+      "expectedIntent": {
+        "domain": "system",
+        "action": "info"
+      },
+      "expectedToolId": "system.info",
+      "expectedEntities": {},
+      "description": "Automated test case for Get System Diagnostic Info"
+    }
+  ]
+}

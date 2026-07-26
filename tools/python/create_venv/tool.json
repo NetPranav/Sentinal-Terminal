@@ -1,0 +1,49 @@
+{
+  "id": "python.create_venv",
+  "version": "1.0.0",
+  "displayName": "Create Python Virtual Environment",
+  "description": "Creates an isolated Python environment (python3 -m venv) in target directory.",
+  "domain": "python",
+  "category": "Python",
+  "tags": [
+    "python",
+    "create_venv",
+    "python.create",
+    "venv",
+    "create",
+    "virtual",
+    "environment",
+    "make",
+    "setup"
+  ],
+  "aliases": [
+    "create venv",
+    "make python virtualenv",
+    "python -m venv",
+    "setup venv"
+  ],
+  "supportedPlatforms": [
+    "macos",
+    "windows",
+    "linux"
+  ],
+  "requiredPermissions": [
+    "ShellExecution"
+  ],
+  "securityRisk": "SAFE",
+  "parameters": [],
+  "optionalParameters": [
+    {
+      "name": "directory",
+      "type": "string",
+      "description": "Directory path for virtual environment folder",
+      "required": false,
+      "default": "venv"
+    }
+  ],
+  "estimatedExecutionTime": "1s",
+  "confirmationRequired": false,
+  "rollbackAvailable": false,
+  "verificationSupported": true,
+  "deprecationStatus": "stable"
+}

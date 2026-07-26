@@ -1,0 +1,47 @@
+{
+  "id": "filesystem.trash",
+  "version": "1.0.0",
+  "displayName": "Move to System Trash",
+  "description": "Safely moves a file or directory to the macOS/OS system Trash or Recycle Bin.",
+  "domain": "filesystem",
+  "category": "Filesystem",
+  "tags": [
+    "filesystem",
+    "trash",
+    "filesystem.trash",
+    "move",
+    "to",
+    "system",
+    "send",
+    "delete"
+  ],
+  "aliases": [
+    "move to trash",
+    "trash file",
+    "send to bin",
+    "delete to recycle bin"
+  ],
+  "supportedPlatforms": [
+    "macos",
+    "windows",
+    "linux"
+  ],
+  "requiredPermissions": [
+    "ReadFiles"
+  ],
+  "securityRisk": "MEDIUM",
+  "parameters": [
+    {
+      "name": "path",
+      "type": "string",
+      "description": "File or directory path to move to trash",
+      "required": true
+    }
+  ],
+  "optionalParameters": [],
+  "estimatedExecutionTime": "2s",
+  "confirmationRequired": false,
+  "rollbackAvailable": true,
+  "verificationSupported": true,
+  "deprecationStatus": "stable"
+}

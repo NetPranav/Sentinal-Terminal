@@ -1,0 +1,16 @@
+{
+  "toolId": "docker.stop",
+  "examples": [
+    {
+      "input": "stop docker container postgres_dev",
+      "expectedIntent": {
+        "domain": "docker",
+        "action": "stop"
+      },
+      "expectedEntities": {
+        "container": "sample_val"
+      },
+      "description": "Example execution of Stop Running Container"
+    }
+  ]
+}

@@ -1,0 +1,34 @@
+{
+  "toolId": "filesystem.rename",
+  "aliases": [
+    "rename file",
+    "rename folder"
+  ],
+  "synonyms": [
+    "please rename file",
+    "please rename folder"
+  ],
+  "commonUserWording": [
+    "rename file old.json to new.json",
+    "could you rename file old.json to new.json",
+    "rename file",
+    "rename folder"
+  ],
+  "commonMistakes": [],
+  "entityHints": {
+    "path": [
+      "/Users/shared/file.json"
+    ],
+    "newName": [
+      "test_value"
+    ]
+  },
+  "deviceNamingPatterns": [],
+  "commonAbbreviations": {},
+  "languageVariations": [
+    "rename file old.json to new.json",
+    "rename file",
+    "rename folder"
+  ],
+  "relatedTools": []
+}

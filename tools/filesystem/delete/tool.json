@@ -1,0 +1,48 @@
+{
+  "id": "filesystem.delete",
+  "version": "1.0.0",
+  "displayName": "Permanently Delete File or Folder",
+  "description": "Permanently deletes a file or directory path from disk.",
+  "domain": "filesystem",
+  "category": "Filesystem",
+  "tags": [
+    "filesystem",
+    "delete",
+    "filesystem.delete",
+    "permanently",
+    "file",
+    "or",
+    "folder",
+    "remove",
+    "rm"
+  ],
+  "aliases": [
+    "delete file",
+    "remove file",
+    "rm file",
+    "delete folder"
+  ],
+  "supportedPlatforms": [
+    "macos",
+    "windows",
+    "linux"
+  ],
+  "requiredPermissions": [
+    "ReadFiles"
+  ],
+  "securityRisk": "HIGH",
+  "parameters": [
+    {
+      "name": "path",
+      "type": "string",
+      "description": "Target file or directory path to remove",
+      "required": true
+    }
+  ],
+  "optionalParameters": [],
+  "estimatedExecutionTime": "2s",
+  "confirmationRequired": true,
+  "rollbackAvailable": false,
+  "verificationSupported": true,
+  "deprecationStatus": "stable"
+}

@@ -1,0 +1,47 @@
+{
+  "id": "filesystem.read",
+  "version": "1.0.0",
+  "displayName": "Read File Content",
+  "description": "Reads text content from a specified file path using safe native APIs.",
+  "domain": "filesystem",
+  "category": "Filesystem",
+  "tags": [
+    "filesystem",
+    "read",
+    "filesystem.read",
+    "file",
+    "content",
+    "cat",
+    "view",
+    "show"
+  ],
+  "aliases": [
+    "read file",
+    "cat file",
+    "view file",
+    "show file contents"
+  ],
+  "supportedPlatforms": [
+    "macos",
+    "windows",
+    "linux"
+  ],
+  "requiredPermissions": [
+    "ReadFiles"
+  ],
+  "securityRisk": "SAFE",
+  "parameters": [
+    {
+      "name": "path",
+      "type": "string",
+      "description": "File path to read",
+      "required": true
+    }
+  ],
+  "optionalParameters": [],
+  "estimatedExecutionTime": "1s",
+  "confirmationRequired": false,
+  "rollbackAvailable": false,
+  "verificationSupported": true,
+  "deprecationStatus": "stable"
+}

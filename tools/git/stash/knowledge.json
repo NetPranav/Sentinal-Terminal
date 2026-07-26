@@ -1,0 +1,35 @@
+{
+  "toolId": "git.stash",
+  "aliases": [
+    "git stash",
+    "stash changes",
+    "pop git stash"
+  ],
+  "synonyms": [
+    "please git stash",
+    "please stash changes",
+    "please pop git stash"
+  ],
+  "commonUserWording": [
+    "git stash save uncommitted work",
+    "could you git stash save uncommitted work",
+    "git stash",
+    "stash changes",
+    "pop git stash"
+  ],
+  "commonMistakes": [],
+  "entityHints": {
+    "operation": [
+      "test_value"
+    ]
+  },
+  "deviceNamingPatterns": [],
+  "commonAbbreviations": {},
+  "languageVariations": [
+    "git stash save uncommitted work",
+    "git stash",
+    "stash changes",
+    "pop git stash"
+  ],
+  "relatedTools": []
+}

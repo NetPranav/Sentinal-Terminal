@@ -1,0 +1,39 @@
+{
+  "toolId": "filesystem.disk_usage",
+  "aliases": [
+    "check disk usage",
+    "folder size",
+    "disk space available",
+    "du h"
+  ],
+  "synonyms": [
+    "please check disk usage",
+    "please folder size",
+    "please disk space available",
+    "please du h"
+  ],
+  "commonUserWording": [
+    "check disk usage for /Users",
+    "could you check disk usage for /Users",
+    "check disk usage",
+    "folder size",
+    "disk space available",
+    "du h"
+  ],
+  "commonMistakes": [],
+  "entityHints": {
+    "path": [
+      "/Users/shared/file.json"
+    ]
+  },
+  "deviceNamingPatterns": [],
+  "commonAbbreviations": {},
+  "languageVariations": [
+    "check disk usage for /Users",
+    "check disk usage",
+    "folder size",
+    "disk space available",
+    "du h"
+  ],
+  "relatedTools": []
+}

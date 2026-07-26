@@ -1,0 +1,41 @@
+{
+  "id": "network.bluetooth.list",
+  "version": "1.0.0",
+  "displayName": "List Bluetooth Devices",
+  "description": "Scans and lists all discoverable Bluetooth devices, including paired and connected devices.",
+  "domain": "network",
+  "category": "Networking",
+  "tags": [
+    "network",
+    "bluetooth.list",
+    "bluetooth",
+    "list",
+    "network.bluetooth.list",
+    "devices",
+    "show",
+    "what"
+  ],
+  "aliases": [
+    "list bluetooth devices",
+    "show bluetooth",
+    "bluetooth devices",
+    "show me all the bluetooth devices",
+    "what bt devices are nearby"
+  ],
+  "supportedPlatforms": [
+    "macos",
+    "windows",
+    "linux"
+  ],
+  "requiredPermissions": [
+    "ShellExecution"
+  ],
+  "securityRisk": "SAFE",
+  "parameters": [],
+  "optionalParameters": [],
+  "estimatedExecutionTime": "1s",
+  "confirmationRequired": false,
+  "rollbackAvailable": false,
+  "verificationSupported": true,
+  "deprecationStatus": "stable"
+}

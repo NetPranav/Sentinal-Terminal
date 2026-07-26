@@ -1,0 +1,14 @@
+{
+  "toolId": "network.interfaces",
+  "examples": [
+    {
+      "input": "show network interfaces",
+      "expectedIntent": {
+        "domain": "network",
+        "action": "interfaces"
+      },
+      "expectedEntities": {},
+      "description": "Example execution of Inspect Network Interfaces"
+    }
+  ]
+}

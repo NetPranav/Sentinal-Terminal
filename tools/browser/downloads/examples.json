@@ -1,0 +1,14 @@
+{
+  "toolId": "browser.downloads",
+  "examples": [
+    {
+      "input": "show 5 recent browser downloads",
+      "expectedIntent": {
+        "domain": "browser",
+        "action": "downloads"
+      },
+      "expectedEntities": {},
+      "description": "Example execution of Check Browser Downloads"
+    }
+  ]
+}

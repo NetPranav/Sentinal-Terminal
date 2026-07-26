@@ -1,0 +1,21 @@
+{
+  "toolId": "network.ip",
+  "version": "1.0.0",
+  "description": "Executes native driver for Resolve System IP Addresses.",
+  "steps": [
+    {
+      "id": "step_exec_main",
+      "name": "Execute Resolve System IP Addresses",
+      "type": "ExecuteCapability",
+      "capabilityId": "network.ip",
+      "parameters": {},
+      "dependencies": [],
+      "onError": "fail"
+    }
+  ],
+  "successCondition": "step:step_exec_main:success",
+  "errorHandling": {
+    "strategy": "fail_fast",
+    "maxRetries": 1
+  }
+}

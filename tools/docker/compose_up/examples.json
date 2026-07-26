@@ -1,0 +1,14 @@
+{
+  "toolId": "docker.compose_up",
+  "examples": [
+    {
+      "input": "start docker compose up detached",
+      "expectedIntent": {
+        "domain": "docker",
+        "action": "compose_up"
+      },
+      "expectedEntities": {},
+      "description": "Example execution of Start Docker Compose Stack"
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "toolId": "git.merge",
+  "tests": [
+    {
+      "id": "git-merge-test-1",
+      "userRequest": "merge branch develop",
+      "expectedIntent": {
+        "domain": "git",
+        "action": "merge"
+      },
+      "expectedToolId": "git.merge",
+      "expectedEntities": {
+        "branch": "sample_val"
+      },
+      "description": "Automated test case for Merge Git Branch"
+    }
+  ]
+}

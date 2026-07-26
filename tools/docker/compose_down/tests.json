@@ -1,0 +1,16 @@
+{
+  "toolId": "docker.compose_down",
+  "tests": [
+    {
+      "id": "docker-compose_down-test-1",
+      "userRequest": "docker compose down stack",
+      "expectedIntent": {
+        "domain": "docker",
+        "action": "compose_down"
+      },
+      "expectedToolId": "docker.compose_down",
+      "expectedEntities": {},
+      "description": "Automated test case for Stop Docker Compose Stack"
+    }
+  ]
+}

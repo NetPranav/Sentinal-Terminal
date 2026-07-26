@@ -1,0 +1,17 @@
+{
+  "toolId": "filesystem.rename",
+  "examples": [
+    {
+      "input": "rename file old.json to new.json",
+      "expectedIntent": {
+        "domain": "filesystem",
+        "action": "rename"
+      },
+      "expectedEntities": {
+        "path": "/test/path.txt",
+        "newName": "sample_val"
+      },
+      "description": "Example execution of Rename File or Directory"
+    }
+  ]
+}

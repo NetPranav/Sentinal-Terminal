@@ -1,0 +1,14 @@
+{
+  "toolId": "network.ports",
+  "examples": [
+    {
+      "input": "check open network ports",
+      "expectedIntent": {
+        "domain": "network",
+        "action": "ports"
+      },
+      "expectedEntities": {},
+      "description": "Example execution of Inspect Open Network Ports"
+    }
+  ]
+}

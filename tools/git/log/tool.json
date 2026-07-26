@@ -1,0 +1,47 @@
+{
+  "id": "git.log",
+  "version": "1.0.0",
+  "displayName": "Inspect Git Commit History",
+  "description": "Displays recent commit log history and authorship metadata.",
+  "domain": "git",
+  "category": "Git",
+  "tags": [
+    "git",
+    "log",
+    "git.log",
+    "inspect",
+    "commit",
+    "history",
+    "show",
+    "view"
+  ],
+  "aliases": [
+    "git log",
+    "show git history",
+    "view recent commits"
+  ],
+  "supportedPlatforms": [
+    "macos",
+    "windows",
+    "linux"
+  ],
+  "requiredPermissions": [
+    "ShellExecution"
+  ],
+  "securityRisk": "SAFE",
+  "parameters": [],
+  "optionalParameters": [
+    {
+      "name": "maxCount",
+      "type": "number",
+      "description": "Maximum number of commit logs to retrieve",
+      "required": false,
+      "default": 15
+    }
+  ],
+  "estimatedExecutionTime": "1s",
+  "confirmationRequired": false,
+  "rollbackAvailable": false,
+  "verificationSupported": true,
+  "deprecationStatus": "stable"
+}

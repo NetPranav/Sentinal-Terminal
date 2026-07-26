@@ -1,0 +1,39 @@
+{
+  "toolId": "application.close",
+  "aliases": [
+    "close app",
+    "quit application",
+    "exit program",
+    "terminate app"
+  ],
+  "synonyms": [
+    "please close app",
+    "please quit application",
+    "please exit program",
+    "please terminate app"
+  ],
+  "commonUserWording": [
+    "close Safari",
+    "could you close Safari",
+    "close app",
+    "quit application",
+    "exit program",
+    "terminate app"
+  ],
+  "commonMistakes": [],
+  "entityHints": {
+    "app": [
+      "test_value"
+    ]
+  },
+  "deviceNamingPatterns": [],
+  "commonAbbreviations": {},
+  "languageVariations": [
+    "close Safari",
+    "close app",
+    "quit application",
+    "exit program",
+    "terminate app"
+  ],
+  "relatedTools": []
+}

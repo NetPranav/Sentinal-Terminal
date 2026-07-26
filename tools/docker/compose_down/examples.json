@@ -1,0 +1,14 @@
+{
+  "toolId": "docker.compose_down",
+  "examples": [
+    {
+      "input": "docker compose down stack",
+      "expectedIntent": {
+        "domain": "docker",
+        "action": "compose_down"
+      },
+      "expectedEntities": {},
+      "description": "Example execution of Stop Docker Compose Stack"
+    }
+  ]
+}

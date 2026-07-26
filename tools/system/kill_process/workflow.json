@@ -1,0 +1,23 @@
+{
+  "toolId": "system.kill_process",
+  "version": "1.0.0",
+  "description": "Executes native driver for Kill System Process.",
+  "steps": [
+    {
+      "id": "step_exec_main",
+      "name": "Execute Kill System Process",
+      "type": "ExecuteCapability",
+      "capabilityId": "system.kill_process",
+      "parameters": {
+        "process": "{{process}}"
+      },
+      "dependencies": [],
+      "onError": "fail"
+    }
+  ],
+  "successCondition": "step:step_exec_main:success",
+  "errorHandling": {
+    "strategy": "fail_fast",
+    "maxRetries": 0
+  }
+}

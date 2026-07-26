@@ -1,0 +1,12 @@
+{
+  "version": "1.0.0",
+  "description": "Training dataset configuration for fine-tuning the Intent Model.",
+  "note": "Only the Intent Model is fine-tuned. Tool Registry metadata and workflows remain deterministic and are NOT part of model weights.",
+  "targetModel": "IntentModel",
+  "splits": {
+    "train": "dataset_v1.jsonl",
+    "validation": "validation.jsonl",
+    "test": "test.jsonl"
+  },
+  "createdDate": "2026-07-25"
+}

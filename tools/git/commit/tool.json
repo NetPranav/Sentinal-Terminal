@@ -1,0 +1,51 @@
+{
+  "id": "git.commit",
+  "version": "1.0.0",
+  "displayName": "Record Git Commit",
+  "description": "Stages modified workspace files and records a version commit with message.",
+  "domain": "git",
+  "category": "Git",
+  "tags": [
+    "git",
+    "commit",
+    "git.commit",
+    "record",
+    "save"
+  ],
+  "aliases": [
+    "git commit",
+    "commit changes",
+    "save git changes"
+  ],
+  "supportedPlatforms": [
+    "macos",
+    "windows",
+    "linux"
+  ],
+  "requiredPermissions": [
+    "ShellExecution"
+  ],
+  "securityRisk": "LOW",
+  "parameters": [
+    {
+      "name": "message",
+      "type": "string",
+      "description": "Commit message describing changes",
+      "required": true
+    }
+  ],
+  "optionalParameters": [
+    {
+      "name": "all",
+      "type": "boolean",
+      "description": "Auto stage modified files (-a)",
+      "required": false,
+      "default": true
+    }
+  ],
+  "estimatedExecutionTime": "2s",
+  "confirmationRequired": false,
+  "rollbackAvailable": false,
+  "verificationSupported": true,
+  "deprecationStatus": "stable"
+}

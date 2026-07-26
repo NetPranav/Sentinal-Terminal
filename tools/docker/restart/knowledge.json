@@ -1,0 +1,35 @@
+{
+  "toolId": "docker.restart",
+  "aliases": [
+    "docker restart",
+    "reboot container",
+    "restart docker service"
+  ],
+  "synonyms": [
+    "please docker restart",
+    "please reboot container",
+    "please restart docker service"
+  ],
+  "commonUserWording": [
+    "restart docker container redis_db",
+    "could you restart docker container redis_db",
+    "docker restart",
+    "reboot container",
+    "restart docker service"
+  ],
+  "commonMistakes": [],
+  "entityHints": {
+    "container": [
+      "test_value"
+    ]
+  },
+  "deviceNamingPatterns": [],
+  "commonAbbreviations": {},
+  "languageVariations": [
+    "restart docker container redis_db",
+    "docker restart",
+    "reboot container",
+    "restart docker service"
+  ],
+  "relatedTools": []
+}

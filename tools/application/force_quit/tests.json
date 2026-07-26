@@ -1,0 +1,18 @@
+{
+  "toolId": "application.force_quit",
+  "tests": [
+    {
+      "id": "application-force_quit-test-1",
+      "userRequest": "force quit Xcode",
+      "expectedIntent": {
+        "domain": "application",
+        "action": "force_quit"
+      },
+      "expectedToolId": "application.force_quit",
+      "expectedEntities": {
+        "app": "sample_val"
+      },
+      "description": "Automated test case for Force Quit Application"
+    }
+  ]
+}

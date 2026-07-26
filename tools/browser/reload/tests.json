@@ -1,0 +1,16 @@
+{
+  "toolId": "browser.reload",
+  "tests": [
+    {
+      "id": "browser-reload-test-1",
+      "userRequest": "refresh browser tab",
+      "expectedIntent": {
+        "domain": "browser",
+        "action": "reload"
+      },
+      "expectedToolId": "browser.reload",
+      "expectedEntities": {},
+      "description": "Automated test case for Reload Active Browser Tab"
+    }
+  ]
+}

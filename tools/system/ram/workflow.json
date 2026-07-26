@@ -1,0 +1,21 @@
+{
+  "toolId": "system.ram",
+  "version": "1.0.0",
+  "description": "Executes native driver for Inspect RAM Memory Capacity.",
+  "steps": [
+    {
+      "id": "step_exec_main",
+      "name": "Execute Inspect RAM Memory Capacity",
+      "type": "ExecuteCapability",
+      "capabilityId": "system.ram",
+      "parameters": {},
+      "dependencies": [],
+      "onError": "fail"
+    }
+  ],
+  "successCondition": "step:step_exec_main:success",
+  "errorHandling": {
+    "strategy": "fail_fast",
+    "maxRetries": 0
+  }
+}

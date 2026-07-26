@@ -1,0 +1,16 @@
+{
+  "toolId": "application.maximize",
+  "examples": [
+    {
+      "input": "maximize Terminal",
+      "expectedIntent": {
+        "domain": "application",
+        "action": "maximize"
+      },
+      "expectedEntities": {
+        "app": "sample_val"
+      },
+      "description": "Example execution of Maximize Application Window"
+    }
+  ]
+}

@@ -1,0 +1,52 @@
+{
+  "id": "filesystem.move",
+  "version": "1.0.0",
+  "displayName": "Move File or Directory",
+  "description": "Moves a file or directory from source path to destination path.",
+  "domain": "filesystem",
+  "category": "Filesystem",
+  "tags": [
+    "filesystem",
+    "move",
+    "filesystem.move",
+    "file",
+    "or",
+    "directory",
+    "mv",
+    "relocate"
+  ],
+  "aliases": [
+    "move file",
+    "mv file",
+    "relocate folder"
+  ],
+  "supportedPlatforms": [
+    "macos",
+    "windows",
+    "linux"
+  ],
+  "requiredPermissions": [
+    "ReadFiles"
+  ],
+  "securityRisk": "MEDIUM",
+  "parameters": [
+    {
+      "name": "source",
+      "type": "string",
+      "description": "Source file or folder path",
+      "required": true
+    },
+    {
+      "name": "destination",
+      "type": "string",
+      "description": "New target location path",
+      "required": true
+    }
+  ],
+  "optionalParameters": [],
+  "estimatedExecutionTime": "2s",
+  "confirmationRequired": false,
+  "rollbackAvailable": true,
+  "verificationSupported": true,
+  "deprecationStatus": "stable"
+}

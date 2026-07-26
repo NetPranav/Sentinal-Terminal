@@ -1,0 +1,16 @@
+{
+  "toolId": "browser.history",
+  "tests": [
+    {
+      "id": "browser-history-test-1",
+      "userRequest": "search browser history for docs",
+      "expectedIntent": {
+        "domain": "browser",
+        "action": "history"
+      },
+      "expectedToolId": "browser.history",
+      "expectedEntities": {},
+      "description": "Automated test case for Query Browser History"
+    }
+  ]
+}

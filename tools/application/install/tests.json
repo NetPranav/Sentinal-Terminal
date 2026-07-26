@@ -1,0 +1,18 @@
+{
+  "toolId": "application.install",
+  "tests": [
+    {
+      "id": "application-install-test-1",
+      "userRequest": "install app ffmpeg",
+      "expectedIntent": {
+        "domain": "application",
+        "action": "install"
+      },
+      "expectedToolId": "application.install",
+      "expectedEntities": {
+        "package": "sample_val"
+      },
+      "description": "Automated test case for Install Desktop Package or App"
+    }
+  ]
+}

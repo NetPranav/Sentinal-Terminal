@@ -1,0 +1,16 @@
+{
+  "toolId": "filesystem.create",
+  "examples": [
+    {
+      "input": "create file notes.txt",
+      "expectedIntent": {
+        "domain": "filesystem",
+        "action": "create"
+      },
+      "expectedEntities": {
+        "path": "/test/path.txt"
+      },
+      "description": "Example execution of Create New File"
+    }
+  ]
+}

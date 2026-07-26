@@ -1,0 +1,16 @@
+{
+  "toolId": "network.bluetooth.connect",
+  "examples": [
+    {
+      "input": "connect bluetooth device AirPods Pro",
+      "expectedIntent": {
+        "domain": "network",
+        "action": "bluetooth.connect"
+      },
+      "expectedEntities": {
+        "device": "sample_val"
+      },
+      "description": "Example execution of Connect to Bluetooth Device"
+    }
+  ]
+}

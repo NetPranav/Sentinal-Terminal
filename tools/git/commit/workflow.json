@@ -1,0 +1,24 @@
+{
+  "toolId": "git.commit",
+  "version": "1.0.0",
+  "description": "Executes native driver for Record Git Commit.",
+  "steps": [
+    {
+      "id": "step_exec_main",
+      "name": "Execute Record Git Commit",
+      "type": "ExecuteCapability",
+      "capabilityId": "git.commit",
+      "parameters": {
+        "message": "{{message}}",
+        "all": "{{all}}"
+      },
+      "dependencies": [],
+      "onError": "fail"
+    }
+  ],
+  "successCondition": "step:step_exec_main:success",
+  "errorHandling": {
+    "strategy": "fail_fast",
+    "maxRetries": 0
+  }
+}

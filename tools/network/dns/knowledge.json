@@ -1,0 +1,46 @@
+{
+  "toolId": "network.dns",
+  "aliases": [
+    "lookup dns",
+    "nslookup domain",
+    "dig domain records",
+    "check dns records",
+    "dns lookup"
+  ],
+  "synonyms": [
+    "please lookup dns",
+    "please nslookup domain",
+    "please dig domain records",
+    "please check dns records",
+    "please dns lookup"
+  ],
+  "commonUserWording": [
+    "lookup dns records for openai.com",
+    "could you lookup dns records for openai.com",
+    "lookup dns",
+    "nslookup domain",
+    "dig domain records",
+    "check dns records",
+    "dns lookup"
+  ],
+  "commonMistakes": [],
+  "entityHints": {
+    "domain": [
+      "test_value"
+    ],
+    "recordType": [
+      "test_value"
+    ]
+  },
+  "deviceNamingPatterns": [],
+  "commonAbbreviations": {},
+  "languageVariations": [
+    "lookup dns records for openai.com",
+    "lookup dns",
+    "nslookup domain",
+    "dig domain records",
+    "check dns records",
+    "dns lookup"
+  ],
+  "relatedTools": []
+}

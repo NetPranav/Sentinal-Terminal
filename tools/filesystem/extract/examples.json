@@ -1,0 +1,16 @@
+{
+  "toolId": "filesystem.extract",
+  "examples": [
+    {
+      "input": "extract build.zip into ./dist",
+      "expectedIntent": {
+        "domain": "filesystem",
+        "action": "extract"
+      },
+      "expectedEntities": {
+        "archivePath": "sample_val"
+      },
+      "description": "Example execution of Extract Archive File"
+    }
+  ]
+}

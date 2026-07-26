@@ -1,0 +1,31 @@
+{
+  "toolId": "browser.reload",
+  "aliases": [
+    "reload page",
+    "refresh browser",
+    "refresh web page"
+  ],
+  "synonyms": [
+    "please reload page",
+    "please refresh browser",
+    "please refresh web page"
+  ],
+  "commonUserWording": [
+    "refresh browser tab",
+    "could you refresh browser tab",
+    "reload page",
+    "refresh browser",
+    "refresh web page"
+  ],
+  "commonMistakes": [],
+  "entityHints": {},
+  "deviceNamingPatterns": [],
+  "commonAbbreviations": {},
+  "languageVariations": [
+    "refresh browser tab",
+    "reload page",
+    "refresh browser",
+    "refresh web page"
+  ],
+  "relatedTools": []
+}

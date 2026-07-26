@@ -1,0 +1,52 @@
+{
+  "id": "python.pip_install",
+  "version": "1.0.0",
+  "displayName": "Install Python Pip Package",
+  "description": "Installs Python software libraries and dependencies via pip package installer.",
+  "domain": "python",
+  "category": "Python",
+  "tags": [
+    "python",
+    "pip_install",
+    "python.pip",
+    "install",
+    "pip",
+    "package"
+  ],
+  "aliases": [
+    "pip install",
+    "install python library",
+    "pip add package"
+  ],
+  "supportedPlatforms": [
+    "macos",
+    "windows",
+    "linux"
+  ],
+  "requiredPermissions": [
+    "ShellExecution"
+  ],
+  "securityRisk": "LOW",
+  "parameters": [
+    {
+      "name": "package",
+      "type": "string",
+      "description": "Package library name or requirements.txt path",
+      "required": true
+    }
+  ],
+  "optionalParameters": [
+    {
+      "name": "upgrade",
+      "type": "boolean",
+      "description": "Upgrade package if already installed (-U)",
+      "required": false,
+      "default": false
+    }
+  ],
+  "estimatedExecutionTime": "2s",
+  "confirmationRequired": false,
+  "rollbackAvailable": false,
+  "verificationSupported": true,
+  "deprecationStatus": "stable"
+}

@@ -1,0 +1,18 @@
+{
+  "toolId": "application.focus",
+  "tests": [
+    {
+      "id": "application-focus-test-1",
+      "userRequest": "focus VSCode",
+      "expectedIntent": {
+        "domain": "application",
+        "action": "focus"
+      },
+      "expectedToolId": "application.focus",
+      "expectedEntities": {
+        "app": "sample_val"
+      },
+      "description": "Automated test case for Focus Application Window"
+    }
+  ]
+}

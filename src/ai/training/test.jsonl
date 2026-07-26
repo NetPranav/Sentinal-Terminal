@@ -1,0 +1,4 @@
+{"prompt": "what bluetooth peripherals are nearby?", "intent": {"domain": "network", "action": "list"}, "entities": {}}
+{"prompt": "find nearby wifi networks", "intent": {"domain": "network", "action": "scan"}, "entities": {}}
+{"prompt": "how much memory is installed?", "intent": {"domain": "system", "action": "info"}, "entities": {}}
+{"prompt": "what files are in ./src", "intent": {"domain": "filesystem", "action": "list"}, "entities": {"file_path": "./src"}}

@@ -1,0 +1,18 @@
+{
+  "toolId": "network.wifi.connect",
+  "tests": [
+    {
+      "id": "network-wifi.connect-test-1",
+      "userRequest": "connect wifi to Home-WiFi-5G",
+      "expectedIntent": {
+        "domain": "network",
+        "action": "wifi.connect"
+      },
+      "expectedToolId": "network.wifi.connect",
+      "expectedEntities": {
+        "ssid": "sample_val"
+      },
+      "description": "Automated test case for Connect to Wi-Fi Network"
+    }
+  ]
+}

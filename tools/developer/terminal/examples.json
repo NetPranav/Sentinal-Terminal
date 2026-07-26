@@ -1,0 +1,14 @@
+{
+  "toolId": "developer.terminal",
+  "examples": [
+    {
+      "input": "open terminal window at ./src",
+      "expectedIntent": {
+        "domain": "developer",
+        "action": "terminal"
+      },
+      "expectedEntities": {},
+      "description": "Example execution of Launch Standalone Terminal"
+    }
+  ]
+}

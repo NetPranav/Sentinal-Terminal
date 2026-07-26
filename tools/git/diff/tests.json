@@ -1,0 +1,16 @@
+{
+  "toolId": "git.diff",
+  "tests": [
+    {
+      "id": "git-diff-test-1",
+      "userRequest": "show git diff for modified files",
+      "expectedIntent": {
+        "domain": "git",
+        "action": "diff"
+      },
+      "expectedToolId": "git.diff",
+      "expectedEntities": {},
+      "description": "Automated test case for View Git Workspace Diff"
+    }
+  ]
+}

@@ -1,0 +1,24 @@
+{
+  "toolId": "filesystem.search",
+  "version": "1.0.0",
+  "description": "Executes native driver for Search Filesystem by Name.",
+  "steps": [
+    {
+      "id": "step_exec_main",
+      "name": "Execute Search Filesystem by Name",
+      "type": "ExecuteCapability",
+      "capabilityId": "filesystem.search",
+      "parameters": {
+        "dir": "{{dir}}",
+        "pattern": "{{pattern}}"
+      },
+      "dependencies": [],
+      "onError": "fail"
+    }
+  ],
+  "successCondition": "step:step_exec_main:success",
+  "errorHandling": {
+    "strategy": "fail_fast",
+    "maxRetries": 0
+  }
+}

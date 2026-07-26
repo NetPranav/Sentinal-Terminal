@@ -1,0 +1,16 @@
+{
+  "toolId": "network.interfaces",
+  "tests": [
+    {
+      "id": "network-interfaces-test-1",
+      "userRequest": "show network interfaces",
+      "expectedIntent": {
+        "domain": "network",
+        "action": "interfaces"
+      },
+      "expectedToolId": "network.interfaces",
+      "expectedEntities": {},
+      "description": "Automated test case for Inspect Network Interfaces"
+    }
+  ]
+}

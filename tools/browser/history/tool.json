@@ -1,0 +1,44 @@
+{
+  "id": "browser.history",
+  "version": "1.0.0",
+  "displayName": "Query Browser History",
+  "description": "Searches recent web browsing navigation history entries.",
+  "domain": "browser",
+  "category": "Web",
+  "tags": [
+    "browser",
+    "history",
+    "browser.history",
+    "query",
+    "show",
+    "search"
+  ],
+  "aliases": [
+    "browser history",
+    "show visited sites",
+    "search web history"
+  ],
+  "supportedPlatforms": [
+    "macos",
+    "windows",
+    "linux"
+  ],
+  "requiredPermissions": [
+    "ShellExecution"
+  ],
+  "securityRisk": "SAFE",
+  "parameters": [],
+  "optionalParameters": [
+    {
+      "name": "query",
+      "type": "string",
+      "description": "Domain or title query keyword",
+      "required": false
+    }
+  ],
+  "estimatedExecutionTime": "1s",
+  "confirmationRequired": false,
+  "rollbackAvailable": false,
+  "verificationSupported": true,
+  "deprecationStatus": "stable"
+}

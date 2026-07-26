@@ -1,0 +1,47 @@
+{
+  "id": "browser.navigate",
+  "version": "1.0.0",
+  "displayName": "Navigate Browser to URL",
+  "description": "Launches default system web browser and navigates directly to web URL.",
+  "domain": "browser",
+  "category": "Web",
+  "tags": [
+    "browser",
+    "navigate",
+    "browser.navigate",
+    "to",
+    "url",
+    "go",
+    "open",
+    "visit"
+  ],
+  "aliases": [
+    "go to website",
+    "open url",
+    "navigate to",
+    "visit url"
+  ],
+  "supportedPlatforms": [
+    "macos",
+    "windows",
+    "linux"
+  ],
+  "requiredPermissions": [
+    "ShellExecution"
+  ],
+  "securityRisk": "SAFE",
+  "parameters": [
+    {
+      "name": "url",
+      "type": "string",
+      "description": "Web address to visit",
+      "required": true
+    }
+  ],
+  "optionalParameters": [],
+  "estimatedExecutionTime": "1s",
+  "confirmationRequired": false,
+  "rollbackAvailable": false,
+  "verificationSupported": true,
+  "deprecationStatus": "stable"
+}

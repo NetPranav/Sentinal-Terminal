@@ -1,0 +1,14 @@
+{
+  "toolId": "filesystem.recent_files",
+  "examples": [
+    {
+      "input": "show 10 recent files",
+      "expectedIntent": {
+        "domain": "filesystem",
+        "action": "recent_files"
+      },
+      "expectedEntities": {},
+      "description": "Example execution of Query Recently Modified Files"
+    }
+  ]
+}

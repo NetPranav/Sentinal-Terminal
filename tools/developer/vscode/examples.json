@@ -1,0 +1,14 @@
+{
+  "toolId": "developer.vscode",
+  "examples": [
+    {
+      "input": "open current folder in vscode",
+      "expectedIntent": {
+        "domain": "developer",
+        "action": "vscode"
+      },
+      "expectedEntities": {},
+      "description": "Example execution of Open in Visual Studio Code"
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "toolId": "filesystem.read",
+  "version": "1.0.0",
+  "description": "Executes native driver for Read File Content.",
+  "steps": [
+    {
+      "id": "step_exec_main",
+      "name": "Execute Read File Content",
+      "type": "ExecuteCapability",
+      "capabilityId": "filesystem.read",
+      "parameters": {
+        "path": "{{path}}"
+      },
+      "dependencies": [],
+      "onError": "fail"
+    }
+  ],
+  "successCondition": "step:step_exec_main:success",
+  "errorHandling": {
+    "strategy": "fail_fast",
+    "maxRetries": 0
+  }
+}

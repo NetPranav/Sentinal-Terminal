@@ -1,0 +1,40 @@
+{
+  "id": "system.battery",
+  "version": "1.0.0",
+  "displayName": "Check Battery Level & Power Status",
+  "description": "Queries internal laptop battery charging percentage, time remaining, and power source.",
+  "domain": "system",
+  "category": "System",
+  "tags": [
+    "system",
+    "battery",
+    "system.battery",
+    "check",
+    "level",
+    "power",
+    "status",
+    "how"
+  ],
+  "aliases": [
+    "check battery",
+    "battery status",
+    "power level",
+    "how much battery left"
+  ],
+  "supportedPlatforms": [
+    "macos",
+    "windows",
+    "linux"
+  ],
+  "requiredPermissions": [
+    "ShellExecution"
+  ],
+  "securityRisk": "SAFE",
+  "parameters": [],
+  "optionalParameters": [],
+  "estimatedExecutionTime": "1s",
+  "confirmationRequired": false,
+  "rollbackAvailable": false,
+  "verificationSupported": true,
+  "deprecationStatus": "stable"
+}

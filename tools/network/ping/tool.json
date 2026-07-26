@@ -1,0 +1,53 @@
+{
+  "id": "network.ping",
+  "version": "1.0.0",
+  "displayName": "Ping Network Host",
+  "description": "Sends ICMP echo packets to test network reachability and packet latency (ping).",
+  "domain": "network",
+  "category": "Networking",
+  "tags": [
+    "network",
+    "ping",
+    "network.ping",
+    "host",
+    "test",
+    "check"
+  ],
+  "aliases": [
+    "ping host",
+    "test connection to",
+    "check network ping",
+    "ping"
+  ],
+  "supportedPlatforms": [
+    "macos",
+    "windows",
+    "linux"
+  ],
+  "requiredPermissions": [
+    "ShellExecution"
+  ],
+  "securityRisk": "SAFE",
+  "parameters": [
+    {
+      "name": "host",
+      "type": "string",
+      "description": "Target hostname or IP address",
+      "required": true
+    }
+  ],
+  "optionalParameters": [
+    {
+      "name": "count",
+      "type": "number",
+      "description": "Number of ICMP packets to send",
+      "required": false,
+      "default": 4
+    }
+  ],
+  "estimatedExecutionTime": "1s",
+  "confirmationRequired": false,
+  "rollbackAvailable": false,
+  "verificationSupported": true,
+  "deprecationStatus": "stable"
+}

@@ -1,0 +1,16 @@
+{
+  "toolId": "git.commit",
+  "examples": [
+    {
+      "input": "commit changes with message \"Fix login validation\"",
+      "expectedIntent": {
+        "domain": "git",
+        "action": "commit"
+      },
+      "expectedEntities": {
+        "message": "sample_val"
+      },
+      "description": "Example execution of Record Git Commit"
+    }
+  ]
+}

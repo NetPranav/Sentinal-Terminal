@@ -1,0 +1,5 @@
+{"prompt": "show me all bluetooth devices", "intent": {"domain": "network", "action": "list"}, "entities": {}}
+{"prompt": "are my AirPods connected?", "intent": {"domain": "network", "action": "list"}, "entities": {"device_name": "AirPods"}}
+{"prompt": "scan for available wifi networks", "intent": {"domain": "network", "action": "scan"}, "entities": {}}
+{"prompt": "what are my hardware specs?", "intent": {"domain": "system", "action": "info"}, "entities": {}}
+{"prompt": "list all files in ~/Documents", "intent": {"domain": "filesystem", "action": "list"}, "entities": {"file_path": "~/Documents"}}

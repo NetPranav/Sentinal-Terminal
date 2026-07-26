@@ -1,0 +1,35 @@
+{
+  "toolId": "system.ram",
+  "aliases": [
+    "ram usage",
+    "check memory left",
+    "free memory",
+    "how much ram available"
+  ],
+  "synonyms": [
+    "please ram usage",
+    "please check memory left",
+    "please free memory",
+    "please how much ram available"
+  ],
+  "commonUserWording": [
+    "check ram usage",
+    "could you check ram usage",
+    "ram usage",
+    "check memory left",
+    "free memory",
+    "how much ram available"
+  ],
+  "commonMistakes": [],
+  "entityHints": {},
+  "deviceNamingPatterns": [],
+  "commonAbbreviations": {},
+  "languageVariations": [
+    "check ram usage",
+    "ram usage",
+    "check memory left",
+    "free memory",
+    "how much ram available"
+  ],
+  "relatedTools": []
+}

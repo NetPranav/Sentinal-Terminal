@@ -1,0 +1,58 @@
+{
+  "id": "network.wifi.connect",
+  "version": "1.0.0",
+  "displayName": "Connect to Wi-Fi Network",
+  "description": "Connects system wireless interface directly to specified Wi-Fi network SSID.",
+  "domain": "network",
+  "category": "Networking",
+  "tags": [
+    "network",
+    "wifi.connect",
+    "wifi",
+    "connect",
+    "network.wifi.connect",
+    "to",
+    "wi-fi",
+    "join"
+  ],
+  "aliases": [
+    "connect wifi",
+    "join wifi network",
+    "wifi connect",
+    "connect me to",
+    "connect to network",
+    "join network",
+    "connect it to",
+    "connect to wifi"
+  ],
+  "supportedPlatforms": [
+    "macos",
+    "windows",
+    "linux"
+  ],
+  "requiredPermissions": [
+    "ShellExecution"
+  ],
+  "securityRisk": "LOW",
+  "parameters": [
+    {
+      "name": "ssid",
+      "type": "string",
+      "description": "Wireless network SSID name",
+      "required": true
+    }
+  ],
+  "optionalParameters": [
+    {
+      "name": "password",
+      "type": "string",
+      "description": "WPA network key password",
+      "required": false
+    }
+  ],
+  "estimatedExecutionTime": "2s",
+  "confirmationRequired": false,
+  "rollbackAvailable": false,
+  "verificationSupported": true,
+  "deprecationStatus": "stable"
+}

@@ -1,0 +1,18 @@
+{
+  "toolId": "application.minimize",
+  "tests": [
+    {
+      "id": "application-minimize-test-1",
+      "userRequest": "minimize Spotify",
+      "expectedIntent": {
+        "domain": "application",
+        "action": "minimize"
+      },
+      "expectedToolId": "application.minimize",
+      "expectedEntities": {
+        "app": "sample_val"
+      },
+      "description": "Automated test case for Minimize Application Window"
+    }
+  ]
+}

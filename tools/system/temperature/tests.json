@@ -1,0 +1,16 @@
+{
+  "toolId": "system.temperature",
+  "tests": [
+    {
+      "id": "system-temperature-test-1",
+      "userRequest": "check system cpu temperature",
+      "expectedIntent": {
+        "domain": "system",
+        "action": "temperature"
+      },
+      "expectedToolId": "system.temperature",
+      "expectedEntities": {},
+      "description": "Automated test case for Check Thermal Sensors"
+    }
+  ]
+}
