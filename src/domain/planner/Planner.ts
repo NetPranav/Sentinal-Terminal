@@ -103,7 +103,7 @@ export class Planner {
         matchedTools.push(tool);
 
         // Merge task extracted entities with parameters
-        const parameters = this.extractParameters(request.goal, tool, task.entities || {});
+        const parameters = this.extractParameters(request.goal, tool, task.entities || {}, request.context?.cwd);
 
         const compilationContext: CompilationContext = {
           platform,
@@ -206,7 +206,10 @@ export class Planner {
   /**
    * Extract parameters merging natural language extraction with entity intelligence.
    */
-  private extractParameters(goal: string, tool: LoadedTool, entities: Record<string, any> = {}): Record<string, any> {
+  /**
+   * Extract parameters merging natural language extraction with entity intelligence.
+   */
+  private extractParameters(goal: string, tool: LoadedTool, entities: Record<string, any> = {}, cwd: string = '~'): Record<string, any> {
     const params: Record<string, any> = { ...entities };
 
     // Apply defaults for all parameters not covered by entities
@@ -217,11 +220,15 @@ export class Planner {
     }
 
     // Synchronize parameter names across different tool schemas
-    if (params['path'] && !params['directory']) params['directory'] = params['path'];
-    if (params['directory'] && !params['path']) params['path'] = params['directory'];
+    const existingPath = params['path'] || params['directory'] || params['dir'] || params['workingDir'] || params['targetDir'];
+    if (existingPath) {
+      params['path'] = existingPath;
+      params['directory'] = existingPath;
+      params['dir'] = existingPath;
+    }
 
     // Intelligent folder and path extraction fallback
-    if (!params['path'] && !params['directory'] && (tool.definition.parameters.some(p => p.name === 'path' || p.name === 'directory'))) {
+    if (!params['path'] && !params['directory'] && !params['dir'] && (tool.definition.parameters.some(p => ['path', 'directory', 'dir', 'workingDir', 'targetDir'].includes(p.name)))) {
       const lower = goal.toLowerCase();
       let detectedPath = '';
       if (lower.includes('download') || lower.includes('donwload') || lower.includes('downlod') || lower.includes('dwnload')) {
@@ -238,13 +245,31 @@ export class Planner {
         detectedPath = '~/Movies';
       } else if (lower.includes('home') || lower.includes('user folder')) {
         detectedPath = '~';
+      } else if (lower.includes('here') || lower.includes('current folder') || lower.includes('current dir') || lower.includes('this folder') || lower.includes('this dir')) {
+        detectedPath = cwd || '~';
       } else {
         const pathMatch = goal.match(/(?:in|at|from|to|of)\s+(~?\/[^\s]+|~\w*)/i);
-        if (pathMatch) detectedPath = pathMatch[1];
+        if (pathMatch) {
+          detectedPath = pathMatch[1];
+        } else {
+          // If no specific folder mentioned, fall back to current terminal working directory
+          detectedPath = cwd || '~';
+        }
       }
       if (detectedPath) {
         params['path'] = detectedPath;
         params['directory'] = detectedPath;
+        params['dir'] = detectedPath;
+      }
+    }
+
+    // Extract search pattern or keyword (e.g., "png files", "id_rsa", "*.ts")
+    if (!params['pattern'] && !params['query'] && !params['name'] && tool.definition.parameters.some(p => ['pattern', 'query', 'name'].includes(p.name))) {
+      const extMatch = goal.match(/(?:all\s+|any\s+|the\s+)?(\w+|\*?\.\w+)\s+files?/i);
+      if (extMatch && extMatch[1] && !['the', 'all', 'any', 'some', 'these'].includes(extMatch[1].toLowerCase())) {
+        params['pattern'] = extMatch[1].startsWith('.') ? extMatch[1] : `${extMatch[1]}`;
+        params['query'] = params['pattern'];
+        params['name'] = params['pattern'];
       }
     }
 

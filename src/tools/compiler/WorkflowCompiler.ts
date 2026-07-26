@@ -36,7 +36,7 @@ export class WorkflowCompiler {
   public compile(tool: LoadedTool, context: CompilationContext): CompilationResult {
     try {
       // 1. Validate required parameters
-      const paramError = this.validateParameters(tool, context.parameters);
+      const paramError = this.validateParameters(tool, context.parameters, context);
       if (paramError) {
         return { success: false, error: paramError };
       }
@@ -90,12 +90,14 @@ export class WorkflowCompiler {
   /**
    * Validate that all required parameters are provided.
    */
-  private validateParameters(tool: LoadedTool, params: Record<string, any>): string | null {
+  private validateParameters(tool: LoadedTool, params: Record<string, any>, context?: CompilationContext): string | null {
     for (const param of tool.definition.parameters) {
-      if (param.required && !(param.name in params)) {
+      if (param.required && (params[param.name] === undefined || params[param.name] === null || params[param.name] === '')) {
         // Check if there's a default value
         if (param.default !== undefined) {
           params[param.name] = param.default;
+        } else if (['dir', 'path', 'directory', 'workingDir', 'cwd', 'targetDir', 'targetPath', 'folder'].includes(param.name)) {
+          params[param.name] = context?.cwd || '~';
         } else {
           return `Missing required parameter: ${param.name} (${param.description})`;
         }
