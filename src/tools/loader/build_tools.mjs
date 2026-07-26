@@ -43,7 +43,7 @@ const toolSpecs = [
       { name: 'dir', type: 'string', desc: 'Starting root directory path', required: true },
       { name: 'pattern', type: 'string', desc: 'Search keyword or glob pattern', required: true }
     ],
-    aliases: ['find file', 'search directory', 'search files', 'locate file', 'find folder', 'locate folder', 'where is', 'tell me the path'], sampleInput: 'search for *.ts files in src directory'
+    aliases: ['find file', 'search directory', 'search files', 'locate file', 'find folder', 'locate folder', 'where is', 'tell me the path', 'how many', 'how many files', 'count files', 'number of files', 'count folders', 'tell me how many'], sampleInput: 'how many png files are here'
   },
   {
     id: 'filesystem.copy', folder: 'filesystem/copy', domain: 'filesystem', action: 'copy',

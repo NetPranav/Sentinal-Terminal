@@ -14,7 +14,10 @@
     "find",
     "locate",
     "where",
-    "tell"
+    "tell",
+    "how",
+    "count",
+    "number"
   ],
   "aliases": [
     "find file",
@@ -24,7 +27,13 @@
     "find folder",
     "locate folder",
     "where is",
-    "tell me the path"
+    "tell me the path",
+    "how many",
+    "how many files",
+    "count files",
+    "number of files",
+    "count folders",
+    "tell me how many"
   ],
   "supportedPlatforms": [
     "macos",

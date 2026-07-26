@@ -2,7 +2,7 @@
   "toolId": "filesystem.search",
   "examples": [
     {
-      "input": "search for *.ts files in src directory",
+      "input": "how many png files are here",
       "expectedIntent": {
         "domain": "filesystem",
         "action": "search"

@@ -8,7 +8,13 @@
     "find folder",
     "locate folder",
     "where is",
-    "tell me the path"
+    "tell me the path",
+    "how many",
+    "how many files",
+    "count files",
+    "number of files",
+    "count folders",
+    "tell me how many"
   ],
   "synonyms": [
     "please find file",
@@ -18,11 +24,17 @@
     "please find folder",
     "please locate folder",
     "please where is",
-    "please tell me the path"
+    "please tell me the path",
+    "please how many",
+    "please how many files",
+    "please count files",
+    "please number of files",
+    "please count folders",
+    "please tell me how many"
   ],
   "commonUserWording": [
-    "search for *.ts files in src directory",
-    "could you search for *.ts files in src directory",
+    "how many png files are here",
+    "could you how many png files are here",
     "find file",
     "search directory",
     "search files",
@@ -30,7 +42,13 @@
     "find folder",
     "locate folder",
     "where is",
-    "tell me the path"
+    "tell me the path",
+    "how many",
+    "how many files",
+    "count files",
+    "number of files",
+    "count folders",
+    "tell me how many"
   ],
   "commonMistakes": [],
   "entityHints": {
@@ -44,7 +62,7 @@
   "deviceNamingPatterns": [],
   "commonAbbreviations": {},
   "languageVariations": [
-    "search for *.ts files in src directory",
+    "how many png files are here",
     "find file",
     "search directory",
     "search files",
@@ -52,7 +70,13 @@
     "find folder",
     "locate folder",
     "where is",
-    "tell me the path"
+    "tell me the path",
+    "how many",
+    "how many files",
+    "count files",
+    "number of files",
+    "count folders",
+    "tell me how many"
   ],
   "relatedTools": []
 }

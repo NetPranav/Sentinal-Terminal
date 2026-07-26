@@ -3,7 +3,7 @@
   "tests": [
     {
       "id": "filesystem-search-test-1",
-      "userRequest": "search for *.ts files in src directory",
+      "userRequest": "how many png files are here",
       "expectedIntent": {
         "domain": "filesystem",
         "action": "search"

@@ -231,7 +231,7 @@ export class Planner {
     if (!params['path'] && !params['directory'] && !params['dir'] && (tool.definition.parameters.some(p => ['path', 'directory', 'dir', 'workingDir', 'targetDir'].includes(p.name)))) {
       const lower = goal.toLowerCase();
       let detectedPath = '';
-      if (lower.includes('download') || lower.includes('donwload') || lower.includes('downlod') || lower.includes('dwnload')) {
+      if (lower.includes('download') || lower.includes('donwload') || lower.includes('downlod') || lower.includes('dwnload') || lower.includes('downlaod')) {
         detectedPath = '~/Downloads';
       } else if (lower.includes('desktop')) {
         detectedPath = '~/Desktop';
@@ -277,14 +277,14 @@ export class Planner {
         extVal = `*${endMatch[1]}`;
       } else if (nameMatch && nameMatch[1]) {
         extVal = nameMatch[1];
-      } else if (extMatch && extMatch[1] && !['the', 'all', 'any', 'some', 'these', 'those', 'few', 'other'].includes(extMatch[1].toLowerCase())) {
+      } else if (extMatch && extMatch[1] && !['the', 'all', 'any', 'some', 'these', 'those', 'few', 'other', 'many', 'how', 'what', 'which', 'there', 'here', 'total', 'count', 'more', 'less'].includes(extMatch[1].toLowerCase())) {
         extVal = extMatch[1].startsWith('.') || extMatch[1].startsWith('*') ? extMatch[1] : `*.${extMatch[1]}`;
       }
 
       if (!extVal) {
-        const catchAll = goal.match(/(?:find|search|locate|show|tell me all the|tell me all)\s+([^\s,.]+(?:\.\w+)?)/i);
-        if (catchAll && catchAll[1] && !['the', 'all', 'any', 'some', 'files', 'folders', 'here', 'there', 'in'].includes(catchAll[1].toLowerCase())) {
-          extVal = catchAll[1];
+        const catchAll = goal.match(/(?:find|search|locate|show|tell me all the|tell me all|how many|count)\s+([^\s,.]+(?:\.\w+)?)/i);
+        if (catchAll && catchAll[1] && !['the', 'all', 'any', 'some', 'files', 'folders', 'here', 'there', 'in', 'many', 'how', 'total', 'count', 'are'].includes(catchAll[1].toLowerCase())) {
+          extVal = catchAll[1].startsWith('.') || catchAll[1].startsWith('*') ? catchAll[1] : (catchAll[0].toLowerCase().includes('many') || catchAll[0].toLowerCase().includes('count') ? `*.${catchAll[1]}` : catchAll[1]);
         }
       }
 
