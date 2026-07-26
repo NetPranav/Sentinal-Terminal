@@ -249,6 +249,17 @@ function App() {
               <span>Terminal</span>
             </span>
             <div className="pane-action-buttons">
+              <button 
+                className="personalize-btn"
+                onClick={(e) => { e.stopPropagation(); setShowThemeModal(!showThemeModal); }} 
+                title="Personalize Workspace Appearance & Theme"
+                style={{
+                  background: showThemeModal ? 'var(--sentinel-hover, rgba(255, 255, 255, 0.15))' : 'transparent',
+                  borderColor: showThemeModal ? 'var(--sentinel-border-active, rgba(255, 255, 255, 0.35))' : 'var(--sentinel-border, rgba(255, 255, 255, 0.1))'
+                }}
+              >
+                Personalize
+              </button>
               <button onClick={(e) => { e.stopPropagation(); splitPane(node.data.id, 'vertical'); }} title="Split Vertically (Side by side)">Split V</button>
               <button onClick={(e) => { e.stopPropagation(); splitPane(node.data.id, 'horizontal'); }} title="Split Horizontally (Stacked)">Split H</button>
               {!isRoot && (
@@ -282,14 +293,7 @@ function App() {
   return (
     <div className="app-container">
       <div className="tabs-bar">
-        {/* Apple macOS style window dots */}
-        <div className="macos-dots" style={{ display: 'flex', gap: '8px', padding: '0 16px', alignItems: 'center' }}>
-          <span style={{ width: '12px', height: '12px', borderRadius: '50%', background: '#FF5F56', display: 'inline-block' }}></span>
-          <span style={{ width: '12px', height: '12px', borderRadius: '50%', background: '#FFBD2E', display: 'inline-block' }}></span>
-          <span style={{ width: '12px', height: '12px', borderRadius: '50%', background: '#27C93F', display: 'inline-block' }}></span>
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', flex: 1, overflowX: 'auto', height: '100%' }}>
+        <div style={{ display: 'flex', alignItems: 'center', flex: 1, overflowX: 'auto', height: '100%', paddingLeft: '16px' }}>
           {tabs.map((tab) => (
             <div 
               key={tab.id} 
@@ -304,38 +308,14 @@ function App() {
           ))}
           <button className="add-tab-btn" onClick={addTab} title="New Terminal Tab">+</button>
         </div>
-
-        {/* Minimalist Personalize Option */}
-        <div style={{ display: 'flex', alignItems: 'center', paddingRight: '16px', gap: '10px' }}>
-          <button 
-            className="personalize-btn"
-            onClick={() => setShowThemeModal(!showThemeModal)}
-            style={{
-              background: showThemeModal ? 'var(--sentinel-hover, rgba(255, 255, 255, 0.12))' : 'rgba(255, 255, 255, 0.05)',
-              border: '1px solid var(--sentinel-border, rgba(255, 255, 255, 0.12))',
-              borderRadius: '14px',
-              padding: '3px 12px',
-              color: 'var(--sentinel-fg, #ffffff)',
-              fontSize: '11px',
-              fontWeight: 500,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              transition: 'all 0.2s ease'
-            }}
-          >
-            Personalize
-          </button>
-        </div>
       </div>
 
       {/* Classic Minimalist Workspace Appearance Modal */}
       {showThemeModal && (
         <div style={{
           position: 'absolute',
-          top: '48px',
-          right: '16px',
+          top: '72px',
+          right: '20px',
           width: '320px',
           background: 'var(--sentinel-modal-bg, rgba(20, 20, 22, 0.97))',
           border: '1px solid var(--sentinel-border-active, rgba(255, 255, 255, 0.2))',
