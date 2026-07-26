@@ -289,8 +289,8 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
                 writeTerm('\r\n\x1b[36m[AI Navigation] Translated command to: \x1b[1;32mcd ~\x1b[0m\r\n');
                 setTimeout(() => sessionManager.write(currentSessionId!, 'cd ~\r'), 80);
                 return;
-              } else if (/^(?:go to|navigate to|move to|switch to|jump to|enter|cd into|goto|take me to|bring me to|head to|head over to|open folder|open directory|change directory to|change folder to|switch folder to|open dir|open)\s+(.+)$/i.test(strippedCmd)) {
-                const match = strippedCmd.match(/^(?:go to|navigate to|move to|switch to|jump to|enter|cd into|goto|take me to|bring me to|head to|head over to|open folder|open directory|change directory to|change folder to|switch folder to|open dir|open)\s+(.+)$/i);
+              } else if (/^(?:go to|navigate to|move to|switch to|jump to|enter|cd into|goto|take me to|bring me to|head to|head over to|change directory to|change folder to|switch folder to|switch dir to)\s+(.+)$/i.test(strippedCmd)) {
+                const match = strippedCmd.match(/^(?:go to|navigate to|move to|switch to|jump to|enter|cd into|goto|take me to|bring me to|head to|head over to|change directory to|change folder to|switch folder to|switch dir to)\s+(.+)$/i);
                 if (match && match[1]) {
                   let target = match[1].replace(/\s+(?:folder|fodler|directory|dir)$/i, '').replace(/\/+$/, '').trim();
                   const knownDirs: Record<string, string> = {
