@@ -275,7 +275,7 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
               // Intercept natural language directory navigation and execute directly in interactive PTY shell
               const backCmds = ['go back', 'navigate back', 'move back', 'step back', 'go backward', 'go up', 'navigate up', 'move up', 'up a folder', 'up a dir', 'up a directory', 'go out', 'parent folder', 'parent directory', 'exit folder', 'exit directory', 'back', 'take me back', 'bring me back'];
               const homeCmds = ['go home', 'navigate home', 'move home', 'take me home', 'home folder', 'home directory', 'return home', 'go to home', 'navigate to home', 'switch to home', 'cd home', 'bring me home'];
-              const strippedCmd = cleanCmd.replace(/^(?:(?:hey|hi|hello|please|can you|could you|would you|kindly|just|now|alright|there|then|so|friend|dude|mate)(?:\s+|,)*)+/i, '').trim();
+              const strippedCmd = cleanCmd.replace(/^(?:(?:hey|hi|hello|please|can you|could you|would you|kindly|just|now|alright|there|then|so|friend|dude|mate|i want you to|i wnat you to|i want to|i need you to|help me to|we need to|you should|let's|lets)(?:\s+|,)*)+/i, '').trim();
               const lowerStripped = strippedCmd.toLowerCase();
               if (backCmds.includes(lowerCmd) || backCmds.includes(lowerStripped)) {
                 notifyNavigation('..');
@@ -289,10 +289,10 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
                 writeTerm('\r\n\x1b[36m[AI Navigation] Translated command to: \x1b[1;32mcd ~\x1b[0m\r\n');
                 setTimeout(() => sessionManager.write(currentSessionId!, 'cd ~\r'), 80);
                 return;
-              } else if (/^(?:go to|navigate to|move to|switch to|jump to|enter|cd into|goto|take me to|bring me to|head to|head over to|change directory to|change folder to|switch folder to|switch dir to)\s+(.+)$/i.test(strippedCmd)) {
-                const match = strippedCmd.match(/^(?:go to|navigate to|move to|switch to|jump to|enter|cd into|goto|take me to|bring me to|head to|head over to|change directory to|change folder to|switch folder to|switch dir to)\s+(.+)$/i);
-                if (match && match[1]) {
-                  let target = match[1].replace(/\s+(?:folder|fodler|directory|dir)$/i, '').replace(/\/+$/, '').trim();
+              } else {
+                const navMatch = cleanCmd.match(/(?:go to|navigate to|move to|switch to|jump to|enter|cd into|goto|take me to|bring me to|head to|head over to|change directory to|change folder to|switch folder to|switch dir to)\s+(.+)$/i);
+                if (navMatch && navMatch[1]) {
+                  let target = navMatch[1].replace(/\s+(?:folder|fodler|directory|dir)$/i, '').replace(/\/+$/, '').trim();
                   const knownDirs: Record<string, string> = {
                     'downloads': '~/Downloads', 'donwloads': '~/Downloads', 'downlaods': '~/Downloads', 'dwonloads': '~/Downloads', 'dowloads': '~/Downloads',
                     'desktop': '~/Desktop', 'dekstop': '~/Desktop', 'desktp': '~/Desktop',
@@ -351,6 +351,7 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
                     const workflowEngine = new WorkflowEngine();
                     
                     const runtime = new AgentRuntime(workflowEngine, executionEngine, planner, response.workflow);
+                    let targetCdPath: string | null = null;
                     
                     runtime.on((event, payload) => {
                       if (event === 'ApprovalRequested' && payload?.plan) {
@@ -372,6 +373,9 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
                         msg = `VerificationFailed: ${payload.error.message || payload.error.code || 'Unknown error'}`;
                       } else if (event === 'StepCompleted' && payload?.step) {
                         msg = `StepCompleted: ${payload.step.name}`;
+                        if (payload.data?.path && typeof payload.data.path === 'string' && (payload.step.action?.capability === 'filesystem.cd' || payload.step.action?.capability === 'shell.cd' || String(payload.data?.stdout || '').includes('Changed directory to:'))) {
+                          targetCdPath = payload.data.path;
+                        }
                         if (payload.data?.stdout) {
                           writeTerm(`\r\n\x1b[32m[Command Output]\x1b[0m\r\n${String(payload.data.stdout).replace(/\n/g, '\r\n')}\r\n`);
                         } else if (payload.data?.stderr) {
@@ -418,7 +422,13 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
                       writeTerm(`Retries: ${Object.keys(summary.retries).length}\r\n`);
                       writeTerm(`Repairs: ${summary.repairCount}\r\n`);
                       writeTerm('\r\n');
-                      sessionManager.write(currentSessionId!, '\r');
+                      if (targetCdPath) {
+                        notifyNavigation(targetCdPath);
+                        const cdCmd = targetCdPath.includes(' ') && !targetCdPath.startsWith('"') && !targetCdPath.startsWith("'") ? `cd "${targetCdPath}"` : `cd ${targetCdPath}`;
+                        setTimeout(() => sessionManager.write(currentSessionId!, `${cdCmd}\r`), 50);
+                      } else {
+                        sessionManager.write(currentSessionId!, '\r');
+                      }
                     });
                   } else {
                     writeTerm(`\x1b[31m[AI Planner Failed] ${response.error?.message || 'Unknown error'}\x1b[0m\r\n\r\n`);
