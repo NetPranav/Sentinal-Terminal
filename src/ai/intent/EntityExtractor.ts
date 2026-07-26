@@ -210,13 +210,24 @@ export class EntityExtractor {
         if (!result.applications.includes(app)) result.applications.push(app);
       }
     }
-    const openAppRegex = /(?:open|launch|start|run)\s+(?:my|the|any|all)?\s*(?:app|application|service|task)?\s*([a-zA-Z0-9_\-\.]+)/i;
-    const openMatch = text.match(openAppRegex);
-    if (openMatch && openMatch[1]) {
-      const appName = openMatch[1].trim();
-      if (appName && !['process', 'app', 'application', 'service', 'task', 'any', 'all'].includes(appName.toLowerCase())) {
-        if (!result.applications) result.applications = [];
-        if (!result.applications.includes(appName)) result.applications.push(appName);
+    const openInRegex = /(?:open|launch)\s+(.+?)\s+(?:in|using|with)\s+([a-z0-9_\-\.\s]+)$/i;
+    const openInMatch = text.match(openInRegex);
+    if (openInMatch && openInMatch[1] && openInMatch[2]) {
+      const appName = openInMatch[2].trim();
+      const targetUrl = openInMatch[1].trim();
+      if (!result.applications) result.applications = [];
+      if (!result.applications.includes(appName)) result.applications.unshift(appName);
+      if (!result.URLs) result.URLs = [];
+      if (!result.URLs.includes(targetUrl)) result.URLs.unshift(targetUrl);
+    } else {
+      const openAppRegex = /(?:open|launch|start|run)\s+(?:my|the|any|all)?\s*(?:app|application|service|task)?\s*([a-zA-Z0-9_\-\.]+)/i;
+      const openMatch = text.match(openAppRegex);
+      if (openMatch && openMatch[1]) {
+        const appName = openMatch[1].trim();
+        if (appName && !['process', 'app', 'application', 'service', 'task', 'any', 'all'].includes(appName.toLowerCase())) {
+          if (!result.applications) result.applications = [];
+          if (!result.applications.includes(appName)) result.applications.push(appName);
+        }
       }
     }
 

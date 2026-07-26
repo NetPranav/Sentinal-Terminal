@@ -41,6 +41,11 @@ describe('Phase X — Core Intent Engine & Multi-Step Planner Verification', () 
     expect(res.plan.tasks[2].tool).toBe('browser.search');
     expect(res.plan.tasks[2].entities.query).toBe('AI');
     expect(res.validation.valid).toBe(true);
+
+    const openInRes = await engine.parseIntent('open youtube.com in safari');
+    expect(openInRes.plan.tasks[0].tool).toBe('application.open');
+    expect(openInRes.plan.tasks[0].entities.app).toBe('safari');
+    expect(openInRes.plan.tasks[0].entities.url).toBe('youtube.com');
   });
 
   it('should auto-correct aliased or shorthand tools to canonical registry IDs', async () => {

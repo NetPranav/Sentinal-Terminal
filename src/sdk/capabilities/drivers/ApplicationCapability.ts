@@ -100,6 +100,23 @@ export class ApplicationCapability extends BaseCapabilityDriver<AppDriverInput, 
         let cmdArgs: string[] = [];
         let resolvedTarget = target;
         let isPathOrFolder = false;
+        let extraArgs: string[] = [];
+
+        const targetArg = input.url || input.uri || input.file || (Array.isArray(input.args) && input.args.length ? input.args[0] : null);
+        if (targetArg && typeof targetArg === 'string') {
+          let formattedArg = targetArg.trim();
+          // If launching a browser or opening a web domain/site, ensure proper URL scheme (https://)
+          const isBrowser = /^(?:safari|chrome|firefox|edge|brave|arc|opera|browser)/i.test(target);
+          const isWebSite = /(?:\.com|\.org|\.net|\.io|\.ai|\.edu|\.gov|\.co|\.app|\.in|^http|^www\.|^(?:youtube|google|github|reddit|twitter|chatgpt|facebook|instagram|linkedin)$)/i.test(formattedArg);
+          if ((isBrowser || isWebSite) && !formattedArg.startsWith('http://') && !formattedArg.startsWith('https://') && !formattedArg.startsWith('file://') && !formattedArg.startsWith('/') && !formattedArg.startsWith('~/')) {
+            if (!formattedArg.includes('.')) formattedArg += '.com';
+            if (!formattedArg.startsWith('www.') && !formattedArg.startsWith('http')) formattedArg = `https://${formattedArg}`;
+            else if (formattedArg.startsWith('www.')) formattedArg = `https://${formattedArg}`;
+          }
+          extraArgs.push(formattedArg);
+        } else if (Array.isArray(input.args)) {
+          extraArgs = input.args;
+        }
 
         if (platform === 'macos') {
           const cleanTarget = target.toLowerCase().replace(/\s*(?:fod?le?r|dir(?:ectory)?)\s*$/i, '').trim();
@@ -124,17 +141,17 @@ export class ApplicationCapability extends BaseCapabilityDriver<AppDriverInput, 
           }
 
           if (isPathOrFolder || target.endsWith('.app')) {
-            cmdArgs = [resolvedTarget, ...(input.args || [])];
+            cmdArgs = [resolvedTarget, ...extraArgs];
           } else {
-            cmdArgs = ['-a', target, ...(input.args || [])];
+            cmdArgs = ['-a', target, ...extraArgs];
           }
           if (input.background) cmdArgs.unshift('-g');
         } else if (platform === 'windows') {
           command = 'cmd.exe';
-          cmdArgs = ['/c', 'start', '', target, ...(input.args || [])];
+          cmdArgs = ['/c', 'start', '', target, ...extraArgs];
         } else {
           command = target;
-          cmdArgs = input.args || [];
+          cmdArgs = extraArgs;
         }
 
         const output = await invoke<{ stdout: string; stderr: string; code: number }>('execute_command', { command, args: cmdArgs });
@@ -142,7 +159,9 @@ export class ApplicationCapability extends BaseCapabilityDriver<AppDriverInput, 
           this.lastOpenedApp = target;
           const stdoutText = isPathOrFolder
             ? `Successfully opened folder/path in macOS Finder: ${resolvedTarget}`
-            : `Successfully launched application: ${target}`;
+            : extraArgs.length > 0
+              ? `Successfully launched ${target} with target: ${extraArgs.join(' ')}`
+              : `Successfully launched application: ${target}`;
           return { success: true, data: { opened: true, target: resolvedTarget, stdout: stdoutText }, commandExecuted: `${command} ${cmdArgs.join(' ')}`, rollbackPayload: { action: 'close', app: target } };
         } else {
           return { success: false, error: { code: 'APP_OPEN_FAILED', message: `Failed to open "${target}": ${output.stderr || output.stdout || 'Item not found'}` } };

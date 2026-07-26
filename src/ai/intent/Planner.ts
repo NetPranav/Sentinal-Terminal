@@ -139,7 +139,14 @@ export class Planner {
         }
       } else if (clauseLower.includes('open ') || clauseLower.includes('launch ')) {
         toolId = 'application.open';
-        if (!combinedEntities.app) combinedEntities.app = combinedEntities['path'] || clause.replace(/^.*(?:open|launch)\s+/i, '').trim();
+        const openInMatch = clause.match(/(?:open|launch)\s+(.+?)\s+(?:in|using|with)\s+([a-z0-9_\-\.\s]+)$/i);
+        if (openInMatch && openInMatch[1] && openInMatch[2]) {
+          combinedEntities.app = openInMatch[2].trim();
+          combinedEntities.url = openInMatch[1].trim();
+          combinedEntities.args = [openInMatch[1].trim()];
+        } else {
+          if (!combinedEntities.app) combinedEntities.app = combinedEntities['path'] || clause.replace(/^.*(?:open|launch)\s+/i, '').trim();
+        }
       } else if ((clauseLower.includes('go to ') || clauseLower.includes('navigate ')) && (clauseLower.includes('http') || clauseLower.includes('.com') || clauseLower.includes('youtube') || clauseLower.includes('google') || clauseLower.includes('website') || clauseLower.includes('page') || combinedEntities.url)) {
         toolId = 'browser.navigate';
         if (!combinedEntities.url && clauseLower.includes('youtube')) combinedEntities.url = 'https://youtube.com';
