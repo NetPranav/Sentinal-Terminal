@@ -54,24 +54,13 @@ function App() {
   const [selectedThemeId, setSelectedThemeId] = useState<string>('classic-dark');
   const [transparency, setTransparency] = useState<number>(0.82);
   const [blurLevel, setBlurLevel] = useState<number>(20);
+  const [activeShellMenuPaneId, setActiveShellMenuPaneId] = useState<string | null>(null);
 
   useEffect(() => {
-    // Initialize Theme
     ThemeManager.getInstance();
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      try {
-        // Cmd+Shift+P or Ctrl+Shift+P
-        if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key && e.key.toLowerCase() === 'p') {
-          e.preventDefault();
-          setCommandPaletteOpen(true);
-        }
-      } catch (err) {
-        console.error("Keyboard event error:", err);
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    const handleGlobalClick = () => setActiveShellMenuPaneId(null);
+    window.addEventListener('click', handleGlobalClick);
+    return () => window.removeEventListener('click', handleGlobalClick);
   }, []);
 
   const addTab = useCallback(() => {
@@ -271,6 +260,67 @@ function App() {
     }
   }, [currentDisplayPath, panePaths]);
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      try {
+        if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key && e.key.toLowerCase() === 'p') {
+          e.preventDefault();
+          setCommandPaletteOpen(true);
+          return;
+        }
+        if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key && e.key.toLowerCase() === 't') {
+          e.preventDefault();
+          addTab();
+          return;
+        }
+        if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key && e.key.toLowerCase() === 'd') {
+          e.preventDefault();
+          if (activeTerminal) splitPane(activeTerminal.id, 'vertical');
+          return;
+        }
+        if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key && e.key.toLowerCase() === 'd') {
+          e.preventDefault();
+          if (activeTerminal) splitPane(activeTerminal.id, 'horizontal');
+          return;
+        }
+        if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key && e.key.toLowerCase() === 'k') {
+          e.preventDefault();
+          if (activeTerminal && activeTerminal.sessionId) {
+            SessionManager.getInstance().write(activeTerminal.sessionId, 'clear\r');
+          }
+          return;
+        }
+        if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key && e.key.toLowerCase() === 'r') {
+          e.preventDefault();
+          if (activeTerminal && activeTerminal.sessionId) {
+            SessionManager.getInstance().write(activeTerminal.sessionId, 'clear && printf "\\033c"\r');
+          }
+          return;
+        }
+        if ((e.metaKey || e.ctrlKey) && e.key === ',') {
+          e.preventDefault();
+          setShowAiSettings(prev => !prev);
+          return;
+        }
+        if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key && e.key.toLowerCase() === 'w') {
+          e.preventDefault();
+          if (activeTab && activeTerminal) {
+            if (activeTab.rootPane.type === 'split') {
+              closePane(activeTerminal.id);
+            } else if (tabs.length > 1) {
+              closeTab(activeTabId, { stopPropagation: () => {} } as any);
+            }
+          }
+          return;
+        }
+      } catch (err) {
+        console.error("Keyboard event error:", err);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [tabs, activeTabId, activeTab, activeTerminal, addTab]);
+
   const handleStatusBarNavigate = (targetPath: string, commandToExecute: string) => {
     if (activeTerminal) {
       setPanePaths(prev => ({ ...prev, [activeTerminal.id]: targetPath }));
@@ -297,9 +347,88 @@ function App() {
               <span>📁 {formatDisplayPath(panePaths[node.data.id] || '~')} — -zsh</span>
             </span>
             <div className="pane-action-buttons">
+              <div style={{ position: 'relative', display: 'inline-block' }}>
+                <button 
+                  className="shell-btn"
+                  onClick={(e) => { e.stopPropagation(); setActiveShellMenuPaneId(activeShellMenuPaneId === node.data.id ? null : node.data.id); setShowThemeModal(false); }}
+                  title="Shell Session & Workspace Actions"
+                  style={{
+                    background: activeShellMenuPaneId === node.data.id ? 'var(--sentinel-hover, rgba(255, 255, 255, 0.15))' : 'transparent',
+                    borderColor: activeShellMenuPaneId === node.data.id ? 'var(--sentinel-border-active, rgba(255, 255, 255, 0.35))' : 'var(--sentinel-border, rgba(255, 255, 255, 0.1))',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}
+                >
+                  <span>Shell</span>
+                  <span style={{ fontSize: '9px', opacity: 0.6 }}>▼</span>
+                </button>
+                {activeShellMenuPaneId === node.data.id && (
+                  <div 
+                    onClick={(e) => e.stopPropagation()}
+                    style={{
+                      position: 'absolute',
+                      top: '100%',
+                      right: 0,
+                      marginTop: '6px',
+                      width: '240px',
+                      background: 'var(--sentinel-modal-bg, rgba(16, 17, 21, 0.98))',
+                      border: '1px solid var(--sentinel-border-active, rgba(255, 255, 255, 0.2))',
+                      borderRadius: '8px',
+                      boxShadow: '0 12px 32px rgba(0, 0, 0, 0.55)',
+                      padding: '6px 0',
+                      zIndex: 10000,
+                      color: 'var(--sentinel-fg, #ffffff)',
+                      fontSize: '12px'
+                    }}
+                  >
+                    {[
+                      { label: 'New Terminal Tab', shortcut: '⌘T', action: () => addTab() },
+                      { label: 'Split Vertically (Side by side)', shortcut: '⌘D', action: () => splitPane(node.data.id, 'vertical') },
+                      { label: 'Split Horizontally (Stacked)', shortcut: '⇧⌘D', action: () => splitPane(node.data.id, 'horizontal') },
+                      { type: 'divider' },
+                      { label: 'Clear Scrollback & Screen', shortcut: '⌘K', action: () => { if (node.data.sessionId) SessionManager.getInstance().write(node.data.sessionId, 'clear\r'); } },
+                      { label: 'Reset Shell Session', shortcut: '⌘R', action: () => { if (node.data.sessionId) SessionManager.getInstance().write(node.data.sessionId, 'clear && printf "\\033c"\r'); } },
+                      { type: 'divider' },
+                      { label: 'AI Command Palette & Prompt', shortcut: '⇧⌘P', action: () => setCommandPaletteOpen(true) },
+                      { label: 'Zero-Trust AI Security & Profile', shortcut: '⌘,', action: () => setShowAiSettings(true) },
+                      { type: 'divider' },
+                      { label: 'Close Pane / Tab', shortcut: '⌘W', action: () => {
+                        if (!isRoot) closePane(node.data.id);
+                        else if (tabs.length > 1) closeTab(activeTabId, { stopPropagation: () => {} } as any);
+                      }, disabled: isRoot && tabs.length === 1 }
+                    ].map((item, idx) => {
+                      if ('type' in item && item.type === 'divider') {
+                        return <div key={idx} style={{ height: '1px', background: 'var(--sentinel-border, rgba(255, 255, 255, 0.08))', margin: '4px 0' }} />;
+                      }
+                      const menuItem = item as { label: string; shortcut: string; action: () => void; disabled?: boolean };
+                      return (
+                        <div
+                          key={idx}
+                          onClick={() => { if (!menuItem.disabled) { menuItem.action(); setActiveShellMenuPaneId(null); } }}
+                          style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            padding: '6px 14px',
+                            cursor: menuItem.disabled ? 'default' : 'pointer',
+                            opacity: menuItem.disabled ? 0.35 : 0.9,
+                            transition: 'background-color 0.15s ease',
+                          }}
+                          onMouseEnter={(e) => { if (!menuItem.disabled) (e.currentTarget as HTMLElement).style.backgroundColor = 'var(--sentinel-hover, rgba(255, 255, 255, 0.08))'; }}
+                          onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.backgroundColor = 'transparent'; }}
+                        >
+                          <span>{menuItem.label}</span>
+                          <span style={{ fontSize: '11px', opacity: 0.5, fontFamily: 'monospace' }}>{menuItem.shortcut}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
               <button 
                 className="personalize-btn"
-                onClick={(e) => { e.stopPropagation(); setShowThemeModal(!showThemeModal); }} 
+                onClick={(e) => { e.stopPropagation(); setShowThemeModal(!showThemeModal); setActiveShellMenuPaneId(null); }} 
                 title="Personalize Workspace Appearance & Theme"
                 style={{
                   background: showThemeModal ? 'var(--sentinel-hover, rgba(255, 255, 255, 0.15))' : 'transparent',
@@ -341,28 +470,30 @@ function App() {
 
   return (
     <div className="app-container">
-      <div className="tabs-bar">
-        <div className="tabs-track">
-          {tabs.map((tab) => {
-            const isActive = activeTabId === tab.id;
-            return (
-              <div 
-                key={tab.id} 
-                className={`tab-pill ${isActive ? 'active' : ''}`}
-                onClick={() => setActiveTabId(tab.id)}
-              >
-                <span className="tab-pill-text">
-                  {getTabDisplayTitle(tab)}
-                </span>
-                {tabs.length > 1 && (
-                  <button className="pill-close-btn" onClick={(e) => closeTab(tab.id, e)} title="Close Tab">✕</button>
-                )}
-              </div>
-            );
-          })}
-          <button className="pill-add-btn" onClick={addTab} title="New Terminal Tab">+</button>
+      {tabs.length > 1 && (
+        <div className="tabs-bar">
+          <div className="tabs-track">
+            {tabs.map((tab) => {
+              const isActive = activeTabId === tab.id;
+              return (
+                <div 
+                  key={tab.id} 
+                  className={`tab-pill ${isActive ? 'active' : ''}`}
+                  onClick={() => setActiveTabId(tab.id)}
+                >
+                  <span className="tab-pill-text">
+                    {getTabDisplayTitle(tab)}
+                  </span>
+                  {tabs.length > 1 && (
+                    <button className="pill-close-btn" onClick={(e) => closeTab(tab.id, e)} title="Close Tab">✕</button>
+                  )}
+                </div>
+              );
+            })}
+            <button className="pill-add-btn" onClick={addTab} title="New Terminal Tab">+</button>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Classic Minimalist Workspace Appearance Modal */}
       {showThemeModal && (
