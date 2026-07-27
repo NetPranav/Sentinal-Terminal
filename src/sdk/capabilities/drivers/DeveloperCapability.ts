@@ -78,13 +78,23 @@ export class DeveloperCapability extends BaseCapabilityDriver<DevDriverInput, an
 
       switch (op) {
         case 'vscode':
-          cmd = 'code';
-          args = [targetPath];
+          if ((_context.platform || this.detectPlatform()) === 'macos') {
+            cmd = 'open';
+            args = ['-a', 'Visual Studio Code', targetPath];
+          } else {
+            cmd = 'code';
+            args = [targetPath];
+          }
           break;
 
         case 'cursor':
-          cmd = 'cursor';
-          args = [targetPath];
+          if ((_context.platform || this.detectPlatform()) === 'macos') {
+            cmd = 'open';
+            args = ['-a', 'Cursor', targetPath];
+          } else {
+            cmd = 'cursor';
+            args = [targetPath];
+          }
           break;
 
         case 'xcode':

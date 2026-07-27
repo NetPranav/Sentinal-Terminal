@@ -125,6 +125,13 @@ export class ApplicationCapability extends BaseCapabilityDriver<AppDriverInput, 
         } else if (typeof input.args === 'string' && input.args) {
           extraArgs = [input.args];
         }
+        extraArgs = extraArgs.map(arg => {
+          const lower = arg.toLowerCase().trim();
+          if (lower.includes('this folder') || lower.includes('this directory') || lower.includes('current folder') || lower.includes('current directory') || lower.includes('this project') || lower === 'this' || lower === 'here' || lower === 'current') {
+            return '.';
+          }
+          return arg;
+        });
 
         if (platform === 'macos') {
           const cleanTarget = target.toLowerCase().replace(/\s*(?:fod?le?r|dir(?:ectory)?)\s*$/i, '').trim();
@@ -138,7 +145,10 @@ export class ApplicationCapability extends BaseCapabilityDriver<AppDriverInput, 
             'music': '~/Music',
             'movies': '~/Movies',
             'home': '~',
-            'project folder': '~/Project Folder'
+            'project folder': '~/Project Folder',
+            'this': '.',
+            'current': '.',
+            'here': '.'
           };
 
           if (folderMapping[cleanTarget]) {

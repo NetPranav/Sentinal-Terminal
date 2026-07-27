@@ -174,5 +174,18 @@ describe('Phase X — Core Intent Engine & Multi-Step Planner Verification', () 
     const timeRes = await engine.parseIntent('what time is it');
     expect(timeRes.plan.tasks[0].tool).toBe('shell.execute');
     expect(timeRes.plan.tasks[0].entities.command).toBe('date');
+
+    const vsRes = await engine.parseIntent('open this folder in the Vs Code');
+    expect(vsRes.plan.tasks[0].tool).toBe('developer.vscode');
+    expect(vsRes.plan.tasks[0].entities.path).toBe('.');
+
+    const antiRes = await engine.parseIntent('Open this folder inside antigravity');
+    expect(antiRes.plan.tasks[0].tool).toBe('application.open');
+    expect(antiRes.plan.tasks[0].entities.app).toBe('Antigravity IDE');
+    expect(antiRes.plan.tasks[0].entities.args).toEqual(['.']);
+
+    const curRes = await engine.parseIntent('open this directory inside cursor');
+    expect(curRes.plan.tasks[0].tool).toBe('developer.cursor');
+    expect(curRes.plan.tasks[0].entities.path).toBe('.');
   });
 });

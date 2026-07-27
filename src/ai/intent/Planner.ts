@@ -137,25 +137,34 @@ export class Planner {
           combinedEntities['path'] = rawPath;
           combinedEntities['directory'] = rawPath;
         }
-      } else if (clauseLower.includes('vscode') || clauseLower.includes('visual studio code') || clauseLower.includes('open in vs code') || clauseLower === 'code .') {
+      } else if (!/\b(?:kill|terminate|pkill|killall|stop|quit|close)\b/.test(clauseLower) && (clauseLower.includes('vscode') || clauseLower.includes('visual studio code') || clauseLower.includes('vs code') || clauseLower.includes('code .') || (clauseLower.includes('open ') && (clauseLower.includes('code') || clauseLower.includes('vs'))))) {
         toolId = 'developer.vscode';
-      } else if (clauseLower.includes('cursor') || clauseLower.includes('cursor ai') || clauseLower.includes('open in cursor')) {
+        combinedEntities.path = this.resolveFolderPath(clause, combinedEntities);
+      } else if (!/\b(?:kill|terminate|pkill|killall|stop|quit|close)\b/.test(clauseLower) && (clauseLower.includes('cursor') || clauseLower.includes('cursor ai') || (clauseLower.includes('open ') && clauseLower.includes('cursor')))) {
         toolId = 'developer.cursor';
-      } else if (clauseLower.includes('xcode') || clauseLower.includes('open in xcode') || clauseLower.includes('ios project')) {
+        combinedEntities.path = this.resolveFolderPath(clause, combinedEntities);
+      } else if (!/\b(?:kill|terminate|pkill|killall|stop|quit|close)\b/.test(clauseLower) && (clauseLower.includes('antigravity') || (clauseLower.includes('open ') && clauseLower.includes('antigravity')))) {
+        toolId = 'application.open';
+        combinedEntities.app = 'Antigravity IDE';
+        combinedEntities.args = [this.resolveFolderPath(clause, combinedEntities)];
+      } else if (!/\b(?:kill|terminate|pkill|killall|stop|quit|close)\b/.test(clauseLower) && (clauseLower.includes('xcode') || clauseLower.includes('open in xcode') || clauseLower.includes('ios project'))) {
         toolId = 'developer.xcode';
-      } else if (clauseLower.includes('android studio') || clauseLower.includes('open in android studio')) {
+        combinedEntities.path = this.resolveFolderPath(clause, combinedEntities);
+      } else if (!/\b(?:kill|terminate|pkill|killall|stop|quit|close)\b/.test(clauseLower) && (clauseLower.includes('android studio') || clauseLower.includes('open in android studio'))) {
         toolId = 'developer.android_studio';
+        combinedEntities.path = this.resolveFolderPath(clause, combinedEntities);
       } else if (clauseLower.includes('jupyter') || clauseLower.includes('notebook') || clauseLower.includes('data science server')) {
         toolId = 'python.notebook';
       } else if (clauseLower.includes('open ') || clauseLower.includes('launch ')) {
         toolId = 'application.open';
-        const openInMatch = clause.match(/(?:open|launch)\s+(.+?)\s+(?:in|using|with)\s+([a-z0-9_\-\.\s]+)$/i);
+        const openInMatch = clause.match(/(?:open|launch)\s+(.+?)\s+(?:in|inside|using|with|via|on|at)\s+([a-z0-9_\-\.\s]+)$/i);
         if (openInMatch && openInMatch[1] && openInMatch[2]) {
-          combinedEntities.app = openInMatch[2].trim();
-          combinedEntities.url = openInMatch[1].trim();
-          combinedEntities.args = [openInMatch[1].trim()];
+          combinedEntities.app = openInMatch[2].trim().replace(/^(?:the|my|a|an)\s+/i, '');
+          const targetArg = this.resolveFolderPath(openInMatch[1].trim(), combinedEntities);
+          combinedEntities.url = targetArg;
+          combinedEntities.args = [targetArg];
         } else {
-          if (!combinedEntities.app) combinedEntities.app = combinedEntities['path'] || clause.replace(/^.*(?:open|launch)\s+/i, '').trim();
+          if (!combinedEntities.app) combinedEntities.app = (combinedEntities['path'] || clause.replace(/^.*(?:open|launch)\s+/i, '').trim()).replace(/^(?:the|my|a|an)\s+/i, '');
         }
       } else if ((clauseLower.includes('go to ') || clauseLower.includes('navigate ')) && (clauseLower.includes('http') || clauseLower.includes('.com') || clauseLower.includes('youtube') || clauseLower.includes('google') || clauseLower.includes('website') || clauseLower.includes('page') || combinedEntities.url)) {
         toolId = 'browser.navigate';
@@ -412,5 +421,13 @@ export class Planner {
       return `Sequential execution: ${tasks.map(t => t.tool.split('.').pop()).join(' → ')}`;
     }
     return `Execute ${tasks[0]?.tool || 'requested tool'}`;
+  }
+
+  private resolveFolderPath(inputStr: string, entities: Record<string, any>): string {
+    const lower = inputStr.toLowerCase().trim();
+    if (lower.includes('this folder') || lower.includes('this directory') || lower.includes('current folder') || lower.includes('current directory') || lower.includes('this project') || lower === 'this' || lower === 'here' || lower === '.' || lower === 'code' || lower === 'cursor' || lower.includes('open ')) {
+      return '.';
+    }
+    return entities.path || entities.directory || inputStr || '.';
   }
 }

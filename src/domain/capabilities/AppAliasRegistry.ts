@@ -41,7 +41,12 @@ export class AppAliasRegistry {
     'calculator': 'Calculator',
     'safari': 'Safari',
     'terminal': 'Terminal',
-    'sentinel': 'Sentinel',
+    'sentinel': 'Sentinel Terminal',
+    'sentinel terminal': 'Sentinel Terminal',
+    'antigravity': 'Antigravity IDE',
+    'antigravity ide': 'Antigravity IDE',
+    'cursor': 'Cursor',
+    'cursor ai': 'Cursor',
     'finder': 'Finder'
   };
 
@@ -122,7 +127,7 @@ export class AppAliasRegistry {
    */
   public resolve(appNameOrAlias: string): string {
     if (!appNameOrAlias) return '';
-    const clean = appNameOrAlias.trim();
+    const clean = appNameOrAlias.trim().replace(/^(?:the|my|a|an)\s+/i, '');
     const lower = clean.toLowerCase();
 
     // Check direct alias lookup
