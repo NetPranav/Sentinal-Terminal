@@ -18,7 +18,6 @@ import { PermissionManager } from '../domain/security/PermissionManager';
 import { SecurityEngine } from '../domain/security/SecurityEngine';
 import { PolicyEngine } from '../domain/security/PolicyEngine';
 import { AuditLogger } from '../domain/security/AuditLogger';
-import { ShellCommandGuard } from '../domain/security/ShellCommandGuard';
 import { AgentRuntime } from '../domain/agent/AgentRuntime';
 import { ToolLoader } from '../tools/loader/ToolLoader';
 import { AppAliasRegistry } from '../domain/capabilities/AppAliasRegistry';
@@ -50,7 +49,6 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
   const [authPassword, setAuthPassword] = useState('');
   const [authError, setAuthError] = useState('');
   const [isVerifying, setIsVerifying] = useState(false);
-  const pendingShellExecRef = useRef<{ sessionId: string; command: string } | null>(null);
 
   const handleAuthorize = async () => {
     if (!authPassword.trim()) {
@@ -496,42 +494,6 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
                 });
                 
                 return; // Do NOT send the \r to the shell
-              }
-
-              // Shell command security intercept — gate dangerous input before PTY execution
-              const shellGuard = ShellCommandGuard.getInstance();
-              const guardResult = shellGuard.evaluate(cleanCmd);
-
-              if (guardResult.action === 'deny') {
-                await sessionManager.write(currentSessionId, '\x03');
-                writeTerm(`\r\n\x1b[1;31m[Security Engine: BLOCKED]\x1b[0m ${guardResult.blockReason || guardResult.risk.explanation}\r\n`);
-                return;
-              }
-
-              if (guardResult.action === 'require_approval' && guardResult.previewPlan) {
-                pendingShellExecRef.current = { sessionId: currentSessionId, command: cleanCmd };
-                writeTerm(`\r\n\x1b[1;31m[Security Engine: ${guardResult.risk.level} RISK SHELL COMMAND]\x1b[0m\r\n`);
-                writeTerm(`  • Command: \x1b[1;33m${cleanCmd}\x1b[0m\r\n`);
-                writeTerm(`  • ${guardResult.risk.explanation}\r\n`);
-                writeTerm(`\x1b[1;33m[Security Hold]\x1b[0m Awaiting authorization before shell execution...\r\n`);
-                setAuthPassword('');
-                setAuthError('');
-                setSecurityModalPlan({
-                  plan: guardResult.previewPlan,
-                  resolve: (approved: boolean) => {
-                    const pending = pendingShellExecRef.current;
-                    pendingShellExecRef.current = null;
-                    if (!pending) return;
-                    if (approved) {
-                      writeTerm(`\x1b[1;32m[Security Verified]\x1b[0m Executing authorized shell command.\r\n`);
-                      sessionManager.write(pending.sessionId, '\r');
-                    } else {
-                      sessionManager.write(pending.sessionId, '\x03');
-                      writeTerm(`\r\n\x1b[1;31m[Security Denied]\x1b[0m Shell command halted by user.\r\n`);
-                    }
-                  }
-                });
-                return;
               }
             }
           }
