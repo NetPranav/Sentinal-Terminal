@@ -66,32 +66,29 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
     try {
       if (typeof window === 'undefined' || !(window as any).__TAURI_INTERNALS__) {
         // Fallback for non-Tauri browser development environments
-        if (authPassword === 'wrong-password') {
-          errorMessage = 'Authentication failed: Invalid system password.';
+        if (authPassword !== 'admin' && authPassword !== 'password' && authPassword !== 'sentinel') {
+          isValid = false;
+          errorMessage = 'Authentication failed: Incorrect system password. Please enter your valid macOS login password.';
         } else {
           isValid = true;
         }
       } else {
         const escaped = authPassword.replace(/'/g, "'\\''");
-        // Securely verify system password against OS authentication without running modifying commands
-        const res = await invoke<{ code?: number; stderr?: string }>('execute_command', {
+        // Securely verify system password against macOS Directory Service login credentials
+        const res = await invoke<{ code?: number; stderr?: string; stdout?: string }>('execute_command', {
           command: 'sh',
-          args: ['-c', `echo '${escaped}' | sudo -S -k -v 2>&1`]
+          args: ['-c', `dscl . -authonly "$(whoami)" '${escaped}' 2>&1 || (echo '${escaped}' | sudo -S -k -v 2>&1)`]
         });
         if (res && res.code === 0) {
           isValid = true;
         } else {
-          errorMessage = res?.stderr || 'Authentication failed: Invalid system password or insufficient privileges.';
+          isValid = false;
+          errorMessage = 'Authentication failed: Incorrect system password. Please enter your valid macOS login password.';
         }
       }
     } catch (err: any) {
-      const msg = String(err?.message || err || '');
-      if (msg.toLowerCase().includes('password') || msg.toLowerCase().includes('incorrect') || msg.toLowerCase().includes('sorry')) {
-        errorMessage = 'Authentication failed: Invalid system password.';
-      } else {
-        // Fallback if sudo is unavailable in development environment
-        isValid = true;
-      }
+      isValid = false;
+      errorMessage = 'Authentication failed: Incorrect system password. Please enter your valid macOS login password.';
     }
 
     setIsVerifying(false);
@@ -661,84 +658,87 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
           left: 0,
           right: 0,
           bottom: 0,
-          backgroundColor: 'rgba(10, 12, 20, 0.85)',
-          backdropFilter: 'blur(8px)',
-          WebkitBackdropFilter: 'blur(8px)',
+          backgroundColor: 'rgba(0, 0, 0, 0.75)',
+          backdropFilter: 'blur(16px)',
+          WebkitBackdropFilter: 'blur(16px)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           zIndex: 9999,
-          padding: '20px'
+          padding: '20px',
+          transition: 'all 0.3s ease'
         }}>
           <div style={{
             width: '100%',
-            maxWidth: '480px',
-            background: 'linear-gradient(135deg, rgba(30, 35, 55, 0.95) 0%, rgba(20, 22, 35, 0.98) 100%)',
-            border: '1px solid rgba(255, 70, 70, 0.5)',
-            borderRadius: '12px',
-            boxShadow: '0 20px 50px rgba(0, 0, 0, 0.7), 0 0 20px rgba(255, 70, 70, 0.2)',
-            padding: '24px',
+            maxWidth: '460px',
+            background: 'rgba(22, 24, 32, 0.88)',
+            border: '1px solid rgba(255, 255, 255, 0.12)',
+            borderRadius: '16px',
+            boxShadow: '0 24px 64px rgba(0, 0, 0, 0.85), 0 4px 16px rgba(0, 0, 0, 0.5)',
+            padding: '26px',
             color: '#fff',
-            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+            backdropFilter: 'blur(20px)',
+            WebkitBackdropFilter: 'blur(20px)'
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '18px' }}>
               <div style={{
-                width: '44px',
-                height: '44px',
-                borderRadius: '10px',
-                backgroundColor: 'rgba(255, 70, 70, 0.15)',
-                border: '1px solid rgba(255, 70, 70, 0.4)',
+                width: '42px',
+                height: '42px',
+                borderRadius: '12px',
+                backgroundColor: 'rgba(245, 158, 11, 0.12)',
+                border: '1px solid rgba(245, 158, 11, 0.25)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                fontSize: '22px'
+                fontSize: '20px'
               }}>
-                🛡️
+                🔒
               </div>
               <div>
-                <h3 style={{ margin: 0, fontSize: '17px', fontWeight: 600, color: '#ff6b6b' }}>
-                  Security Authorization Required
+                <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 600, color: '#f8fafc', letterSpacing: '-0.2px' }}>
+                  System Authorization Required
                 </h3>
-                <span style={{ fontSize: '12px', color: 'rgba(255, 255, 255, 0.7)' }}>
-                  {securityModalPlan.plan.riskLevel || 'ADMIN'} Risk Level Operation Detected
+                <span style={{ fontSize: '12px', color: 'rgba(255, 255, 255, 0.55)', display: 'block', marginTop: '2px' }}>
+                  Protected operation requested • {securityModalPlan.plan.riskLevel || 'ADMIN'} Profile
                 </span>
               </div>
             </div>
 
-            <p style={{ fontSize: '13px', lineHeight: '1.5', color: 'rgba(255, 255, 255, 0.85)', margin: '0 0 16px 0' }}>
-              To prevent unintended file deletion or system alterations, Sentinel strictly mandates password authentication and explicit user consent before executing this action.
+            <p style={{ fontSize: '13px', lineHeight: '1.55', color: 'rgba(255, 255, 255, 0.75)', margin: '0 0 18px 0' }}>
+              To ensure system integrity and prevent unauthorized modifications, please verify your macOS user login password to execute this capability.
             </p>
 
             <div style={{
-              backgroundColor: 'rgba(0, 0, 0, 0.35)',
-              border: '1px solid rgba(255, 255, 255, 0.1)',
-              borderRadius: '8px',
-              padding: '12px',
-              marginBottom: '18px',
+              backgroundColor: 'rgba(10, 11, 15, 0.6)',
+              border: '1px solid rgba(255, 255, 255, 0.07)',
+              borderRadius: '10px',
+              padding: '12px 14px',
+              marginBottom: '20px',
               fontSize: '12px',
               fontFamily: 'monospace'
             }}>
-              <div style={{ marginBottom: '4px' }}>
-                <span style={{ color: '#888' }}>Capability: </span>
-                <span style={{ color: '#66d9ef', fontWeight: 'bold' }}>{securityModalPlan.plan.capabilityId}</span>
+              <div style={{ marginBottom: '6px', display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: 'rgba(255, 255, 255, 0.5)' }}>Action:</span>
+                <span style={{ color: '#38bdf8', fontWeight: 600 }}>{securityModalPlan.plan.capabilityId}</span>
               </div>
-              <div>
-                <span style={{ color: '#888' }}>Target / Parameters: </span>
-                <span style={{ color: '#f92672', wordBreak: 'break-all' }}>
-                  {securityModalPlan.plan.parameters?.path || securityModalPlan.plan.parameters?.source || securityModalPlan.plan.parameters?.command || JSON.stringify(securityModalPlan.plan.parameters)}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px' }}>
+                <span style={{ color: 'rgba(255, 255, 255, 0.5)', flexShrink: 0 }}>Target:</span>
+                <span style={{ color: '#e2e8f0', wordBreak: 'break-all', textAlign: 'right', fontWeight: 500 }}>
+                  {String(securityModalPlan.plan.parameters?.path || securityModalPlan.plan.parameters?.source || securityModalPlan.plan.parameters?.command || JSON.stringify(securityModalPlan.plan.parameters))}
                 </span>
               </div>
             </div>
 
-            <div style={{ marginBottom: '16px' }}>
-              <label style={{ display: 'block', fontSize: '12px', color: 'rgba(255, 255, 255, 0.8)', marginBottom: '6px', fontWeight: 500 }}>
-                Enter System Password to Authorize:
+            <div style={{ marginBottom: '22px' }}>
+              <label style={{ display: 'block', fontSize: '12px', color: 'rgba(255, 255, 255, 0.85)', marginBottom: '8px', fontWeight: 500 }}>
+                macOS User Login Password:
               </label>
               <input
                 type="password"
                 value={authPassword}
                 onChange={(e) => { setAuthPassword(e.target.value); setAuthError(''); }}
-                placeholder="Required for all deletion & super-user commands..."
+                placeholder="Enter system credentials..."
                 autoFocus
                 disabled={isVerifying}
                 onKeyDown={(e) => {
@@ -752,18 +752,21 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
                 }}
                 style={{
                   width: '100%',
-                  padding: '10px 12px',
-                  borderRadius: '6px',
-                  border: authError ? '1px solid #ff4646' : '1px solid rgba(255, 255, 255, 0.2)',
-                  backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                  padding: '10px 14px',
+                  borderRadius: '8px',
+                  border: authError ? '1px solid rgba(239, 68, 68, 0.6)' : '1px solid rgba(255, 255, 255, 0.15)',
+                  backgroundColor: 'rgba(8, 9, 13, 0.75)',
                   color: '#fff',
                   fontSize: '13px',
                   outline: 'none',
-                  boxSizing: 'border-box'
+                  boxSizing: 'border-box',
+                  transition: 'border-color 0.2s ease'
                 }}
               />
               {authError && (
-                <div style={{ color: '#ff6b6b', fontSize: '11px', marginTop: '6px' }}>{authError}</div>
+                <div style={{ color: '#ef4444', fontSize: '12px', marginTop: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span>⚠️</span> {authError}
+                </div>
               )}
             </div>
 
@@ -777,33 +780,35 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
                 }}
                 style={{
                   padding: '9px 16px',
-                  borderRadius: '6px',
-                  border: '1px solid rgba(255, 255, 255, 0.2)',
-                  backgroundColor: 'transparent',
-                  color: '#ccc',
+                  borderRadius: '8px',
+                  border: '1px solid rgba(255, 255, 255, 0.12)',
+                  backgroundColor: 'rgba(255, 255, 255, 0.04)',
+                  color: '#cbd5e1',
                   fontSize: '13px',
                   cursor: 'pointer',
-                  fontWeight: 500
+                  fontWeight: 500,
+                  transition: 'background-color 0.2s ease'
                 }}
               >
-                Deny & Halt
+                Cancel
               </button>
               <button
                 disabled={isVerifying}
                 onClick={handleAuthorize}
                 style={{
                   padding: '9px 18px',
-                  borderRadius: '6px',
+                  borderRadius: '8px',
                   border: 'none',
-                  background: isVerifying ? '#888' : 'linear-gradient(90deg, #ff4646 0%, #d41414 100%)',
-                  color: '#fff',
+                  background: isVerifying ? 'rgba(255, 255, 255, 0.2)' : '#f59e0b',
+                  color: isVerifying ? '#ffffff' : '#000000',
                   fontSize: '13px',
                   cursor: isVerifying ? 'wait' : 'pointer',
                   fontWeight: 600,
-                  boxShadow: isVerifying ? 'none' : '0 2px 8px rgba(255, 70, 70, 0.4)'
+                  boxShadow: isVerifying ? 'none' : '0 2px 10px rgba(245, 158, 11, 0.3)',
+                  transition: 'all 0.2s ease'
                 }}
               >
-                {isVerifying ? 'Verifying...' : 'Approve & Execute'}
+                {isVerifying ? 'Authenticating...' : 'Authorize'}
               </button>
             </div>
           </div>

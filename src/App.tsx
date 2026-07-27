@@ -248,11 +248,12 @@ function App() {
     }
   };
 
-  const renderPane = (node: PaneNode, isRoot: boolean = false): React.JSX.Element => {
+  const renderPane = (node: PaneNode, isTabActive: boolean, isRoot: boolean = false): React.JSX.Element => {
     if (node.type === 'terminal') {
       const isSelected = activeTerminal?.id === node.data.id;
       return (
         <div 
+          key={node.data.id}
           className="pane-terminal-wrapper" 
           onClick={() => setActivePaneId(node.data.id)}
           style={{ 
@@ -284,8 +285,9 @@ function App() {
           </div>
           <div style={{ flex: 1, position: 'relative', overflow: 'hidden', padding: '6px' }}>
             <TerminalView 
+              key={node.data.id}
               sessionId={node.data.sessionId}
-              isActive={true}
+              isActive={isTabActive}
               currentPath={panePaths[node.data.id] || '~'}
               onPathChange={(p) => setPanePaths(prev => ({ ...prev, [node.data.id]: p }))}
               onSessionCreated={(sessionId) => handleSessionCreated(node.data.id, sessionId)}
@@ -296,10 +298,10 @@ function App() {
     } else {
       const isVertical = node.data.direction === 'vertical';
       return (
-        <div className={`split-container ${isVertical ? 'split-vertical' : 'split-horizontal'}`}>
-          <div className="split-pane">{renderPane(node.data.pane1, false)}</div>
+        <div key={node.data.id} className={`split-container ${isVertical ? 'split-vertical' : 'split-horizontal'}`}>
+          <div className="split-pane">{renderPane(node.data.pane1, isTabActive, false)}</div>
           <div className="split-divider" />
-          <div className="split-pane">{renderPane(node.data.pane2, false)}</div>
+          <div className="split-pane">{renderPane(node.data.pane2, isTabActive, false)}</div>
         </div>
       );
     }
@@ -465,7 +467,14 @@ function App() {
       )}
 
       <div className="terminal-container">
-        {activeTab && renderPane(activeTab.rootPane, true)}
+        {tabs.map(tab => (
+          <div 
+            key={tab.id} 
+            style={{ display: activeTabId === tab.id ? 'flex' : 'none', width: '100%', height: '100%', flex: 1 }}
+          >
+            {renderPane(tab.rootPane, activeTabId === tab.id, true)}
+          </div>
+        ))}
       </div>
       <StatusBar 
         currentPath={currentDisplayPath}
