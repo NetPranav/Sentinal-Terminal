@@ -239,6 +239,38 @@ function App() {
   const activeTerminal = getActiveTerminalPane(activeTab?.rootPane);
   const currentDisplayPath = activeTerminal ? (panePaths[activeTerminal.id] || '~') : '~';
 
+  const formatDisplayPath = (path?: string): string => {
+    if (!path || path === '~' || path.trim() === '') return '~';
+    return path.replace(/^(\/Users\/[^\/]+|\/home\/[^\/]+)/, '~');
+  };
+
+  const getFolderBasename = (path: string): string => {
+    const cleaned = formatDisplayPath(path);
+    if (cleaned === '~' || cleaned === '') return '~';
+    const parts = cleaned.split('/').filter(Boolean);
+    return parts.length > 0 ? parts[parts.length - 1] : '~';
+  };
+
+  const getTabDisplayTitle = (tab: Tab): string => {
+    const term = getActiveTerminalPane(tab.rootPane);
+    const rawPath = term ? (panePaths[term.id] || '~') : '~';
+    const cleaned = formatDisplayPath(rawPath);
+    return `${cleaned} — -zsh`;
+  };
+
+  useEffect(() => {
+    try {
+      const basename = getFolderBasename(currentDisplayPath);
+      const windowTitle = `📁 ${basename} — -zsh`;
+      document.title = windowTitle;
+      import('@tauri-apps/api/window').then(({ getCurrentWindow }) => {
+        getCurrentWindow().setTitle(windowTitle).catch(() => {});
+      }).catch(() => {});
+    } catch (e) {
+      // Ignore in non-Tauri environments
+    }
+  }, [currentDisplayPath, panePaths]);
+
   const handleStatusBarNavigate = (targetPath: string, commandToExecute: string) => {
     if (activeTerminal) {
       setPanePaths(prev => ({ ...prev, [activeTerminal.id]: targetPath }));
@@ -261,8 +293,8 @@ function App() {
           }}
         >
           <div className="pane-header-controls">
-            <span style={{ display: 'flex', alignItems: 'center', gap: '6px', opacity: 0.7, fontSize: '11px', fontWeight: 500 }}>
-              <span>Terminal</span>
+            <span style={{ display: 'flex', alignItems: 'center', gap: '6px', opacity: 0.85, fontSize: '11px', fontWeight: 500 }}>
+              <span>📁 {formatDisplayPath(panePaths[node.data.id] || '~')} — -zsh</span>
             </span>
             <div className="pane-action-buttons">
               <button 
@@ -310,20 +342,25 @@ function App() {
   return (
     <div className="app-container">
       <div className="tabs-bar">
-        <div style={{ display: 'flex', alignItems: 'center', flex: 1, overflowX: 'auto', height: '100%', paddingLeft: '16px' }}>
-          {tabs.map((tab) => (
-            <div 
-              key={tab.id} 
-              className={`tab ${activeTabId === tab.id ? 'active' : ''}`}
-              onClick={() => setActiveTabId(tab.id)}
-            >
-              <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <span style={{ opacity: 0.65 }}>⌘</span> {tab.name}
-              </span>
-              <button className="close-btn" onClick={(e) => closeTab(tab.id, e)}>✕</button>
-            </div>
-          ))}
-          <button className="add-tab-btn" onClick={addTab} title="New Terminal Tab">+</button>
+        <div className="tabs-track">
+          {tabs.map((tab) => {
+            const isActive = activeTabId === tab.id;
+            return (
+              <div 
+                key={tab.id} 
+                className={`tab-pill ${isActive ? 'active' : ''}`}
+                onClick={() => setActiveTabId(tab.id)}
+              >
+                <span className="tab-pill-text">
+                  {getTabDisplayTitle(tab)}
+                </span>
+                {tabs.length > 1 && (
+                  <button className="pill-close-btn" onClick={(e) => closeTab(tab.id, e)} title="Close Tab">✕</button>
+                )}
+              </div>
+            );
+          })}
+          <button className="pill-add-btn" onClick={addTab} title="New Terminal Tab">+</button>
         </div>
       </div>
 
