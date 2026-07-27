@@ -4,6 +4,7 @@ export class GhostTextRenderer {
   private terminal: Terminal;
   private overlayElement: HTMLDivElement | null = null;
   private currentSuggestion: string = '';
+  private currentGhostPart: string = '';
 
   constructor(terminal: Terminal) {
     this.terminal = terminal;
@@ -15,58 +16,86 @@ export class GhostTextRenderer {
     this.overlayElement.style.position = 'absolute';
     this.overlayElement.style.pointerEvents = 'none';
     this.overlayElement.style.whiteSpace = 'pre';
-    // Match theme CSS variables
-    this.overlayElement.style.color = 'var(--sentinel-fg)';
-    this.overlayElement.style.opacity = '0.4';
-    this.overlayElement.style.fontFamily = 'var(--sentinel-font)';
-    this.overlayElement.style.fontSize = 'var(--sentinel-font-size)';
-    this.overlayElement.style.zIndex = '10';
+    this.overlayElement.style.color = 'var(--sentinel-fg, #ffffff)';
+    this.overlayElement.style.opacity = '0.38';
+    this.overlayElement.style.fontFamily = 'var(--sentinel-font, "JetBrains Mono", Menlo, Monaco, monospace)';
+    this.overlayElement.style.fontSize = 'var(--sentinel-font-size, 14px)';
+    this.overlayElement.style.zIndex = '250';
+    this.overlayElement.style.display = 'none';
 
     container.appendChild(this.overlayElement);
   }
 
   public render(suggestion: string, currentInput: string) {
-    if (!this.overlayElement || !suggestion) {
+    if (!this.overlayElement || !suggestion || !currentInput) {
       this.clear();
       return;
     }
 
-    // Only render the part of the suggestion that hasn't been typed yet
-    // E.g., if input is "git s" and suggestion is "git status", ghost text is "tatus"
-    if (!suggestion.toLowerCase().startsWith(currentInput.toLowerCase())) {
+    const cleanInput = currentInput.trimStart();
+    if (cleanInput.length === 0 || !suggestion.toLowerCase().startsWith(cleanInput.toLowerCase())) {
+      this.clear();
+      return;
+    }
+
+    if (suggestion.length <= cleanInput.length) {
       this.clear();
       return;
     }
 
     this.currentSuggestion = suggestion;
-    const ghostPart = suggestion.substring(currentInput.length);
+    const ghostPart = suggestion.substring(cleanInput.length);
+    this.currentGhostPart = ghostPart;
 
-    // Calculate cursor position from xterm
+    // Calculate cursor position from active xterm buffer
     const buffer = this.terminal.buffer.active;
     const cursorX = buffer.cursorX;
     const cursorY = buffer.cursorY;
 
-    // Use xterm's internal cell dimensions to position the overlay exactly over the cursor
+    // Retrieve precise rendering dimensions from xterm v6 internals or fallback to mathematical element division
     const core = (this.terminal as any)._core;
-    const cellWidth = core._renderService?.dimensions?.actualCellWidth || 9;
-    const cellHeight = core._renderService?.dimensions?.actualCellHeight || 17;
+    const dims = core._renderService?.dimensions || core._renderService?.dimensions?.css || {};
+    
+    const cellWidth = dims.actualCellWidth || dims.css?.cell?.width || dims.scaledCellWidth || 
+      (this.terminal.element ? this.terminal.element.clientWidth / this.terminal.cols : 9);
+    const cellHeight = dims.actualCellHeight || dims.css?.cell?.height || dims.scaledCellHeight || 
+      (this.terminal.element ? this.terminal.element.clientHeight / this.terminal.rows : 17);
 
-    const top = cursorY * cellHeight;
-    const left = cursorX * cellWidth;
+    // Calculate exact pixel offset relative to positioned container
+    const screenEl = this.terminal.element?.querySelector('.xterm-screen') as HTMLElement | null;
+    let offsetTop = 0;
+    let offsetLeft = 0;
+    if (screenEl && this.overlayElement.parentElement) {
+      const screenRect = screenEl.getBoundingClientRect();
+      const containerRect = this.overlayElement.parentElement.getBoundingClientRect();
+      offsetTop = screenRect.top - containerRect.top;
+      offsetLeft = screenRect.left - containerRect.left;
+    }
 
-    this.overlayElement.style.top = `\${top}px`;
-    this.overlayElement.style.left = `\${left}px`;
+    const top = offsetTop + (cursorY * cellHeight);
+    const left = offsetLeft + (cursorX * cellWidth);
+
+    this.overlayElement.style.top = `${top}px`;
+    this.overlayElement.style.left = `${left}px`;
+    this.overlayElement.style.lineHeight = `${cellHeight}px`;
     this.overlayElement.textContent = ghostPart;
+    this.overlayElement.style.display = 'block';
   }
 
   public clear() {
     this.currentSuggestion = '';
+    this.currentGhostPart = '';
     if (this.overlayElement) {
       this.overlayElement.textContent = '';
+      this.overlayElement.style.display = 'none';
     }
   }
 
   public getSuggestion(): string {
     return this.currentSuggestion;
+  }
+
+  public getRemaining(): string {
+    return this.currentGhostPart;
   }
 }

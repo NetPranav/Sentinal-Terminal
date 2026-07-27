@@ -11,19 +11,45 @@ export class HistoryProvider implements IAutocompleteProvider {
   id = 'provider.history';
   enabled = true;
   
-  // Mock history database
+  // Enriched default history database for intelligent developer & AI command suggestions
   private history: HistoryEntry[] = [
     { command: 'git status', count: 50, lastUsed: Date.now() - 1000, cwd: '/Users/pranav/Project Folder/AI Terminal' },
     { command: 'git checkout main', count: 20, lastUsed: Date.now() - 50000 },
+    { command: 'git add -A', count: 18, lastUsed: Date.now() - 60000 },
+    { command: 'git commit -m ""', count: 15, lastUsed: Date.now() - 70000 },
+    { command: 'git pull origin main', count: 14, lastUsed: Date.now() - 80000 },
+    { command: 'git push origin main', count: 12, lastUsed: Date.now() - 90000 },
     { command: 'npm run dev', count: 100, lastUsed: Date.now() - 2000, cwd: '/Users/pranav/Project Folder/AI Terminal' },
-    { command: 'python3 main.py', count: 5, lastUsed: Date.now() - 100000 }
+    { command: 'npm run build', count: 80, lastUsed: Date.now() - 3000 },
+    { command: 'npm test', count: 70, lastUsed: Date.now() - 4000 },
+    { command: 'python3 main.py', count: 5, lastUsed: Date.now() - 100000 },
+    // Explicit > AI Intent suggestions
+    { command: '>open safari', count: 45, lastUsed: Date.now() - 5000 },
+    { command: '>open spotify', count: 35, lastUsed: Date.now() - 6000 },
+    { command: '>open vs code', count: 35, lastUsed: Date.now() - 7000 },
+    { command: '>open chrome', count: 30, lastUsed: Date.now() - 8000 },
+    { command: '>list running applications', count: 48, lastUsed: Date.now() - 4000 },
+    { command: '>what time is it', count: 30, lastUsed: Date.now() - 9000 },
+    { command: '>who am i', count: 25, lastUsed: Date.now() - 10000 },
+    { command: '>check wifi connection', count: 30, lastUsed: Date.now() - 11000 },
+    { command: '>check bluetooth devices', count: 25, lastUsed: Date.now() - 12000 },
+    { command: '>check battery status', count: 25, lastUsed: Date.now() - 13000 },
+    { command: '>kill process', count: 20, lastUsed: Date.now() - 14000 },
+    { command: '>clear terminal', count: 50, lastUsed: Date.now() - 1500 },
+    // Standard system utility suggestions
+    { command: 'ls -la', count: 60, lastUsed: Date.now() - 2500 },
+    { command: 'cd ~', count: 40, lastUsed: Date.now() - 3500 },
+    { command: 'clear', count: 90, lastUsed: Date.now() - 1500 },
+    { command: 'docker ps', count: 25, lastUsed: Date.now() - 20000 },
+    { command: 'cat README.md', count: 15, lastUsed: Date.now() - 30000 },
+    { command: 'source venv/bin/activate', count: 15, lastUsed: Date.now() - 40000 }
   ];
 
   async getSuggestions(context: AutocompleteContext): Promise<AutocompleteSuggestion[]> {
-    const input = context.currentInput;
+    const input = context.currentInput.trimStart();
     if (input.length === 0) return [];
 
-    const matches = this.history.filter(h => h.command.startsWith(input));
+    const matches = this.history.filter(h => h.command.toLowerCase().startsWith(input.toLowerCase()));
     
     // Ranking Algorithm based on Frequency, Recency, and CWD
     matches.sort((a, b) => {
@@ -46,7 +72,7 @@ export class HistoryProvider implements IAutocompleteProvider {
       id: `hist-${m.command}`,
       value: m.command,
       category: 'History',
-      priority: 90, // History is usually highest priority for shell usage
+      priority: 90,
       confidence: 0.95,
       sourceProvider: this.id
     }));

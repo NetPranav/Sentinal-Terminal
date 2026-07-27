@@ -208,25 +208,11 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
 
           // Handle Tab completion or Right Arrow completion
           if (data === '\t' || data === '\x1b[C') {
-             const suggestion = ghostText.getSuggestion();
-             if (suggestion) {
-                const buffer = term.buffer.active;
-                const lineIndex = buffer.baseY + buffer.cursorY;
-                const line = buffer.getLine(lineIndex);
-                if (line) {
-                  const fullText = line.translateToString(true);
-                  const promptMatch = fullText.match(/.*[$%#]\s*/);
-                  const commandText = promptMatch ? fullText.substring(promptMatch[0].length) : fullText;
-                  
-                  if (suggestion.toLowerCase().startsWith(commandText.toLowerCase())) {
-                    const remaining = suggestion.substring(commandText.length);
-                    if (remaining) {
-                       await sessionManager.write(currentSessionId, remaining);
-                       ghostText.clear();
-                       return; // Intercept key
-                    }
-                  }
-                }
+             const remaining = ghostText.getRemaining();
+             if (remaining) {
+               await sessionManager.write(currentSessionId, remaining);
+               ghostText.clear();
+               return; // Intercept key
              }
           }
 
@@ -647,7 +633,7 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
     <div style={{ position: 'relative', width: '100%', height: '100%', overflow: 'hidden', display: isActive ? 'block' : 'none' }}>
       <div 
         ref={terminalRef} 
-        style={{ width: '100%', height: '100%', overflow: 'hidden' }} 
+        style={{ position: 'relative', width: '100%', height: '100%', overflow: 'hidden' }} 
       />
 
       {/* Security & Deletion Authorization Overlay Modal */}
