@@ -203,6 +203,21 @@ export class Planner {
         ((clauseLower.includes('app') || clauseLower.includes('applic') || clauseLower.includes('program')) && (clauseLower.includes('runn') || clauseLower.includes('activ') || clauseLower.includes('open') || clauseLower.includes('list') || clauseLower.includes('show') || clauseLower.includes('what')))
       ) {
         toolId = 'application.list_running';
+      } else if (clauseLower === 'clear' || clauseLower.includes('clear terminal') || clauseLower.includes('clear screen') || clauseLower.includes('clean screen') || clauseLower.includes('clean terminal')) {
+        toolId = 'shell.execute';
+        combinedEntities.command = 'clear';
+      } else if (clauseLower.includes('who am i') || clauseLower.includes('whoami') || clauseLower === 'who' || clauseLower.includes('current user') || clauseLower.includes('my username')) {
+        toolId = 'shell.execute';
+        combinedEntities.command = 'whoami';
+      } else if (clauseLower.includes('enviorn') || clauseLower.includes('environ') || clauseLower.includes('env var') || clauseLower === 'env' || clauseLower === 'show env' || clauseLower === 'printenv' || clauseLower.includes('environment variables') || clauseLower.includes('env variables')) {
+        toolId = 'shell.execute';
+        combinedEntities.command = 'env';
+      } else if (clauseLower.includes('what time') || clauseLower.includes('current time') || clauseLower.includes('show time') || clauseLower.includes('what is the time') || clauseLower.includes('date today') || clauseLower.includes('current date') || clauseLower.includes('show date') || clauseLower === 'date' || clauseLower === 'time') {
+        toolId = 'shell.execute';
+        combinedEntities.command = 'date';
+      } else if (clauseLower.includes('cal ') || clauseLower.includes('calendar') || clauseLower === 'cal') {
+        toolId = 'shell.execute';
+        combinedEntities.command = 'cal';
       } else if (clauseLower.includes('view file') || clauseLower.includes('read file') || clauseLower.includes('show file') || clauseLower.includes('display file') || clauseLower.startsWith('cat ') || clauseLower.includes('contents of file') || (clauseLower.includes('open file') && (clauseLower.includes('terminal') || clauseLower.includes('here') || clauseLower.includes('read')))) {
         toolId = 'filesystem.read';
         if (!combinedEntities['file'] && !combinedEntities['path']) {

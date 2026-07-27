@@ -158,5 +158,21 @@ describe('Phase X — Core Intent Engine & Multi-Step Planner Verification', () 
     const calRes = await engine.parseIntent('show me the calendar for this month');
     expect(calRes.plan.tasks[0].tool).toBe('shell.execute');
     expect(calRes.plan.tasks[0].entities.command).toBe('cal');
+
+    const whoRes = await engine.parseIntent('who am i');
+    expect(whoRes.plan.tasks[0].tool).toBe('shell.execute');
+    expect(whoRes.plan.tasks[0].entities.command).toBe('whoami');
+
+    const clearRes = await engine.parseIntent('clear terminal');
+    expect(clearRes.plan.tasks[0].tool).toBe('shell.execute');
+    expect(clearRes.plan.tasks[0].entities.command).toBe('clear');
+
+    const envRes = await engine.parseIntent('show enviornment variables');
+    expect(envRes.plan.tasks[0].tool).toBe('shell.execute');
+    expect(envRes.plan.tasks[0].entities.command).toBe('env');
+
+    const timeRes = await engine.parseIntent('what time is it');
+    expect(timeRes.plan.tasks[0].tool).toBe('shell.execute');
+    expect(timeRes.plan.tasks[0].entities.command).toBe('date');
   });
 });

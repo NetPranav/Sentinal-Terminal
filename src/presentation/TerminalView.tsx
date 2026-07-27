@@ -441,7 +441,11 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
                         if (payload.data?.path && typeof payload.data.path === 'string' && (payload.step.action?.capability === 'filesystem.cd' || payload.step.action?.capability === 'shell.cd' || String(payload.data?.stdout || '').includes('Changed directory to:'))) {
                           targetCdPath = payload.data.path;
                         }
-                        if (payload.data?.stdout) {
+                        if (payload.step.action?.capability === 'shell.execute' && (payload.step.action?.parameters?.command === 'clear' || payload.step.parameters?.command === 'clear')) {
+                          term.clear();
+                          writeTerm('\x1b[2J\x1b[H');
+                          return;
+                        } else if (payload.data?.stdout) {
                           writeTerm(`\r\n\x1b[32m[Command Output]\x1b[0m\r\n${String(payload.data.stdout).replace(/\n/g, '\r\n')}\r\n`);
                         } else if (payload.data?.stderr) {
                           writeTerm(`\r\n\x1b[33m[Command Output (Stderr)]\x1b[0m\r\n${String(payload.data.stderr).replace(/\n/g, '\r\n')}\r\n`);
@@ -478,6 +482,13 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
 
                     writeTerm(`\x1b[33mStarting Agent Runtime...\x1b[0m\r\n`);
                     runtime.start().then(summary => {
+                      const isClearCmd = aiGoal.toLowerCase() === 'clear' || aiGoal.toLowerCase().includes('clear terminal') || aiGoal.toLowerCase().includes('clear screen') || aiGoal.toLowerCase().includes('clean screen') || aiGoal.toLowerCase().includes('clean terminal');
+                      if (isClearCmd && summary.finalResult === 'Success') {
+                        term.clear();
+                        writeTerm('\x1b[2J\x1b[H');
+                        sessionManager.write(currentSessionId!, '\r');
+                        return;
+                      }
                       writeTerm(`\r\n\x1b[35m[Execution Summary]\x1b[0m\r\n`);
                       writeTerm(`Goal: ${summary.goal}\r\n`);
                       writeTerm(`Result: ${summary.finalResult}\r\n`);

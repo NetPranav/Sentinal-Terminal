@@ -69,7 +69,8 @@ export class ExecutionEngine {
         }
 
         const risk = this.securityEngine.calculateRisk(capabilityId, input);
-        const needsAsk = permState === 'AskEveryTime' || policyResult === 'Ask' || risk.level === 'CRITICAL' || risk.level === 'ADMIN' || risk.requiresConsent || risk.requiresPassword || capabilityId === 'filesystem.delete' || capabilityId === 'filesystem.trash';
+        const isSafeShell = (permCategory === 'ShellExecution' || capabilityId.startsWith('shell.')) && risk.level === 'SAFE';
+        const needsAsk = (!isSafeShell && permState === 'AskEveryTime') || policyResult === 'Ask' || risk.level === 'CRITICAL' || risk.level === 'ADMIN' || risk.requiresConsent || risk.requiresPassword || capabilityId === 'filesystem.delete' || capabilityId === 'filesystem.trash';
         if (needsAsk) {
           if (!options.onAskPermission && (typeof process === 'undefined' || process.env.NODE_ENV !== 'test')) {
             await this.logAudit(capabilityId, input, risk.score, 'Denied', startTime);
@@ -133,13 +134,14 @@ export class ExecutionEngine {
       let permissionResult: 'Granted' | 'Denied' | 'Bypassed' = 'Granted';
       let needsAsk = policyResult === 'Ask' || risk.level === 'CRITICAL' || risk.level === 'ADMIN' || risk.requiresConsent || risk.requiresPassword;
 
+      const isSafeShell = (capabilityId.startsWith('shell.') || capabilityId === 'terminal.run') && risk.level === 'SAFE';
       for (const requiredPerm of capability.metadata.requiredPermissions) {
         const state = this.permissionManager.checkPermission(requiredPerm as PermissionCategory);
         if (state === 'AlwaysDeny') {
           await this.logAudit(capabilityId, input, risk.score, 'Denied', startTime);
           return this.errorResult('PERMISSION_DENIED', `Permission ${requiredPerm} is always denied.`, startTime);
         }
-        if (state === 'AskEveryTime') {
+        if (state === 'AskEveryTime' && !isSafeShell) {
           needsAsk = true;
         }
       }

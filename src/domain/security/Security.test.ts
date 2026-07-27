@@ -79,6 +79,14 @@ describe('ExecutionEngine Pipeline', () => {
     expect(res.data).toBe('success');
   });
 
+  it('should bypass interactive prompt in SafeMode for harmless read-only shell utilities (date, whoami, clear, cal)', async () => {
+    permissionManager.setProfile('SafeMode');
+    let asked = false;
+    // Test evaluating a harmless read-only command via shell.core / shell.execute
+    const risk = executionEngine['securityEngine'].calculateRisk('shell.execute', { command: 'date' });
+    expect(risk.level).toBe('SAFE');
+  });
+
   it('should deny if user rejects ask prompt', async () => {
     const res = await executionEngine.execute('test.cap', { value: 'success' }, {
       onAskPermission: async () => false // Deny

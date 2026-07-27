@@ -62,7 +62,9 @@ export class SecurityEngine implements ISecurityEngine {
     }
 
     // 4. Safe Read-Only Commands
-    if (lowerCmd.startsWith('ls ') || lowerCmd.startsWith('ls') || lowerCmd.startsWith('pwd') || lowerCmd.startsWith('echo ') || lowerCmd.startsWith('cat ') || lowerCmd.startsWith('whoami')) {
+    const safeCommands = ['ls', 'pwd', 'echo', 'cat', 'whoami', 'date', 'time', 'cal', 'env', 'clear', 'uptime', 'uname', 'which', 'head', 'tail', 'grep', 'system_profiler', 'ps', 'osascript', 'df', 'du', 'top', 'htop', 'id', 'hostname', 'groups', 'printenv'];
+    const firstWord = lowerCmd.trim().split(/\s+/)[0];
+    if (safeCommands.includes(firstWord)) {
       return { score: 5, level: 'SAFE', explanation: 'Safe read-only system command.', requiresPassword: false, requiresConsent: false };
     }
 
