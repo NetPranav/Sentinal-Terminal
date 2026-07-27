@@ -42,8 +42,34 @@ export class ExecutionEngine {
     if (!capability) {
       const sdkDriver = CapabilityRegistrySDK.getInstance().getDriver(capabilityId);
       if (sdkDriver) {
+        // 1. Evaluate Policy Engine first for SDK calls
+        const policyResult = this.policyEngine.evaluate(capabilityId, input);
+        if (policyResult === 'Deny') {
+          await this.logAudit(capabilityId, input, 100, 'Denied', startTime);
+          return this.errorResult('POLICY_DENIED', 'Execution denied by policy rules.', startTime);
+        }
+
+        // 2. Evaluate permissions against current Profile
+        let permCategory: PermissionCategory = 'ReadFiles';
+        if (capabilityId === 'filesystem.delete' || capabilityId === 'filesystem.trash') permCategory = 'DeleteFiles';
+        else if (capabilityId === 'filesystem.rename') permCategory = 'RenameFiles';
+        else if (capabilityId.startsWith('filesystem.') && ['create', 'mkdir', 'copy', 'move', 'duplicate', 'compress', 'extract', 'restore', 'permissions'].some(op => capabilityId.includes(op))) permCategory = 'WriteFiles';
+        else if (capabilityId === 'system.kill_process' || capabilityId === 'application.force_quit') permCategory = 'ProcessManagement';
+        else if (capabilityId.startsWith('shell.')) permCategory = 'ShellExecution';
+        else if (capabilityId.startsWith('network.') || capabilityId.startsWith('wifi.')) permCategory = 'Network';
+
+        let permState = this.permissionManager.checkPermission(permCategory);
+        if (this.permissionManager.getCurrentProfile() === 'SafeMode' && capabilityId === 'filesystem.trash') {
+          // Allow Trash with explicit prompt in SafeMode, while permanent deletes remain AlwaysDeny
+          permState = 'AskEveryTime';
+        }
+        if (permState === 'AlwaysDeny') {
+          await this.logAudit(capabilityId, input, 100, 'Denied', startTime);
+          return this.errorResult('PERMISSION_DENIED', `Permission ${permCategory} is always denied under current security profile.`, startTime);
+        }
+
         const risk = this.securityEngine.calculateRisk(capabilityId, input);
-        const needsAsk = risk.level === 'CRITICAL' || risk.level === 'ADMIN' || risk.requiresConsent || risk.requiresPassword || capabilityId === 'filesystem.delete' || capabilityId === 'filesystem.trash';
+        const needsAsk = permState === 'AskEveryTime' || policyResult === 'Ask' || risk.level === 'CRITICAL' || risk.level === 'ADMIN' || risk.requiresConsent || risk.requiresPassword || capabilityId === 'filesystem.delete' || capabilityId === 'filesystem.trash';
         if (needsAsk) {
           if (!options.onAskPermission && (typeof process === 'undefined' || process.env.NODE_ENV !== 'test')) {
             await this.logAudit(capabilityId, input, risk.score, 'Denied', startTime);

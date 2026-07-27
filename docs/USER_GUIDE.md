@@ -16,26 +16,28 @@ When you open Sentinel Terminal, you are greeted with a fast, hardware-accelerat
 
 ## 🗣️ Conversational Intelligence vs. Standard Shell Commands
 
-Sentinel features an embedded **AI Intent & Planning Engine** that continuously interprets your workflow without disrupting standard utilities.
+Sentinel features an embedded **AI Intent & Planning Engine** that interprets conversational commands without disrupting standard utilities. To ensure zero ambiguity between ordinary Unix command syntax and automated AI assistance, Sentinel uses an explicit **`>`** trigger prefix.
 
 ### Standard Command Execution
-Execute industry-standard utilities without friction or delay. Tools such as `vim`, `tmux`, `git`, `docker`, `brew`, `htop`, and custom scripting pipelines run at native execution speeds with sub-millisecond responsiveness.
+Execute industry-standard utilities without friction or delay. Standard commands without the `>` prefix run directly as sub-millisecond shell commands:
 ```bash
 git pull origin main
 docker ps -a
 cd ~/Projects && ls -lh
 ```
 
-### Natural Language Workflows
-When an instruction is expressed in everyday language, Sentinel instantly translates your intent into secure operating system capability workflows:
+### Natural Language & AI Workflows (`>`)
+To summon AI assistance, simply start your line with the **`>`** prompt symbol. Sentinel instantly translates your conversational intent into secure operating system capability workflows:
 - **Direct Workspace Navigation**: 
-  - `"take me to Downloads folder"` ➔ Automatically moves your active terminal prompt to `~/Downloads`.
-  - `"take me home"` / `"go back"` ➔ Instantly updates your current working directory.
+  - `>take me to Downloads folder` ➔ Automatically moves your active terminal prompt to `~/Downloads`.
+  - `>take me home` / `>go back` ➔ Instantly updates your current working directory.
 - **Application & Desktop Management**:
-  - `"open youtube.com in safari"` ➔ Launches Safari and navigates directly to the secure destination.
-  - `"open google.com using chrome"` ➔ Instantly directs Chrome to your requested domain.
+  - `>tell me all the running applications` ➔ Lists running desktop GUI applications (e.g. Sentinel Terminal, Chrome, Safari, Preview) cleanly without OS background daemons.
+  - `>open youtube.com in safari` or `>open workspace in cursor` ➔ Launches native applications and IDEs directly.
 - **Process & Daemon Control**:
-  - `"stop chrome"` or `"kill antigravity"` ➔ Safely targets and halts all active application processes, background threads, and stuck system daemons.
+  - `>stop chrome` or `>kill antigravity` ➔ Safely targets and halts active application processes and background threads.
+- **System, Hardware & Network Diagnostics**:
+  - `>check gpu status and vram` / `>what ports are open` / `>scan available wifi networks` ➔ Executes instantaneous hardware and connectivity evaluations.
 
 ---
 

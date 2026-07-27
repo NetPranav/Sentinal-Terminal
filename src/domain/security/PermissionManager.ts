@@ -26,11 +26,60 @@ export interface IPermissionManager {
 }
 
 export class PermissionManager implements IPermissionManager {
+  private static instance?: PermissionManager;
   private permissions: Map<PermissionCategory, PermissionState> = new Map();
   private currentProfile: PermissionProfile = 'SafeMode';
+  private skipSave = false;
+
+  static getInstance(): PermissionManager {
+    if (!PermissionManager.instance) {
+      PermissionManager.instance = new PermissionManager();
+      PermissionManager.instance.loadState();
+    }
+    return PermissionManager.instance;
+  }
 
   constructor() {
+    this.skipSave = true;
     this.setProfile('SafeMode'); // Default
+    this.skipSave = false;
+  }
+
+  private loadState(): void {
+    if (typeof localStorage !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('sentinel_permission_state');
+        if (saved) {
+          const data = JSON.parse(saved);
+          if (data.profile) {
+            this.currentProfile = data.profile;
+          }
+          if (data.permissions) {
+            Object.entries(data.permissions).forEach(([key, val]) => {
+              this.permissions.set(key as PermissionCategory, val as PermissionState);
+            });
+          }
+        }
+      } catch (e) {
+        console.warn('[PermissionManager] Failed to load persisted state:', e);
+      }
+    }
+  }
+
+  private saveState(): void {
+    if (this.skipSave) return;
+    if (typeof localStorage !== 'undefined') {
+      try {
+        const permsObj: Record<string, string> = {};
+        this.permissions.forEach((val, key) => { permsObj[key] = val; });
+        localStorage.setItem('sentinel_permission_state', JSON.stringify({
+          profile: this.currentProfile,
+          permissions: permsObj
+        }));
+      } catch (e) {
+        console.warn('[PermissionManager] Failed to save state:', e);
+      }
+    }
   }
 
   checkPermission(category: PermissionCategory): PermissionState {
@@ -40,6 +89,7 @@ export class PermissionManager implements IPermissionManager {
   setPermission(category: PermissionCategory, state: PermissionState): void {
     this.permissions.set(category, state);
     this.currentProfile = 'Custom';
+    this.saveState();
   }
 
   getCurrentProfile(): PermissionProfile {
@@ -91,5 +141,6 @@ export class PermissionManager implements IPermissionManager {
         this.permissions.set('ShellExecution', 'AlwaysDeny');
         break;
     }
+    this.saveState();
   }
 }

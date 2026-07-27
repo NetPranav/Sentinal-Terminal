@@ -129,6 +129,7 @@ describe('ExecutionEngine Pipeline', () => {
   });
 
   it('should enforce administrative security confirmation when executing destructive filesystem deletion via SDK driver', async () => {
+    permissionManager.setPermission('DeleteFiles', 'AskEveryTime');
     let asked = false;
     const res = await executionEngine.execute('filesystem.delete', { path: '~/Downloads/AAAAAAAA', operation: 'delete' }, {
       onAskPermission: async (plan) => {
@@ -141,5 +142,19 @@ describe('ExecutionEngine Pipeline', () => {
     });
     expect(asked).toBe(true);
     expect(res.success).toBe(true);
+  });
+
+  it('should deny filesystem.delete by default under SafeMode profile', async () => {
+    // Under SafeMode, DeleteFiles permission is AlwaysDeny
+    const res = await executionEngine.execute('filesystem.delete', { path: '~/Downloads/test.txt' });
+    expect(res.success).toBe(false);
+    expect(res.error?.code).toBe('PERMISSION_DENIED');
+  });
+
+  it('should deny system directory deletion via PolicyEngine even in Developer profile', async () => {
+    permissionManager.setProfile('Developer');
+    const res = await executionEngine.execute('filesystem.delete', { path: '/System' });
+    expect(res.success).toBe(false);
+    expect(res.error?.code).toBe('POLICY_DENIED');
   });
 });

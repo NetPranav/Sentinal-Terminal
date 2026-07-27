@@ -7,6 +7,7 @@
 
 import { BaseCapabilityDriver, CapabilityExecutionResult, ExecutionContext, Platform } from '../CapabilitySDK';
 import { invoke } from '@tauri-apps/api/core';
+import { AppAliasRegistry } from '../../../domain/capabilities/AppAliasRegistry';
 
 export type AppOperation = 'open' | 'close' | 'force_quit' | 'focus' | 'minimize' | 'maximize' | 'list_running' | 'install' | 'uninstall';
 
@@ -14,7 +15,7 @@ export interface AppDriverInput {
   operation?: AppOperation;
   app?: string;
   package?: string;
-  args?: string[];
+  args?: string[] | string;
   background?: boolean;
   [key: string]: any;
 }
@@ -62,7 +63,10 @@ export class ApplicationCapability extends BaseCapabilityDriver<AppDriverInput, 
       op = this.capabilityId.replace('application.', '') as AppOperation;
     }
 
-    const target = input.app || input.package || '';
+    const rawTarget = input.app || input.package || '';
+    const target = (op === 'open' || op === 'close' || op === 'force_quit' || op === 'focus' || op === 'minimize' || op === 'maximize')
+      ? AppAliasRegistry.getInstance().resolve(rawTarget)
+      : rawTarget;
 
     // Automated tests & mock execution environment
     if (typeof process !== 'undefined' && process.env.NODE_ENV === 'test') {
@@ -81,8 +85,10 @@ export class ApplicationCapability extends BaseCapabilityDriver<AppDriverInput, 
           return { success: true, data: { minimized: true }, commandExecuted };
         case 'maximize':
           return { success: true, data: { maximized: true }, commandExecuted };
-        case 'list_running':
-          return { success: true, data: { apps: ['Finder', 'Safari', 'Sentinel', 'Terminal'] }, commandExecuted };
+        case 'list_running': {
+          const mockApps = ['Sentinel Terminal', 'Antigravity IDE', 'Google Chrome', 'Safari', 'Preview'];
+          return { success: true, data: { apps: mockApps, stdout: `Currently Running Desktop Applications (${mockApps.length}):\r\n  • ` + mockApps.join('\r\n  • ') }, commandExecuted };
+        }
         case 'install':
           return { success: true, data: { installed: true, package: target }, commandExecuted, rollbackPayload: { action: 'uninstall', package: target } };
         case 'uninstall':
@@ -102,7 +108,7 @@ export class ApplicationCapability extends BaseCapabilityDriver<AppDriverInput, 
         let isPathOrFolder = false;
         let extraArgs: string[] = [];
 
-        const targetArg = input.url || input.uri || input.file || (Array.isArray(input.args) && input.args.length ? input.args[0] : null);
+        const targetArg = input.url || input.uri || input.file || (Array.isArray(input.args) && input.args.length ? input.args[0] : (typeof input.args === 'string' ? input.args : null));
         if (targetArg && typeof targetArg === 'string') {
           let formattedArg = targetArg.trim();
           // If launching a browser or opening a web domain/site, ensure proper URL scheme (https://)
@@ -116,6 +122,8 @@ export class ApplicationCapability extends BaseCapabilityDriver<AppDriverInput, 
           extraArgs.push(formattedArg);
         } else if (Array.isArray(input.args)) {
           extraArgs = input.args;
+        } else if (typeof input.args === 'string' && input.args) {
+          extraArgs = [input.args];
         }
 
         if (platform === 'macos') {
@@ -175,9 +183,30 @@ export class ApplicationCapability extends BaseCapabilityDriver<AppDriverInput, 
       }
 
       if (op === 'list_running') {
-        const output = await invoke<{ stdout: string }>('execute_command', { command: 'ps', args: ['-eo', 'comm'] });
-        const apps = (output?.stdout || '').split('\n').filter(Boolean);
-        return { success: true, data: { apps }, commandExecuted: `ps -eo comm` };
+        if (platform === 'macos') {
+          const output = await invoke<{ stdout: string; code: number }>('execute_command', { 
+            command: 'osascript', 
+            args: ['-e', 'tell application "System Events" to get name of every application process whose background only is false'] 
+          });
+          let apps = (output?.stdout || '')
+            .split(',')
+            .map(s => s.trim())
+            .filter(Boolean)
+            .map(name => {
+              if (name === 'tauri-app') return 'Sentinel Terminal';
+              if (name === 'Electron') return 'Antigravity IDE';
+              if (name === 'chrome' || name === 'Google Chrome') return 'Google Chrome';
+              return name;
+            });
+          apps = Array.from(new Set(apps));
+          const stdoutText = `Currently Running Desktop Applications (${apps.length}):\r\n  • ` + apps.join('\r\n  • ');
+          return { success: true, data: { apps, stdout: stdoutText }, commandExecuted: `osascript -e 'tell application "System Events" to get GUI processes'` };
+        } else {
+          const output = await invoke<{ stdout: string }>('execute_command', { command: 'ps', args: ['-eo', 'comm'] });
+          const apps = (output?.stdout || '').split('\n').filter(Boolean);
+          const stdoutText = `Running Processes (${apps.length}):\r\n  • ` + apps.slice(0, 20).join('\r\n  • ');
+          return { success: true, data: { apps, stdout: stdoutText }, commandExecuted: `ps -eo comm` };
+        }
       }
 
       if (op === 'install') {

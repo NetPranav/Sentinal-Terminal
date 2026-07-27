@@ -16,18 +16,25 @@
     "end",
     "killall",
     "pkill",
-    "force"
+    "force",
+    "halt"
   ],
   "aliases": [
     "kill process",
     "kill any process",
     "terminate process",
     "stop process",
+    "stop all process",
     "end task",
     "killall",
     "pkill",
     "force kill",
-    "kill"
+    "kill",
+    "stop",
+    "halt",
+    "kill antigravity",
+    "stop antigravity",
+    "kill chrome"
   ],
   "supportedPlatforms": [
     "macos",
@@ -35,7 +42,7 @@
     "linux"
   ],
   "requiredPermissions": [
-    "ShellExecution"
+    "ProcessManagement"
   ],
   "securityRisk": "HIGH",
   "parameters": [

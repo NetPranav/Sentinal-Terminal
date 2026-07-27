@@ -137,6 +137,16 @@ export class Planner {
           combinedEntities['path'] = rawPath;
           combinedEntities['directory'] = rawPath;
         }
+      } else if (clauseLower.includes('vscode') || clauseLower.includes('visual studio code') || clauseLower.includes('open in vs code') || clauseLower === 'code .') {
+        toolId = 'developer.vscode';
+      } else if (clauseLower.includes('cursor') || clauseLower.includes('cursor ai') || clauseLower.includes('open in cursor')) {
+        toolId = 'developer.cursor';
+      } else if (clauseLower.includes('xcode') || clauseLower.includes('open in xcode') || clauseLower.includes('ios project')) {
+        toolId = 'developer.xcode';
+      } else if (clauseLower.includes('android studio') || clauseLower.includes('open in android studio')) {
+        toolId = 'developer.android_studio';
+      } else if (clauseLower.includes('jupyter') || clauseLower.includes('notebook') || clauseLower.includes('data science server')) {
+        toolId = 'python.notebook';
       } else if (clauseLower.includes('open ') || clauseLower.includes('launch ')) {
         toolId = 'application.open';
         const openInMatch = clause.match(/(?:open|launch)\s+(.+?)\s+(?:in|using|with)\s+([a-z0-9_\-\.\s]+)$/i);
@@ -188,7 +198,10 @@ export class Planner {
         }
       } else if (clauseLower.includes('process') || clauseLower.includes('processes') || clauseLower.includes('activity monitor') || clauseLower.includes('top process') || clauseLower === 'ps' || clauseLower === 'ps aux' || clauseLower === 'top' || clauseLower === 'htop' || clauseLower === 'btop' || clauseLower === 'glances') {
         toolId = 'system.processes';
-      } else if (clauseLower.includes('list running app') || clauseLower.includes('show running app') || clauseLower.includes('active app') || (clauseLower.includes('what') && clauseLower.includes('app') && clauseLower.includes('running'))) {
+      } else if (
+        clauseLower.includes('list running app') || clauseLower.includes('show running app') || clauseLower.includes('active app') ||
+        ((clauseLower.includes('app') || clauseLower.includes('applic') || clauseLower.includes('program')) && (clauseLower.includes('runn') || clauseLower.includes('activ') || clauseLower.includes('open') || clauseLower.includes('list') || clauseLower.includes('show') || clauseLower.includes('what')))
+      ) {
         toolId = 'application.list_running';
       } else if (clauseLower.includes('view file') || clauseLower.includes('read file') || clauseLower.includes('show file') || clauseLower.includes('display file') || clauseLower.startsWith('cat ') || clauseLower.includes('contents of file') || (clauseLower.includes('open file') && (clauseLower.includes('terminal') || clauseLower.includes('here') || clauseLower.includes('read')))) {
         toolId = 'filesystem.read';
@@ -226,6 +239,110 @@ export class Planner {
         toolId = 'network.ping';
       } else if (clauseLower.includes('open ports') || clauseLower.includes('listening ports') || clauseLower.includes('show ports')) {
         toolId = 'network.ports';
+      } else if (clauseLower.includes('gpu') || clauseLower.includes('graphics card') || clauseLower.includes('vram')) {
+        toolId = 'system.gpu';
+      } else if (clauseLower.startsWith('git ') || clauseLower.includes('git repo') || clauseLower.includes('git branch') || clauseLower.includes('git commit') || clauseLower.includes('git status') || clauseLower.includes('git history')) {
+        if (clauseLower.includes('clone') || clauseLower.includes('download repo')) { toolId = 'git.clone'; }
+        else if (clauseLower.includes('log') || clauseLower.includes('history') || clauseLower.includes('commit history')) { toolId = 'git.log'; }
+        else if (clauseLower.includes('commit') || clauseLower.includes('record commit')) { toolId = 'git.commit'; }
+        else if (clauseLower.includes('push') || clauseLower.includes('upload commit')) { toolId = 'git.push'; }
+        else if (clauseLower.includes('pull') || clauseLower.includes('fetch update')) { toolId = 'git.pull'; }
+        else if (clauseLower.includes('checkout') || clauseLower.includes('switch branch')) { toolId = 'git.checkout'; }
+        else if (clauseLower.includes('merge')) { toolId = 'git.merge'; }
+        else if (clauseLower.includes('stash')) { toolId = 'git.stash'; }
+        else if (clauseLower.includes('diff') || clauseLower.includes('show changes')) { toolId = 'git.diff'; }
+        else if (clauseLower.includes('branch') || clauseLower.includes('list branch')) { toolId = 'git.branch'; }
+        else { toolId = 'shell.execute'; combinedEntities.command = clause; }
+      } else if (clauseLower.includes('docker ') || clauseLower.includes('container') || clauseLower.includes('compose')) {
+        if (clauseLower.includes('image') || clauseLower.includes('cached image')) { toolId = 'docker.images'; }
+        else if (clauseLower.includes('log') || clauseLower.includes('container log')) { toolId = 'docker.logs'; }
+        else if (clauseLower.includes('exec') || clauseLower.includes('run inside container')) { toolId = 'docker.exec'; }
+        else if (clauseLower.includes('compose up') || clauseLower.includes('start stack')) { toolId = 'docker.compose_up'; }
+        else if (clauseLower.includes('compose down') || clauseLower.includes('stop stack')) { toolId = 'docker.compose_down'; }
+        else if (clauseLower.includes('stop') || clauseLower.includes('halt container')) { toolId = 'docker.stop'; }
+        else if (clauseLower.includes('restart') || clauseLower.includes('reboot container')) { toolId = 'docker.restart'; }
+        else { toolId = 'docker.ps'; }
+      } else if (clauseLower.includes('npm install') || clauseLower.includes('install npm') || clauseLower.includes('npm i') || clauseLower.includes('node package')) {
+        toolId = 'node.npm_install';
+      } else if (clauseLower.includes('npm run') || clauseLower.includes('npm start') || clauseLower.includes('npm test') || clauseLower.includes('npm dev')) {
+        toolId = 'node.npm_run';
+      } else if (clauseLower.includes('pnpm ')) {
+        toolId = 'node.pnpm';
+      } else if (clauseLower.includes('bun ')) {
+        toolId = 'node.bun';
+      } else if (clauseLower.includes('yarn ')) {
+        toolId = 'node.yarn';
+      } else if (clauseLower.includes('python venv') || clauseLower.includes('create venv') || clauseLower.includes('virtual environment') || clauseLower.includes('virtualenv')) {
+        toolId = 'python.create_venv';
+      } else if (clauseLower.includes('pip install') || clauseLower.includes('install python package') || clauseLower.includes('pip add')) {
+        toolId = 'python.pip_install';
+      } else if (clauseLower.includes('run python') || clauseLower.includes('execute python') || clauseLower.endsWith('.py')) {
+        toolId = 'python.run_script';
+      } else if (clauseLower.includes('dns ') || clauseLower.includes('nslookup') || clauseLower.includes('dig ') || clauseLower.includes('domain records')) {
+        toolId = 'network.dns';
+      } else if (clauseLower.includes('traceroute') || clauseLower.includes('trace hops') || clauseLower.includes('network path')) {
+        toolId = 'network.traceroute';
+      } else if (clauseLower.includes('network interface') || clauseLower.includes('adapter') || clauseLower.includes('ifconfig') || clauseLower.includes('mac address')) {
+        toolId = 'network.interfaces';
+      } else if (clauseLower.includes('scan wifi') || clauseLower.includes('list wifi') || clauseLower.includes('available wifi') || clauseLower.includes('nearby wireless')) {
+        toolId = 'network.wifi.scan';
+      } else if (clauseLower.includes('zip ') || clauseLower.includes('compress ') || clauseLower.includes('tar ') || clauseLower.includes('create archive')) {
+        toolId = 'filesystem.compress';
+      } else if (clauseLower.includes('unzip ') || clauseLower.includes('extract ') || clauseLower.includes('decompress ') || clauseLower.includes('untar ')) {
+        toolId = 'filesystem.extract';
+      } else if (clauseLower.includes('chmod ') || clauseLower.includes('file permission') || clauseLower.includes('chown ') || clauseLower.includes('access rights')) {
+        toolId = 'filesystem.permissions';
+      } else if (clauseLower.includes('disk usage') || clauseLower.includes('folder size') || clauseLower.includes('how large is') || clauseLower.includes('du -h')) {
+        toolId = 'filesystem.disk_usage';
+      } else if (clauseLower.includes('recent file') || clauseLower.includes('recently edited') || clauseLower.includes('latest files')) {
+        toolId = 'filesystem.recent_files';
+      } else if (clauseLower.includes('trash') || clauseLower.includes('recycle bin') || clauseLower.includes('move to trash')) {
+        toolId = 'filesystem.trash';
+      } else if (clauseLower.includes('grep ') || clauseLower.includes('search inside') || clauseLower.includes('find text') || (clauseLower.includes('search') && clauseLower.includes('content'))) {
+        toolId = 'filesystem.grep';
+      } else if (clauseLower.includes('install ') && !clauseLower.includes('npm') && !clauseLower.includes('pip') && !clauseLower.includes('wifi') && !clauseLower.includes('package')) {
+        toolId = 'application.install';
+      } else if (clauseLower.includes('uninstall ') || (clauseLower.includes('remove ') && clauseLower.includes('app'))) {
+        toolId = 'application.uninstall';
+      } else if (clauseLower.includes('minimize') || clauseLower.includes('hide window')) {
+        toolId = 'application.minimize';
+      } else if (clauseLower.includes('maximize') || clauseLower.includes('fullscreen') || clauseLower.includes('full screen')) {
+        toolId = 'application.maximize';
+      } else if (clauseLower.includes('focus') || clauseLower.includes('bring to front')) {
+        toolId = 'application.focus';
+      } else if (clauseLower.includes('browser history') || (clauseLower.includes('history') && clauseLower.includes('web')) || clauseLower.includes('visited site')) {
+        toolId = 'browser.history';
+      } else if (clauseLower.includes('reload') && (clauseLower.includes('tab') || clauseLower.includes('page') || clauseLower.includes('browser')) || clauseLower.includes('refresh page')) {
+        toolId = 'browser.reload';
+      } else if (clauseLower.includes('close tab') || clauseLower.includes('close browser tab')) {
+        toolId = 'browser.close_tabs';
+      }
+
+      if (toolId === 'unknown.tool') {
+        // Intelligent Terminal Shell fallback for general user-friendly terminal tasks
+        if (
+          clauseLower.includes('date') || clauseLower.includes('time') || clauseLower.includes('clock') ||
+          clauseLower.includes('cal') || clauseLower.includes('calendar') ||
+          clauseLower.includes('whoami') || clauseLower.includes('user') ||
+          clauseLower.includes('clear') || clauseLower.includes('env') ||
+          clauseLower.includes('history') || clauseLower.includes('version') ||
+          clauseLower.includes('curl ') || clauseLower.includes('wget ') ||
+          clauseLower.includes('brew ') || clauseLower.includes('echo ') ||
+          clauseLower.includes('show me') || clauseLower.includes('check ') ||
+          clauseLower.includes('what is') || clauseLower.includes('how many') ||
+          clauseLower.startsWith('run ') || clauseLower.startsWith('exec ')
+        ) {
+          if (clauseLower !== 'do something') {
+            toolId = 'shell.execute';
+            let cmd = clause;
+            if (clauseLower.includes('date') || clauseLower.includes('time') || clauseLower.includes('clock')) cmd = 'date';
+            else if (clauseLower.includes('cal') || clauseLower.includes('calendar')) cmd = 'cal';
+            else if (clauseLower.includes('whoami') || clauseLower.includes('who am i') || clauseLower.includes('current user')) cmd = 'whoami';
+            else if (clauseLower.includes('clear')) cmd = 'clear';
+            else if (clauseLower.includes('env')) cmd = 'env';
+            combinedEntities.command = cmd;
+          }
+        }
       }
 
       tasks.push({

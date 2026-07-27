@@ -2,7 +2,7 @@
   "id": "application.open",
   "version": "1.0.0",
   "displayName": "Open Desktop Application",
-  "description": "Opens a system desktop application using native launchers (Launch Services).",
+  "description": "Opens a system desktop application using native launchers (Launch Services) with optional URL, file, or target arguments.",
   "domain": "application",
   "category": "Desktop",
   "tags": [
@@ -18,7 +18,9 @@
     "open app",
     "launch app",
     "run program",
-    "start application"
+    "start application",
+    "open url in app",
+    "open website in app"
   ],
   "supportedPlatforms": [
     "macos",
@@ -37,7 +39,26 @@
       "required": true
     }
   ],
-  "optionalParameters": [],
+  "optionalParameters": [
+    {
+      "name": "url",
+      "type": "string",
+      "description": "Optional web URL or domain to open in application",
+      "required": false
+    },
+    {
+      "name": "file",
+      "type": "string",
+      "description": "Optional file path to open in application",
+      "required": false
+    },
+    {
+      "name": "args",
+      "type": "string",
+      "description": "Optional command line target arguments",
+      "required": false
+    }
+  ],
   "estimatedExecutionTime": "1s",
   "confirmationRequired": false,
   "rollbackAvailable": false,

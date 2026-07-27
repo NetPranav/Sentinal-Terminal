@@ -4,13 +4,17 @@
     "open app",
     "launch app",
     "run program",
-    "start application"
+    "start application",
+    "open url in app",
+    "open website in app"
   ],
   "synonyms": [
     "please open app",
     "please launch app",
     "please run program",
-    "please start application"
+    "please start application",
+    "please open url in app",
+    "please open website in app"
   ],
   "commonUserWording": [
     "open Chrome",
@@ -18,11 +22,22 @@
     "open app",
     "launch app",
     "run program",
-    "start application"
+    "start application",
+    "open url in app",
+    "open website in app"
   ],
   "commonMistakes": [],
   "entityHints": {
     "app": [
+      "test_value"
+    ],
+    "url": [
+      "test_value"
+    ],
+    "file": [
+      "test_value"
+    ],
+    "args": [
       "test_value"
     ]
   },
@@ -33,7 +48,9 @@
     "open app",
     "launch app",
     "run program",
-    "start application"
+    "start application",
+    "open url in app",
+    "open website in app"
   ],
   "relatedTools": []
 }

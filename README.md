@@ -56,15 +56,17 @@ Sentinel redefines the modern command-line interface. Built for developers, syst
 
 Sentinel delivers a rich suite of built-in capabilities engineered from the ground up for productivity, visual excellence, and zero latency.
 
-### 🤖 AI Native Terminal
-Sentinel embeds intentional intelligence directly into your terminal interface. You never have to memorize complex parameter flags or decipher lengthy manuals; simply express what you need in plain conversation, and Sentinel executes the exact native system commands automatically.
+### 🤖 AI Native Terminal with Explicit `>` Trigger
+Sentinel embeds intentional intelligence directly into your terminal interface without ever interfering with traditional shell execution. Standard Unix commands run with zero latency; when you need conversational AI assistance or desktop automation, simply prefix your input with the **`>`** trigger symbol. You never have to memorize complex parameter flags or decipher lengthy manuals—just type `>` followed by what you need in plain English!
 
-### 🗣️ Natural Language Commands
-Interact with your desktop workspace without breaking flow or reaching for your mouse:
-- **Instant Folder Navigation**: Ask Sentinel to `"take me to downloads folder"` or `"take me home"`, and watch your active prompt smoothly move to your requested workspace directory immediately.
-- **Smart File Discovery**: Type `"tell me all the png files here"` to search and categorize files instantly without syntax friction.
-- **Application & Website Control**: Command `"open youtube.com in safari"` or `"launch github.com using chrome"`, opening web destinations directly within your native system desktop applications.
-- **Intelligent Process Termination**: Simply say `"stop chrome"` or `"kill antigravity"` to execute thorough system process cleanups that clear stubborn background threads and daemons safely.
+### 🗣️ Natural Language Commands (`>`)
+Interact with your desktop workspace, applications, and operating system without breaking flow or reaching for your mouse:
+- **Explicit & Frictionless**: Type standard shell commands normally (`ls -la`, `git status`, `npm run dev`) or summon instant AI execution by starting your line with **`>`**.
+- **Instant Folder Navigation**: Ask Sentinel to **`>take me to downloads folder`** or **`>take me home`**, and watch your active prompt smoothly move to your requested workspace directory immediately.
+- **Curated Running App Inspection**: Type **`>tell me all the running applications`** to receive a pristine, clutter-free summary of active graphical desktop software (such as *Sentinel Terminal*, *Antigravity IDE*, *Chrome*, *Safari*, or *Preview*) without noisy OS background daemons.
+- **Application & Website Control**: Command **`>open youtube.com in safari`** or **`>open workspace in cursor`**, opening web destinations and IDEs directly within your native desktop software.
+- **Intelligent Process Termination**: Simply say **`>stop chrome`** or **`>kill antigravity`** to execute thorough system process cleanups that clear stubborn background threads safely.
+- **Expanded Hardware & Network Diagnostics**: Directly query your machine with **`>check gpu status and vram`**, **`>scan available wifi networks`**, **`>what port is 3000 running on`**, or **`>show me the calendar for this month`**!
 
 ### 🪟 Multiple Terminal Panes
 Eliminate desktop clutter by organizing multithreaded development workflows within a single cohesive window:
@@ -142,10 +144,12 @@ Experience the speed and intelligence of Sentinel Terminal on your machine today
 Getting started with Sentinel requires zero manual setup or external configuration:
 
 1. **Launch the Application**: Double-click **`Sentinel Terminal.app`** from your Applications folder or macOS Dock to open your modern glassmorphism workspace.
-2. **Interact Conversationally or via Syntax**: Start typing standard commands instantly or enter everyday language instructions directly into your prompt:
-   - Type `"take me to downloads folder"` to jump straight to your downloads directory.
-   - Type `"open youtube.com in safari"` to launch your native desktop browser.
-   - Type `"stop chrome"` to perform a clean, deep process sweep of running Chrome threads.
+2. **Interact via Syntax or Summon AI (`>`)**: Type standard shell syntax instantly or trigger conversational instructions by prefixing your line with **`>`**:
+   - Type **`>take me to downloads folder`** to jump straight to your downloads directory.
+   - Type **`>tell me all the running applications`** to inspect active graphical desktop programs cleanly.
+   - Type **`>open youtube.com in safari`** or **`>open in cursor`** to launch native apps and browsers.
+   - Type **`>stop chrome`** to perform a clean, deep process sweep of running Chrome threads.
+   - Type **`>check gpu status`** or **`>what ports are open`** for instant hardware and network diagnostics.
 3. **Personalize Your Experience**: Use your macOS desktop top screen menu bar under **`Personalization`** to open new tabs (`Cmd+T`), divide split workspaces (`Cmd+D`), or tune background theme aesthetics on the fly!
 
 ---
@@ -176,7 +180,7 @@ Are you interested in contributing features, implementing custom capability driv
 - **[Workflow & Agentic Engine Guide](file:///developer/WORKFLOW_ENGINE.md)**: Autonomous step execution loop architecture, error repair retries, and automatic interactive shell synchronization.
 - **[Intent Engine & Telemetry Pipelines](file:///developer/INTENT_AI.md)**: Deep dive into conversational linguistic trimming algorithms, target parameter extraction, and offline JSONL training datasets for LoRA fine-tuning.
 - **[Coding Standards & Style Rules](file:///developer/CODING_STANDARDS.md)**: Strict typing discipline, zero compiler warning mandates, and Conventional Commit messaging formatting.
-- **[Automated Testing Guide](file:///developer/TESTING.md)**: Instructions for executing our automated Vitest unit test verification battery (69+ tests) and writing capability assertions.
+- **[Automated Testing Guide](file:///developer/TESTING.md)**: Instructions for executing our automated Vitest unit test verification battery (81+ tests) and writing capability assertions.
 
 ---
 

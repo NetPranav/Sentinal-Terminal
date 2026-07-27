@@ -175,9 +175,14 @@ const toolSpecs = [
   // ─── 2. APPLICATIONS DOMAIN ───
   {
     id: 'application.open', folder: 'application/open', domain: 'application', action: 'open',
-    name: 'Open Desktop Application', desc: 'Opens a system desktop application using native launchers (Launch Services).',
-    category: 'Desktop', risk: 'SAFE', params: [{ name: 'app', type: 'string', desc: 'Application name or bundle path', required: true }],
-    aliases: ['open app', 'launch app', 'run program', 'start application'], sampleInput: 'open Chrome'
+    name: 'Open Desktop Application', desc: 'Opens a system desktop application using native launchers (Launch Services) with optional URL, file, or target arguments.',
+    category: 'Desktop', risk: 'SAFE', params: [
+      { name: 'app', type: 'string', desc: 'Application name or bundle path', required: true },
+      { name: 'url', type: 'string', desc: 'Optional web URL or domain to open in application', required: false },
+      { name: 'file', type: 'string', desc: 'Optional file path to open in application', required: false },
+      { name: 'args', type: 'string', desc: 'Optional command line target arguments', required: false }
+    ],
+    aliases: ['open app', 'launch app', 'run program', 'start application', 'open url in app', 'open website in app'], sampleInput: 'open Chrome'
   },
   {
     id: 'application.close', folder: 'application/close', domain: 'application', action: 'close',
@@ -744,7 +749,14 @@ toolSpecs.forEach((spec, index) => {
     tags: tags,
     aliases: spec.aliases,
     supportedPlatforms: ["macos", "windows", "linux"],
-    requiredPermissions: spec.domain === 'filesystem' ? ["ReadFiles"] : ["ShellExecution"],
+    requiredPermissions: (() => {
+      if (spec.id === 'filesystem.delete' || spec.id === 'filesystem.trash') return ["DeleteFiles"];
+      if (spec.id === 'filesystem.rename') return ["RenameFiles"];
+      if (['create', 'mkdir', 'copy', 'move', 'duplicate', 'compress', 'extract', 'restore', 'permissions'].includes(spec.action) && spec.domain === 'filesystem') return ["WriteFiles"];
+      if (spec.domain === 'filesystem') return ["ReadFiles"];
+      if (spec.id === 'system.kill_process' || spec.id === 'application.force_quit') return ["ProcessManagement"];
+      return ["ShellExecution"];
+    })(),
     securityRisk: spec.risk,
     parameters: spec.params.filter(p => p.required).map(p => ({
       name: p.name,

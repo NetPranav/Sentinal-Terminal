@@ -28,7 +28,7 @@
     "linux"
   ],
   "requiredPermissions": [
-    "ReadFiles"
+    "WriteFiles"
   ],
   "securityRisk": "LOW",
   "parameters": [

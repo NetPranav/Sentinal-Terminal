@@ -28,7 +28,7 @@
     "linux"
   ],
   "requiredPermissions": [
-    "ReadFiles"
+    "DeleteFiles"
   ],
   "securityRisk": "HIGH",
   "parameters": [

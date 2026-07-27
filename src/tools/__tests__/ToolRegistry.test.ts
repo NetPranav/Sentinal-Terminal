@@ -111,6 +111,9 @@ describe('AI Operating Knowledge Base - Tool Registry', () => {
 
       const btOffMatch = searcher.findBestMatch('turn bluetooth off');
       expect(btOffMatch?.tool.definition.id).toBe('network.bluetooth.off');
+
+      const appRunMatch = searcher.findBestMatch('show me all the applicataion runnign');
+      expect(appRunMatch?.tool.definition.id).toBe('application.list_running');
     });
   });
 

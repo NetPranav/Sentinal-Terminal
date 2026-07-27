@@ -23,7 +23,7 @@
     "linux"
   ],
   "requiredPermissions": [
-    "ReadFiles"
+    "RenameFiles"
   ],
   "securityRisk": "MEDIUM",
   "parameters": [

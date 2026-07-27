@@ -5,22 +5,34 @@
     "kill any process",
     "terminate process",
     "stop process",
+    "stop all process",
     "end task",
     "killall",
     "pkill",
     "force kill",
-    "kill"
+    "kill",
+    "stop",
+    "halt",
+    "kill antigravity",
+    "stop antigravity",
+    "kill chrome"
   ],
   "synonyms": [
     "please kill process",
     "please kill any process",
     "please terminate process",
     "please stop process",
+    "please stop all process",
     "please end task",
     "please killall",
     "please pkill",
     "please force kill",
-    "please kill"
+    "please kill",
+    "please stop",
+    "please halt",
+    "please kill antigravity",
+    "please stop antigravity",
+    "please kill chrome"
   ],
   "commonUserWording": [
     "kill process node",
@@ -29,11 +41,17 @@
     "kill any process",
     "terminate process",
     "stop process",
+    "stop all process",
     "end task",
     "killall",
     "pkill",
     "force kill",
-    "kill"
+    "kill",
+    "stop",
+    "halt",
+    "kill antigravity",
+    "stop antigravity",
+    "kill chrome"
   ],
   "commonMistakes": [],
   "entityHints": {
@@ -49,11 +67,17 @@
     "kill any process",
     "terminate process",
     "stop process",
+    "stop all process",
     "end task",
     "killall",
     "pkill",
     "force kill",
-    "kill"
+    "kill",
+    "stop",
+    "halt",
+    "kill antigravity",
+    "stop antigravity",
+    "kill chrome"
   ],
   "relatedTools": []
 }

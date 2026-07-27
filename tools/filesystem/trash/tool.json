@@ -27,7 +27,7 @@
     "linux"
   ],
   "requiredPermissions": [
-    "ReadFiles"
+    "DeleteFiles"
   ],
   "securityRisk": "MEDIUM",
   "parameters": [

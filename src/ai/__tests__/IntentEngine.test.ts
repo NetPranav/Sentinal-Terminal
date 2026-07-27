@@ -141,4 +141,22 @@ describe('Phase X — Core Intent Engine & Multi-Step Planner Verification', () 
     expect(portRes2.plan.tasks[0].tool).toBe('network.ports');
     expect(portRes2.plan.tasks[0].entities.port).toBe(3000);
   });
+
+  it('should accurately route desktop running app queries and expanded developer/system commands', async () => {
+    const appsRes = await engine.parseIntent('tell me all the running applications');
+    expect(appsRes.plan.tasks[0].tool).toBe('application.list_running');
+
+    const dockerRes = await engine.parseIntent('list docker containers');
+    expect(dockerRes.plan.tasks[0].tool).toBe('docker.ps');
+
+    const cursorRes = await engine.parseIntent('open in cursor');
+    expect(cursorRes.plan.tasks[0].tool).toBe('developer.cursor');
+
+    const gitRes = await engine.parseIntent('show git commit history');
+    expect(gitRes.plan.tasks[0].tool).toBe('git.log');
+
+    const calRes = await engine.parseIntent('show me the calendar for this month');
+    expect(calRes.plan.tasks[0].tool).toBe('shell.execute');
+    expect(calRes.plan.tasks[0].entities.command).toBe('cal');
+  });
 });

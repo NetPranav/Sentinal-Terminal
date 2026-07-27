@@ -14,6 +14,7 @@ import { PythonCapability } from '../capabilities/drivers/PythonCapability';
 import { NetworkingCapability } from '../capabilities/drivers/NetworkingCapability';
 import { DeveloperCapability } from '../capabilities/drivers/DeveloperCapability';
 import { ToolLoader } from '../../tools/loader/ToolLoader';
+import { AppAliasRegistry } from '../../domain/capabilities/AppAliasRegistry';
 
 describe('Capability SDK — End-to-End Concrete Execution Drivers', () => {
   let registry: CapabilityRegistrySDK;
@@ -25,17 +26,31 @@ describe('Capability SDK — End-to-End Concrete Execution Drivers', () => {
   describe('1. ApplicationCapability (Desktop Launch Driver)', () => {
     it('should open an application via express open() driver and verify lifecycle', async () => {
       const appDriver = new ApplicationCapability();
-      const res = await appDriver.open('Chrome');
+      const res = await appDriver.open('Safari');
       
       expect(res.success).toBe(true);
       expect(res.data?.opened).toBe(true);
-      expect(res.commandExecuted).toContain('Chrome');
+      expect(res.commandExecuted).toContain('Safari');
       
-      const verified = await appDriver.verify({ app: 'Chrome' }, res);
+      const verified = await appDriver.verify({ app: 'Safari' }, res);
       expect(verified).toBe(true);
       
-      const rolledBack = await appDriver.rollback({ app: 'Chrome' }, res);
+      const rolledBack = await appDriver.rollback({ app: 'Safari' }, res);
       expect(rolledBack).toBe(true);
+    });
+
+    it('should automatically resolve macOS application aliases like "chrome" to "Google Chrome" and custom user registrations', async () => {
+      const appDriver = new ApplicationCapability();
+      const chromeRes = await appDriver.open('chrome', ['https://youtube.com']);
+      expect(chromeRes.success).toBe(true);
+      expect(chromeRes.commandExecuted).toContain('Google Chrome');
+
+      // Test runtime custom registration
+      const appRegistry = AppAliasRegistry.getInstance();
+      appRegistry.setAlias('myedit', 'TextEdit');
+      expect(appRegistry.resolve('myedit')).toBe('TextEdit');
+      expect(appRegistry.resolve('chrome')).toBe('Google Chrome');
+      expect(appRegistry.resolve('vscode')).toBe('Visual Studio Code');
     });
 
     it('should support dry run simulation without executing system commands', async () => {

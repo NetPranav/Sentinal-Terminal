@@ -9,7 +9,10 @@
       "type": "ExecuteCapability",
       "capabilityId": "application.open",
       "parameters": {
-        "app": "{{app}}"
+        "app": "{{app}}",
+        "url": "{{url}}",
+        "file": "{{file}}",
+        "args": "{{args}}"
       },
       "dependencies": [],
       "onError": "fail"

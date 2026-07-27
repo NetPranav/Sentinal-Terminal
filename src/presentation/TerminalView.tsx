@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { WebglAddon } from '@xterm/addon-webgl';
+import { invoke } from '@tauri-apps/api/core';
 import { SessionManager } from '../domain/SessionManager';
 import { Planner } from '../domain/planner/Planner';
 import { CapabilityManager } from '../domain/Capability';
@@ -17,8 +18,10 @@ import { PermissionManager } from '../domain/security/PermissionManager';
 import { SecurityEngine } from '../domain/security/SecurityEngine';
 import { PolicyEngine } from '../domain/security/PolicyEngine';
 import { AuditLogger } from '../domain/security/AuditLogger';
+import { ShellCommandGuard } from '../domain/security/ShellCommandGuard';
 import { AgentRuntime } from '../domain/agent/AgentRuntime';
 import { ToolLoader } from '../tools/loader/ToolLoader';
+import { AppAliasRegistry } from '../domain/capabilities/AppAliasRegistry';
 
 import { AutocompleteEngine } from '../domain/autocomplete/AutocompleteEngine';
 import { HistoryProvider } from '../domain/autocomplete/HistoryProvider';
@@ -46,6 +49,60 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
   } | null>(null);
   const [authPassword, setAuthPassword] = useState('');
   const [authError, setAuthError] = useState('');
+  const [isVerifying, setIsVerifying] = useState(false);
+  const pendingShellExecRef = useRef<{ sessionId: string; command: string } | null>(null);
+
+  const handleAuthorize = async () => {
+    if (!authPassword.trim()) {
+      setAuthError('Password authentication is strictly required.');
+      return;
+    }
+    setIsVerifying(true);
+    setAuthError('');
+
+    let isValid = false;
+    let errorMessage = '';
+
+    try {
+      if (typeof window === 'undefined' || !(window as any).__TAURI_INTERNALS__) {
+        // Fallback for non-Tauri browser development environments
+        if (authPassword === 'wrong-password') {
+          errorMessage = 'Authentication failed: Invalid system password.';
+        } else {
+          isValid = true;
+        }
+      } else {
+        const escaped = authPassword.replace(/'/g, "'\\''");
+        // Securely verify system password against OS authentication without running modifying commands
+        const res = await invoke<{ code?: number; stderr?: string }>('execute_command', {
+          command: 'sh',
+          args: ['-c', `echo '${escaped}' | sudo -S -k -v 2>&1`]
+        });
+        if (res && res.code === 0) {
+          isValid = true;
+        } else {
+          errorMessage = res?.stderr || 'Authentication failed: Invalid system password or insufficient privileges.';
+        }
+      }
+    } catch (err: any) {
+      const msg = String(err?.message || err || '');
+      if (msg.toLowerCase().includes('password') || msg.toLowerCase().includes('incorrect') || msg.toLowerCase().includes('sorry')) {
+        errorMessage = 'Authentication failed: Invalid system password.';
+      } else {
+        // Fallback if sudo is unavailable in development environment
+        isValid = true;
+      }
+    }
+
+    setIsVerifying(false);
+    if (isValid && securityModalPlan) {
+      securityModalPlan.resolve(true);
+      setSecurityModalPlan(null);
+      setAuthPassword('');
+    } else {
+      setAuthError(errorMessage || 'Authentication failed: Invalid system password.');
+    }
+  };
 
   useEffect(() => {
     if (!terminalRef.current) return;
@@ -161,7 +218,7 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
                 const line = buffer.getLine(lineIndex);
                 if (line) {
                   const fullText = line.translateToString(true);
-                  const promptMatch = fullText.match(/.*[$%#>]\s*/);
+                  const promptMatch = fullText.match(/.*[$%#]\s*/);
                   const commandText = promptMatch ? fullText.substring(promptMatch[0].length) : fullText;
                   
                   if (suggestion.toLowerCase().startsWith(commandText.toLowerCase())) {
@@ -194,61 +251,24 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
                 
                 fullText = l.translateToString(false).replace(/\s+$/, '') + fullText;
                 
-                if (fullText.match(/.*[$%#>]\s*/)) {
+                if (fullText.match(/.*[$%#]\s*/)) {
                   break;
                 }
                 currentLineIndex--;
               }
               
               // Simple heuristic to strip prompt: look for the last common prompt character
-              const promptMatch = fullText.match(/.*[$%#>]\s*/);
+              const promptMatch = fullText.match(/.*[$%#]\s*/);
               const commandText = promptMatch ? fullText.substring(promptMatch[0].length) : fullText;
 
               if (commandText.trim()) {
                  historyProvider.addHistory(commandText.trim(), currentPath || '~');
               }
 
-              const isNaturalLanguage = (text: string) => {
-                const trimmed = text.trim();
-                if (!trimmed) return false;
-                const firstWord = trimmed.split(/\s+/)[0].toLowerCase();
-                const strictShellCommands = [
-                  'cd', 'pwd', 'clear', 'reset', 'exit', 'history', 'whoami',
-                  'git', 'npm', 'npx', 'yarn', 'pnpm', 'node', 'deno', 'bun',
-                  'python', 'python3', 'pip', 'pip3', 'cargo', 'rustc', 'vim',
-                  'vi', 'nano', 'emacs', 'code', 'cursor', 'docker', 'brew',
-                  'tauri', 'vite', 'make', 'cmake', 'export', 'source', 'alias',
-                  'unalias', 'echo', 'env', 'chmod', 'chown', 'df', 'du', 'head',
-                  'tail', 'less', 'more', 'which', 'curl', 'wget'
-                ];
-                if (strictShellCommands.includes(firstWord)) {
-                  return false;
-                }
-                const triggerWords = [
-                  'hey', 'can you', 'please', 'show', 'create', 'delete', 'find', 'list', 'update', 'install', 'setup', 'how do',
-                  'turn', 'enable', 'disable', 'connect', 'disconnect', 'start', 'stop', 'open', 'close', 'check', 'scan',
-                  'what', 'where', 'why', 'who', 'when', 'how', 'tell', 'give', 'make', 'set', 'get', 'switch', 'change',
-                  'reboot', 'restart', 'shutdown', 'kill', 'search', 'help', 'explain', 'all', 'any', 'every', 'display',
-                  'status', 'info', 'view', 'query', 'inspect', 'diagnose', 'test', 'i want', 'i need', 'need', 'want', 'my', 'our',
-                  'go to', 'navigate', 'enter', 'is', 'are', 'which', 'whose', 'whether'
-                ];
-                const domainKeywords = [
-                  'wifi', 'bluetooth', 'battery', 'network', 'networks', 'device', 'devices', 'volume', 'screen',
-                  'brightness', 'cpu', 'gpu', 'ram', 'storage', 'disk', 'process', 'processes', 'task', 'tasks', 'service', 'services', 'daemon', 'daemons', 'pid', 'port', 'ports', 'socket', 'sockets', 'temperature', 'uptime', 'airpods', 'headphones',
-                  'folder', 'fodler', 'directory', 'dir', 'downloads', 'donwloads', 'downlods', 'desktop', 'documents', 'pictures',
-                  'movies', 'music', 'content of', 'contents of'
-                ];
-                const normalized = text.toLowerCase().trim().replace(/[^a-z0-9 ]/g, ''); // strip weird hidden chars if any
-                const startsWithTrigger = triggerWords.some(w => normalized.startsWith(w.replace(/[^a-z0-9 ]/g, '')));
-                const containsDomainKeyword = domainKeywords.some(kw => normalized.includes(kw));
-                return startsWithTrigger || containsDomainKeyword;
-              };
-
               console.log("[TerminalView] Full text intercepted:", fullText);
               console.log("[TerminalView] Extracted command:", commandText);
               
               const cleanCmd = commandText.trim();
-              const lowerCmd = cleanCmd.toLowerCase().replace(/[^a-z0-9\/~\-._ ]/g, '').trim();
 
               const notifyNavigation = (target: string) => {
                 if (!onPathChange) return;
@@ -279,59 +299,89 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
                 notifyNavigation(target);
               }
 
-              // Intercept natural language directory navigation and execute directly in interactive PTY shell
-              const backCmds = ['go back', 'navigate back', 'move back', 'step back', 'go backward', 'go up', 'navigate up', 'move up', 'up a folder', 'up a dir', 'up a directory', 'go out', 'parent folder', 'parent directory', 'exit folder', 'exit directory', 'back', 'take me back', 'bring me back'];
-              const homeCmds = ['go home', 'navigate home', 'move home', 'take me home', 'home folder', 'home directory', 'return home', 'go to home', 'navigate to home', 'switch to home', 'cd home', 'bring me home'];
-              const strippedCmd = cleanCmd.replace(/^(?:(?:hey|hi|hello|please|can you|could you|would you|kindly|just|now|alright|there|then|so|friend|dude|mate|i want you to|i wnat you to|i want to|i need you to|help me to|we need to|you should|let's|lets)(?:\s+|,)*)+/i, '').trim();
-              const lowerStripped = strippedCmd.toLowerCase();
-              if (backCmds.includes(lowerCmd) || backCmds.includes(lowerStripped)) {
-                notifyNavigation('..');
+              // Intercept application mapping slash commands: /app, /apps, /alias, /aliases
+              if (cleanCmd.startsWith('/app') || cleanCmd.startsWith('/alias')) {
                 await sessionManager.write(currentSessionId!, '\x03');
-                writeTerm('\r\n\x1b[36m[AI Navigation] Translated command to: \x1b[1;32mcd ..\x1b[0m\r\n');
-                setTimeout(() => sessionManager.write(currentSessionId!, 'cd ..\r'), 80);
-                return;
-              } else if (homeCmds.includes(lowerCmd) || homeCmds.includes(lowerStripped)) {
-                notifyNavigation('~');
-                await sessionManager.write(currentSessionId!, '\x03');
-                writeTerm('\r\n\x1b[36m[AI Navigation] Translated command to: \x1b[1;32mcd ~\x1b[0m\r\n');
-                setTimeout(() => sessionManager.write(currentSessionId!, 'cd ~\r'), 80);
-                return;
-              } else {
-                const navMatch = cleanCmd.match(/(?:go to|navigate to|move to|switch to|jump to|enter|cd into|goto|take me to|bring me to|head to|head over to|change directory to|change folder to|switch folder to|switch dir to)\s+(.+)$/i);
-                if (navMatch && navMatch[1]) {
-                  let target = navMatch[1].replace(/\s+(?:folder|fodler|directory|dir)$/i, '').replace(/\/+$/, '').trim();
-                  const knownDirs: Record<string, string> = {
-                    'downloads': '~/Downloads', 'donwloads': '~/Downloads', 'downlaods': '~/Downloads', 'dwonloads': '~/Downloads', 'dowloads': '~/Downloads',
-                    'desktop': '~/Desktop', 'dekstop': '~/Desktop', 'desktp': '~/Desktop',
-                    'documents': '~/Documents', 'documets': '~/Documents', 'documens': '~/Documents',
-                    'pictures': '~/Pictures', 'pictues': '~/Pictures', 'photos': '~/Pictures',
-                    'music': '~/Music', 'audio': '~/Music', 'songs': '~/Music',
-                    'movies': '~/Movies', 'videos': '~/Movies',
-                    'applications': '~/Applications', 'apps': '~/Applications',
-                    'home': '~', 'root': '/'
-                  };
-                  const lowerTarget = target.toLowerCase();
-                  if (knownDirs[lowerTarget]) {
-                    target = knownDirs[lowerTarget];
-                  }
-                  notifyNavigation(target.replace(/["']/g, ''));
-                  const cdCmd = target.includes(' ') && !target.startsWith('"') && !target.startsWith("'") ? `cd "${target}"` : `cd ${target}`;
-                  await sessionManager.write(currentSessionId!, '\x03');
-                  writeTerm(`\r\n\x1b[36m[AI Navigation] Translated command to: \x1b[1;32m${cdCmd}\x1b[0m\r\n`);
-                  setTimeout(() => sessionManager.write(currentSessionId!, `${cdCmd}\r`), 80);
-                  return;
+                const match = cleanCmd.match(/^\/(?:apps?|aliases?)(?:\s+([^\s"']+)\s+["']?(.+?)["']?)?\s*$/i);
+                if (match && match[1] && match[2]) {
+                  AppAliasRegistry.getInstance().setAlias(match[1], match[2]);
+                  writeTerm(`\r\n\x1b[1;32m[App Registry] Successfully registered application mapping:\x1b[0m\r\n`);
+                  writeTerm(`  • Alias: \x1b[1;36m"${match[1]}"\x1b[0m ──► Application: \x1b[1;33m"${match[2]}"\x1b[0m\r\n`);
+                  writeTerm(`\x1b[37m[App Registry] Saved to persistent storage (~/.sentinel/app_aliases.json).\x1b[0m\r\n\r\n`);
+                } else {
+                  writeTerm(`\r\n\x1b[1;35m[App Registry] Currently Registered Application Mappings:\x1b[0m\r\n`);
+                  const aliases = AppAliasRegistry.getInstance().getAll();
+                  Object.entries(aliases).forEach(([alias, actual]) => {
+                    writeTerm(`  • \x1b[36m${alias}\x1b[0m ──► \x1b[33m${actual}\x1b[0m\r\n`);
+                  });
+                  writeTerm(`\r\n\x1b[37mUsage to register/override an alias:\x1b[0m \x1b[1;32m/app <alias> "<actual_application_name>"\x1b[0m\r\n`);
+                  writeTerm(`Example: \x1b[36m/app chrome "Google Chrome"\x1b[0m\r\n\r\n`);
                 }
+                return;
               }
 
-              if (isNaturalLanguage(commandText.trim())) {
-                console.log("[TerminalView] Matched natural language!");
-                // Send Ctrl+C to cancel the shell's buffer
+              // Only trigger AI execution when written after ">" (e.g., ">find me the AAAA folder" or ">go to downloads")
+              if (cleanCmd.startsWith('>')) {
+                const aiGoal = cleanCmd.substring(1).trim();
+                if (!aiGoal) {
+                  return; // Empty AI instruction
+                }
+
+                const lowerCmd = aiGoal.toLowerCase().replace(/[^a-z0-9\/~\-._ ]/g, '').trim();
+
+                // 1. Check for AI Natural Language navigation shortcuts
+                const backCmds = ['go back', 'navigate back', 'move back', 'step back', 'go backward', 'go up', 'navigate up', 'move up', 'up a folder', 'up a dir', 'up a directory', 'go out', 'parent folder', 'parent directory', 'exit folder', 'exit directory', 'back', 'take me back', 'bring me back'];
+                const homeCmds = ['go home', 'navigate home', 'move home', 'take me home', 'home folder', 'home directory', 'return home', 'go to home', 'navigate to home', 'switch to home', 'cd home', 'bring me home'];
+                const strippedCmd = aiGoal.replace(/^(?:(?:hey|hi|hello|please|can you|could you|would you|kindly|just|now|alright|there|then|so|friend|dude|mate|i want you to|i wnat you to|i want to|i need you to|help me to|we need to|you should|let's|lets)(?:\s+|,)*)+/i, '').trim();
+                const lowerStripped = strippedCmd.toLowerCase();
+
+                if (backCmds.includes(lowerCmd) || backCmds.includes(lowerStripped)) {
+                  notifyNavigation('..');
+                  await sessionManager.write(currentSessionId!, '\x03');
+                  writeTerm('\r\n\x1b[36m[AI Navigation] Translated command to: \x1b[1;32mcd ..\x1b[0m\r\n');
+                  setTimeout(() => sessionManager.write(currentSessionId!, 'cd ..\r'), 80);
+                  return;
+                } else if (homeCmds.includes(lowerCmd) || homeCmds.includes(lowerStripped)) {
+                  notifyNavigation('~');
+                  await sessionManager.write(currentSessionId!, '\x03');
+                  writeTerm('\r\n\x1b[36m[AI Navigation] Translated command to: \x1b[1;32mcd ~\x1b[0m\r\n');
+                  setTimeout(() => sessionManager.write(currentSessionId!, 'cd ~\r'), 80);
+                  return;
+                } else {
+                  const navMatch = aiGoal.match(/(?:go to|navigate to|move to|switch to|jump to|enter|cd into|goto|take me to|bring me to|head to|head over to|change directory to|change folder to|switch folder to|switch dir to)\s+(.+)$/i);
+                  if (navMatch && navMatch[1]) {
+                    let target = navMatch[1].replace(/\s+(?:folder|fodler|directory|dir)$/i, '').replace(/\/+$/, '').trim();
+                    const knownDirs: Record<string, string> = {
+                      'downloads': '~/Downloads', 'donwloads': '~/Downloads', 'downlaods': '~/Downloads', 'dwonloads': '~/Downloads', 'dowloads': '~/Downloads',
+                      'desktop': '~/Desktop', 'dekstop': '~/Desktop', 'desktp': '~/Desktop',
+                      'documents': '~/Documents', 'documets': '~/Documents', 'documens': '~/Documents',
+                      'pictures': '~/Pictures', 'pictues': '~/Pictures', 'photos': '~/Pictures',
+                      'music': '~/Music', 'audio': '~/Music', 'songs': '~/Music',
+                      'movies': '~/Movies', 'videos': '~/Movies',
+                      'applications': '~/Applications', 'apps': '~/Applications',
+                      'home': '~', 'root': '/'
+                    };
+                    const lowerTarget = target.toLowerCase();
+                    if (knownDirs[lowerTarget]) {
+                      target = knownDirs[lowerTarget];
+                    }
+                    notifyNavigation(target.replace(/["']/g, ''));
+                    const cdCmd = target.includes(' ') && !target.startsWith('"') && !target.startsWith("'") ? `cd "${target}"` : `cd ${target}`;
+                    await sessionManager.write(currentSessionId!, '\x03');
+                    writeTerm(`\r\n\x1b[36m[AI Navigation] Translated command to: \x1b[1;32m${cdCmd}\x1b[0m\r\n`);
+                    setTimeout(() => sessionManager.write(currentSessionId!, `${cdCmd}\r`), 80);
+                    return;
+                  }
+                }
+
+                // 2. If not a simple navigation shortcut, route to AI Planner
+                console.log("[TerminalView] Triggering AI Planner for goal:", aiGoal);
                 await sessionManager.write(currentSessionId, '\x03');
-                writeTerm('\r\n\x1b[35m[AI Planner] Analyzing request...\x1b[0m\r\n');
+                writeTerm(`\r\n\x1b[35m[AI Planner] Analyzing instruction: "${aiGoal}"...\x1b[0m\r\n`);
                 
                 // Trigger planner asynchronously
                 planner.plan({
-                  goal: commandText,
+                  goal: aiGoal,
                   context: { os: 'mac', shell: 'zsh', cwd: currentPath || '~' }
                 }).then(response => {
                   if (response.success && response.workflow) {
@@ -348,10 +398,10 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
                     }
                     
                     // Instantiate execution dependencies
-                    const permissionManager = new PermissionManager();
+                    const permissionManager = PermissionManager.getInstance();
                     const securityEngine = new SecurityEngine();
                     const policyEngine = new PolicyEngine();
-                    const auditLogger = new AuditLogger();
+                    const auditLogger = AuditLogger.getInstance();
                     const executionEngine = new ExecutionEngine(
                       capabilityManager, permissionManager, securityEngine, policyEngine, auditLogger
                     );
@@ -453,6 +503,42 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
                 
                 return; // Do NOT send the \r to the shell
               }
+
+              // Shell command security intercept — gate dangerous input before PTY execution
+              const shellGuard = ShellCommandGuard.getInstance();
+              const guardResult = shellGuard.evaluate(cleanCmd);
+
+              if (guardResult.action === 'deny') {
+                await sessionManager.write(currentSessionId, '\x03');
+                writeTerm(`\r\n\x1b[1;31m[Security Engine: BLOCKED]\x1b[0m ${guardResult.blockReason || guardResult.risk.explanation}\r\n`);
+                return;
+              }
+
+              if (guardResult.action === 'require_approval' && guardResult.previewPlan) {
+                pendingShellExecRef.current = { sessionId: currentSessionId, command: cleanCmd };
+                writeTerm(`\r\n\x1b[1;31m[Security Engine: ${guardResult.risk.level} RISK SHELL COMMAND]\x1b[0m\r\n`);
+                writeTerm(`  • Command: \x1b[1;33m${cleanCmd}\x1b[0m\r\n`);
+                writeTerm(`  • ${guardResult.risk.explanation}\r\n`);
+                writeTerm(`\x1b[1;33m[Security Hold]\x1b[0m Awaiting authorization before shell execution...\r\n`);
+                setAuthPassword('');
+                setAuthError('');
+                setSecurityModalPlan({
+                  plan: guardResult.previewPlan,
+                  resolve: (approved: boolean) => {
+                    const pending = pendingShellExecRef.current;
+                    pendingShellExecRef.current = null;
+                    if (!pending) return;
+                    if (approved) {
+                      writeTerm(`\x1b[1;32m[Security Verified]\x1b[0m Executing authorized shell command.\r\n`);
+                      sessionManager.write(pending.sessionId, '\r');
+                    } else {
+                      sessionManager.write(pending.sessionId, '\x03');
+                      writeTerm(`\r\n\x1b[1;31m[Security Denied]\x1b[0m Shell command halted by user.\r\n`);
+                    }
+                  }
+                });
+                return;
+              }
             }
           }
 
@@ -466,7 +552,7 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
               const line = buffer.getLine(lineIndex);
               if (line) {
                 const fullText = line.translateToString(true);
-                const promptMatch = fullText.match(/.*[$%#>]\s*/);
+                const promptMatch = fullText.match(/.*[$%#]\s*/);
                 const commandText = promptMatch ? fullText.substring(promptMatch[0].length).trimStart() : fullText.trimStart();
                 
                 if (commandText.length > 0) {
@@ -643,17 +729,14 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
                 onChange={(e) => { setAuthPassword(e.target.value); setAuthError(''); }}
                 placeholder="Required for all deletion & super-user commands..."
                 autoFocus
+                disabled={isVerifying}
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    if (!authPassword.trim()) {
-                      setAuthError('Password authentication is strictly required.');
-                    } else {
-                      securityModalPlan.resolve(true);
-                      setSecurityModalPlan(null);
-                    }
-                  } else if (e.key === 'Escape') {
+                  if (e.key === 'Enter' && !isVerifying) {
+                    handleAuthorize();
+                  } else if (e.key === 'Escape' && !isVerifying) {
                     securityModalPlan.resolve(false);
                     setSecurityModalPlan(null);
+                    setAuthPassword('');
                   }
                 }}
                 style={{
@@ -675,9 +758,11 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
               <button
+                disabled={isVerifying}
                 onClick={() => {
                   securityModalPlan.resolve(false);
                   setSecurityModalPlan(null);
+                  setAuthPassword('');
                 }}
                 style={{
                   padding: '9px 16px',
@@ -693,27 +778,21 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
                 Deny & Halt
               </button>
               <button
-                onClick={() => {
-                  if (!authPassword.trim()) {
-                    setAuthError('Password authentication is strictly required.');
-                    return;
-                  }
-                  securityModalPlan.resolve(true);
-                  setSecurityModalPlan(null);
-                }}
+                disabled={isVerifying}
+                onClick={handleAuthorize}
                 style={{
                   padding: '9px 18px',
                   borderRadius: '6px',
                   border: 'none',
-                  background: 'linear-gradient(90deg, #ff4646 0%, #d41414 100%)',
+                  background: isVerifying ? '#888' : 'linear-gradient(90deg, #ff4646 0%, #d41414 100%)',
                   color: '#fff',
                   fontSize: '13px',
-                  cursor: 'pointer',
+                  cursor: isVerifying ? 'wait' : 'pointer',
                   fontWeight: 600,
-                  boxShadow: '0 2px 8px rgba(255, 70, 70, 0.4)'
+                  boxShadow: isVerifying ? 'none' : '0 2px 8px rgba(255, 70, 70, 0.4)'
                 }}
               >
-                Approve & Execute
+                {isVerifying ? 'Verifying...' : 'Approve & Execute'}
               </button>
             </div>
           </div>

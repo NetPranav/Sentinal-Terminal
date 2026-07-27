@@ -51,13 +51,27 @@ export class WorkflowCompiler {
 
       // 3. Deep clone and inject parameters
       const compiledSteps: WorkflowStep[] = rawSteps.map(step => {
+        let compiledParams: Record<string, any> | undefined = undefined;
+        if (step.parameters) {
+          const injected = this.injectParameters(step.parameters, context.parameters);
+          compiledParams = this.cleanUnreplacedPlaceholders(injected);
+          // Preserve any additional extracted entities (such as url, file, args, ssid, device) so native capabilities receive all target context
+          if (typeof compiledParams === 'object' && compiledParams !== null && context.parameters) {
+            for (const [k, v] of Object.entries(context.parameters)) {
+              if (v !== undefined && v !== null && v !== '' && compiledParams[k] === undefined) {
+                compiledParams[k] = v;
+              }
+            }
+          }
+        }
+
         const compiled: WorkflowStep = {
           id: step.id,
           type: step.type as WorkflowStep['type'],
           name: step.name,
           dependencies: step.dependencies || [],
           capabilityId: step.capabilityId,
-          parameters: step.parameters ? this.injectParameters(step.parameters, context.parameters) : undefined,
+          parameters: compiledParams,
           condition: step.condition,
           trueBranch: step.trueBranch,
           falseBranch: step.falseBranch,
@@ -131,6 +145,30 @@ export class WorkflowCompiler {
       return result;
     }
 
+    return obj;
+  }
+
+  /**
+   * Remove unreplaced {{placeholders}} for optional parameters from compiled parameter objects.
+   */
+  private cleanUnreplacedPlaceholders(obj: any): any {
+    if (typeof obj === 'string') {
+      if (/^\{\{\w+\}\}$/.test(obj)) return undefined;
+      return obj;
+    }
+    if (Array.isArray(obj)) {
+      return obj.map(item => this.cleanUnreplacedPlaceholders(item)).filter(v => v !== undefined);
+    }
+    if (typeof obj === 'object' && obj !== null) {
+      const result: Record<string, any> = {};
+      for (const [key, value] of Object.entries(obj)) {
+        const cleaned = this.cleanUnreplacedPlaceholders(value);
+        if (cleaned !== undefined) {
+          result[key] = cleaned;
+        }
+      }
+      return result;
+    }
     return obj;
   }
 }

@@ -32,10 +32,30 @@ export class PolicyEngine implements IPolicyEngine {
 
     this.addRule({
       id: 'protect-system-dirs',
-      description: 'Never delete system folders.',
+      description: 'Never delete system folders or root/home directory structures.',
       evaluate: (capId, input) => {
-        if (capId === 'fs.core' && input.operation === 'delete') {
-          if (['/', '/System', '/Windows', '/bin', '/usr'].includes(input.path)) {
+        if (!input) return null;
+
+        const isDeleteCap = 
+          capId === 'filesystem.delete' || 
+          capId === 'filesystem.trash' || 
+          capId === 'fs.delete' || 
+          capId === 'fs.trash' ||
+          (capId === 'fs.core' && ['delete', 'trash', 'remove', 'rm', 'rmdir'].includes(input?.operation?.toLowerCase()));
+
+        if (isDeleteCap) {
+          const rawPath = String(input.path || input.target || input.source || '').trim();
+          // Remove quotes, and remove trailing slashes (unless the path is literally "/" or "//")
+          const normalized = rawPath.replace(/^['"]|['"]$/g, '').replace(/(.+)\/+$/, '$1');
+
+          const protectedRoots = [
+            '/', '~', '$HOME', '${HOME}', 
+            '/System', '/Windows', '/bin', '/usr', '/sbin', '/etc', '/var', '/Library'
+          ];
+          
+          const destructiveGlobs = ['/*', '~/*', '$HOME/*', '/System/*', '/usr/*', '/bin/*', '/etc/*'];
+
+          if (protectedRoots.includes(normalized) || destructiveGlobs.includes(rawPath)) {
             return 'Deny';
           }
         }
