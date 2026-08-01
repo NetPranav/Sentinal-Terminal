@@ -108,7 +108,7 @@ export class ApplicationCapability extends BaseCapabilityDriver<AppDriverInput, 
         let isPathOrFolder = false;
         let extraArgs: string[] = [];
 
-        const targetArg = input.url || input.uri || input.file || (Array.isArray(input.args) && input.args.length ? input.args[0] : (typeof input.args === 'string' ? input.args : null));
+        const targetArg = input.url || input.uri || input.file || input.path || input.directory || (Array.isArray(input.args) && input.args.length ? input.args[0] : (typeof input.args === 'string' ? input.args : null));
         if (targetArg && typeof targetArg === 'string') {
           let formattedArg = targetArg.trim();
           // If launching a browser or opening a web domain/site, ensure proper URL scheme (https://)
@@ -133,6 +133,25 @@ export class ApplicationCapability extends BaseCapabilityDriver<AppDriverInput, 
           return arg;
         });
 
+        for (let i = 0; i < extraArgs.length; i++) {
+          let arg = extraArgs[i];
+          const isUrlLike = /(?:\.com|\.dev|\.org|\.net|\.io|\.ai|\.edu|\.gov|\.co|\.app|\.in|\.me|\.us|\.uk|\.tv|\.info|^http|^www\.)/i.test(arg);
+          if (arg && typeof arg === 'string' && !arg.startsWith('-') && !arg.startsWith('http://') && !arg.startsWith('https://') && !arg.startsWith('file://') && !isUrlLike) {
+            if (!arg.startsWith('/') && !arg.startsWith('~/') && arg !== '~' && !arg.startsWith('C:\\')) {
+              const baseCwd = (context?.cwd && context.cwd.trim() !== '' && context.cwd !== '/') ? context.cwd : '~';
+              arg = arg === '.' ? baseCwd : `${baseCwd.replace(/\/+$/, '')}/${arg.replace(/^\.\//, '')}`;
+            }
+            if (arg.startsWith('~/') || arg === '~') {
+              try {
+                const hRes = await invoke<{ stdout: string }>('execute_command', { command: 'sh', args: ['-c', 'echo $HOME'] });
+                const hd = (hRes?.stdout || '').trim();
+                if (hd) arg = arg === '~' ? hd : arg.replace(/^~/, hd);
+              } catch { /* ignore */ }
+            }
+            extraArgs[i] = arg;
+          }
+        }
+
         if (platform === 'macos') {
           const cleanTarget = target.toLowerCase().replace(/\s*(?:fod?le?r|dir(?:ectory)?)\s*$/i, '').trim();
           const folderMapping: Record<string, string> = {
@@ -156,6 +175,20 @@ export class ApplicationCapability extends BaseCapabilityDriver<AppDriverInput, 
             isPathOrFolder = true;
           } else if (target.startsWith('/') || target.startsWith('~/') || target.startsWith('./') || target === '~') {
             isPathOrFolder = true;
+          }
+
+          if (isPathOrFolder && typeof resolvedTarget === 'string') {
+            if (!resolvedTarget.startsWith('/') && !resolvedTarget.startsWith('~/') && resolvedTarget !== '~' && !resolvedTarget.startsWith('C:\\')) {
+              const baseCwd = (context?.cwd && context.cwd.trim() !== '' && context.cwd !== '/') ? context.cwd : '~';
+              resolvedTarget = resolvedTarget === '.' ? baseCwd : `${baseCwd.replace(/\/+$/, '')}/${resolvedTarget.replace(/^\.\//, '')}`;
+            }
+            if (resolvedTarget.startsWith('~/') || resolvedTarget === '~') {
+              try {
+                const hRes = await invoke<{ stdout: string }>('execute_command', { command: 'sh', args: ['-c', 'echo $HOME'] });
+                const hd = (hRes?.stdout || '').trim();
+                if (hd) resolvedTarget = resolvedTarget === '~' ? hd : resolvedTarget.replace(/^~/, hd);
+              } catch { /* ignore */ }
+            }
           }
 
           if (isPathOrFolder || target.endsWith('.app')) {

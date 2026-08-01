@@ -116,8 +116,12 @@ export class FilesystemSDKCapability extends BaseCapabilityDriver<FsDriverInput,
     }
 
     try {
-      // Proactively resolve ~/ to user's home directory across ALL filesystem operations
-      let resolvedPath = targetPath;
+      // Proactively resolve relative paths against active terminal working directory and expand ~/
+      let resolvedPath = targetPath.trim();
+      if (!resolvedPath.startsWith('/') && !resolvedPath.startsWith('~/') && resolvedPath !== '~' && !resolvedPath.startsWith('C:\\')) {
+        const baseCwd = (_context?.cwd && _context.cwd.trim() !== '' && _context.cwd !== '/') ? _context.cwd : '~';
+        resolvedPath = `${baseCwd.replace(/\/+$/, '')}/${resolvedPath.replace(/^\.\//, '')}`;
+      }
       if (resolvedPath.startsWith('~/') || resolvedPath === '~') {
         try {
           const hRes = await invoke<{ stdout: string }>('execute_command', { command: 'sh', args: ['-c', 'echo $HOME'] });
@@ -274,9 +278,14 @@ export class FilesystemSDKCapability extends BaseCapabilityDriver<FsDriverInput,
         case 'search':
         case 'locate_files':
         case 'locate_folders': {
-          const pattern = input.pattern || input.query || input.name || '';
-          let startDir = input.dir || input.path || '~';
-          if (startDir === 'unknown') startDir = '~';
+          const pattern = input.pattern || input.query || input.name || '*';
+          let startDir = input.dir || input.path || '.';
+          if (startDir === 'here' || startDir === '.' || startDir === './') {
+            const cwd = (this as any).context?.cwd;
+            startDir = (cwd && cwd.trim() !== '' && cwd !== '/') ? cwd : '.';
+          } else if (startDir === 'unknown') {
+            startDir = '~';
+          }
           let resolvedDir = startDir;
           if (resolvedDir.startsWith('~/') || resolvedDir === '~') {
             try {
@@ -287,25 +296,54 @@ export class FilesystemSDKCapability extends BaseCapabilityDriver<FsDriverInput,
           }
           const cleanPattern = pattern.toString().trim() || '*';
           const inamePattern = cleanPattern.includes('*') ? cleanPattern : `*${cleanPattern}*`;
+          const findArgs = [resolvedDir, '-maxdepth', '10', '-iname', inamePattern, '-not', '-path', '*/.*'];
+          if (input.size) {
+            findArgs.push('-type', 'f', '-size', String(input.size));
+          }
           let matches: string[] = [];
           let stdout = '';
           try {
-            const findCmd = await invoke<{ stdout: string; stderr: string; code: number }>('execute_command', {
+            const findCmd = await invoke<{ stdout: string; stderr: string; code?: number }>('execute_command', {
               command: 'find',
-              args: [resolvedDir, '-maxdepth', '5', '-iname', inamePattern, '-not', '-path', '*/.*']
+              args: findArgs
             });
             if (findCmd && findCmd.stdout) {
               matches = findCmd.stdout.split('\n').map(l => l.trim()).filter(Boolean);
             }
+            const sizeMsg = input.size ? ` (size ${input.size})` : '';
             if (matches.length > 0) {
-              stdout = `Located ${matches.length} match(es) for "${cleanPattern}" in ${startDir}:\r\n` + matches.map(m => `  • ${m}`).join('\r\n');
+              stdout = `Located ${matches.length} match(es) for "${cleanPattern}"${sizeMsg} in ${startDir}:\r\n` + matches.map(m => `  • ${m}`).join('\r\n');
             } else {
-              stdout = `No folder or file matching "${cleanPattern}" was found under ${startDir}.`;
+              stdout = `No folder or file matching "${cleanPattern}"${sizeMsg} was found under ${startDir}.`;
             }
           } catch {
             stdout = `Could not execute search for "${cleanPattern}" in ${startDir}.`;
           }
-          return { success: true, data: { matches, pattern: cleanPattern, dir: startDir, stdout }, commandExecuted: `find "${resolvedDir}" -iname "${inamePattern}"` };
+          return { success: true, data: { matches, pattern: cleanPattern, dir: startDir, size: input.size, stdout }, commandExecuted: `find "${resolvedDir}" -iname "${inamePattern}"${input.size ? ` -size ${input.size}` : ''}` };
+        }
+
+        case 'grep': {
+          const query = input.query || input.pattern || input.text || '';
+          const searchPath = resolvedPath || (this as any).context?.cwd || '.';
+          let matches: string[] = [];
+          let stdout = '';
+          try {
+            const grepCmd = await invoke<{ stdout: string; stderr: string; code?: number }>('execute_command', {
+              command: 'grep',
+              args: ['-rnI', '--max-count=25', String(query), searchPath]
+            });
+            if (grepCmd && grepCmd.stdout) {
+              matches = grepCmd.stdout.split('\n').map(l => l.trim()).filter(Boolean);
+            }
+            if (matches.length > 0) {
+              stdout = `Located ${matches.length} matching content line(s) for "${query}" in ${searchPath}:\r\n` + matches.map(m => `  • ${m}`).join('\r\n');
+            } else {
+              stdout = `No content matching "${query}" was found under ${searchPath}.`;
+            }
+          } catch {
+            stdout = `Could not execute grep search for "${query}" in ${searchPath}.`;
+          }
+          return { success: true, data: { matches, query, path: searchPath, stdout }, commandExecuted: `grep -rnI "${query}" "${searchPath}"` };
         }
 
         default: {

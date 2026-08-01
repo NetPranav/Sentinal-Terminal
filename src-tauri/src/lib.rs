@@ -107,8 +107,16 @@ pub fn run() {
             process_cmds::list_processes,
             process_cmds::kill_process,
             process_cmds::get_system_stats,
-            process_cmds::execute_command
+            process_cmds::execute_command,
+            process_cmds::get_launch_args
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|app_handle, event| {
+            if let tauri::RunEvent::Opened { urls } = event {
+                use tauri::Emitter;
+                let url_strings: Vec<String> = urls.into_iter().map(|u| u.to_string()).collect();
+                let _ = app_handle.emit("sentinel-url", url_strings);
+            }
+        });
 }

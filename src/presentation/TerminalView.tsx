@@ -26,6 +26,7 @@ import { AutocompleteEngine } from '../domain/autocomplete/AutocompleteEngine';
 import { HistoryProvider } from '../domain/autocomplete/HistoryProvider';
 import { GhostTextRenderer } from '../ui/components/GhostText';
 import { ThemeManager } from '../ui/theme/ThemeManager';
+import { ShellAdapter } from '../domain/shell/ShellAdapter';
 import '@xterm/xterm/css/xterm.css';
 
 interface TerminalViewProps {
@@ -108,6 +109,8 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
     const term = new Terminal({
       cursorBlink: true,
       allowTransparency: true,
+      scrollback: 100000,
+      allowProposedApi: true,
       fontFamily: currentTheme.ui.fontFamily || 'Menlo, Monaco, "Courier New", monospace',
       fontSize: currentTheme.ui.fontSize || 14,
       theme: {
@@ -164,7 +167,15 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
     const initSession = async () => {
       try {
         if (!currentSessionId) {
-          currentSessionId = await sessionManager.createSession(term.rows, term.cols);
+          const shellAdapter = ShellAdapter.getInstance();
+          const defaultProfile = shellAdapter.detectLoginShell();
+          currentSessionId = await sessionManager.createSession(
+            term.rows, 
+            term.cols, 
+            defaultProfile.defaultPath, 
+            currentPath || undefined, 
+            true
+          );
           setSessionId(currentSessionId);
           onSessionCreated?.(currentSessionId);
         } else {
@@ -329,23 +340,102 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
                   setTimeout(() => sessionManager.write(currentSessionId!, 'cd ~\r'), 80);
                   return;
                 } else {
-                  const navMatch = aiGoal.match(/(?:go to|navigate to|move to|switch to|jump to|enter|cd into|goto|take me to|bring me to|head to|head over to|change directory to|change folder to|switch folder to|switch dir to)\s+(.+)$/i);
+                  // Detect multi-step commands: if the instruction contains sequential conjunctions, skip navigation and route to AI Planner
+                  const isMultiStep = /\b(?:and\s+then|then\s+(?:open|create|make|list|delete|remove|run|launch|show|find|search|check)|,\s*then|after\s+that|afterwards|next\s+(?:open|create|make|list)|;\s*(?:open|create|make|list|delete|remove|run|launch))\b/i.test(aiGoal);
+
+                  const navMatch = !isMultiStep ? aiGoal.match(/(?:go to|navigate to|move to|switch to|jump to|enter|cd into|goto|take me to|bring me to|head to|head over to|change directory to|change folder to|switch folder to|switch dir to|access|open folder|open dir|open directory)\s+(.+)$/i) : null;
                   if (navMatch && navMatch[1]) {
-                    let target = navMatch[1].replace(/\s+(?:folder|fodler|directory|dir)$/i, '').replace(/\/+$/, '').trim();
                     const knownDirs: Record<string, string> = {
-                      'downloads': '~/Downloads', 'donwloads': '~/Downloads', 'downlaods': '~/Downloads', 'dwonloads': '~/Downloads', 'dowloads': '~/Downloads',
-                      'desktop': '~/Desktop', 'dekstop': '~/Desktop', 'desktp': '~/Desktop',
+                      'downloads': '~/Downloads', 'donwloads': '~/Downloads', 'downlaods': '~/Downloads', 'dwonloads': '~/Downloads', 'dowloads': '~/Downloads', 'dwnload': '~/Downloads',
+                      'desktop': '~/Desktop', 'dekstop': '~/Desktop', 'desktp': '~/Desktop', 'deskop': '~/Desktop', 'dektsop': '~/Desktop',
                       'documents': '~/Documents', 'documets': '~/Documents', 'documens': '~/Documents',
                       'pictures': '~/Pictures', 'pictues': '~/Pictures', 'photos': '~/Pictures',
                       'music': '~/Music', 'audio': '~/Music', 'songs': '~/Music',
                       'movies': '~/Movies', 'videos': '~/Movies',
                       'applications': '~/Applications', 'apps': '~/Applications',
-                      'home': '~', 'root': '/'
+                      'home': '~', 'root': '/', 'project': '~/Project Folder', 'projects': '~/Project Folder'
                     };
-                    const lowerTarget = target.toLowerCase();
-                    if (knownDirs[lowerTarget]) {
-                      target = knownDirs[lowerTarget];
+
+                    let rawText = navMatch[1].trim();
+                    const isReverse = /\b(?:inside|in|under|within|from|at)\b(?!\s+(?:it|that|there|this|the\s+(?:folder|dir)))/i.test(rawText) && !/\b(?:inside\s+it|in\s+it|then|->|=>|\\|\/)/i.test(rawText);
+
+                    // Split into segments across any relational connector and strip all variations of folder/dir words
+                    let segments = rawText
+                      .split(/(?:\s+(?:inside|into|in|under|within)(?:\s+(?:it|that|this|the|of))?\s+|\s*(?:->|=>|\\|\/)\s*|\s+(?:and\s+)?(?:then\s+)?(?:inside|into|open|enter|switch\s+to|goto)\s+)/i)
+                      .map(s => s.replace(/\b(?:folders?|fod?le?rs?|floders?|folers?|foders?|dir(?:ectory|ectories)?|dirs|app(?:lication)?s?)\b/gi, '').trim())
+                      .filter(Boolean);
+
+                    if (isReverse && segments.length > 1) {
+                      segments = segments.reverse();
                     }
+
+                    // Ensure if any segment matches a known system base dir (like Desktop or Downloads), it is moved to index 0 as root parent
+                    const baseDirIndex = segments.findIndex(seg => knownDirs[seg.toLowerCase()]);
+                    if (baseDirIndex > 0) {
+                      const [baseSeg] = segments.splice(baseDirIndex, 1);
+                      segments.unshift(baseSeg);
+                    }
+
+                    let resolvedParts: string[] = [];
+                    for (let idx = 0; idx < segments.length; idx++) {
+                      let seg = segments[idx];
+                      const lowerSeg = seg.toLowerCase();
+                      if (idx === 0 && knownDirs[lowerSeg]) {
+                        resolvedParts.push(knownDirs[lowerSeg]);
+                      } else {
+                        // Intelligent fuzzy resolution against real filesystem structure via OS shell inspection
+                        const baseSoFar = resolvedParts.length > 0 ? resolvedParts.join('/') : '.';
+                        try {
+                          const lsRes = await invoke<{ code?: number; stdout?: string }>('execute_command', {
+                            command: 'sh',
+                            args: ['-c', `ls -1 "${baseSoFar.replace(/^~/, '$HOME')}" 2>/dev/null`]
+                          });
+                          if (lsRes && (lsRes.code === 0 || lsRes.code === undefined) && lsRes.stdout) {
+                            const entries = lsRes.stdout.split('\n').map(e => e.trim()).filter(Boolean);
+                            const cleanQuery = seg.toLowerCase().replace(/[\s_\-]/g, '');
+                            let matches: { name: string; score: number }[] = [];
+
+                            for (const entry of entries) {
+                              const cleanEntry = entry.toLowerCase().replace(/[\s_\-]/g, '');
+                              if (entry === seg) {
+                                matches.push({ name: entry, score: 100 });
+                              } else if (cleanEntry === cleanQuery) {
+                                matches.push({ name: entry, score: 90 });
+                              } else if (cleanEntry.includes(cleanQuery) || cleanQuery.includes(cleanEntry)) {
+                                matches.push({ name: entry, score: 85 });
+                              } else {
+                                let overlap = 0;
+                                for (let i = 0; i < Math.min(cleanEntry.length, cleanQuery.length); i++) {
+                                  if (cleanEntry[i] === cleanQuery[i]) overlap++;
+                                  else break;
+                                }
+                                if (overlap >= 3 && overlap >= cleanQuery.length * 0.5) {
+                                  matches.push({ name: entry, score: Math.round((overlap / Math.max(cleanEntry.length, cleanQuery.length)) * 100) });
+                                }
+                              }
+                            }
+                            matches.sort((a, b) => b.score - a.score);
+                            const topMatches = matches.filter(m => m.score >= 65);
+
+                            if (topMatches.length > 0) {
+                              const best = topMatches[0];
+                              seg = best.name;
+                              if (best.score < 100) {
+                                await sessionManager.write(currentSessionId!, '\x03');
+                                const matchText = topMatches.length === 1
+                                  ? `Found only 1 file matching (${best.score}%):`
+                                  : `Found ${topMatches.length} matching items, selecting highest confidence (${best.score}%):`;
+                                writeTerm(`\r\n\x1b[33m[AI Resolution] ${matchText} \x1b[1;32m${best.name}\x1b[0m\r\n`);
+                              }
+                            }
+                          }
+                        } catch (err) {
+                          // Ignore shell errors if fallback path synthesis works
+                        }
+                        resolvedParts.push(seg);
+                      }
+                    }
+                    const target = resolvedParts.join('/');
                     notifyNavigation(target.replace(/["']/g, ''));
                     const cdCmd = target.includes(' ') && !target.startsWith('"') && !target.startsWith("'") ? `cd "${target}"` : `cd ${target}`;
                     await sessionManager.write(currentSessionId!, '\x03');
@@ -419,7 +509,7 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
                         msg = `VerificationFailed: ${payload.error.message || payload.error.code || 'Unknown error'}`;
                       } else if (event === 'StepCompleted' && payload?.step) {
                         msg = `StepCompleted: ${payload.step.name}`;
-                        if (payload.data?.path && typeof payload.data.path === 'string' && (payload.step.action?.capability === 'filesystem.cd' || payload.step.action?.capability === 'shell.cd' || String(payload.data?.stdout || '').includes('Changed directory to:'))) {
+                        if (payload.data?.path && typeof payload.data.path === 'string' && (payload.step.capabilityId === 'filesystem.navigate' || payload.step.capabilityId === 'filesystem.cd' || payload.step.action?.capability === 'filesystem.cd' || payload.step.action?.capability === 'filesystem.navigate' || payload.step.action?.capability === 'shell.cd' || String(payload.data?.stdout || '').includes('Changed directory to:'))) {
                           targetCdPath = payload.data.path;
                         }
                         if (payload.step.action?.capability === 'shell.execute' && (payload.step.action?.parameters?.command === 'clear' || payload.step.parameters?.command === 'clear')) {

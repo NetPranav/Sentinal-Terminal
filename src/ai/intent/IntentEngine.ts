@@ -62,8 +62,9 @@ export class IntentEngine {
   /**
    * Primary entry point: converts unrestricted natural language into structured JSON execution plans.
    */
-  public async parseIntent(query: string): Promise<IntentEngineResult> {
+  public async parseIntent(rawQuery: string): Promise<IntentEngineResult> {
     const startTime = performance.now();
+    const query = rawQuery.replace(/^[\s>\$#\-:]+/, '').trim();
 
     // 1. Build context and inspect tool registry dynamically
     this.contextBuilder.buildContext(query);

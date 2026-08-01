@@ -64,8 +64,24 @@ export class SessionManager {
     }
   }
 
-  public async createSession(rows: number, cols: number): Promise<string> {
-    const sessionId = await invoke<string>('spawn_pty', { rows, cols });
+  public async createSession(
+    rows: number, 
+    cols: number,
+    shell?: string,
+    cwd?: string,
+    loginShell = true,
+    args?: string[],
+    env?: Record<string, string>
+  ): Promise<string> {
+    const sessionId = await invoke<string>('spawn_pty', { 
+      rows, 
+      cols, 
+      shell: shell || null, 
+      cwd: cwd || null, 
+      loginShell: loginShell, 
+      args: args || null, 
+      env: env || null 
+    });
     this.outputListeners.set(sessionId, []);
     this.sessionBuffers.set(sessionId, []);
     return sessionId;

@@ -46,8 +46,41 @@ export class ModelManager {
   private metadataCache: Map<string, ModelMetadata> = new Map();
   private isAutoPulling = false;
 
-  // Curated registry of high-performance lightweight local candidates (< 1.5 GB memory target)
+  // Curated registry of high-performance local candidates (Coder 7B models & lightweight targets)
   readonly candidateCatalog: Record<string, CandidateModelSpec> = {
+    'qwen2.5-coder:7b': {
+      id: 'qwen2.5-coder:7b',
+      name: 'Qwen2.5-Coder 7B Instruct',
+      recommendedTag: 'qwen2.5-coder:7b',
+      maxRamBytes: 4500 * 1024 * 1024, // ~4.5GB
+      expectedLatencyMs: 450,
+      jsonReliabilityScore: 99,
+      toolSelectionAccuracy: 99,
+      overallScore: 105,
+      appleSiliconOptimized: true
+    },
+    'qwen2.5:7b': {
+      id: 'qwen2.5:7b',
+      name: 'Qwen2.5 7B Instruct',
+      recommendedTag: 'qwen2.5:7b',
+      maxRamBytes: 4500 * 1024 * 1024,
+      expectedLatencyMs: 440,
+      jsonReliabilityScore: 99,
+      toolSelectionAccuracy: 98,
+      overallScore: 102,
+      appleSiliconOptimized: true
+    },
+    'llama3.1:8b': {
+      id: 'llama3.1:8b',
+      name: 'Llama 3.1 8B Instruct',
+      recommendedTag: 'llama3.1:8b',
+      maxRamBytes: 5100 * 1024 * 1024,
+      expectedLatencyMs: 480,
+      jsonReliabilityScore: 98,
+      toolSelectionAccuracy: 98,
+      overallScore: 100,
+      appleSiliconOptimized: true
+    },
     'qwen2.5:1.5b': {
       id: 'qwen2.5:1.5b',
       name: 'Qwen2.5 1.5B Instruct',

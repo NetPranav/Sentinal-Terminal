@@ -56,7 +56,18 @@ export class DeveloperCapability extends BaseCapabilityDriver<DevDriverInput, an
       op = this.capabilityId.replace('developer.', '') as DevOperation;
     }
 
-    const targetPath = input.path || '.';
+    let targetPath = input.path || '.';
+    if (!targetPath.startsWith('/') && !targetPath.startsWith('~/') && targetPath !== '~' && !targetPath.startsWith('C:\\')) {
+      const baseCwd = (_context?.cwd && _context.cwd.trim() !== '' && _context.cwd !== '/') ? _context.cwd : '~';
+      targetPath = targetPath === '.' ? baseCwd : `${baseCwd.replace(/\/+$/, '')}/${targetPath.replace(/^\.\//, '')}`;
+    }
+    if (targetPath.startsWith('~/') || targetPath === '~') {
+      try {
+        const hRes = await invoke<{ stdout: string }>('execute_command', { command: 'sh', args: ['-c', 'echo $HOME'] });
+        const hd = (hRes?.stdout || '').trim();
+        if (hd) targetPath = targetPath === '~' ? hd : targetPath.replace(/^~/, hd);
+      } catch { /* ignore */ }
+    }
 
     if (typeof process !== 'undefined' && process.env.NODE_ENV === 'test') {
       const commandExecuted = `developer.${op}(${JSON.stringify(input)})`;

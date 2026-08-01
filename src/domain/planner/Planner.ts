@@ -125,7 +125,21 @@ export class Planner {
           };
         }
 
-        compiledSteps.push(...compilationResult.workflow.steps);
+        for (const step of compilationResult.workflow.steps) {
+          const uniqueStepId = structuredPlan.tasks.length > 1 
+            ? `${step.id}_${compiledSteps.length + 1}` 
+            : step.id;
+          const prevStep = compiledSteps.length > 0 ? compiledSteps[compiledSteps.length - 1] : undefined;
+          const dependencies = structuredPlan.tasks.length > 1 && prevStep
+            ? [prevStep.id]
+            : (step.dependencies || []);
+
+          compiledSteps.push({
+            ...step,
+            id: uniqueStepId,
+            dependencies
+          });
+        }
 
         // Track aggregate risk & permissions
         const toolRiskScore = this.riskToScore(tool.definition.securityRisk);

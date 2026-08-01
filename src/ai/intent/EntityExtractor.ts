@@ -91,14 +91,14 @@ export class EntityExtractor {
     // Intelligent folder and directory name mapping (supporting common typos & standard macOS user folders)
     const lowerText = text.toLowerCase();
     const directoryMappings: [RegExp, string][] = [
-      [/\b(downl?o?a?ds?|donwloads?|dwnloads?)(?:\s*(?:fod?le?r|dir(?:ectory)?))?\b/i, '~/Downloads'],
-      [/\bdesktop(?:\s*(?:fod?le?r|dir(?:ectory)?))?\b/i, '~/Desktop'],
-      [/\bdocuments?(?:\s*(?:fod?le?r|dir(?:ectory)?))?\b/i, '~/Documents'],
-      [/\b(pictures?|photos?|images?)(?:\s*(?:fod?le?r|dir(?:ectory)?))?\b/i, '~/Pictures'],
-      [/\b(music|songs?|audio)(?:\s*(?:fod?le?r|dir(?:ectory)?))?\b/i, '~/Music'],
-      [/\b(movies?|videos?)(?:\s*(?:fod?le?r|dir(?:ectory)?))?\b/i, '~/Movies'],
-      [/\b(?:home|user)(?:\s*(?:fod?le?r|dir(?:ectory)?))?\b/i, '~'],
-      [/\bproject\s*(?:fod?le?r|dir(?:ectory)?)\b/i, '~/Project Folder']
+      [/\b(downl?o?a?ds?|donwloads?|dw?nloads?)(?:\s*(?:fod?le?r|floder|dir(?:ectory)?))?\b/i, '~/Downloads'],
+      [/\b(des?k?t?op|de?kstop|desktp)(?:\s*(?:fod?le?r|floder|dir(?:ectory)?))?\b/i, '~/Desktop'],
+      [/\bdocuments?(?:\s*(?:fod?le?r|floder|dir(?:ectory)?))?\b/i, '~/Documents'],
+      [/\b(pictures?|photos?|images?)(?:\s*(?:fod?le?r|floder|dir(?:ectory)?))?\b/i, '~/Pictures'],
+      [/\b(music|songs?|audio)(?:\s*(?:fod?le?r|floder|dir(?:ectory)?))?\b/i, '~/Music'],
+      [/\b(movies?|videos?)(?:\s*(?:fod?le?r|floder|dir(?:ectory)?))?\b/i, '~/Movies'],
+      [/\b(?:home|user)(?:\s*(?:fod?le?r|floder|dir(?:ectory)?))?\b/i, '~'],
+      [/\bproject\s*(?:fod?le?r|floder|dir(?:ectory)?)\b/i, '~/Project Folder']
     ];
     for (const [regex, mappedPath] of directoryMappings) {
       if (regex.test(lowerText)) {
@@ -108,12 +108,14 @@ export class EntityExtractor {
     }
 
     // Intelligent Folder / File Creation & Deletion Extraction (e.g., "in Downloads folder Make a new folder named AAAAAAAA" or "create folder AAAAAAAA in Desktop")
-    const creationRegex = /(?:make|create|new|add|delete|remove|destroy|erase)\s+(?:(?:a|an|the)\s+)?(?:new\s+|old\s+)?(folder|directory|dir|file)\s+(?:named?|called|titled|as)?\s*["']?([a-z0-9_\-\.\s]+?)["']?(?:\s+(?:in|at|inside|from|on|under)\s+.*|\s*$)/i;
+    const creationRegex = /(?:make|create|new|add|delete|remove|destroy|erase)\s+(?:(?:a|an|the|\d+)\s+)?(?:new\s+|old\s+)?(folder|directory|dir|file|files)\s+(?:named?|called|titled|as)?\s*["']?([a-z0-9_\-\.\s]+?)["']?(?:\s+(?:in|at|from|on|under)\s+.*|\s*[,;|]|\s+(?:and|then|next|inside)\b|\s*$)/i;
     const creationMatch = text.match(creationRegex);
     if (creationMatch && creationMatch[2]) {
-      let extractedName = creationMatch[2].trim();
+      let extractedName = creationMatch[2].trim().replace(/[,;|]+$/, '').trim();
       extractedName = extractedName.replace(/\s+(?:in|at|inside|from|on|under)\s+.*$/i, '').trim();
-      if (extractedName && !['folder', 'file', 'dir', 'directory', 'wifi', 'bluetooth', 'network'].includes(extractedName.toLowerCase())) {
+      extractedName = extractedName.replace(/\b(?:right\s+)?(?:here|there|now|please|in\s+this\s+(?:folder|directory|dir|location))\b/gi, '').trim();
+      extractedName = extractedName.replace(/\s+(?:folder|directory|dir)\b/gi, '').trim();
+      if (extractedName && !['folder', 'file', 'files', 'dir', 'directory', 'wifi', 'bluetooth', 'network', 'here', 'there'].includes(extractedName.toLowerCase())) {
         const type = creationMatch[1].toLowerCase();
         let baseDir = '~';
         if (result.folders && result.folders.length > 0) {
@@ -123,27 +125,58 @@ export class EntityExtractor {
         }
         const fullPath = (baseDir === '~' && !result.folders && !result.paths) ? extractedName : `${baseDir.replace(/\/+$/, '')}/${extractedName}`;
         if (!result.paths) result.paths = [];
-        result.paths.unshift(fullPath);
-        if (type === 'file') {
+        result.paths = [fullPath, ...result.paths.filter(p => p !== fullPath)];
+        if (type.startsWith('file')) {
           if (!result.files) result.files = [];
-          result.files.unshift(fullPath);
+          result.files = [fullPath, ...result.files.filter(f => f !== fullPath)];
         } else {
           if (!result.folders) result.folders = [];
-          result.folders.unshift(fullPath);
+          result.folders = [fullPath, ...result.folders.filter(f => f !== fullPath && f !== baseDir)];
         }
       }
     }
 
+    // Extract file size constraints (e.g., "larger than 50 MBs", "under 500k")
+    const sizeRegex = /(?:(larger|bigger|greater|over|above|exceeding)|(smaller|less|under|below))\s*(?:than\s*)?(\d+(?:\.\d+)?)\s*(mb|mbs|gb|gbs|kb|kbs|bytes?|b|m|k|g)\b/i;
+    const sizeMatch = text.match(sizeRegex);
+    if (sizeMatch && (sizeMatch[1] || sizeMatch[2])) {
+      const isLarger = Boolean(sizeMatch[1]);
+      const num = sizeMatch[3];
+      const unitStr = (sizeMatch[4] || '').toLowerCase().replace(/s$/, '');
+      let unit = 'M';
+      if (unitStr === 'kb' || unitStr === 'k') unit = 'k';
+      else if (unitStr === 'gb' || unitStr === 'g') unit = 'G';
+      else if (unitStr === 'byte' || unitStr === 'b' || unitStr === 'c') unit = 'c';
+      else unit = 'M';
+      result.size = `${isLarger ? '+' : '-'}${num}${unit}`;
+    }
+
+    // Check if query targets common file types or extensions ("every PDF", "mp4 videos", "json files")
+    let foundExtPattern: string | undefined;
+    const extMatch = text.match(/\b(pdf|png|jpg|jpeg|gif|svg|mp4|mp3|mov|avi|zip|tar|gz|txt|md|json|yaml|yml|ts|js|py|rs|go|html|css|sql|csv|doc|docx|xls|xlsx|ppt|pptx)s?\b/i);
+    if (extMatch && extMatch[1] && /(?:where|find|locate|search|show|every|all|any)/i.test(text)) {
+      const ext = extMatch[1].toLowerCase();
+      foundExtPattern = `*.${ext}`;
+      result.pattern = foundExtPattern;
+      result.query = foundExtPattern;
+      if (!result.paths || result.paths.length === 0) {
+        result.paths = /(?:where|path)/i.test(text) ? ['~'] : ['.'];
+      }
+    }
+
     // Intelligent File/Folder Search & Location Query Extraction ("where did you create AAAAAA folder", "tell me the path where you created X", "where is X located")
-    const searchLocRegex = /(?:where|path|find|locate|search)\s+(?:(?:is|are|of|for|did\s+you\s+(?:create|make|save|put)|did\s+it\s+(?:create|make|save|put)|to|the|my|a|an)\s+)*(?:(?:folder|directory|dir|file|app|application)\s+)*(?:named?|called)?\s*["']?([a-zA-Z0-9_\-\.]+?)\s*(?:folder|directory|dir|file|app|application)?["']?(?:\s+(?:located|created|saved|stored|hidden|put|\?|$)|$)/i;
-    const searchLocMatch = text.match(searchLocRegex);
-    if (searchLocMatch && searchLocMatch[1]) {
-      const targetName = searchLocMatch[1].replace(/\s+(?:folder|directory|dir|file)$/i, '').trim();
-      if (targetName && !['folder', 'file', 'directory', 'path', 'the', 'a', 'an', 'is', 'did', 'you', 'create', 'make', 'where', 'tell', 'me'].includes(targetName.toLowerCase())) {
-        result.pattern = targetName;
-        result.query = targetName;
-        if (!result.paths || result.paths.length === 0) {
-          result.paths = ['~'];
+    if (!foundExtPattern) {
+      const searchLocRegex = /(?:where|path|find|locate|search)\s+(?:(?:is|are|of|for|did\s+you\s+(?:create|make|save|put)|did\s+it\s+(?:create|make|save|put)|to|the|my|a|an)\s+)*(?:(?:folder|directory|dir|file|app|application)\s+)*(?:named?|called)?\s*["']?([a-zA-Z0-9_\-\.]+?)\s*(?:folder|directory|dir|file|app|application)?["']?(?:\s+(?:located|created|saved|stored|hidden|put|\?|$)|$)/i;
+      const searchLocMatch = text.match(searchLocRegex);
+      if (searchLocMatch && searchLocMatch[1]) {
+        const targetName = searchLocMatch[1].replace(/\s+(?:folder|directory|dir|file)$/i, '').trim();
+        const ignoreWords = ['folder', 'file', 'directory', 'path', 'the', 'a', 'an', 'is', 'did', 'you', 'create', 'make', 'where', 'tell', 'me', 'every', 'all', 'any', 'some', 'files', 'folders', 'directories', 'larger', 'bigger', 'smaller', 'less', 'than', 'over', 'under', 'above', 'below', 'mbs', 'mb', 'gbs', 'gb', 'kbs', 'kb', 'bytes', 'size'];
+        if (targetName && !ignoreWords.includes(targetName.toLowerCase())) {
+          result.pattern = targetName;
+          result.query = targetName;
+          if (!result.paths || result.paths.length === 0) {
+            result.paths = /(?:where|path)/i.test(text) ? ['~'] : ['.'];
+          }
         }
       }
     }

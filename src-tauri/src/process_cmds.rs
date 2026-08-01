@@ -85,3 +85,9 @@ pub fn execute_command(command: String, args: Vec<String>) -> Result<CommandOutp
         code: output.status.code().unwrap_or(-1),
     })
 }
+
+#[tauri::command]
+pub fn get_launch_args() -> Vec<String> {
+    std::env::args().collect()
+}
+

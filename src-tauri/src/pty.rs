@@ -35,6 +35,11 @@ pub fn spawn_pty(
     state: State<'_, PtyState>,
     rows: u16,
     cols: u16,
+    shell: Option<String>,
+    cwd: Option<String>,
+    login_shell: Option<bool>,
+    args: Option<Vec<String>>,
+    env: Option<HashMap<String, String>>,
 ) -> Result<String, String> {
     let pty_system = NativePtySystem::default();
 
@@ -46,18 +51,41 @@ pub fn spawn_pty(
     }).map_err(|e| e.to_string())?;
 
     #[cfg(target_os = "windows")]
-    let mut cmd = CommandBuilder::new("powershell.exe");
-    
+    let default_shell = "powershell.exe".to_string();
     #[cfg(not(target_os = "windows"))]
-    let mut cmd = CommandBuilder::new(std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".to_string()));
+    let default_shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".to_string());
 
-    // Enforce interactive term mode so shells (zsh/bash) handle Backspace (0x7F/0x08) properly
-    // instead of defaulting to dumb teleprinter mode when launched via Finder/Launch Services
+    let target_shell = shell.filter(|s| !s.trim().is_empty()).unwrap_or(default_shell);
+    let mut cmd = CommandBuilder::new(&target_shell);
+
+    if login_shell == Some(true) && !target_shell.contains("pwsh") && !target_shell.contains("powershell") {
+        cmd.arg("-l");
+    }
+
+    if let Some(extra_args) = args {
+        for arg in extra_args {
+            cmd.arg(arg);
+        }
+    }
+
+    if let Some(dir) = cwd.filter(|d| !d.trim().is_empty()) {
+        cmd.cwd(dir);
+    }
+
+    // Enforce standard macOS terminal emulator variables
     cmd.env("TERM", "xterm-256color");
     cmd.env("COLORTERM", "truecolor");
     cmd.env("TERM_PROGRAM", "Sentinel Terminal");
+    cmd.env("TERM_PROGRAM_VERSION", "0.1.0");
+    cmd.env("SENTINEL_TERMINAL", "1");
     cmd.env("LANG", "en_US.UTF-8");
     cmd.env("LC_ALL", "en_US.UTF-8");
+
+    if let Some(custom_env) = env {
+        for (k, v) in custom_env {
+            cmd.env(k, v);
+        }
+    }
 
     if let Ok(path) = std::env::var("PATH") {
         if !path.contains("/opt/homebrew/bin") && !path.contains("/usr/local/bin") {

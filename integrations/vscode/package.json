@@ -1,0 +1,52 @@
+{
+  "name": "sentinel-terminal-integration",
+  "displayName": "Sentinel Terminal",
+  "description": "First-Class macOS Desktop Terminal Emulator integration for Visual Studio Code",
+  "version": "1.0.0",
+  "publisher": "sentinel",
+  "engines": {
+    "vscode": "^1.75.0"
+  },
+  "categories": [
+    "Other",
+    "Terminal"
+  ],
+  "contributes": {
+    "terminal": {
+      "profiles": [
+        {
+          "id": "sentinel-terminal.profile",
+          "title": "Sentinel Terminal",
+          "path": "/Applications/Sentinel Terminal.app/Contents/MacOS/Sentinel Terminal",
+          "icon": "terminal",
+          "overrideName": true
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "sentinel-terminal.openInSentinel",
+        "title": "Open in Sentinel Terminal",
+        "category": "Terminal"
+      }
+    ],
+    "menus": {
+      "explorer/context": [
+        {
+          "command": "sentinel-terminal.openInSentinel",
+          "group": "2_workspace",
+          "when": "explorerResourceIsFolder"
+        }
+      ]
+    }
+  },
+  "scripts": {},
+  "keywords": [
+    "terminal",
+    "macos",
+    "sentinel",
+    "pty",
+    "shell"
+  ],
+  "license": "MIT"
+}

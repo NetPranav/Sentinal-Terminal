@@ -57,31 +57,63 @@ export class SystemSDKCapability extends BaseCapabilityDriver<SystemDriverInput,
     switch (op) {
       case 'kill_process':
       case 'kill': {
-        const target = input.process || input.name || input.pid || input.app || input.target || '';
+        let target = (input.port ? String(input.port) : (input.process || input.name || input.pid || input.app || input.target || '')).toString().trim();
+        target = target.replace(/^(?:using\s+port|on\s+port|at\s+port|using|port|on|at|pid)\s+/i, '').trim();
         if (!target) {
-          return { success: false, error: { code: 'MISSING_TARGET', message: 'No process name or PID specified to kill' } };
+          return { success: false, error: { code: 'MISSING_TARGET', message: 'No process name, port, or PID specified to kill' } };
         }
         if (typeof process !== 'undefined' && process.env.NODE_ENV === 'test') {
           return { success: true, data: { terminated: true, process: target }, commandExecuted: `kill process ${target}` };
         }
         try {
-          const targetStr = target.toString().trim();
-          const isPid = /^\d+$/.test(targetStr);
-          if (isPid) {
-            await invoke('execute_command', { command: 'kill', args: ['-9', targetStr] });
-            return { success: true, data: { terminated: true, pid: targetStr, signal: 'SIGKILL (-9)' }, commandExecuted: `kill -9 ${targetStr}` };
+          const cleanNum = target.replace(/^:/, '').trim();
+          const isNumeric = /^\d+$/.test(cleanNum);
+
+          if (isNumeric) {
+            const portNum = parseInt(cleanNum, 10);
+            if (portNum >= 80 && portNum <= 65535) {
+              try {
+                const lsofRes = await invoke<{ code?: number; stdout?: string }>('execute_command', {
+                  command: 'sh',
+                  args: ['-c', `lsof -ti :${cleanNum} 2>/dev/null`]
+                });
+                if (lsofRes && (lsofRes.code === 0 || lsofRes.code === undefined) && lsofRes.stdout && lsofRes.stdout.trim()) {
+                  const pids = lsofRes.stdout.split('\n').map(p => p.trim()).filter(Boolean);
+                  let killedAny = false;
+                  for (const pid of pids) {
+                    const kRes = await invoke<{ code?: number }>('execute_command', { command: 'kill', args: ['-9', pid] });
+                    if (!kRes || kRes.code === undefined || kRes.code === 0) killedAny = true;
+                  }
+                  if (killedAny) {
+                    return {
+                      success: true,
+                      data: { terminated: true, port: cleanNum, pids, signal: 'SIGKILL (-9)', stdout: `Terminated process(es) [${pids.join(', ')}] using port ${cleanNum}` },
+                      commandExecuted: `lsof -ti :${cleanNum} | xargs kill -9`
+                    };
+                  }
+                }
+              } catch {
+                // Ignore lsof errors and fall back to treating target as a direct PID
+              }
+            }
+
+            const killRes = await invoke<{ code?: number; stderr?: string }>('execute_command', { command: 'kill', args: ['-9', cleanNum] });
+            if (killRes && killRes.code !== undefined && killRes.code !== 0) {
+              return { success: false, error: { code: 'KILL_FAILED', message: killRes.stderr || `No active process or listening service found with port or PID ${cleanNum}.` } };
+            }
+            return { success: true, data: { terminated: true, pid: cleanNum, signal: 'SIGKILL (-9)', stdout: `Terminated process with PID ${cleanNum}` }, commandExecuted: `kill -9 ${cleanNum}` };
           } else {
-            await invoke('execute_command', { command: 'pkill', args: ['-9', '-i', '-f', targetStr] });
-            return { success: true, data: { terminated: true, processName: targetStr, signal: 'SIGKILL (-9)', allProcessesStopped: true }, commandExecuted: `pkill -9 -i -f ${targetStr}` };
+            const pkillRes = await invoke<{ code?: number; stderr?: string }>('execute_command', { command: 'pkill', args: ['-9', '-i', '-f', target] });
+            if (pkillRes && pkillRes.code !== undefined && pkillRes.code !== 0) {
+              const killallRes = await invoke<{ code?: number; stderr?: string }>('execute_command', { command: 'killall', args: ['-9', '-i', target] });
+              if (killallRes && killallRes.code !== undefined && killallRes.code !== 0) {
+                return { success: false, error: { code: 'KILL_FAILED', message: `No active process found matching name "${target}".` } };
+              }
+            }
+            return { success: true, data: { terminated: true, processName: target, signal: 'SIGKILL (-9)', allProcessesStopped: true, stdout: `Terminated processes matching "${target}"` }, commandExecuted: `pkill -9 -i -f "${target}"` };
           }
         } catch (err: any) {
-          // Attempt fallback killall if pkill fails
-          try {
-            await invoke('execute_command', { command: 'killall', args: ['-9', '-i', target.toString().trim()] });
-            return { success: true, data: { terminated: true, process: target, allProcessesStopped: true }, commandExecuted: `killall -9 -i ${target}` };
-          } catch {
-            return { success: false, error: { code: 'KILL_FAILED', message: err.message || `Could not terminate process "${target}": process not found or access denied.` } };
-          }
+          return { success: false, error: { code: 'KILL_FAILED', message: err.message || `Could not terminate process "${target}": access denied or not found.` } };
         }
       }
 

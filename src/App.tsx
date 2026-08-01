@@ -6,6 +6,8 @@ import { StatusBar } from "./ui/components/StatusBar";
 import { ThemeManager } from "./ui/theme/ThemeManager";
 import { AiSettingsPage } from "./ui/components/AiSettingsPage";
 import { SessionManager } from "./domain/SessionManager";
+import { InstallerWizard } from "./ui/components/InstallerWizard";
+import { UrlSchemeHandler } from "./domain/integration/UrlSchemeHandler";
 import "./App.css";
 
 type SplitDirection = 'vertical' | 'horizontal';
@@ -55,6 +57,7 @@ function App() {
   const [transparency, setTransparency] = useState<number>(0.82);
   const [blurLevel, setBlurLevel] = useState<number>(20);
   const [activeShellMenuPaneId, setActiveShellMenuPaneId] = useState<string | null>(null);
+  const [showWizard, setShowWizard] = useState<boolean>(() => !localStorage.getItem('sentinel_onboarded'));
 
   useEffect(() => {
     ThemeManager.getInstance();
@@ -63,10 +66,10 @@ function App() {
     return () => window.removeEventListener('click', handleGlobalClick);
   }, []);
 
-  const addTab = useCallback(() => {
+  const addTab = useCallback((customPath?: string | unknown) => {
     const newId = getUniqueId('tab');
     const newPane = createTerminalPane();
-    setPanePaths(prev => ({ ...prev, [newPane.data.id]: '~' }));
+    setPanePaths(prev => ({ ...prev, [newPane.data.id]: typeof customPath === 'string' ? customPath : '~' }));
     setTabs(prev => [...prev, { id: newId, name: `Terminal ${prev.length + 1}`, rootPane: newPane }]);
     setActiveTabId(newId);
     setActivePaneId(newPane.data.id);
@@ -74,6 +77,7 @@ function App() {
 
   useEffect(() => {
     let unlistenMenu: (() => void) | undefined;
+    let unlistenUrl: (() => void) | undefined;
     listen<string>("menu-event", (event) => {
       if (event.payload === "open-theme") {
         setShowThemeModal(true);
@@ -83,7 +87,22 @@ function App() {
         addTab();
       }
     }).then(fn => { unlistenMenu = fn; }).catch(() => {});
-    return () => { if (unlistenMenu) unlistenMenu(); };
+
+    listen<string[]>("sentinel-url", (event) => {
+      const actions = UrlSchemeHandler.getInstance().parseMany(event.payload);
+      for (const action of actions) {
+        if (action.type === 'new-tab') {
+          addTab(action.path);
+        } else if ((action.type === 'open' || action.type === 'workspace') && action.path) {
+          addTab(action.path);
+        }
+      }
+    }).then(fn => { unlistenUrl = fn; }).catch(() => {});
+
+    return () => { 
+      if (unlistenMenu) unlistenMenu(); 
+      if (unlistenUrl) unlistenUrl();
+    };
   }, [addTab]);
 
   const closeTab = async (id: string, e: React.MouseEvent) => {
@@ -392,6 +411,7 @@ function App() {
                       { type: 'divider' },
                       { label: 'AI Command Palette & Prompt', shortcut: '⇧⌘P', action: () => setCommandPaletteOpen(true) },
                       { label: 'Zero-Trust AI Security & Profile', shortcut: '⌘,', action: () => setShowAiSettings(true) },
+                      { label: 'macOS Integration & Setup Wizard...', shortcut: '⌘I', action: () => setShowWizard(true) },
                       { type: 'divider' },
                       { label: 'Close Pane / Tab', shortcut: '⌘W', action: () => {
                         if (!isRoot) closePane(node.data.id);
@@ -678,6 +698,7 @@ function App() {
           </button>
         </div>
       )}
+      <InstallerWizard isOpen={showWizard} onClose={() => setShowWizard(false)} />
     </div>
   );
 }

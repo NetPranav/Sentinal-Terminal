@@ -36,7 +36,7 @@ export class Planner {
    * Leverages fast heuristic task decomposition and local AI inference when available.
    */
   public async generatePlan(query: string): Promise<StructuredPlan> {
-    const clean = query.trim();
+    const clean = query.replace(/^[\s>\$#\-:]+/, '').trim();
 
     // 1. Extract global entities from prompt
     const globalEntities = this.extractor.extract(clean);
@@ -45,6 +45,7 @@ export class Planner {
     // e.g. "Open Chrome. Go to YouTube. Search for AI." or "Turn on bluetooth and connect my headphones"
     const clauses = this.splitIntoClauses(clean);
     const tasks: PlannedTask[] = [];
+    let activeContextPath: string | undefined = undefined;
 
     for (const clause of clauses) {
       const clauseEntities = this.extractor.extract(clause);
@@ -82,6 +83,21 @@ export class Planner {
         }
       }
 
+      // Inherit active contextual folder from earlier sequential tasks if spatial reference is used
+      if (activeContextPath && combinedEntities.files && Array.isArray(combinedEntities.files)) {
+        combinedEntities.files = combinedEntities.files.map((f: string) => 
+          (f.startsWith('~/') || f.startsWith('/') || f.includes('/')) ? f : `${activeContextPath}/${f.replace(/^\.\//, '')}`
+        );
+        combinedEntities['file'] = combinedEntities.files[0];
+        combinedEntities['path'] = combinedEntities.files[0];
+      }
+      if (activeContextPath && !combinedEntities['path'] && !combinedEntities.folders && !combinedEntities.files) {
+        if (clause.toLowerCase().includes('it') || clause.toLowerCase().includes('there') || clause.toLowerCase().includes('that')) {
+          combinedEntities['path'] = activeContextPath;
+          combinedEntities['directory'] = activeContextPath;
+        }
+      }
+
       // Find tool match for this specific clause
       const match = this.searcher.findBestMatch(clause, undefined, combinedEntities);
       let toolId = match ? match.tool.definition.id : 'unknown.tool';
@@ -114,45 +130,71 @@ export class Planner {
         }
       } else if (clauseLower.includes('where') || clauseLower.includes('what is the path') || clauseLower.includes('tell me the path') || clauseLower.includes('find folder') || clauseLower.includes('find file') || clauseLower.includes('locate folder') || clauseLower.includes('locate file') || clauseLower.includes('search folder') || clauseLower.includes('search file') || (clauseLower.includes('locate') && (clauseLower.includes('folder') || clauseLower.includes('file') || clauseLower.includes('directory')))) {
         toolId = 'filesystem.search';
+        if (!combinedEntities.size) {
+          const szMatch = clause.match(/(?:(larger|bigger|greater|over|above|exceeding)|(smaller|less|under|below))\s*(?:than\s*)?(\d+(?:\.\d+)?)\s*(mb|mbs|gb|gbs|kb|kbs|bytes?|b|m|k|g)\b/i);
+          if (szMatch && (szMatch[1] || szMatch[2])) {
+            const isLarger = Boolean(szMatch[1]);
+            const num = szMatch[3];
+            const uStr = (szMatch[4] || '').toLowerCase().replace(/s$/, '');
+            let u = 'M';
+            if (uStr === 'kb' || uStr === 'k') u = 'k'; else if (uStr === 'gb' || uStr === 'g') u = 'G'; else if (uStr === 'byte' || uStr === 'b' || uStr === 'c') u = 'c';
+            combinedEntities.size = `${isLarger ? '+' : '-'}${num}${u}`;
+          }
+        }
         if (!combinedEntities.pattern && !combinedEntities.query) {
-          const match = clause.match(/(?:where|path|find|locate|search)\s+(?:(?:is|are|of|for|did\s+you\s+(?:create|make|save|put)|did\s+it\s+(?:create|make|save|put)|to|the|my|a|an)\s+)*(?:(?:folder|directory|dir|file|app|application)\s+)*(?:named?|called)?\s*["']?([a-zA-Z0-9_\-\.]+)/i);
-          const name = match && match[1] ? match[1].replace(/\s+(?:folder|directory|dir|file)$/i, '').trim() : (combinedEntities.folders?.[0] || combinedEntities.files?.[0] || 'folder');
-          combinedEntities.pattern = name;
-          combinedEntities.query = name;
+          const extMatch = clause.match(/\b(pdf|png|jpg|jpeg|gif|svg|mp4|mp3|mov|avi|zip|tar|gz|txt|md|json|yaml|yml|ts|js|py|rs|go|html|css|sql|csv|doc|docx|xls|xlsx|ppt|pptx)s?\b/i);
+          if (extMatch && extMatch[1]) {
+            const ext = extMatch[1].toLowerCase();
+            combinedEntities.pattern = `*.${ext}`;
+            combinedEntities.query = `*.${ext}`;
+          } else {
+            const match = clause.match(/(?:where|path|find|locate|search)\s+(?:(?:is|are|of|for|did\s+you\s+(?:create|make|save|put)|did\s+it\s+(?:create|make|save|put)|to|the|my|a|an)\s+)*(?:(?:folder|directory|dir|file|app|application)\s+)*(?:named?|called)?\s*["']?([a-zA-Z0-9_\-\.]+)/i);
+            const name = match && match[1] ? match[1].replace(/\s+(?:folder|directory|dir|file)$/i, '').trim() : (combinedEntities.folders?.[0] || combinedEntities.files?.[0] || 'folder');
+            combinedEntities.pattern = name;
+            combinedEntities.query = name;
+          }
         }
         if (!combinedEntities.dir) {
-          combinedEntities.dir = '~';
+          combinedEntities.dir = /(?:where|path)/i.test(clause) ? '~' : '.';
         }
       } else if (clauseLower.includes('make a new folder') || clauseLower.includes('create a new folder') || clauseLower.includes('make folder') || clauseLower.includes('create folder') || clauseLower.includes('new folder') || clauseLower.includes('mkdir') || clauseLower.includes('make dir') || clauseLower.includes('create dir') || clauseLower.includes('make a folder') || clauseLower.includes('create a folder') || (clauseLower.includes('make') && clauseLower.includes('folder'))) {
         toolId = 'filesystem.mkdir';
-      } else if (clauseLower.includes('make a new file') || clauseLower.includes('create a new file') || clauseLower.includes('make file') || clauseLower.includes('create file') || clauseLower.includes('new file') || clauseLower.includes('touch file') || clauseLower.includes('make a file') || clauseLower.includes('create a file')) {
+      } else if (clauseLower.includes('make a new file') || clauseLower.includes('create a new file') || clauseLower.includes('make file') || clauseLower.includes('create file') || clauseLower.includes('new file') || clauseLower.includes('touch file') || clauseLower.includes('make a file') || clauseLower.includes('create a file') || (clauseLower.includes('make') && (clauseLower.includes('file') || clauseLower.includes('files'))) || (clauseLower.includes('create') && (clauseLower.includes('file') || clauseLower.includes('files'))) || (clauseLower.includes('touch') && (clauseLower.includes('file') || clauseLower.includes('files')))) {
         toolId = 'filesystem.create';
       } else if (clauseLower.includes('delete file') || clauseLower.includes('delete folder') || clauseLower.includes('remove file') || clauseLower.includes('remove folder') || clauseLower.includes('permanently delete') || (clauseLower.includes('delete') && (clauseLower.includes('file') || clauseLower.includes('folder') || clauseLower.includes('dir')))) {
         toolId = 'filesystem.delete';
-      } else if ((clauseLower.includes('go to ') || clauseLower.includes('navigate ') || clauseLower.includes('content of') || clauseLower.includes('contents of') || clauseLower.includes('what is in') || clauseLower.includes('files in') || ((clauseLower.includes('show ') || clauseLower.includes('list ') || clauseLower.includes('view ')) && !clauseLower.includes('bluetooth') && !clauseLower.includes('wifi') && !clauseLower.includes('network'))) && isFolderQuery) {
+      } else if ((clauseLower.includes('go to ') || clauseLower.includes('navigate to ') || clauseLower.includes('take me to ') || clauseLower.includes('bring me to ') || clauseLower.includes('head to ') || clauseLower.includes('switch to ') || clauseLower.includes('jump to ') || clauseLower.includes('move to ') || clauseLower.includes('cd into ') || clauseLower.includes('cd ') || clauseLower.includes('enter ')) && isFolderQuery && !clauseLower.includes('list ') && !clauseLower.includes('show ') && !clauseLower.includes('view ') && !clauseLower.includes('content') && !clauseLower.includes('files in') && !clauseLower.includes('what is in')) {
+        toolId = 'filesystem.navigate';
+        if (!combinedEntities['path'] && !combinedEntities['directory']) {
+          const m = clause.match(/(?:to|into|enter)\s+(.+?)(?:\s+(?:folder|directory|dir))?$/i);
+          const rawPath = m ? m[1].replace(/\s*(?:folder|directory|dir)\s*$/i, '').trim() : '.';
+          combinedEntities['path'] = rawPath;
+          combinedEntities['directory'] = rawPath;
+        }
+      } else if ((clauseLower.includes('content of') || clauseLower.includes('contents of') || clauseLower.includes('what is in') || clauseLower.includes('files in') || clauseLower.includes('files inside') || ((clauseLower.includes('show ') || clauseLower.includes('list ') || clauseLower.includes('view ')) && !clauseLower.includes('bluetooth') && !clauseLower.includes('wifi') && !clauseLower.includes('network'))) && isFolderQuery) {
         toolId = 'filesystem.list';
         if (!combinedEntities['path'] && !combinedEntities['directory']) {
-          const m = clause.match(/(?:to|of|in|show|list|view)\s+([^\s]+)/i);
+          const m = clause.match(/(?:to|of|in|inside|show|list|view)\s+([^\s]+)/i);
           const rawPath = m ? m[1].trim() : '~/Downloads';
           combinedEntities['path'] = rawPath;
           combinedEntities['directory'] = rawPath;
         }
       } else if (!/\b(?:kill|terminate|pkill|killall|stop|quit|close)\b/.test(clauseLower) && (clauseLower.includes('vscode') || clauseLower.includes('visual studio code') || clauseLower.includes('vs code') || clauseLower.includes('code .') || (clauseLower.includes('open ') && (clauseLower.includes('code') || clauseLower.includes('vs'))))) {
         toolId = 'developer.vscode';
-        combinedEntities.path = this.resolveFolderPath(clause, combinedEntities);
+        combinedEntities.path = this.resolveFolderPath(clause, combinedEntities, activeContextPath);
       } else if (!/\b(?:kill|terminate|pkill|killall|stop|quit|close)\b/.test(clauseLower) && (clauseLower.includes('cursor') || clauseLower.includes('cursor ai') || (clauseLower.includes('open ') && clauseLower.includes('cursor')))) {
         toolId = 'developer.cursor';
-        combinedEntities.path = this.resolveFolderPath(clause, combinedEntities);
+        combinedEntities.path = this.resolveFolderPath(clause, combinedEntities, activeContextPath);
       } else if (!/\b(?:kill|terminate|pkill|killall|stop|quit|close)\b/.test(clauseLower) && (clauseLower.includes('antigravity') || (clauseLower.includes('open ') && clauseLower.includes('antigravity')))) {
         toolId = 'application.open';
         combinedEntities.app = 'Antigravity IDE';
-        combinedEntities.args = [this.resolveFolderPath(clause, combinedEntities)];
+        combinedEntities.args = [this.resolveFolderPath(clause, combinedEntities, activeContextPath)];
       } else if (!/\b(?:kill|terminate|pkill|killall|stop|quit|close)\b/.test(clauseLower) && (clauseLower.includes('xcode') || clauseLower.includes('open in xcode') || clauseLower.includes('ios project'))) {
         toolId = 'developer.xcode';
-        combinedEntities.path = this.resolveFolderPath(clause, combinedEntities);
+        combinedEntities.path = this.resolveFolderPath(clause, combinedEntities, activeContextPath);
       } else if (!/\b(?:kill|terminate|pkill|killall|stop|quit|close)\b/.test(clauseLower) && (clauseLower.includes('android studio') || clauseLower.includes('open in android studio'))) {
         toolId = 'developer.android_studio';
-        combinedEntities.path = this.resolveFolderPath(clause, combinedEntities);
+        combinedEntities.path = this.resolveFolderPath(clause, combinedEntities, activeContextPath);
       } else if (clauseLower.includes('jupyter') || clauseLower.includes('notebook') || clauseLower.includes('data science server')) {
         toolId = 'python.notebook';
       } else if (clauseLower.includes('open ') || clauseLower.includes('launch ')) {
@@ -182,7 +224,7 @@ export class Planner {
         }
         if (!combinedEntities.process && !combinedEntities.app) {
           let target = clause.replace(/^.*(?:kill|terminate|stop|end|pkill|killall|force\s+quit|force\s+close)\s+/i, '').trim();
-          const cleanWords = /^(?:entirely|completely|all|the|any|every|active|running|processes|process|services|service|apps|app|applications|application|tasks|task|of|called|named|with\s+name|by\s+name)\s+/i;
+          const cleanWords = /^(?:entirely|completely|all|the|any|every|active|running|processes|process|services|service|apps|app|applications|application|tasks|task|of|called|named|with\s+name|by\s+name|using\s+port|using\s+pid|using|on\s+port|on\s+pid|on|at\s+port|at\s+pid|at|port|pid)\s+/i;
           while (cleanWords.test(target)) {
             target = target.replace(cleanWords, '').trim();
           }
@@ -240,9 +282,9 @@ export class Planner {
         toolId = 'filesystem.copy';
       } else if (clauseLower.includes('move file') || clauseLower.includes('rename file') || clauseLower.includes('move folder') || clauseLower.includes('rename folder') || clauseLower.startsWith('mv ')) {
         toolId = 'filesystem.move';
-      } else if (clauseLower.startsWith('find ')) {
+      } else if (clauseLower.startsWith('find ') || clauseLower.startsWith('search for file') || clauseLower.startsWith('search for folder') || clauseLower.startsWith('locate ') || clauseLower.includes('find every ') || clauseLower.includes('find all ') || clauseLower.includes('find any ') || (clauseLower.includes('find') && (clauseLower.includes('larger than') || clauseLower.includes('smaller than') || clauseLower.includes('mb') || clauseLower.includes('gb') || clauseLower.includes('kb')))) {
         toolId = 'filesystem.search';
-        if (!combinedEntities.dir) combinedEntities.dir = '~';
+        if (!combinedEntities.dir) combinedEntities.dir = '.';
       } else if (clauseLower.includes('system info') || clauseLower.includes('about mac') || clauseLower.includes('my specs') || clauseLower.includes('computer specs') || clauseLower.includes('os version')) {
         toolId = 'system.info';
       } else if (clauseLower.includes('battery') || clauseLower.includes('power remaining') || clauseLower.includes('charging status')) {
@@ -369,6 +411,20 @@ export class Planner {
         }
       }
 
+      if ((toolId === 'filesystem.mkdir' || toolId === 'filesystem.navigate') && (combinedEntities.folders?.[0] || combinedEntities['path'] || combinedEntities['directory'])) {
+        activeContextPath = combinedEntities.folders?.[0] || combinedEntities['path'] || combinedEntities['directory'];
+      }
+
+      if (toolId === 'filesystem.create' && combinedEntities.files && Array.isArray(combinedEntities.files) && combinedEntities.files.length > 1) {
+        for (const f of combinedEntities.files) {
+          tasks.push({
+            tool: 'filesystem.create',
+            entities: { ...combinedEntities, file: f, path: f, files: [f] }
+          });
+        }
+        continue;
+      }
+
       tasks.push({
         tool: toolId,
         entities: combinedEntities
@@ -386,9 +442,16 @@ export class Planner {
   }
 
   private splitIntoClauses(text: string): string[] {
-    // Split by periods followed by space or end of string, semicolons, or sequential conjunctions " and then ", " and ", " then "
-    // Be careful not to split decimal numbers or filenames
-    const cleaned = text.replace(/\.\s+/g, '|').replace(/\.$/, '').replace(/;\s*/g, '|');
+    // Replace transitions like ", inside it make..." or ", then open..." or " and then " with a clause boundary '|'
+    const cleaned = text
+      .replace(/^(?:hey|hi|hello|please|sentinel)[\s,]+/i, '') // Remove conversational filler
+      .replace(/\.\s+/g, '|')
+      .replace(/\.$/, '')
+      .replace(/;\s*/g, '|')
+      .replace(/,\s*(?:and\s+)?(?:then|next|afterwards|inside\s+(?:it|that|this|the\s+dir(?:ectory)?|the\s+folder)|in\s+(?:it|that|this|the\s+dir(?:ectory)?|the\s+folder))\b/gi, '|$&')
+      .replace(/ \b(?:and\s+)?then\b /gi, '|then ')
+      .replace(/,\s*(?=(?:make|create|open|delete|remove|run|execute|list|check|find|search|go|navigate)\b)/gi, '|');
+
     const segments = cleaned.split('|').flatMap(s => {
       if (s.toLowerCase().includes(' and then ')) return s.split(/ \band then\b /i);
       if (s.toLowerCase().includes(' and ') && !s.includes('@') && !s.includes('=')) {
@@ -402,11 +465,11 @@ export class Planner {
       return [s];
     });
 
-    return segments.map(s => s.trim()).filter(Boolean);
+    return segments.map(s => s.replace(/^[,|\s]+/, '').trim()).filter(Boolean);
   }
 
   private hasActionVerb(str: string): boolean {
-    const verbs = ['connect', 'disconnect', 'open', 'close', 'launch', 'search', 'go', 'navigate', 'show', 'list', 'turn', 'enable', 'disable', 'start', 'stop', 'scan', 'check'];
+    const verbs = ['connect', 'disconnect', 'open', 'close', 'launch', 'search', 'go', 'navigate', 'show', 'list', 'turn', 'enable', 'disable', 'start', 'stop', 'scan', 'check', 'make', 'create', 'touch', 'delete', 'remove', 'run', 'execute', 'install', 'uninstall', 'find', 'locate', 'inside', 'in'];
     const firstWord = str.trim().split(/\s+/)[0]?.toLowerCase();
     return verbs.includes(firstWord);
   }
@@ -423,11 +486,14 @@ export class Planner {
     return `Execute ${tasks[0]?.tool || 'requested tool'}`;
   }
 
-  private resolveFolderPath(inputStr: string, entities: Record<string, any>): string {
+  private resolveFolderPath(inputStr: string, entities: Record<string, any>, activeContext?: string): string {
     const lower = inputStr.toLowerCase().trim();
-    if (lower.includes('this folder') || lower.includes('this directory') || lower.includes('current folder') || lower.includes('current directory') || lower.includes('this project') || lower === 'this' || lower === 'here' || lower === '.' || lower === 'code' || lower === 'cursor' || lower.includes('open ')) {
-      return '.';
+    if (activeContext && (lower.includes('open it') || lower.includes('in it') || lower.includes('open that') || lower.includes('this') || lower.includes('there'))) {
+      return activeContext;
     }
-    return entities.path || entities.directory || inputStr || '.';
+    if (lower.includes('this folder') || lower.includes('this directory') || lower.includes('current folder') || lower.includes('current directory') || lower.includes('this project') || lower === 'this' || lower === 'here' || lower === '.' || lower === 'code' || lower === 'cursor' || lower.includes('open ')) {
+      return activeContext || '.';
+    }
+    return entities.path || entities.directory || activeContext || inputStr || '.';
   }
 }

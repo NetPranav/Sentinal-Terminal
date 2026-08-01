@@ -67,7 +67,7 @@ describe('Phase X — Core Intent Engine & Multi-Step Planner Verification', () 
     expect(res1.plan.tasks[0].entities.path || res1.plan.tasks[0].entities.directory).toBe('~/Downloads');
 
     const res2 = await engine.parseIntent('Hey there go to Donwloads Folder');
-    expect(res2.plan.tasks[0].tool).toBe('filesystem.list');
+    expect(res2.plan.tasks[0].tool).toBe('filesystem.navigate');
     expect(res2.plan.tasks[0].entities.path || res2.plan.tasks[0].entities.directory).toBe('~/Downloads');
   });
 
@@ -128,6 +128,17 @@ describe('Phase X — Core Intent Engine & Multi-Step Planner Verification', () 
     expect(res.plan.tasks[0].tool).toBe('filesystem.search');
     expect(res.plan.tasks[0].entities.pattern).toBe('AAAAAA');
     expect(res.plan.tasks[0].entities.dir).toBe('~');
+
+    const resPdf = await engine.parseIntent('Find every PDF larger than 50 MBs');
+    expect(resPdf.plan.tasks[0].tool).toBe('filesystem.search');
+    expect(resPdf.plan.tasks[0].entities.pattern).toBe('*.pdf');
+    expect(resPdf.plan.tasks[0].entities.size).toBe('+50M');
+    expect(resPdf.plan.tasks[0].entities.dir).toBe('.');
+
+    const resPromptResidue = await engine.parseIntent('>> Find every PDF larger than 1 mb');
+    expect(resPromptResidue.plan.tasks[0].tool).toBe('filesystem.search');
+    expect(resPromptResidue.plan.tasks[0].entities.pattern).toBe('*.pdf');
+    expect(resPromptResidue.plan.tasks[0].entities.size).toBe('+1M');
   });
 
   it('should reliably route queries about currently running processes and network ports (active/free)', async () => {
@@ -188,4 +199,18 @@ describe('Phase X — Core Intent Engine & Multi-Step Planner Verification', () 
     expect(curRes.plan.tasks[0].tool).toBe('developer.cursor');
     expect(curRes.plan.tasks[0].entities.path).toBe('.');
   });
+
+  it('should cleanly break down multi-step instructions with contextual entity reference across tasks', async () => {
+    const res = await engine.parseIntent('Hey in downloads make a folder named prnv, inside it make 2 file p1.ts, p2.ts and then open it in vs code');
+    expect(res.plan.tasks.length).toBe(4);
+    expect(res.plan.tasks[0].tool).toBe('filesystem.mkdir');
+    expect(res.plan.tasks[0].entities.path).toBe('~/Downloads/prnv');
+    expect(res.plan.tasks[1].tool).toBe('filesystem.create');
+    expect(res.plan.tasks[1].entities.file).toBe('~/Downloads/prnv/p1.ts');
+    expect(res.plan.tasks[2].tool).toBe('filesystem.create');
+    expect(res.plan.tasks[2].entities.file).toBe('~/Downloads/prnv/p2.ts');
+    expect(res.plan.tasks[3].tool).toBe('developer.vscode');
+    expect(res.plan.tasks[3].entities.path).toBe('~/Downloads/prnv');
+  });
 });
+
