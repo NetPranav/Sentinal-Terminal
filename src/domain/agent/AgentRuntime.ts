@@ -148,6 +148,7 @@ export class AgentRuntime {
           const input = this.workflowEngine.interpolate(this.workflow.id, step.parameters || {});
           
           result = await this.executionEngine.execute(step.capabilityId!, input, {
+            cwd: this.workflow.metadata?.cwd,
             onAskPermission: async (plan: ExecutionPreviewPlan) => {
               this.emit('ApprovalRequested', { plan });
               

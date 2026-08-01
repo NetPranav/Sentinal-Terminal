@@ -90,6 +90,7 @@ export class WorkflowCompiler {
         description: tool.definition.description,
         version: tool.definition.version,
         createdTime: new Date().toISOString(),
+        metadata: { cwd: context.cwd },
         variables: { ...context.parameters },
         steps: compiledSteps,
       };

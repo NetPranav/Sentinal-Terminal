@@ -389,7 +389,7 @@ export const ActionCostSchema = z.object({
 
 export const ActionExampleSchema = z.object({
   title: z.string().min(1),
-  input: z.record(z.unknown()),
+  input: z.record(z.string(), z.unknown()),
   expectedOutput: z.string()
 });
 

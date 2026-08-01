@@ -56,7 +56,14 @@ export interface ToolRegistryState {
   knowledgeIndex: KnowledgeIndex;
 }
 
-import { BUNDLED_TOOLS, RawToolBundle } from './BundledTools';
+export interface RawToolBundle {
+  tool: any;
+  workflow: any;
+  knowledge: any;
+  examples: any;
+  tests: any;
+  folderPath: string;
+}
 
 export class ToolLoader {
   private state: ToolRegistryState;
@@ -73,7 +80,7 @@ export class ToolLoader {
   }
 
   /**
-   * Load all bundled tools, validate schemas, and build indexes.
+   * Load all dynamically discovered tools, validate schemas, and build indexes.
    */
   public loadAll(): LoadResult {
     const diagnostics: LoadDiagnostic[] = [];
@@ -88,7 +95,31 @@ export class ToolLoader {
     this.state.aliasIndex.clear();
     this.state.knowledgeIndex.clear();
 
-    for (const bundle of BUNDLED_TOOLS) {
+    const toolModules = import.meta.glob('../../../tools/**/tool.json', { eager: true });
+    const workflowModules = import.meta.glob('../../../tools/**/workflow.json', { eager: true });
+    const knowledgeModules = import.meta.glob('../../../tools/**/knowledge.json', { eager: true });
+    const examplesModules = import.meta.glob('../../../tools/**/examples.json', { eager: true });
+    const testsModules = import.meta.glob('../../../tools/**/tests.json', { eager: true });
+
+    const bundles: Record<string, RawToolBundle> = {};
+
+    for (const [path, module] of Object.entries(toolModules)) {
+      const dirPath = path.substring(0, path.lastIndexOf('/'));
+      const folderPath = dirPath.replace('../../../', '');
+      
+      const getDef = (mod: any) => mod?.default !== undefined ? mod.default : mod;
+
+      bundles[dirPath] = {
+        tool: getDef(module),
+        workflow: getDef(workflowModules[`${dirPath}/workflow.json`]),
+        knowledge: getDef(knowledgeModules[`${dirPath}/knowledge.json`]),
+        examples: getDef(examplesModules[`${dirPath}/examples.json`]),
+        tests: getDef(testsModules[`${dirPath}/tests.json`]),
+        folderPath
+      };
+    }
+
+    for (const bundle of Object.values(bundles)) {
       const result = this.loadSingleTool(bundle, diagnostics);
       if (result) {
         loaded++;

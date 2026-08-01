@@ -23,7 +23,6 @@ import { NodeCapability } from './drivers/NodeCapability';
 import { PythonCapability } from './drivers/PythonCapability';
 import { NetworkingCapability } from './drivers/NetworkingCapability';
 import { DeveloperCapability } from './drivers/DeveloperCapability';
-import { BUNDLED_TOOLS } from '../../tools/loader/BundledTools';
 
 export class CapabilityRegistrySDK {
   private static instance: CapabilityRegistrySDK;
@@ -41,9 +40,10 @@ export class CapabilityRegistrySDK {
   }
 
   private initializeDefaultMappings(): void {
-    // 1. Synchronize and bind concrete drivers for all ~91 bundled capabilities in the Tool Registry
-    for (const bundle of BUNDLED_TOOLS) {
-      const toolId: string = bundle.tool.id;
+    const toolModules = import.meta.glob('../../../tools/**/tool.json', { eager: true });
+    for (const module of Object.values(toolModules)) {
+      const toolDef: any = (module as any).default || module;
+      const toolId: string = toolDef.id;
       if (!toolId) continue;
 
       if (toolId.startsWith('filesystem.')) {

@@ -166,6 +166,27 @@ mindmap
 
 ---
 
+## 🏗️ The Sentinel V3 Architecture
+
+Sentinel is built on a massive, highly decoupled 14-phase architecture ensuring absolute determinism, stability, and intelligent execution:
+
+1. **Phase 1: Conversation Engine** - Natural language intent, entity extraction, and dialog context.
+2. **Phase 2: Goal Planning Engine** - Multi-step deterministic DAG planners and action decomposition.
+3. **Phase 3: Action Registry** - Centralized knowledge base of command semantics and validation schemas.
+4. **Phase 4: Execution Runtime** - Multi-threaded execution, state machines, and resource locking.
+5. **Phase 5: Capability SDK** - Native OS integrations (macOS/Linux/Windows) with rollback guarantees.
+6. **Phase 6: State Engine & World Model** - Real-time tracking of filesystems, networks, and environment contexts.
+7. **Phase 7: Verification & Repair Engine** - Automated post-execution validation and fallback self-healing.
+8. **Phase 8: Workflow Engine** - Graph-based visual automation editor and parameterized background cron loops.
+9. **Phase 9: Memory Engine** - Long-term persistent knowledge graphs and semantic user context.
+10. **Phase 10: Learning Engine** - Experience stores and intelligent ranking for continuous personalization.
+11. **Phase 11: Plugin SDK** - Third-party sandboxed extension models and marketplace scaffolding.
+12. **Phase 12: Developer Platform** - Time-travel debugging, zero-overhead tracing, and unified diagnostics.
+13. **Phase 13: Production Platform** - Automated backups, schema migrations, structured logging, and release channels.
+14. **Phase 14: User Experience & Polish** - Intelligent clarifications, visual diffs, undo managers, and presentation demo-modes.
+
+---
+
 ## 📥 Download & Install
 
 Experience the speed, privacy, and intelligence of Sentinel Terminal on your machine today:

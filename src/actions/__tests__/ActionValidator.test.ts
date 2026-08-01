@@ -11,7 +11,7 @@ describe('ActionValidator', () => {
     id: 'g1',
     title: 'Goal',
     description: '',
-    goal: 'test.action',
+    goal: 'unknown.test',
     dependencies: [],
     requiredEntities: [],
     boundEntities: boundEntities.map(e => ({ ...e, confidence: 1, raw: e.value })) as any,
@@ -35,7 +35,7 @@ describe('ActionValidator', () => {
   describe('validate ActionNode', () => {
     it('should pass for a valid node with all inputs provided', () => {
       const action = createMockAction({
-        id: 'test.action',
+        id: 'unknown.test' as any,
         inputs: [
           { name: 'path', type: 'string', description: 'File path', required: true },
         ],
@@ -49,7 +49,7 @@ describe('ActionValidator', () => {
 
     it('should fail if required input is missing', () => {
       const action = createMockAction({
-        id: 'test.action',
+        id: 'unknown.test' as any,
         inputs: [
           { name: 'path', type: 'string', description: 'File path', required: true },
         ],
@@ -63,7 +63,7 @@ describe('ActionValidator', () => {
 
     it('should pass if missing required input has a default value', () => {
       const action = createMockAction({
-        id: 'test.action',
+        id: 'unknown.test' as any,
         inputs: [
           { name: 'recursive', type: 'boolean', description: 'Recursive', required: true, defaultValue: false },
         ],
@@ -76,7 +76,7 @@ describe('ActionValidator', () => {
 
     it('should fail if platform is unsupported', () => {
       const action = createMockAction({
-        id: 'test.action',
+        id: 'unknown.test' as any,
         supportedPlatforms: ['linux'],
       });
       const node = createActionNode(action);
@@ -88,7 +88,7 @@ describe('ActionValidator', () => {
 
     it('should fail if required entity is not bound', () => {
       const action = createMockAction({
-        id: 'test.action',
+        id: 'unknown.test' as any,
         requiredEntities: ['application'],
       });
       const node = createActionNode(action, {}, createGoalNode([]));
@@ -100,7 +100,7 @@ describe('ActionValidator', () => {
 
     it('should pass if required entity is bound', () => {
       const action = createMockAction({
-        id: 'test.action',
+        id: 'unknown.test' as any,
         requiredEntities: ['application'],
       });
       const node = createActionNode(action, {}, createGoalNode([{ type: 'application', value: 'Chrome' }]));
@@ -111,7 +111,7 @@ describe('ActionValidator', () => {
 
     it('should warn on mandatory constraints', () => {
       const action = createMockAction({
-        id: 'test.action',
+        id: 'unknown.test' as any,
         constraints: [{ id: 'requires_internet', description: 'Requires internet', mandatory: true }],
       });
       const node = createActionNode(action);

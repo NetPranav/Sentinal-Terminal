@@ -9,6 +9,7 @@ export interface ExecutionOptions {
   isDryRun?: boolean;
   skipPreview?: boolean; // For automated workflows where 'Ask' might trigger UI if not skipped
   onAskPermission?: (plan: ExecutionPreviewPlan) => Promise<boolean>;
+  cwd?: string; // Terminal current working directory for SDK capabilities
 }
 
 export interface ExecutionPreviewPlan {
@@ -94,7 +95,7 @@ export class ExecutionEngine {
             }
           }
         }
-        const res = await sdkDriver.execute(input, { isDryRun: options.isDryRun });
+        const res = await sdkDriver.execute(input, { isDryRun: options.isDryRun, cwd: options.cwd });
         const isVerified = res.success ? await sdkDriver.verify(input, res) : false;
         await this.logAudit(capabilityId, input, risk.score || 10, 'Granted', startTime, isVerified ? 'Success' : 'NotApplicable', !!res.rollbackPayload);
         return {
