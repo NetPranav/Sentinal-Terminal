@@ -1,3 +1,8 @@
+#[cfg(target_os = "macos")]
+mod pty;
+
+#[cfg(target_os = "windows")]
+#[path = "pty_windows.rs"]
 mod pty;
 mod process_cmds;
 

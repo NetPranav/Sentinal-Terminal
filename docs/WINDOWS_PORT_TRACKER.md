@@ -3,13 +3,13 @@
 This document tracks the progress of porting Sentinel Terminal to Windows natively, ensuring that all macOS functionality remains completely intact via conditional compilation and runtime checks.
 
 ## Phase 1: Rust Backend Compatibility (`src-tauri/`)
-- [ ] **Path Overrides:** Update `pty.rs` to conditionalize macOS specific `PATH` overrides (`/opt/homebrew/bin`) using `#[cfg(target_os = "macos")]`.
-- [ ] **Shell Spawning:** Verify `pty.rs` correctly defaults to `powershell.exe` (or `pwsh`) on Windows.
-- [ ] **Native Menus:** Update `lib.rs` to conditionally compile the macOS native `Menu` building code so it does not crash Tauri on Windows.
+- [x] **Path Overrides:** Update `pty.rs` to conditionalize macOS specific `PATH` overrides (`/opt/homebrew/bin`) using `#[cfg(target_os = "macos")]`.
+- [x] **Shell Spawning:** Verify `pty.rs` correctly defaults to `powershell.exe` (or `pwsh`) on Windows.
+- [x] **Native Menus:** Update `lib.rs` to conditionally compile the macOS native `Menu` building code so it does not crash Tauri on Windows.
 
 ## Phase 2: AI Tool Registry Updates (`tools/`)
-- [ ] **Schema Updates:** Write and execute a script to iterate over all 96 `tool.json` schemas in the `tools/` directory.
-- [ ] **Platform Addition:** Automatically append `"windows"` to the `supportedPlatforms` array for every applicable capability.
+- [x] **Schema Updates:** Write and execute a script to iterate over all 96 `tool.json` schemas in the `tools/` directory.
+- [x] **Platform Addition:** Automatically append `"windows"` to the `supportedPlatforms` array for every applicable capability.
 
 ## Phase 3: Frontend Capability SDK Refactor (`src/sdk/`)
 - [ ] **Wi-Fi Module:** Refactor `WifiCapability.ts` to detect Windows and execute `netsh wlan` instead of `airport`.
