@@ -74,7 +74,8 @@ export class ShellAdapter {
    * Detect the user's default login shell from environment variable or platform default.
    */
   public detectLoginShell(envShellPath?: string): ShellProfile {
-    const targetPath = envShellPath || '/bin/zsh';
+    const isWindows = typeof navigator !== 'undefined' && navigator.userAgent.toLowerCase().includes('win');
+    const targetPath = envShellPath || (isWindows ? 'powershell.exe' : '/bin/zsh');
     const lower = targetPath.toLowerCase();
 
     if (lower.includes('bash')) return this.profiles.bash;

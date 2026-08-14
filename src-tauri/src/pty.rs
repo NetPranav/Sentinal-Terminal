@@ -87,12 +87,15 @@ pub fn spawn_pty(
         }
     }
 
-    if let Ok(path) = std::env::var("PATH") {
-        if !path.contains("/opt/homebrew/bin") && !path.contains("/usr/local/bin") {
-            cmd.env("PATH", format!("{}:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin", path));
+    #[cfg(target_os = "macos")]
+    {
+        if let Ok(path) = std::env::var("PATH") {
+            if !path.contains("/opt/homebrew/bin") && !path.contains("/usr/local/bin") {
+                cmd.env("PATH", format!("{}:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin", path));
+            }
+        } else {
+            cmd.env("PATH", "/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin");
         }
-    } else {
-        cmd.env("PATH", "/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin");
     }
 
     let _child = pair.slave.spawn_command(cmd).map_err(|e| e.to_string())?;
