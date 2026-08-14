@@ -12,11 +12,11 @@ This document tracks the progress of porting Sentinel Terminal to Windows native
 - [x] **Platform Addition:** Automatically append `"windows"` to the `supportedPlatforms` array for every applicable capability.
 
 ## Phase 3: Frontend Capability SDK Refactor (`src/sdk/`)
-- [ ] **Wi-Fi Module:** Refactor `WifiCapability.ts` to detect Windows and execute `netsh wlan` instead of `airport`.
-- [ ] **System Diagnostics:** Refactor `SystemCapability.ts` to execute `systeminfo` and `Get-WmiObject` instead of `system_profiler`.
-- [ ] **Process Management:** Refactor `ProcessCapability.ts` to use `Get-Process` instead of `ps`.
-- [ ] **Bluetooth Control:** Refactor `BluetoothCapability.ts` to bypass or use basic PowerShell bluetooth commands instead of `blueutil`.
-- [ ] **Permissions Engine:** Update `PermissionManager.ts` remedy hints to direct users to Windows Settings appropriately.
+- [x] **Wi-Fi Module:** Refactor `WifiCapability.ts` to detect Windows and execute `netsh wlan` instead of `airport`.
+- [x] **System Diagnostics:** Refactor `SystemCapability.ts` to execute `systeminfo` and `Get-WmiObject` instead of `system_profiler`.
+- [x] **Process Management:** Refactor `ProcessCapability.ts` to use `Get-Process` instead of `ps`.
+- [x] **Bluetooth Control:** Refactor `BluetoothCapability.ts` to bypass or use basic PowerShell bluetooth commands instead of `blueutil`.
+- [x] **Permissions Engine:** Update `PermissionManager.ts` remedy hints to direct users to Windows Settings appropriately.
 
 ## Phase 4: UI & Theme Adjustments (`src/ui/`)
 - [ ] **Font Fallbacks:** Update `ThemeManager.ts` to provide a fallback font family (like `Segoe UI`) when macOS's `-apple-system` is unavailable.

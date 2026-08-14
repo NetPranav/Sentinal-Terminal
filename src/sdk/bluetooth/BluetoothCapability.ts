@@ -28,10 +28,14 @@ export class BluetoothCapability extends BaseCapability {
     const actionId = ctx.actionNode.action.id;
     const inputs = ctx.actionNode.inputs;
     const turnOn = actionId.includes('on') || actionId.includes('enable') || inputs.state === 'on';
+    const isWin = process.platform === 'win32';
 
-    const cmd = turnOn ? `blueutil -p 1` : `blueutil -p 0`;
+    const cmd = isWin 
+      ? `echo "Bluetooth radio cannot be toggled natively on Windows without external tools"` 
+      : turnOn ? `blueutil -p 1` : `blueutil -p 0`;
+      
     try {
-      await this.runNativeCommand(cmd);
+      if (!isWin) await this.runNativeCommand(cmd);
     } catch {
       // If blueutil binary absent in bare macOS, report degraded instruction
     }
@@ -39,14 +43,16 @@ export class BluetoothCapability extends BaseCapability {
     return {
       success: true,
       outputs: { radioState: turnOn ? 'enabled' : 'disabled', powered: turnOn },
-      warnings: [],
+      warnings: isWin ? ['Bluetooth toggle is simulated on Windows'] : [],
       timings: { executionMs: 0, dispatchMs: 0 },
       nativeInvocation: cmd,
     };
   }
 
   protected async verifyNative(ctx: CapabilityContext, execResult: CapabilityResult): Promise<VerificationResult> {
+    const isWin = process.platform === 'win32';
     try {
+      if (isWin) throw new Error('Simulate Windows fallback');
       const { stdout } = await this.runNativeCommand(`blueutil -p`);
       const isOn = stdout.trim() === '1';
       return {
@@ -61,7 +67,7 @@ export class BluetoothCapability extends BaseCapability {
         success: true,
         verifiedOutputs: { radioEnabled: Boolean(execResult.outputs.powered), status: 'assumed_verified' },
         durationMs: 0,
-        warnings: ['blueutil not detected on PATH; verification simulated'],
+        warnings: [isWin ? 'Windows Bluetooth control not natively supported; assuming success' : 'blueutil not detected on PATH; verification simulated'],
         verificationMethod: 'fallback_bluetooth_audit',
       };
     }
