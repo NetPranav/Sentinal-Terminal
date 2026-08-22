@@ -58,7 +58,7 @@ const FAST_PATHS: { pattern: RegExp; tool: string; paramsFn: (match: RegExpMatch
 
   // List files
   { pattern: /^(?:ls|list\s+files?|show\s+files?|what'?s?\s+(?:in\s+)?here)\s*$/i, tool: 'filesystem.list', paramsFn: () => ({ path: '.' }) },
-  { pattern: /^(?:ls|list|show)\s+(.+)/i, tool: 'filesystem.list', paramsFn: (m) => ({ path: resolvePathAlias(m[1].trim()) }) },
+  { pattern: /^(?:ls|list\s+directory|list\s+folder|show\s+directory|show\s+folder)\s+(.+)/i, tool: 'filesystem.list', paramsFn: (m) => ({ path: resolvePathAlias(m[1].trim()) }) },
 
   // Clear
   { pattern: /^(?:clear|clear\s+(?:terminal|screen)|clean\s+(?:terminal|screen))\s*$/i, tool: '__clear__', paramsFn: () => ({}) },
@@ -73,7 +73,7 @@ const FAST_PATHS: { pattern: RegExp; tool: string; paramsFn: (match: RegExpMatch
 ];
 
 function resolvePathAlias(raw: string): string {
-  const lower = raw.toLowerCase().replace(/\s*(folder|directory|dir)\s*/gi, '').trim();
+  const lower = raw.toLowerCase().replace(/^(?:the|a|an)\s+/i, '').replace(/\s*(folder|directory|dir)\s*/gi, '').trim();
   const aliases: Record<string, string> = {
     'downloads': '~/Downloads', 'download': '~/Downloads',
     'desktop': '~/Desktop', 'documents': '~/Documents',
@@ -82,7 +82,7 @@ function resolvePathAlias(raw: string): string {
     'home': '~', 'root': '/',
     'project folder': '~/Project Folder', 'projects': '~/Projects',
   };
-  return aliases[lower] || raw;
+  return aliases[lower] || raw.replace(/^(?:the|a|an)\s+/i, '').replace(/\s*(?:folder|directory|dir)$/i, '').trim();
 }
 
 export class AgentLoop {
@@ -90,6 +90,7 @@ export class AgentLoop {
   private toolSpecs: ToolSpec[];
   private modelManager: ModelManager;
   private listener?: AgentEventListener;
+  private conversationHistory: { role: string; content: string }[] = [];
 
   private static readonly MAX_STEPS = 8;
 
@@ -126,14 +127,27 @@ export class AgentLoop {
       .replace(/^(?:(?:please|can you|could you|would you|kindly|just|now|alright|then|so|i want you to|i want to|i need you to|help me to|let's|lets)[\s,]*)+/i, '')
       .trim();
 
-    // 1. Try fast-path shortcuts (if the query is short/exact)
+    let result: AgentResult;
     if (cleaned.length > 0) {
       const fastResult = await this.tryFastPath(cleaned, context);
-      if (fastResult) return fastResult;
+      if (fastResult) {
+        result = fastResult;
+      } else {
+        result = await this.runLLMLoop(cleaned || goal.trim(), context);
+      }
+    } else {
+      result = await this.runLLMLoop(goal.trim(), context);
     }
 
-    // 2. Use LLM agent loop
-    return await this.runLLMLoop(cleaned || goal.trim(), context);
+    this.conversationHistory.push({ role: 'user', content: goal.trim() });
+    this.conversationHistory.push({ role: 'assistant', content: result.summary });
+    
+    // Keep only last 10 messages (5 user/assistant pairs)
+    if (this.conversationHistory.length > 10) {
+      this.conversationHistory = this.conversationHistory.slice(this.conversationHistory.length - 10);
+    }
+
+    return result;
   }
 
   /**
@@ -190,6 +204,7 @@ export class AgentLoop {
 
     // Build conversation messages
     const messages: { role: string; content: string }[] = [
+      ...this.conversationHistory,
       { role: 'user', content: goal }
     ];
 
@@ -433,9 +448,21 @@ export class AgentLoop {
       return { tool: 'system.lock', params: {} };
     }
 
+    // Environment variables
+    if (lower.includes('environment variables') || lower.includes('env variables')) {
+      return { tool: 'shell.execute', params: { command: 'env' } };
+    }
+
+    // Running applications
+    if (lower.includes('running applications') || lower.includes('open applications') || lower.includes('running apps')) {
+      return { tool: 'application.list_running', params: {} };
+    }
+
     // Processes
     if ((lower.includes('kill') || lower.includes('stop') || lower.includes('terminate') || lower.includes('force quit')) && !lower.includes('show') && !lower.includes('list')) {
-      const target = goal.replace(/^.*(?:kill|stop|terminate|force\s+quit)\s+/i, '').replace(/\s+(?:process|app|application).*$/i, '').trim();
+      let target = goal.replace(/^.*(?:kill|stop|terminate|force\s+quit)\s+/i, '').replace(/\s+(?:process|app|application).*$/i, '').trim();
+      if (target.toLowerCase() === 'vs code') target = 'Visual Studio Code';
+      if (target.toLowerCase().includes('antigrav')) target = 'Antigravity IDE';
       if (target) return { tool: 'system.kill_process', params: { process: target } };
     }
 
@@ -472,6 +499,26 @@ export class AgentLoop {
         let backend = isDjango ? 'django' : isExpress ? 'express' : undefined;
         return { tool: 'developer.scaffold', params: { frontend, backend, projectName: 'new_project' } };
       }
+    }
+
+    // Filesystem search (find me all files named X)
+    const searchMatch = lower.match(/(?:find|search|locate)\s+(?:me\s+)?(?:all\s+)?(?:files?\s+)?(?:named|with\s+name|matching)\s+['"]?([a-z0-9_.-]+)['"]?/i);
+    if (searchMatch && searchMatch[1]) {
+      return { tool: 'filesystem.search', params: { dir: '.', pattern: searchMatch[1].trim() } };
+    }
+
+    // Basic Queries (Time, User, Git)
+    if (lower === 'who am i' || lower === 'whoami' || lower.includes('current user')) {
+      return { tool: 'shell.execute', params: { command: 'whoami' } };
+    }
+    if (lower.includes('time is it') || lower.includes('show me the time') || lower.includes('current time')) {
+      return { tool: 'shell.execute', params: { command: 'date +"%r %Z"' } };
+    }
+    if (lower.includes('what is the date') || lower.includes('show me the date') || lower.includes('current date')) {
+      return { tool: 'shell.execute', params: { command: 'date +"%A, %B %d, %Y"' } };
+    }
+    if (lower.includes('git commit history') || lower === 'git log' || lower === 'show git log') {
+      return { tool: 'git.log', params: {} };
     }
 
     return null;

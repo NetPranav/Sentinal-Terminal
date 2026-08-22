@@ -120,9 +120,13 @@ export class DeveloperCapability extends BaseCapabilityDriver<DevDriverInput, an
       const finalCmdStr = scaffoldCmds.join(' && ');
       
       try {
+        const isWindows = typeof navigator !== 'undefined' && navigator.userAgent.toLowerCase().includes('windows');
+        const shell = isWindows ? 'cmd' : 'zsh';
+        const shellArgs = isWindows ? ['/c', finalCmdStr] : ['-l', '-c', finalCmdStr];
+        
         const output = await invoke<{ code: number; stdout: string; stderr: string }>('execute_command', {
-          command: 'sh',
-          args: ['-c', finalCmdStr]
+          command: shell,
+          args: shellArgs
         });
         
         if (output.code === 0) {

@@ -56,6 +56,12 @@ Sentinel redefines the modern command-line interface. Built for developers, soft
 
 Sentinel is engineered from the ground up to empower everyday developer workflows with zero friction and visual excellence.
 
+### 🧠 Conversation Memory & Context Awareness
+Sentinel doesn't just execute isolated commands; it remembers your context. The **Embedded LLM Agent Loop** natively tracks your last 10 messages (user inputs and assistant tool responses), injecting them directly into the context window. This allows you to issue fluid follow-up commands like:
+- `>take me to the backend folder`
+- `>make a new directory named configs here` (It remembers where "here" is based on the previous command!)
+- `>run it again but this time with the force flag`
+
 ### 🤖 The Explicit `>` AI Trigger (Zero-Friction Intelligence)
 Sentinel never gets in the way of your standard muscle memory. When you type traditional command syntax (`ls -la`, `git status`, `npm run dev`, `cargo build`), Sentinel executes directly in your high-speed PTY session with zero overhead.
 When you want to summon conversational intelligence or perform automated multi-step desktop orchestration, simply prefix your prompt with the **`>`** symbol:
@@ -71,7 +77,7 @@ pranav@Pranavs-MacBook ~ % >open this folder inside antigravity
 
 ### 🎯 Universal IDE & Workspace Launchers
 Sentinel natively connects with your favorite coding tools and development environments. Using intelligent natural language grammar resolution and native macOS Launch Services (`open -a`), Sentinel resolves conversational phrases and prepositions effortlessly:
-- **Natural Phrase Resolution**: Speak naturally—phrases like `"this folder"`, `"this directory"`, `"current project"`, or `"here"` are instantly translated to your current working directory (`.`).
+- **Natural Phrase Resolution**: Speak naturally—phrases like `"this folder"`, `"this directory"`, `"current project"`, or `"here"` are instantly translated to your current working directory (`.`). The AI also seamlessly ignores conversational fluff like `"the"`, `"a"`, or `"folder"`, meaning `>redirect me to the frontend folder` resolves purely to `frontend` without failing.
 - **Resilient Application Resolution**: Sentinel automatically strips leading articles (`"the Vs Code"`, `"my chrome"`, `"an xcode"`) and maps conversational aliases to exact system bundle names:
   - `>open this folder in the Vs Code` ➔ Launches **Visual Studio Code** at `.`
   - `>Open this folder inside antigravity` ➔ Launches **Antigravity IDE** at `.`
