@@ -12,11 +12,20 @@ Sentinel is engineered around high-efficiency localized models:
 
 ---
 
-## 🎯 Conversational Noise Filtering & Entity Extraction
+## 🎯 Conversational Noise Filtering & Resilient JSON Extraction
 
-Users naturally add conversational modifiers when communicating with AI assistants (e.g., *"hey there can you please stop all active chrome processes right now"*). `EntityExtractor.ts` applies layered syntactic normalization to uncover pure tool parameters:
+Users naturally add conversational modifiers when communicating with AI assistants. `EntityExtractor.ts` applies layered syntactic normalization to uncover pure tool parameters, while `AgentLoop.ts` handles the volatile nature of 3B parameter model outputs.
 
-### 1. Conversational Prefix Trimming
+### 1. Resilient JSON Parsing (Curly-Brace Counting Algorithm)
+Standard regex extraction frequently fails on smaller models (like the 3B parameter model) that output conversational text intermingled with multi-step JSON tool calls. Sentinel replaces regex with a robust curly-brace counting algorithm that reads the LLM output character-by-character, perfectly isolating nested JSON configurations even if the model was abruptly interrupted or hallucinated surrounding text.
+
+### 2. Strict Anti-Hallucination Rules
+To prevent the model from guessing non-existent OS paths (e.g., hallucinating `/path/to/project`), `SystemPrompt.ts` enforces stringent logic:
+- The AI must explicitly search for a file/folder before attempting to open it.
+- Aliases are hardcoded into the fallback logic (e.g. mapping "antigrav" to "Antigravity IDE").
+- The system prevents output paths like `YourUsername` or `Project Folder`.
+
+### 3. Conversational Prefix Trimming
 Our regex heuristics strip polite chatter and conversational framing without dropping intent:
 ```typescript
 // Removes phrases like "hey there", "can you", "please", "i want you to", "take me to"

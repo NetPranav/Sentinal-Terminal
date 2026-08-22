@@ -15,5 +15,7 @@
       </array>
     </dict>
   </array>
+  <key>NSBluetoothAlwaysUsageDescription</key>
+  <string>Sentinel Terminal requires Bluetooth access to turn on/off and connect to your Bluetooth devices on your behalf.</string>
 </dict>
 </plist>

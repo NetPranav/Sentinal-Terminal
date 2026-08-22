@@ -13,14 +13,26 @@
     "contents",
     "ls",
     "dir",
-    "show"
+    "show",
+    "view",
+    "files",
+    "folder"
   ],
   "aliases": [
     "list files",
     "ls",
     "dir",
     "show directory",
-    "list directory"
+    "list directory",
+    "show files",
+    "show folder contents",
+    "what is in folder",
+    "files in folder",
+    "view directory",
+    "view folder",
+    "content of folder",
+    "contents of folder",
+    "files inside"
   ],
   "supportedPlatforms": [
     "macos",

@@ -35,6 +35,8 @@
     "macOS": {
       "minimumSystemVersion": "12.0",
       "infoPlist": "Info.plist"
-    }
+    },
+    "externalBin": ["binaries/llama-server"],
+    "resources": ["resources/models/*"]
   }
 }

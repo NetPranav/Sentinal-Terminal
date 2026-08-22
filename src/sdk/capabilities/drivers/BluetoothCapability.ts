@@ -7,6 +7,7 @@
 
 import { BaseCapabilityDriver, CapabilityExecutionResult, ExecutionContext, Platform } from '../CapabilitySDK';
 import { invoke } from '@tauri-apps/api/core';
+import { levenshtein } from '../../../ai/intent/SynonymMap';
 
 export interface BluetoothInput {
   operation?: 'list' | 'on' | 'off' | 'connect' | 'disconnect';
@@ -134,15 +135,53 @@ export class BluetoothCapability extends BaseCapabilityDriver<BluetoothInput, an
           return { success: false, error: { code: 'MISSING_BT_DEVICE', message: 'Device name or MAC address required for Bluetooth connect' } };
         }
 
+        let actualTarget = target;
+
+        // Try to fuzzy-match the device name against paired devices
+        try {
+          const listOutput = await invoke<{ stdout: string; code: number }>('execute_command', {
+            command: 'blueutil',
+            args: ['--paired']
+          });
+          if (listOutput.code === 0) {
+            let bestMatch = '';
+            let bestScore = Infinity;
+            
+            const lines = listOutput.stdout.split('\n');
+            for (const line of lines) {
+              const nameMatch = line.match(/name: "([^"]+)"/);
+              const addrMatch = line.match(/address: ([A-Za-z0-9:-]+)/);
+              if (nameMatch && nameMatch[1]) {
+                const devName = nameMatch[1];
+                const devAddr = addrMatch ? addrMatch[1] : devName;
+                
+                // Exact substring match check first
+                if (devName.toLowerCase().includes(target.toLowerCase())) {
+                  actualTarget = devAddr;
+                  bestScore = 0;
+                  break;
+                }
+                
+                // Fuzzy match fallback
+                const dist = levenshtein(target, devName);
+                if (dist < bestScore && dist < Math.max(3, target.length / 2)) {
+                  bestScore = dist;
+                  actualTarget = devAddr;
+                }
+              }
+            }
+          }
+        } catch { /* proceed with raw target if listing fails */ }
+
         const output = await invoke<{ stdout: string; stderr: string; code: number }>('execute_command', {
           command: 'blueutil',
-          args: ['--connect', target]
+          args: ['--connect', actualTarget]
         });
 
         if (output.code === 0 && !output.stderr.includes('Failed')) {
-          return { success: true, data: { connected: true, device: target }, commandExecuted: `blueutil --connect "${target}"`, rollbackPayload: { op: 'connect', device: target } };
+          return { success: true, data: { connected: true, device: actualTarget }, commandExecuted: `blueutil --connect "${actualTarget}"`, rollbackPayload: { op: 'connect', device: actualTarget } };
         }
-        return { success: false, error: { code: 'BT_CONNECT_FAILED', message: `Failed to connect to Bluetooth device "${target}": ${output.stderr || output.stdout || 'Device out of range or not paired'}` } };
+        return { success: false, error: { code: 'BT_CONNECT_FAILED', message: `Failed to connect to Bluetooth device "${actualTarget}": ${output.stderr || output.stdout || 'Device out of range or not paired'}` } };
       }
 
       return { success: false, error: { code: 'UNSUPPORTED_BT_OP', message: `Unsupported Bluetooth operation: ${op}` } };

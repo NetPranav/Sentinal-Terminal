@@ -11,16 +11,28 @@
     "filesystem.delete",
     "permanently",
     "file",
-    "or",
     "folder",
     "remove",
-    "rm"
+    "rm",
+    "erase",
+    "destroy",
+    "trash"
   ],
   "aliases": [
     "delete file",
     "remove file",
     "rm file",
-    "delete folder"
+    "delete folder",
+    "remove folder",
+    "rm folder",
+    "erase file",
+    "erase folder",
+    "destroy file",
+    "destroy folder",
+    "trash file",
+    "permanently delete",
+    "wipe file",
+    "wipe folder"
   ],
   "supportedPlatforms": [
     "macos",

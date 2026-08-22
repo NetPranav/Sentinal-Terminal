@@ -9,7 +9,7 @@ import { BaseCapabilityDriver, CapabilityExecutionResult, ExecutionContext, Plat
 import { invoke } from '@tauri-apps/api/core';
 import { AppAliasRegistry } from '../../../domain/capabilities/AppAliasRegistry';
 
-export type AppOperation = 'open' | 'close' | 'force_quit' | 'focus' | 'minimize' | 'maximize' | 'list_running' | 'install' | 'uninstall';
+export type AppOperation = 'open' | 'close' | 'force_quit' | 'focus' | 'minimize' | 'maximize' | 'list_running' | 'install' | 'uninstall' | 'update';
 
 export interface AppDriverInput {
   operation?: AppOperation;
@@ -264,6 +264,43 @@ export class ApplicationCapability extends BaseCapabilityDriver<AppDriverInput, 
         const args = platform === 'macos' ? ['uninstall', target] : ['remove', '-y', target];
         await invoke('execute_command', { command: cmd, args });
         return { success: true, data: { uninstalled: true }, commandExecuted: `${cmd} ${args.join(' ')}` };
+      }
+
+      if (op === 'update') {
+        if (!target) {
+          return { success: false, error: { code: 'NO_TARGET', message: 'No application specified to update.' } };
+        }
+        
+        // Exclude system apps
+        if (target.toLowerCase() === 'safari' || target.toLowerCase() === 'finder' || target.toLowerCase() === 'system settings') {
+          return { 
+            success: true, 
+            data: { updated: false, reason: 'System application', stdout: `${target} is a macOS system application and can only be updated via System Settings -> Software Update.` },
+            commandExecuted: 'echo'
+          };
+        }
+
+        const cmd = platform === 'macos' ? 'brew' : 'apt';
+        const args = platform === 'macos' ? ['upgrade', target] : ['upgrade', '-y', target];
+        
+        try {
+          const res = await invoke<{ stdout: string; stderr: string; code: number }>('execute_command', { command: cmd, args });
+          if (res.code === 0) {
+            return { success: true, data: { updated: true, stdout: res.stdout }, commandExecuted: `${cmd} ${args.join(' ')}` };
+          } else {
+            return { 
+              success: true, 
+              data: { updated: false, stdout: `Could not update ${target} via ${cmd}. It might not be managed by a package manager, or it is already up to date. \n\n${res.stderr || res.stdout}` },
+              commandExecuted: `${cmd} ${args.join(' ')}` 
+            };
+          }
+        } catch (err: any) {
+           return { 
+              success: true, 
+              data: { updated: false, error: err.message, stdout: `Could not update ${target}. Please update it from within the app itself.` },
+              commandExecuted: `${cmd} ${args.join(' ')}` 
+            };
+        }
       }
 
       // Window manipulation operations fallback

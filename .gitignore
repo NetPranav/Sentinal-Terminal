@@ -22,3 +22,7 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Embedded AI Models & Binaries
+src-tauri/binaries/
+src-tauri/resources/models/

@@ -27,6 +27,7 @@ import { DeveloperCapability } from './drivers/DeveloperCapability';
 export class CapabilityRegistrySDK {
   private static instance: CapabilityRegistrySDK;
   private drivers: Map<string, ICapabilityDriver<any, any>> = new Map();
+  private fallbackChains: Map<string, ICapabilityDriver<any, any>[]> = new Map();
 
   private constructor() {
     this.initializeDefaultMappings();
@@ -94,8 +95,30 @@ export class CapabilityRegistrySDK {
     this.drivers.set(toolId, driver);
   }
 
+  /**
+   * Register a primary driver with a chain of fallback drivers.
+   * If the primary fails, each fallback is tried in order.
+   */
+  public registerWithFallback(toolId: string, drivers: ICapabilityDriver<any, any>[]): void {
+    if (drivers.length === 0) return;
+    this.drivers.set(toolId, drivers[0]);
+    if (drivers.length > 1) {
+      this.fallbackChains.set(toolId, drivers.slice(1));
+    }
+  }
+
   public getDriver<I = any, O = any>(toolId: string): ICapabilityDriver<I, O> | undefined {
     return this.drivers.get(toolId) as ICapabilityDriver<I, O> | undefined;
+  }
+
+  /**
+   * Get the full driver chain (primary + fallbacks) for a tool.
+   */
+  public getDriverChain<I = any, O = any>(toolId: string): ICapabilityDriver<I, O>[] {
+    const primary = this.drivers.get(toolId);
+    if (!primary) return [];
+    const fallbacks = this.fallbackChains.get(toolId) || [];
+    return [primary, ...fallbacks] as ICapabilityDriver<I, O>[];
   }
 
   public getAllRegisteredIds(): string[] {
@@ -107,8 +130,8 @@ export class CapabilityRegistrySDK {
     input: I,
     context?: ExecutionContext
   ): Promise<CapabilityExecutionResult<O>> {
-    const driver = this.getDriver<I, O>(toolId);
-    if (!driver) {
+    const chain = this.getDriverChain<I, O>(toolId);
+    if (chain.length === 0) {
       return {
         success: false,
         error: {
@@ -117,6 +140,28 @@ export class CapabilityRegistrySDK {
         }
       };
     }
-    return driver.execute(input, context);
+
+    // Try primary driver first, then fallbacks in order
+    let lastError: any = null;
+    for (let i = 0; i < chain.length; i++) {
+      try {
+        const result = await chain[i].execute(input, context);
+        if (result.success) return result;
+        lastError = result.error;
+        if (i < chain.length - 1) {
+          console.warn(`[CapabilitySDK] Driver ${i} for "${toolId}" failed, trying fallback ${i + 1}...`);
+        }
+      } catch (err: any) {
+        lastError = { code: 'DRIVER_ERROR', message: err.message };
+        if (i < chain.length - 1) {
+          console.warn(`[CapabilitySDK] Driver ${i} for "${toolId}" threw error, trying fallback ${i + 1}...`);
+        }
+      }
+    }
+
+    return {
+      success: false,
+      error: lastError || { code: 'ALL_DRIVERS_FAILED', message: `All ${chain.length} drivers for "${toolId}" failed.` }
+    };
   }
 }

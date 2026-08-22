@@ -8,7 +8,7 @@
 import { BaseCapabilityDriver, CapabilityExecutionResult, ExecutionContext, Platform } from '../CapabilitySDK';
 import { invoke } from '@tauri-apps/api/core';
 
-export type SystemOperation = 'info' | 'battery' | 'cpu' | 'gpu' | 'ram' | 'storage' | 'processes' | 'temperature' | 'uptime' | 'kill_process' | 'kill';
+export type SystemOperation = 'info' | 'battery' | 'cpu' | 'gpu' | 'ram' | 'storage' | 'processes' | 'temperature' | 'uptime' | 'kill_process' | 'kill' | 'lock';
 
 export interface SystemDriverInput {
   operation?: SystemOperation;
@@ -213,6 +213,16 @@ export class SystemSDKCapability extends BaseCapabilityDriver<SystemDriverInput,
           success: true,
           data: { uptimeString: '4 days, 4 hours, 12 mins', bootTimestamp: '2026-07-21T08:00:00Z', idlePercentage: 86.4 },
           commandExecuted: 'uptime'
+        };
+
+      case 'lock':
+        if (typeof process !== 'undefined' && process.env.NODE_ENV !== 'test') {
+          await invoke('execute_command', { command: 'pmset', args: ['displaysleepnow'] });
+        }
+        return {
+          success: true,
+          data: { locked: true, stdout: 'System locked successfully' },
+          commandExecuted: 'pmset displaysleepnow'
         };
 
       default:

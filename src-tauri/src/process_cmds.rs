@@ -73,7 +73,7 @@ pub struct CommandOutput {
 }
 
 #[tauri::command]
-pub fn execute_command(command: String, args: Vec<String>) -> Result<CommandOutput, String> {
+pub async fn execute_command(command: String, args: Vec<String>) -> Result<CommandOutput, String> {
     let output = std::process::Command::new(&command)
         .args(&args)
         .output()

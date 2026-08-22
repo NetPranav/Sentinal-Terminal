@@ -12,7 +12,10 @@
     "create",
     "new",
     "directory",
-    "make"
+    "make",
+    "folder",
+    "add",
+    "setup"
   ],
   "aliases": [
     "make folder",
@@ -25,7 +28,17 @@
     "create dir",
     "make a new folder",
     "create a new folder",
-    "make new directory"
+    "make new directory",
+    "set up a folder",
+    "set up folder",
+    "add folder",
+    "add directory",
+    "make a folder",
+    "create a folder",
+    "make me a folder",
+    "create me a folder",
+    "i need a folder",
+    "set up a directory"
   ],
   "supportedPlatforms": [
     "macos",

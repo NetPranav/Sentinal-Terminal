@@ -73,3 +73,9 @@ When an end-user executes process termination instructions (such as `"kill antig
 
 ### 2. Launch Services & Web Link Scheme Normalization
 Our application launcher drivers automatically evaluate user parameters for web destinations. If a natural language utterance like `"open youtube.com in safari"` omits protocol designations, our SDK driver injects strict secure HTTPS schemas (`https://youtube.com`) prior to invoking native macOS Launch Services (`open -a`).
+
+### 3. Developer Scaffolding Operations
+The `DeveloperCapability` has been augmented with a native `scaffold` tool to instantly configure full-stack architectures. Given `frontend` (e.g., `nextjs`, `react`) and `backend` (e.g., `django`, `express`) frameworks, the driver constructs complex execution chains integrating package managers (e.g., `npx create-next-app`, `python3 -m venv`) completely bypassing LLM syntax hallucination.
+
+### 4. Native Application Upgrading (`application.update`)
+The `ApplicationCapability` natively interfaces with host package managers (like `brew`) to upgrade specific GUI and terminal software upon request. It contains hardcoded safety thresholds to identify and decline updates for core macOS utilities (like `Finder` or `System Settings`).

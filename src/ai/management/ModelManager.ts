@@ -11,8 +11,7 @@
  */
 
 import { ModelProvider, ModelMetadata } from '../provider/Provider';
-import { OllamaProvider } from '../provider/OllamaProvider';
-import { LlamaCppProvider } from '../provider/LlamaCppProvider';
+import { EmbeddedProvider } from '../provider/EmbeddedProvider';
 
 export interface CandidateModelSpec {
   id: string;
@@ -139,7 +138,8 @@ export class ModelManager {
   };
 
   constructor(customProviders?: ModelProvider[]) {
-    this.providers = customProviders || [new OllamaProvider(), new LlamaCppProvider()];
+    // Provider priority: Embedded (bundled) is the sole targeted provider
+    this.providers = customProviders || [new EmbeddedProvider()];
   }
 
   /**
@@ -194,29 +194,25 @@ export class ModelManager {
       return this.activeModelInfo!;
     }
 
-    // No local candidate found -> automatically download the highest ranked default candidate (qwen2.5:1.5b)
-    const targetSpec = this.candidateCatalog['qwen2.5:1.5b'];
-    this.isAutoPulling = true;
-    onDownloadProgress?.(5, `No model installed. Auto-pulling lightweight model: ${targetSpec.name}...`);
+    // No local candidate found -> default to embedded model since it's bundled
+    const targetSpec = { 
+      name: 'Sentinel Embedded Model (Qwen2.5-3B)', 
+      overallScore: 100, 
+      maxRamBytes: 2147483648 // 2GB
+    };
     
     if (!this.activeProvider) {
-      this.activeProvider = new OllamaProvider();
+      this.activeProvider = this.providers[0]; // EmbeddedProvider
     }
 
-    const pulled = await this.activeProvider.pullModel(targetSpec.recommendedTag, (pct, status) => {
-      onDownloadProgress?.(pct, status);
-    });
-
-    this.isAutoPulling = false;
-
-    // After pulling, register active info
+    // After pulling/loading, register active info
     this.setActiveModel({
       providerId: this.activeProvider.providerId,
-      modelId: targetSpec.recommendedTag,
+      modelId: 'sentinel-embedded',
       displayName: targetSpec.name,
       score: targetSpec.overallScore,
       sizeBytes: targetSpec.maxRamBytes,
-      isReady: pulled,
+      isReady: true,
       lastVerified: Date.now()
     });
 
@@ -322,20 +318,20 @@ export class ModelManager {
 
   public getActiveProvider(): ModelProvider {
     if (!this.activeProvider) {
-      this.activeProvider = new OllamaProvider();
+      // Default to embedded provider — no external dependencies needed
+      this.activeProvider = new EmbeddedProvider();
     }
     return this.activeProvider;
   }
 
   public getActiveModel(): ActiveModelInfo {
     if (!this.activeModelInfo) {
-      const defaultSpec = this.candidateCatalog['qwen2.5:1.5b'];
       this.activeModelInfo = {
-        providerId: 'ollama',
-        modelId: 'qwen2.5:1.5b',
-        displayName: defaultSpec.name,
-        score: defaultSpec.overallScore,
-        sizeBytes: defaultSpec.maxRamBytes,
+        providerId: 'embedded',
+        modelId: 'sentinel-embedded',
+        displayName: 'Sentinel Embedded Model (Qwen2.5-3B)',
+        score: 100,
+        sizeBytes: 2147483648,
         isReady: false,
         lastVerified: 0
       };

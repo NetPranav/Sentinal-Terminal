@@ -1,10 +1,99 @@
 mod pty;
 mod process_cmds;
 
+#[cfg(target_os = "macos")]
+fn request_bluetooth_permission() {
+    use objc::{class, msg_send, sel, sel_impl};
+    use std::os::raw::c_void;
+
+    unsafe {
+        // Force link CoreBluetooth framework
+        #[link(name = "CoreBluetooth", kind = "framework")]
+        extern "C" {}
+
+        let manager_class = class!(CBCentralManager);
+        let alloc: *mut objc::runtime::Object = msg_send![manager_class, alloc];
+        let nil: *mut c_void = std::ptr::null_mut();
+        // Initialize to trigger the permission prompt
+        let _: *mut objc::runtime::Object = msg_send![
+            alloc,
+            initWithDelegate: nil
+            queue: nil
+            options: nil
+        ];
+    }
+}
+
+#[cfg(not(target_os = "macos"))]
+fn request_bluetooth_permission() {}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .setup(|app| {
+            request_bluetooth_permission();
+
+            // Spawn Embedded LLM Sidecar
+            use tauri::Manager;
+            
+            // Find the llama-server binary — it's placed next to our main executable by Tauri
+            let exe_dir = std::env::current_exe()
+                .ok()
+                .and_then(|p| p.parent().map(|d| d.to_path_buf()));
+            
+            if let Some(exe_dir) = exe_dir {
+                // Model is in the resources directory
+                let model_path = if let Ok(resource_dir) = app.path().resource_dir() {
+                    resource_dir.join("resources/models/model.gguf")
+                } else {
+                    exe_dir.join("resources/models/model.gguf")
+                };
+                
+                // Try multiple possible locations for the llama-server binary
+                let possible_paths = vec![
+                    exe_dir.join("llama-server"),                    // dev mode: target/debug/llama-server
+                    exe_dir.join("../MacOS/llama-server"),           // bundled .app: Contents/MacOS/llama-server
+                ];
+                
+                let binary_path = possible_paths.iter().find(|p| p.exists());
+                
+                match binary_path {
+                    Some(bin_path) => {
+                        let model_str = model_path.to_string_lossy().into_owned();
+                        let bin_str = bin_path.to_string_lossy().into_owned();
+                        println!("Starting llama-server: {} with model: {}", bin_str, model_str);
+                        // Get CPU thread count for optimal threading
+                        let n_threads = std::thread::available_parallelism()
+                            .map(|n| n.get())
+                            .unwrap_or(4)
+                            .to_string();
+                        
+                        match std::process::Command::new(bin_path)
+                            .args([
+                                "--port", "8847",
+                                "-m", &model_str,
+                                "-ngl", "99",           // Offload ALL layers to Metal GPU
+                                "-t", &n_threads,       // Use all CPU threads for prompt processing
+                                "--flash-attn",         // Flash attention for faster inference
+                                "-b", "2048",           // Larger batch size for throughput
+                                "-c", "4096",           // Context window
+                                "--no-warmup",          // Skip warmup for faster startup
+                            ])
+                            .stdout(std::process::Stdio::null())
+                            .stderr(std::process::Stdio::null())
+                            .spawn()
+                        {
+                            Ok(child) => println!("Successfully spawned llama-server (pid: {})", child.id()),
+                            Err(e) => eprintln!("Failed to spawn llama-server: {}", e),
+                        }
+                    },
+                    None => {
+                        eprintln!("Could not find llama-server binary. Searched: {:?}", 
+                            possible_paths.iter().map(|p| p.display().to_string()).collect::<Vec<_>>());
+                    }
+                }
+            }
+            
             #[cfg(target_os = "macos")]
             {
                 use tauri::menu::{Menu, Submenu, MenuItem, PredefinedMenuItem};

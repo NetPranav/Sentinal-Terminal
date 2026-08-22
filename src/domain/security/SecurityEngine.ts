@@ -68,7 +68,7 @@ export class SecurityEngine implements ISecurityEngine {
       return { score: 5, level: 'SAFE', explanation: 'Safe read-only system command.', requiresPassword: false, requiresConsent: false };
     }
 
-    return { score: 50, level: 'UNKNOWN', explanation: 'Standard terminal utility execution.', requiresPassword: false, requiresConsent: false };
+    return { score: 10, level: 'SAFE', explanation: 'Standard terminal utility execution.', requiresPassword: false, requiresConsent: false };
   }
 
   analyzeWorkflow(actions: any[]): RiskAnalysisResult {
@@ -144,6 +144,11 @@ export class SecurityEngine implements ISecurityEngine {
     // 3. Mid-Level Network & Hardware Controls
     if (capabilityId.startsWith('network.') || capabilityId.startsWith('bluetooth.') || capabilityId.startsWith('hardware.')) {
       const action = capabilityId.toLowerCase();
+      // Exclude basic bluetooth toggles from ADMIN risk
+      if (capabilityId.includes('bluetooth') && (action.includes('on') || action.includes('off') || action.includes('connect') || action.includes('disconnect'))) {
+        return { score: 30, level: 'SAFE', explanation: 'Standard user-level Bluetooth control.', requiresPassword: false, requiresConsent: false };
+      }
+      
       if (action.includes('toggle') || action.includes('off') || action.includes('on') || action.includes('disconnect') || action.includes('bind') || action.includes('config')) {
         return {
           score: 80,

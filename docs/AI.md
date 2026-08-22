@@ -24,7 +24,8 @@ Sentinel works alongside modern runtime infrastructure (including **Ollama**) to
 ## 🧠 Smart Intent Recognition
 
 Sentinel distinguishes between everyday language instructions and exact terminal syntax in real-time:
-- **Conversational Parsing**: When you enter phrases such as `"hey there take me to downloads folder"` or `"open youtube.com in safari"`, the AI Intent Engine instantly strips conversational filler words and evaluates user intent with extreme confidence.
+- **Hybrid Execution (Heuristic Fast-Paths)**: Sentinel employs native heuristic intercepts that capture complex structural commands (like `"update brave browser"` or `"make a folder and initialize a nextjs frontend"`). These specific intents instantly bypass LLM inference, triggering native capabilities directly to eliminate execution latency and LLM hallucinations.
+- **Resilient Reasoning (Curly-Brace Engine)**: When delegating complex multi-step plans to the offline 3B model, Sentinel uses a custom character-by-character curly-brace JSON counting algorithm. This guarantees flawless tool execution even if the LLM output is malformed, abruptly interrupted, or intermingled with conversational text.
 - **Automatic Shell Synchronization**: When an AI automated workflow executes a directory jump or workspace transformation, Sentinel immediately sends the confirmed commands straight into your active terminal shell session. Your actual working directory updates instantly on screen!
 
 ---

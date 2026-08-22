@@ -15,6 +15,9 @@ Experience frictionless interaction through intuitive conversational instruction
 - **Smart File Discovery**: Type `"tell me all the png files here"` or `"search for logs modified today"` to generate fast, structured filesystem evaluations without complex manual parameters.
 - **Application & Website Control**: Command `"open youtube.com in safari"` or `"launch github.com using chrome"`, effortlessly launching native system apps directly to targeted destinations.
 - **Intelligent Process Termination**: Express instructions like `"stop chrome"` or `"kill antigravity"` to execute clean, deep process sweeps that safely clear stuck threads and memory hogging background workers.
+- **Developer Scaffolding**: Effortlessly initialize full-stack architectures (e.g., `"make a folder and initialize a frontend with next project and backend with python django"`).
+- **Application Upgrading**: Keep your apps up to date naturally with commands like `"update brave browser"`.
+- **System Control**: Issue direct hardware commands such as `"lock the laptop"` to instantly secure your workstation.
 
 ---
 

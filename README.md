@@ -113,6 +113,9 @@ Try typing these real example commands into Sentinel today! Simply start your in
 | **Desktop Application Control**| `>tell me all the running applications` | `application.list_running` | Displays curated list of active graphical apps (*Sentinel*, *Antigravity*, *Chrome*, *Safari*). |
 | | `>open youtube.com in safari` | `application.open` | Launches Safari and directly opens the YouTube web platform. |
 | | `>stop chrome` / `>kill antigravity` | `system.kill_process` / `force_quit` | Performs a deep, clean termination of target desktop software threads. |
+| | `>update brave browser` | `application.update` | Intercepts intent to natively run `brew upgrade` for the specified GUI app. |
+| **Development & Scaffolding** | `>initialize a nextjs frontend and django backend` | `developer.scaffold` | Bypasses LLM generation to natively execute `npx` and `django-admin` scaffolding. |
+| **System & Hardware Control** | `>lock the laptop` | `system.lock` | Safely secures the workstation by engaging macOS `pmset displaysleepnow`. |
 | **Navigation & Filesystem** | `>take me to downloads folder` | `filesystem.cd` / `shell.cd` | Synchronizes shell working directory directly to `~/Downloads`! |
 | | `>take me home` | `filesystem.cd` (`~`) | Instantly jumps to your macOS home profile directory. |
 | | `>find me all files named .env` | `filesystem.search` | Scans current hierarchy for environment configs via ripgrep/find mechanics. |
