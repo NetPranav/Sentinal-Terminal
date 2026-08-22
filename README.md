@@ -24,7 +24,31 @@ Sentinel redefines the modern command-line interface. Built for developers, soft
 
 ---
 
+## 📸 Screenshot Gallery
 
+<div align="center">
+  <table>
+    <tr>
+      <td width="50%"><img src="docs/images/screenshot1.png" alt="Sentinel Workspace 1"></td>
+      <td width="50%"><img src="docs/images/screenshot2.png" alt="Sentinel Workspace 2"></td>
+    </tr>
+    <tr>
+      <td width="50%"><img src="docs/images/screenshot3.png" alt="Sentinel Workspace 3"></td>
+      <td width="50%"><img src="docs/images/screenshot4.png" alt="Sentinel Workspace 4"></td>
+    </tr>
+    <tr>
+      <td width="50%"><img src="docs/images/screenshot5.png" alt="Sentinel Workspace 5"></td>
+      <td width="50%"><img src="docs/images/screenshot6.png" alt="Sentinel Workspace 6"></td>
+    </tr>
+    <tr>
+      <td width="50%"><img src="docs/images/screenshot7.png" alt="Sentinel Workspace 7"></td>
+      <td width="50%"><img src="docs/images/screenshot8.png" alt="Sentinel Workspace 8"></td>
+    </tr>
+  </table>
+  <p><i>A multi-pane glassmorphic workspace enabling autonomous desktop workflows and system orchestration.</i></p>
+</div>
+
+---
 
 ## ✨ Architectural Highlights & Capabilities
 
