@@ -14,20 +14,6 @@
 
 <br>
 <br>
-
-<!-- ========================================================================================= -->
-<!-- 🎬 DEMONSTRATION VIDEO PLACEHOLDER: HERO OVERVIEW DEMO                                   -->
-<!-- Replace the placeholder below with your 60-second Loom/GIF/Video showing Sentinel in action -->
-<!-- Example: ![Sentinel Demo Overview](./docs/images/sentinel-demo-hero.gif)               -->
-<!-- ========================================================================================= -->
-
-<p align="center">
-  <b>[ 🎥 Insert Application Hero Demonstration Video / GIF Here: e.g. <code>./docs/images/sentinel-demo-hero.gif</code> ]</b>
-</p>
-<p align="center">
-  <i>Watch Sentinel seamlessly switch between sub-millisecond zsh shell execution and natural language desktop automation.</i>
-</p>
-
 </div>
 
 ---
@@ -38,19 +24,7 @@ Sentinel redefines the modern command-line interface. Built for developers, soft
 
 ---
 
-<!-- ========================================================================================= -->
-<!-- 📸 SCREENSHOT SHOWCASE: MULTI-PANE GLASSMORPHISM WORKSPACE                              -->
-<!-- Insert high-res screenshot of split screens, status hierarchy, and glass theme here      -->
-<!-- ========================================================================================= -->
 
-<div align="center">
-  <br>
-  <b>[ 📸 Insert Screenshot of Multi-Pane Split Screen Workspace Here: e.g. <code>./docs/images/split-screen-workspace.png</code> ]</b>
-  <p><i>Effortlessly divide your workflow into vertical and horizontal split screens—each maintaining independent directory memory and execution session context.</i></p>
-  <br>
-</div>
-
----
 
 ## ✨ Architectural Highlights & Capabilities
 
@@ -242,23 +216,23 @@ Getting started with Sentinel requires zero complex configuration or external cl
 Everything you need to master Sentinel as a user or contribute as an open-source software engineer is thoroughly articulated in our documentation portals:
 
 ### 📖 For End Users
-- **[User Guide](file:///docs/USER_GUIDE.md)**: Master the mixing of traditional shell syntax with explicit `>` conversational commands.
-- **[Features Overview](file:///docs/FEATURES.md)**: Deep dive into offline privacy guarantees, glassmorphic styling, and intelligent capability tools.
-- **[Keyboard Shortcuts & Menu Controls](file:///docs/KEYBOARD_SHORTCUTS.md)**: Complete hotkey reference table for tab navigation, split views, and menu controls.
-- **[Frequently Asked Questions (FAQ)](file:///docs/FAQ.md)**: Explanations regarding offline local AI inference, Apple Silicon Metal acceleration, and data privacy.
-- **[Troubleshooting Guide](file:///docs/TROUBLESHOOTING.md)**: Simple fixes for verifying local Ollama connectivity and optimizing macOS accessibility permissions.
-- **[Theme & Personalization Manual](file:///docs/THEMES.md)**: Instructions for tailoring backdrop transparency sliders, blur depth, and color palettes.
-- **[Security & Risk Safeguards](file:///docs/SECURITY.md)**: Understand how Sentinel's Zero-Trust firewall assesses command danger profiles and whitelists safe commands.
+- **[User Guide](docs/USER_GUIDE.md)**: Master the mixing of traditional shell syntax with explicit `>` conversational commands.
+- **[Features Overview](docs/FEATURES.md)**: Deep dive into offline privacy guarantees, glassmorphic styling, and intelligent capability tools.
+- **[Keyboard Shortcuts & Menu Controls](docs/KEYBOARD_SHORTCUTS.md)**: Complete hotkey reference table for tab navigation, split views, and menu controls.
+- **[Frequently Asked Questions (FAQ)](docs/FAQ.md)**: Explanations regarding offline local AI inference, Apple Silicon Metal acceleration, and data privacy.
+- **[Troubleshooting Guide](docs/TROUBLESHOOTING.md)**: Simple fixes for verifying local Ollama connectivity and optimizing macOS accessibility permissions.
+- **[Theme & Personalization Manual](docs/THEMES.md)**: Instructions for tailoring backdrop transparency sliders, blur depth, and color palettes.
+- **[Security & Risk Safeguards](docs/SECURITY.md)**: Understand how Sentinel's Zero-Trust firewall assesses command danger profiles and whitelists safe commands.
 
 ### 🛠️ For Open-Source Contributors & Maintainers
-- **[Contributing Manual](file:///developer/CONTRIBUTING.md)**: Welcome guidelines detailing branching workflows, verification mandates, and feature proposal protocols.
-- **[Development Setup & Toolchains](file:///developer/DEVELOPMENT_SETUP.md)**: Instructions for preparing Node.js, Rust/Cargo toolchains, Tauri v2 dependencies, and local Ollama installations.
-- **[Build & Packaging Reference](file:///developer/BUILD.md)**: Authoritative instructions for compiling standalone macOS `.app` bundles (`npm run build:app`) from source code.
-- **[System Architecture Reference](file:///developer/ARCHITECTURE.md)**: Comprehensive architectural breakdown connecting React 19 views with native Rust PTY execution engines.
-- **[Tool Registry Knowledge Base Pattern](file:///developer/TOOL_REGISTRY.md)**: How Sentinel organizes its 97+ structured JSON operational schemas, Zod validation models, and semantic indexes.
-- **[Capability SDK Driver Engineering](file:///developer/CAPABILITY_SDK.md)**: Code blueprints for subclassing `BaseCapabilityDriver` to invoke native operating system APIs and Launch Services.
-- **[Intent Engine & LoRA Telemetry Pipelines](file:///developer/INTENT_AI.md)**: Technical specifications for conversational trimming algorithms and offline JSONL training dataset generation.
-- **[Automated Verification Testing](file:///developer/TESTING.md)**: Guide to executing our automated Vitest test verification battery (82+ unit tests) and writing capability assertions.
+- **[Contributing Manual](developer/CONTRIBUTING.md)**: Welcome guidelines detailing branching workflows, verification mandates, and feature proposal protocols.
+- **[Development Setup & Toolchains](developer/DEVELOPMENT_SETUP.md)**: Instructions for preparing Node.js, Rust/Cargo toolchains, Tauri v2 dependencies, and local Ollama installations.
+- **[Build & Packaging Reference](developer/BUILD.md)**: Authoritative instructions for compiling standalone macOS `.app` bundles (`npm run build:app`) from source code.
+- **[System Architecture Reference](developer/ARCHITECTURE.md)**: Comprehensive architectural breakdown connecting React 19 views with native Rust PTY execution engines.
+- **[Tool Registry Knowledge Base Pattern](developer/TOOL_REGISTRY.md)**: How Sentinel organizes its 97+ structured JSON operational schemas, Zod validation models, and semantic indexes.
+- **[Capability SDK Driver Engineering](developer/CAPABILITY_SDK.md)**: Code blueprints for subclassing `BaseCapabilityDriver` to invoke native operating system APIs and Launch Services.
+- **[Intent Engine & LoRA Telemetry Pipelines](developer/INTENT_AI.md)**: Technical specifications for conversational trimming algorithms and offline JSONL training dataset generation.
+- **[Automated Verification Testing](developer/TESTING.md)**: Guide to executing our automated Vitest test verification battery (82+ unit tests) and writing capability assertions.
 
 ---
 
@@ -269,7 +243,7 @@ Sentinel continuously evolves to bring state-of-the-art desktop developer ergono
 - **🧩 Visual Workflow Designer**: Construct automated multi-step development pipelines using an interactive drag-and-drop workspace canvas directly inside your terminal window.
 - **🖼️ Multi-Modal Image Interpretation**: Simply paste UI error screenshots or architectural diagrams straight into terminal panes for immediate offline AI diagnostics and command suggestions.
 
-*Review our comprehensive **[Product Roadmap Documentation](file:///docs/ROADMAP.md)** for complete engineering timelines and future milestones!*
+*Review our comprehensive **[Product Roadmap Documentation](docs/ROADMAP.md)** for complete engineering timelines and future milestones!*
 
 ---
 
