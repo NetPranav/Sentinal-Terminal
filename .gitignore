@@ -26,3 +26,7 @@ dist-ssr
 # Embedded AI Models & Binaries
 src-tauri/binaries/
 src-tauri/resources/models/
+
+# Local comparison clones
+sentinal-windows/
+

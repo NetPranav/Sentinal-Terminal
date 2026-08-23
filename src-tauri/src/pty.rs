@@ -52,13 +52,23 @@ pub fn spawn_pty(
 
     #[cfg(target_os = "windows")]
     let default_shell = "powershell.exe".to_string();
-    #[cfg(not(target_os = "windows"))]
+    #[cfg(target_os = "macos")]
     let default_shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".to_string());
+    #[cfg(target_os = "linux")]
+    let default_shell = std::env::var("SHELL").unwrap_or_else(|_| {
+        if std::path::Path::new("/bin/bash").exists() {
+            "/bin/bash".to_string()
+        } else if std::path::Path::new("/bin/zsh").exists() {
+            "/bin/zsh".to_string()
+        } else {
+            "/bin/sh".to_string()
+        }
+    });
 
     let target_shell = shell.filter(|s| !s.trim().is_empty()).unwrap_or(default_shell);
     let mut cmd = CommandBuilder::new(&target_shell);
 
-    if login_shell == Some(true) && !target_shell.contains("pwsh") && !target_shell.contains("powershell") {
+    if login_shell == Some(true) && !target_shell.contains("pwsh") && !target_shell.contains("powershell") && !target_shell.contains("cmd.exe") {
         cmd.arg("-l");
     }
 
@@ -72,7 +82,7 @@ pub fn spawn_pty(
         cmd.cwd(dir);
     }
 
-    // Enforce standard macOS terminal emulator variables
+    // Enforce standard terminal emulator variables
     cmd.env("TERM", "xterm-256color");
     cmd.env("COLORTERM", "truecolor");
     cmd.env("TERM_PROGRAM", "Sentinel Terminal");
@@ -88,11 +98,30 @@ pub fn spawn_pty(
     }
 
     if let Ok(path) = std::env::var("PATH") {
-        if !path.contains("/opt/homebrew/bin") && !path.contains("/usr/local/bin") {
-            cmd.env("PATH", format!("{}:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin", path));
+        let mut path_additions = Vec::new();
+        #[cfg(target_os = "macos")]
+        {
+            if !path.contains("/opt/homebrew/bin") { path_additions.push("/opt/homebrew/bin"); }
+            if !path.contains("/opt/homebrew/sbin") { path_additions.push("/opt/homebrew/sbin"); }
+            if !path.contains("/usr/local/bin") { path_additions.push("/usr/local/bin"); }
+        }
+        #[cfg(target_os = "linux")]
+        {
+            if !path.contains("/usr/local/bin") { path_additions.push("/usr/local/bin"); }
+            if !path.contains("/usr/bin") { path_additions.push("/usr/bin"); }
+            if !path.contains("/bin") { path_additions.push("/bin"); }
+            if !path.contains("/usr/local/sbin") { path_additions.push("/usr/local/sbin"); }
+            if !path.contains("/usr/sbin") { path_additions.push("/usr/sbin"); }
+            if !path.contains("/sbin") { path_additions.push("/sbin"); }
+        }
+        if !path_additions.is_empty() {
+            cmd.env("PATH", format!("{}:{}", path, path_additions.join(":")));
         }
     } else {
+        #[cfg(target_os = "macos")]
         cmd.env("PATH", "/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin");
+        #[cfg(target_os = "linux")]
+        cmd.env("PATH", "/usr/local/bin:/usr/bin:/bin:/usr/local/sbin:/usr/sbin:/sbin");
     }
 
     let _child = pair.slave.spawn_command(cmd).map_err(|e| e.to_string())?;

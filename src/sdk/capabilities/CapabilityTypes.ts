@@ -25,7 +25,7 @@ export interface CapabilityMetadata {
   /** Action ID prefixes or explicit tool IDs supported by this capability (e.g., ['filesystem.', 'app.open']) */
   readonly supportedActions: readonly string[];
   /** Target macOS version or minimum requirement (e.g., '>=12.0') */
-  readonly supportedMacOsVersion: string;
+  readonly supportedMacOsVersion?: string;
   /** OS commands or binaries required (e.g., ['osascript', 'launchctl', 'networksetup']) */
   readonly dependencies: readonly string[];
   /** OS permissions required (e.g., ['Accessibility', 'Full Disk Access']) */

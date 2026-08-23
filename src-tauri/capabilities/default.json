@@ -35,12 +35,6 @@
         { "url": "http://localhost:8847/**" },
         { "url": "http://127.0.0.1:8847/**" }
       ]
-    },
-    {
-      "identifier": "shell:allow-spawn",
-      "allow": [
-        { "name": "binaries/llama-server", "sidecar": true, "args": true }
-      ]
     }
   ]
 }

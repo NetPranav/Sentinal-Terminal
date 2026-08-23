@@ -29,4 +29,7 @@ export default defineConfig(async () => ({
       ignored: ["**/src-tauri/**"],
     },
   },
+  test: {
+    exclude: ["**/node_modules/**", "**/dist/**", "**/sentinal-windows/**"],
+  },
 }));

@@ -1,8 +1,8 @@
 /**
- * ProcessCapability.ts — Native macOS Capability Driver for Process Sweeping & Listening Socket Audits
+ * ProcessCapability.ts — Cross-Platform Capability Driver for Process Sweeping & Listening Socket Audits
  *
- * Implements PID table searches, TCP socket port inspections (lsof -i),
- * and signal termination (kill / pkill).
+ * Implements PID table searches, TCP socket port inspections, and signal termination.
+ * Supports Linux, macOS, and Windows.
  */
 
 import { BaseCapability } from '../common/BaseCapability';
@@ -13,11 +13,11 @@ export class ProcessCapability extends BaseCapability {
     super(
       {
         id: 'process',
-        version: '3.0.0',
-        description: 'Native macOS process scanner, TCP/UDP socket auditor, and process lifecycle terminator',
+        version: '3.1.0',
+        description: 'Cross-platform process scanner, TCP/UDP socket auditor, and process lifecycle terminator',
         supportedActions: ['process.', 'socket.', 'port.', 'ps.'],
         supportedMacOsVersion: '>=11.0',
-        dependencies: ['ps', 'lsof', 'pgrep', 'kill'],
+        dependencies: ['ps', 'lsof', 'pgrep', 'kill', 'tasklist', 'taskkill'],
         requiredPermissions: ['Full Disk Access'],
         health: 'healthy',
       },
@@ -28,12 +28,29 @@ export class ProcessCapability extends BaseCapability {
   protected async executeNative(ctx: CapabilityContext): Promise<CapabilityResult> {
     const inputs = ctx.actionNode.inputs;
     const actionId = ctx.actionNode.action.id;
+    const isWin = process.platform === 'win32';
 
     if (actionId.includes('find') || actionId.includes('search') || actionId.includes('lookup')) {
       const target = String(inputs.process || inputs.appName || inputs.name || '').trim();
       const port = Number(inputs.port || 0);
 
       if (port > 0) {
+        if (isWin) {
+          const { stdout } = await this.runNativeCommand(`netstat -ano | findstr :${port}`).catch(() => ({ stdout: '' }));
+          const pids = stdout
+            .split('\n')
+            .map((line) => line.trim().split(/\s+/).pop())
+            .filter(Boolean)
+            .map(Number);
+          return {
+            success: true,
+            outputs: { port, foundPids: pids, pid: pids[0] || null, active: pids.length > 0 },
+            warnings: [],
+            timings: { executionMs: 0, dispatchMs: 0 },
+            nativeInvocation: `netstat -ano | findstr :${port}`,
+          };
+        }
+
         const { stdout } = await this.runNativeCommand(`lsof -t -i :${port}`).catch(() => ({ stdout: '' }));
         const pids = stdout.split('\n').filter(Boolean).map(Number);
         return {
@@ -45,26 +62,41 @@ export class ProcessCapability extends BaseCapability {
         };
       }
 
-      const { stdout } = await this.runNativeCommand(`pgrep -i -f "${target}"`).catch(() => ({ stdout: '' }));
-      const pids = stdout.split('\n').filter(Boolean).map(Number);
+      const cmd = isWin ? `tasklist /FI "IMAGENAME eq ${target}*" /FO CSV /NH` : `pgrep -i -f "${target}"`;
+      const { stdout } = await this.runNativeCommand(cmd).catch(() => ({ stdout: '' }));
+      let pids: number[] = [];
+      if (isWin) {
+        pids = stdout
+          .split('\n')
+          .filter((line) => line.includes(','))
+          .map((line) => {
+            const parts = line.split(',');
+            return Number(parts[1]?.replace(/"/g, '').trim());
+          })
+          .filter((pid) => pid > 0);
+      } else {
+        pids = stdout.split('\n').filter(Boolean).map(Number);
+      }
+
       return {
         success: true,
         outputs: { processName: target, foundPids: pids, pid: pids[0] || null, active: pids.length > 0 },
         warnings: [],
         timings: { executionMs: 0, dispatchMs: 0 },
-        nativeInvocation: `pgrep -i -f "${target}"`,
+        nativeInvocation: cmd,
       };
     } else if (actionId.includes('kill') || actionId.includes('stop') || actionId.includes('terminate')) {
       // Consume PID directly from inputs or shared ExecutionContext
       const pid = Number(inputs.pid || ctx.executionContext.getOutput(ctx.actionNode.dependencies[0] || '', 'pid') || 0);
       if (pid > 0) {
-        await this.runNativeCommand(`kill -9 ${pid}`).catch(() => {});
+        const cmd = isWin ? `taskkill /F /PID ${pid}` : `kill -9 ${pid}`;
+        await this.runNativeCommand(cmd).catch(() => {});
         return {
           success: true,
           outputs: { terminatedPid: pid, running: false },
-          warnings: [`Dispatched SIGKILL (-9) directly to PID ${pid}`],
+          warnings: [`Dispatched kill signal directly to PID ${pid}`],
           timings: { executionMs: 0, dispatchMs: 0 },
-          nativeInvocation: `kill -9 ${pid}`,
+          nativeInvocation: cmd,
         };
       }
     }
@@ -79,13 +111,28 @@ export class ProcessCapability extends BaseCapability {
   }
 
   protected async verifyNative(ctx: CapabilityContext, execResult: CapabilityResult): Promise<VerificationResult> {
+    const isWin = process.platform === 'win32';
     const pid = Number(execResult.outputs.terminatedPid || execResult.outputs.pid || 0);
     if (pid > 0 && execResult.outputs.running === false) {
       try {
-        await this.runNativeCommand(`ps -p ${pid}`);
-        return { success: false, verifiedOutputs: { pid, running: true }, durationMs: 0, warnings: ['Process still exists in OS schedule table'], verificationMethod: 'ps_pid_check' };
+        const cmd = isWin ? `tasklist /FI "PID eq ${pid}"` : `ps -p ${pid}`;
+        const { stdout } = await this.runNativeCommand(cmd);
+        if (isWin && !stdout.includes(String(pid))) throw new Error('Process not found');
+        return {
+          success: false,
+          verifiedOutputs: { pid, running: true },
+          durationMs: 0,
+          warnings: ['Process still exists in OS schedule table'],
+          verificationMethod: isWin ? 'tasklist_check' : 'ps_pid_check',
+        };
       } catch {
-        return { success: true, verifiedOutputs: { pid, running: false, verifiedTerminated: true }, durationMs: 0, warnings: [], verificationMethod: 'ps_absence_verification' };
+        return {
+          success: true,
+          verifiedOutputs: { pid, running: false, verifiedTerminated: true },
+          durationMs: 0,
+          warnings: [],
+          verificationMethod: 'process_absence_verification',
+        };
       }
     }
 

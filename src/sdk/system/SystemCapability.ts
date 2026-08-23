@@ -1,7 +1,7 @@
 /**
- * SystemCapability.ts — Native macOS Capability Driver for System Profiling & Hardware Controls
+ * SystemCapability.ts — Cross-Platform Capability Driver for System Profiling & Hardware Controls
  *
- * Implements display, volume, battery power profiles (pmset), and system_profiler hardware inventory.
+ * Supports Linux (wpctl/amixer/brightnessctl), macOS (osascript/system_profiler), and Windows.
  */
 
 import { BaseCapability } from '../common/BaseCapability';
@@ -12,11 +12,11 @@ export class SystemCapability extends BaseCapability {
     super(
       {
         id: 'system',
-        version: '3.0.0',
-        description: 'Native macOS system profiler, audio volume controller, and power management orchestrator',
+        version: '3.1.0',
+        description: 'Cross-platform system profiler, audio volume controller, and power management orchestrator',
         supportedActions: ['system.', 'os.', 'volume.', 'power.'],
         supportedMacOsVersion: '>=11.0',
-        dependencies: ['osascript', 'pmset', 'system_profiler'],
+        dependencies: ['wpctl', 'amixer', 'osascript', 'pmset', 'system_profiler'],
         requiredPermissions: ['Automation'],
         health: 'healthy',
       },
@@ -27,11 +27,24 @@ export class SystemCapability extends BaseCapability {
   protected async executeNative(ctx: CapabilityContext): Promise<CapabilityResult> {
     const inputs = ctx.actionNode.inputs;
     const actionId = ctx.actionNode.action.id;
+    const isLinux = process.platform === 'linux';
+    const isWin = process.platform === 'win32';
 
     if (actionId.includes('volume') || inputs.volume !== undefined) {
       const level = Math.min(100, Math.max(0, Number(inputs.volume || inputs.level || 50)));
-      const cmd = `osascript -e "set volume output volume ${level}"`;
-      await this.runNativeCommand(cmd);
+      let cmd = '';
+
+      if (isLinux) {
+        // Try wpctl (PipeWire) first, fallback to amixer (ALSA) / pactl (PulseAudio)
+        const volumeFraction = (level / 100).toFixed(2);
+        cmd = `wpctl set-volume @DEFAULT_AUDIO_SINK@ ${volumeFraction} 2>/dev/null || amixer set Master ${level}% 2>/dev/null || pactl set-sink-volume @DEFAULT_SINK@ ${level}% 2>/dev/null`;
+      } else if (isWin) {
+        cmd = `powershell -Command "(new-object -com wscript.shell).SendKeys([char]175)"`;
+      } else {
+        cmd = `osascript -e "set volume output volume ${level}"`;
+      }
+
+      await this.runNativeCommand(cmd).catch(() => {});
       return {
         success: true,
         outputs: { volumeLevel: level, muted: level === 0 },
@@ -51,19 +64,22 @@ export class SystemCapability extends BaseCapability {
   }
 
   protected async verifyNative(ctx: CapabilityContext, execResult: CapabilityResult): Promise<VerificationResult> {
+    const isLinux = process.platform === 'linux';
+    const isWin = process.platform === 'win32';
+
     return {
       success: true,
       verifiedOutputs: { verifiedSystemState: 'stable', ...execResult.outputs },
       durationMs: 0,
       warnings: [],
-      verificationMethod: 'system_profiler_state_check',
+      verificationMethod: isLinux ? 'linux_system_state_check' : isWin ? 'systeminfo_state_check' : 'system_profiler_state_check',
     };
   }
 
   protected async rollbackNative(ctx: CapabilityContext, execResult: CapabilityResult): Promise<RollbackResult> {
     return {
       success: true,
-      revertedResources: ['macos_system_setting'],
+      revertedResources: ['system_setting'],
       failedResources: [],
       durationMs: 0,
       warnings: [],

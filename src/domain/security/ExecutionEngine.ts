@@ -142,7 +142,7 @@ export class ExecutionEngine {
           await this.logAudit(capabilityId, input, risk.score, 'Denied', startTime);
           return this.errorResult('PERMISSION_DENIED', `Permission ${requiredPerm} is always denied.`, startTime);
         }
-        if (state === 'AskEveryTime' && !isSafeAction) {
+        if (state === 'AskEveryTime') {
           needsAsk = true;
         }
       }

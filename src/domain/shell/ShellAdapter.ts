@@ -80,7 +80,7 @@ export class ShellAdapter {
     if (lower.includes('bash')) return this.profiles.bash;
     if (lower.includes('fish')) return this.profiles.fish;
     if (lower.includes('nu')) return this.profiles.nushell;
-    if (lower.includes('pwsh') || lower.includes('powershell')) return this.profiles.powershell;
+    if (lower.includes('pwsh') || lower.includes('powershell') || lower.includes('cmd.exe')) return this.profiles.powershell;
 
     return this.profiles.zsh;
   }

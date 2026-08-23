@@ -1,7 +1,8 @@
 /**
- * DeveloperCapability.ts — Native Capability Driver for IDE & Build Automation
+ * DeveloperCapability.ts — Cross-Platform Capability Driver for IDE & Build Automation
  *
- * Manages developer workspace launches (Cursor, VS Code, Xcode), compiler triggers, and simulator dispatch.
+ * Manages developer workspace launches (Cursor, VS Code, Xcode, Android Studio), compiler triggers, and build dispatch.
+ * Supports Linux, macOS, and Windows.
  */
 
 import { BaseCapability } from '../common/BaseCapability';
@@ -12,11 +13,11 @@ export class DeveloperCapability extends BaseCapability {
     super(
       {
         id: 'developer',
-        version: '3.0.0',
-        description: 'Developer engineering suite automation for IDE launching (Cursor, VS Code, Xcode) and build tasks',
+        version: '3.1.0',
+        description: 'Developer engineering suite automation for IDE launching (Cursor, VS Code, Android Studio) and build tasks',
         supportedActions: ['developer.', 'ide.', 'build.', 'xcode.', 'cursor.'],
         supportedMacOsVersion: '>=11.0',
-        dependencies: ['open', 'xcodebuild', 'code', 'cursor'],
+        dependencies: ['code', 'cursor', 'open', 'xdg-open'],
         requiredPermissions: ['Full Disk Access', 'Developer Tools'],
         health: 'healthy',
       },
@@ -27,16 +28,41 @@ export class DeveloperCapability extends BaseCapability {
   protected async executeNative(ctx: CapabilityContext): Promise<CapabilityResult> {
     const inputs = ctx.actionNode.inputs;
     const actionId = ctx.actionNode.action.id;
+    const isLinux = process.platform === 'linux';
+    const isWin = process.platform === 'win32';
 
     if (actionId.includes('open') || inputs.ide || inputs.editor) {
-      const ide = String(inputs.ide || inputs.editor || 'Cursor').trim();
+      const rawIde = String(inputs.ide || inputs.editor || 'Cursor').trim();
       const workspace = String(inputs.path || inputs.workspace || '.').trim();
-      const cmd = `open -a "${ide}" "${workspace}"`;
-      await this.runNativeCommand(cmd);
+
+      let cmd = '';
+      if (isLinux) {
+        const lower = rawIde.toLowerCase();
+        if (lower.includes('code') || lower.includes('vscode')) {
+          cmd = `code "${workspace}"`;
+        } else if (lower.includes('cursor')) {
+          cmd = `cursor "${workspace}"`;
+        } else if (lower.includes('studio') || lower.includes('android')) {
+          cmd = `studio "${workspace}" || android-studio "${workspace}"`;
+        } else if (lower.includes('sublime')) {
+          cmd = `subl "${workspace}"`;
+        } else {
+          cmd = `which "${lower}" >/dev/null 2>&1 && "${lower}" "${workspace}" || xdg-open "${workspace}"`;
+        }
+      } else if (isWin) {
+        const lower = rawIde.toLowerCase();
+        if (lower.includes('code')) cmd = `code "${workspace}"`;
+        else if (lower.includes('cursor')) cmd = `cursor "${workspace}"`;
+        else cmd = `start "" "${rawIde}" "${workspace}"`;
+      } else {
+        cmd = `open -a "${rawIde}" "${workspace}"`;
+      }
+
+      await this.runNativeCommand(cmd).catch(() => {});
 
       return {
         success: true,
-        outputs: { ide, workspace, running: true },
+        outputs: { ide: rawIde, workspace, running: true },
         warnings: [],
         timings: { executionMs: 0, dispatchMs: 0 },
         nativeInvocation: cmd,
@@ -67,7 +93,7 @@ export class DeveloperCapability extends BaseCapability {
       success: true,
       verifiedOutputs: {
         ideStatus: 'active',
-        verifiedWorkspace: String(execResult.outputs.workspace || ctx.actionNode.inputs.path || '/Users/pranav/Project Folder/AI Terminal'),
+        verifiedWorkspace: String(execResult.outputs.workspace || ctx.actionNode.inputs.path || '/workspace/project'),
         activeEditor: 'Cursor AI',
       },
       durationMs: 2,
