@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { InstallerService } from './InstallerService';
+import { isMacOS } from '../../shared/platform';
 
 const mockStore: Record<string, string> = {};
 
@@ -21,6 +22,7 @@ vi.mock('@tauri-apps/plugin-fs', () => ({
 describe('InstallerService', () => {
   const installer = InstallerService.getInstance();
   const cliTarget = '/usr/local/bin/sentinel';
+  const linuxAppDir = '/home/user/.local/share/applications';
   const servicesDir = '/Library/Services';
   const vscodeSettings = '/Code/settings.json';
   const cursorSettings = '/Cursor/settings.json';
@@ -35,11 +37,24 @@ describe('InstallerService', () => {
     expect(mockStore[cliTarget]).toContain('echo "test"');
   });
 
-  it('generates the Finder Quick Action Open in Sentinel workflow service', async () => {
+  it('generates Linux desktop entry file and file manager integration script', async () => {
+    const res = await installer.enableLinuxDesktopIntegration(linuxAppDir, '/home/user/.local/share/nautilus/scripts');
+    expect(res.success).toBe(true);
+    expect(mockStore[`${linuxAppDir}/sentinel.desktop`]).toBeDefined();
+    expect(mockStore[`${linuxAppDir}/sentinel.desktop`]).toContain('[Desktop Entry]');
+    expect(mockStore[`${linuxAppDir}/sentinel.desktop`]).toContain('Exec=sentinel %U');
+    expect(mockStore[`/home/user/.local/share/nautilus/scripts/Open in Sentinel`]).toBeDefined();
+  });
+
+  it('generates the Finder Quick Action Open in Sentinel workflow service on macOS or desktop entry on Linux', async () => {
     const res = await installer.enableFinderIntegration(servicesDir);
     expect(res.success).toBe(true);
-    expect(mockStore[`${servicesDir}/Open in Sentinel.workflow/Contents/Info.plist`]).toBeDefined();
-    expect(mockStore[`${servicesDir}/Open in Sentinel.workflow/Contents/document.wflow`]).toContain('sentinel://open');
+    if (isMacOS()) {
+      expect(mockStore[`${servicesDir}/Open in Sentinel.workflow/Contents/Info.plist`]).toBeDefined();
+      expect(mockStore[`${servicesDir}/Open in Sentinel.workflow/Contents/document.wflow`]).toContain('sentinel://open');
+    } else {
+      expect(res.workflowPath).toContain('sentinel.desktop');
+    }
   });
 
   it('injects Sentinel Terminal profile into VS Code settings.json cleanly', async () => {
@@ -50,7 +65,8 @@ describe('InstallerService', () => {
 
     const saved = JSON.parse(mockStore[vscodeSettings]);
     expect(saved['editor.fontSize']).toBe(14);
-    expect(saved['terminal.integrated.profiles.osx']['Sentinel Terminal'].path).toContain('Sentinel Terminal.app');
+    const profileKey = isMacOS() ? 'terminal.integrated.profiles.osx' : 'terminal.integrated.profiles.linux';
+    expect(saved[profileKey]['Sentinel Terminal']).toBeDefined();
   });
 
   it('injects Sentinel Terminal profile into Cursor IDE settings.json', async () => {
@@ -58,7 +74,8 @@ describe('InstallerService', () => {
     expect(res.success).toBe(true);
 
     const saved = JSON.parse(mockStore[cursorSettings]);
-    expect(saved['terminal.integrated.profiles.osx']['Sentinel Terminal']).toBeDefined();
+    const profileKey = isMacOS() ? 'terminal.integrated.profiles.osx' : 'terminal.integrated.profiles.linux';
+    expect(saved[profileKey]['Sentinel Terminal']).toBeDefined();
   });
 
   it('accurately verifies status of all desktop integration components', async () => {

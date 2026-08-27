@@ -217,12 +217,19 @@ export class SystemSDKCapability extends BaseCapabilityDriver<SystemDriverInput,
 
       case 'lock':
         if (typeof process !== 'undefined' && process.env.NODE_ENV !== 'test') {
-          await invoke('execute_command', { command: 'pmset', args: ['displaysleepnow'] });
+          if (this.detectPlatform() === 'macos') {
+            await invoke('execute_command', { command: 'pmset', args: ['displaysleepnow'] });
+          } else {
+            await invoke('execute_command', { 
+              command: 'sh', 
+              args: ['-c', 'loginctl lock-session 2>/dev/null || xdg-screensaver lock 2>/dev/null || gnome-screensaver-command -l 2>/dev/null || xflock4 2>/dev/null || swaylock 2>/dev/null'] 
+            });
+          }
         }
         return {
           success: true,
           data: { locked: true, stdout: 'System locked successfully' },
-          commandExecuted: 'pmset displaysleepnow'
+          commandExecuted: this.detectPlatform() === 'macos' ? 'pmset displaysleepnow' : 'loginctl lock-session'
         };
 
       default:

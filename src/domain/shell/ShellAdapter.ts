@@ -74,7 +74,17 @@ export class ShellAdapter {
    * Detect the user's default login shell from environment variable or platform default.
    */
   public detectLoginShell(envShellPath?: string): ShellProfile {
-    const targetPath = envShellPath || '/bin/zsh';
+    let targetPath = envShellPath;
+    if (!targetPath && typeof process !== 'undefined' && process.env?.SHELL) {
+      targetPath = process.env.SHELL;
+    }
+    if (!targetPath) {
+      const isMac = typeof process !== 'undefined' ? process.platform === 'darwin' : false;
+      const isWin = typeof process !== 'undefined' ? process.platform === 'win32' : false;
+      if (isWin) targetPath = 'powershell.exe';
+      else if (isMac) targetPath = '/bin/zsh';
+      else targetPath = '/bin/bash'; // Linux standard default (Arch, Ubuntu, Debian, etc.)
+    }
     const lower = targetPath.toLowerCase();
 
     if (lower.includes('bash')) return this.profiles.bash;

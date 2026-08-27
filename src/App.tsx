@@ -8,6 +8,8 @@ import { AiSettingsPage } from "./ui/components/AiSettingsPage";
 import { SessionManager } from "./domain/SessionManager";
 import { InstallerWizard } from "./ui/components/InstallerWizard";
 import { UrlSchemeHandler } from "./domain/integration/UrlSchemeHandler";
+import { ShellAdapter } from "./domain/shell/ShellAdapter";
+import { formatShortcut, isMacOS } from "./shared/platform";
 import "./App.css";
 
 type SplitDirection = 'vertical' | 'horizontal';
@@ -259,17 +261,19 @@ function App() {
     return parts.length > 0 ? parts[parts.length - 1] : '~';
   };
 
+  const detectedShell = ShellAdapter.getInstance().detectLoginShell().id;
+
   const getTabDisplayTitle = (tab: Tab): string => {
     const term = getActiveTerminalPane(tab.rootPane);
     const rawPath = term ? (panePaths[term.id] || '~') : '~';
     const cleaned = formatDisplayPath(rawPath);
-    return `${cleaned} — -zsh`;
+    return `${cleaned} — ${detectedShell}`;
   };
 
   useEffect(() => {
     try {
       const basename = getFolderBasename(currentDisplayPath);
-      const windowTitle = `📁 ${basename} — -zsh`;
+      const windowTitle = `📁 ${basename} — ${detectedShell}`;
       document.title = windowTitle;
       import('@tauri-apps/api/window').then(({ getCurrentWindow }) => {
         getCurrentWindow().setTitle(windowTitle).catch(() => {});
@@ -277,7 +281,7 @@ function App() {
     } catch (e) {
       // Ignore in non-Tauri environments
     }
-  }, [currentDisplayPath, panePaths]);
+  }, [currentDisplayPath, panePaths, detectedShell]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -363,7 +367,7 @@ function App() {
         >
           <div className="pane-header-controls">
             <span style={{ display: 'flex', alignItems: 'center', gap: '6px', opacity: 0.85, fontSize: '11px', fontWeight: 500 }}>
-              <span>📁 {formatDisplayPath(panePaths[node.data.id] || '~')} — -zsh</span>
+              <span>📁 {formatDisplayPath(panePaths[node.data.id] || '~')} — {detectedShell}</span>
             </span>
             <div className="pane-action-buttons">
               <div style={{ position: 'relative', display: 'inline-block' }}>
@@ -390,7 +394,7 @@ function App() {
                       top: '100%',
                       right: 0,
                       marginTop: '6px',
-                      width: '240px',
+                      width: '260px',
                       background: 'var(--sentinel-modal-bg, rgba(16, 17, 21, 0.98))',
                       border: '1px solid var(--sentinel-border-active, rgba(255, 255, 255, 0.2))',
                       borderRadius: '8px',
@@ -402,18 +406,18 @@ function App() {
                     }}
                   >
                     {[
-                      { label: 'New Terminal Tab', shortcut: '⌘T', action: () => addTab() },
-                      { label: 'Split Vertically (Side by side)', shortcut: '⌘D', action: () => splitPane(node.data.id, 'vertical') },
-                      { label: 'Split Horizontally (Stacked)', shortcut: '⇧⌘D', action: () => splitPane(node.data.id, 'horizontal') },
+                      { label: 'New Terminal Tab', shortcut: formatShortcut('t'), action: () => addTab() },
+                      { label: 'Split Vertically (Side by side)', shortcut: formatShortcut('d'), action: () => splitPane(node.data.id, 'vertical') },
+                      { label: 'Split Horizontally (Stacked)', shortcut: formatShortcut('d', true), action: () => splitPane(node.data.id, 'horizontal') },
                       { type: 'divider' },
-                      { label: 'Clear Scrollback & Screen', shortcut: '⌘K', action: () => { if (node.data.sessionId) SessionManager.getInstance().write(node.data.sessionId, 'clear\r'); } },
-                      { label: 'Reset Shell Session', shortcut: '⌘R', action: () => { if (node.data.sessionId) SessionManager.getInstance().write(node.data.sessionId, 'clear && printf "\\033c"\r'); } },
+                      { label: 'Clear Scrollback & Screen', shortcut: formatShortcut('k'), action: () => { if (node.data.sessionId) SessionManager.getInstance().write(node.data.sessionId, 'clear\r'); } },
+                      { label: 'Reset Shell Session', shortcut: formatShortcut('r'), action: () => { if (node.data.sessionId) SessionManager.getInstance().write(node.data.sessionId, 'clear && printf "\\033c"\r'); } },
                       { type: 'divider' },
-                      { label: 'AI Command Palette & Prompt', shortcut: '⇧⌘P', action: () => setCommandPaletteOpen(true) },
-                      { label: 'Zero-Trust AI Security & Profile', shortcut: '⌘,', action: () => setShowAiSettings(true) },
-                      { label: 'macOS Integration & Setup Wizard...', shortcut: '⌘I', action: () => setShowWizard(true) },
+                      { label: 'AI Command Palette & Prompt', shortcut: formatShortcut('p', true), action: () => setCommandPaletteOpen(true) },
+                      { label: 'Zero-Trust AI Security & Profile', shortcut: formatShortcut(','), action: () => setShowAiSettings(true) },
+                      { label: isMacOS() ? 'macOS Integration & Setup Wizard...' : 'Linux Desktop Integration & Setup Wizard...', shortcut: formatShortcut('i'), action: () => setShowWizard(true) },
                       { type: 'divider' },
-                      { label: 'Close Pane / Tab', shortcut: '⌘W', action: () => {
+                      { label: 'Close Pane / Tab', shortcut: formatShortcut('w'), action: () => {
                         if (!isRoot) closePane(node.data.id);
                         else if (tabs.length > 1) closeTab(activeTabId, { stopPropagation: () => {} } as any);
                       }, disabled: isRoot && tabs.length === 1 }
@@ -665,6 +669,7 @@ function App() {
         ))}
       </div>
       <StatusBar 
+        currentShell={detectedShell}
         currentPath={currentDisplayPath}
         onNavigate={handleStatusBarNavigate}
       />

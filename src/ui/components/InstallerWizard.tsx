@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { InstallerService, IntegrationStatus } from '../../domain/integration/InstallerService';
+import { isMacOS, isLinux } from '../../shared/platform';
 
 interface InstallerWizardProps {
   isOpen: boolean;
@@ -17,6 +18,7 @@ export const InstallerWizard: React.FC<InstallerWizardProps> = ({ isOpen, onClos
   const [message, setMessage] = useState<string | null>(null);
 
   const installer = InstallerService.getInstance();
+  const onMac = isMacOS();
 
   useEffect(() => {
     if (isOpen) {
@@ -33,7 +35,11 @@ export const InstallerWizard: React.FC<InstallerWizardProps> = ({ isOpen, onClos
     setLoading(true);
     setMessage('Installing desktop integrations...');
     await installer.installCli();
-    await installer.enableFinderIntegration();
+    if (onMac) {
+      await installer.enableFinderIntegration();
+    } else {
+      await installer.enableLinuxDesktopIntegration();
+    }
     await installer.configureVsCodeIntegration();
     await installer.configureCursorIntegration();
     await refreshStatus();
@@ -51,10 +57,10 @@ export const InstallerWizard: React.FC<InstallerWizardProps> = ({ isOpen, onClos
     setLoading(false);
   };
 
-  const handleEnableFinder = async () => {
+  const handleEnableDesktop = async () => {
     setLoading(true);
-    const res = await installer.enableFinderIntegration();
-    if (res.success) setMessage('✓ Finder Quick Actions registered!');
+    const res = onMac ? await installer.enableFinderIntegration() : await installer.enableLinuxDesktopIntegration();
+    if (res.success) setMessage(onMac ? '✓ Finder Quick Actions registered!' : '✓ Desktop Entry & File Manager actions registered!');
     else setMessage(`Error: ${res.error}`);
     await refreshStatus();
     setLoading(false);
@@ -76,6 +82,8 @@ export const InstallerWizard: React.FC<InstallerWizardProps> = ({ isOpen, onClos
 
   if (!isOpen) return null;
 
+  const osLabel = onMac ? 'macOS' : 'Linux';
+
   return (
     <div style={{
       position: 'fixed',
@@ -89,7 +97,7 @@ export const InstallerWizard: React.FC<InstallerWizardProps> = ({ isOpen, onClos
       alignItems: 'center',
       justifyContent: 'center',
       zIndex: 9999,
-      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif'
+      fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Ubuntu, Cantarell, sans-serif'
     }}>
       <div style={{
         width: '560px',
@@ -105,10 +113,12 @@ export const InstallerWizard: React.FC<InstallerWizardProps> = ({ isOpen, onClos
       }}>
         <div>
           <h2 style={{ fontSize: '22px', fontWeight: 700, margin: '0 0 8px 0', letterSpacing: '-0.3px', color: '#ffffff' }}>
-            Would you like to configure Sentinel as your primary terminal?
+            Configure Sentinel as your primary terminal
           </h2>
           <p style={{ fontSize: '14px', color: 'rgba(255, 255, 255, 0.65)', margin: 0, lineHeight: 1.5 }}>
-            Sentinel provides deep operating system integration on macOS, making it effortless to open sessions from Finder, your CLI, and your favorite IDEs.
+            {onMac
+              ? 'Sentinel provides deep operating system integration on macOS, making it effortless to open sessions from Finder, your CLI, and your favorite IDEs.'
+              : 'Sentinel provides deep desktop integration on Linux (Arch Linux, Ubuntu, Debian, etc.), making it effortless to open sessions from your file manager, application launcher, CLI, and IDEs.'}
           </p>
         </div>
 
@@ -140,7 +150,7 @@ export const InstallerWizard: React.FC<InstallerWizardProps> = ({ isOpen, onClos
             <div>
               <div style={{ fontWeight: 600, fontSize: '15px' }}>Command Line Launcher (`sentinel`)</div>
               <div style={{ fontSize: '13px', color: 'rgba(255, 255, 255, 0.5)', marginTop: '2px' }}>
-                Install executable to `/usr/local/bin/sentinel`
+                Install executable wrapper to `/usr/local/bin/sentinel` or `~/.local/bin/sentinel`
               </div>
             </div>
             <button
@@ -162,7 +172,7 @@ export const InstallerWizard: React.FC<InstallerWizardProps> = ({ isOpen, onClos
             </button>
           </div>
 
-          {/* Item 2: Finder Quick Actions */}
+          {/* Item 2: Desktop / File Manager Quick Actions */}
           <div style={{
             display: 'flex',
             alignItems: 'center',
@@ -173,13 +183,17 @@ export const InstallerWizard: React.FC<InstallerWizardProps> = ({ isOpen, onClos
             borderRadius: '12px'
           }}>
             <div>
-              <div style={{ fontWeight: 600, fontSize: '15px' }}>Finder Quick Actions</div>
+              <div style={{ fontWeight: 600, fontSize: '15px' }}>
+                {onMac ? 'Finder Quick Actions' : 'Desktop & File Manager Integration'}
+              </div>
               <div style={{ fontSize: '13px', color: 'rgba(255, 255, 255, 0.5)', marginTop: '2px' }}>
-                Right-click any folder → Services → Open in Sentinel
+                {onMac
+                  ? 'Right-click any folder → Services → Open in Sentinel'
+                  : 'Desktop launcher entry (.desktop) & Nautilus/Dolphin/Thunar context actions'}
               </div>
             </div>
             <button
-              onClick={handleEnableFinder}
+              onClick={handleEnableDesktop}
               disabled={loading || status.finderEnabled}
               style={{
                 padding: '8px 16px',
@@ -210,7 +224,7 @@ export const InstallerWizard: React.FC<InstallerWizardProps> = ({ isOpen, onClos
             <div>
               <div style={{ fontWeight: 600, fontSize: '15px' }}>VS Code & Cursor IDE Profiles</div>
               <div style={{ fontSize: '13px', color: 'rgba(255, 255, 255, 0.5)', marginTop: '2px' }}>
-                Inject integrated terminal configuration into editor settings
+                Inject integrated terminal configuration into editor settings ({osLabel})
               </div>
             </div>
             <button

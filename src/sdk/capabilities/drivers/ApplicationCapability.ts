@@ -201,15 +201,57 @@ export class ApplicationCapability extends BaseCapabilityDriver<AppDriverInput, 
           command = 'cmd.exe';
           cmdArgs = ['/c', 'start', '', target, ...extraArgs];
         } else {
-          command = target;
-          cmdArgs = extraArgs;
+          // Linux (Arch Linux, Ubuntu, Debian, Fedora, etc.)
+          const cleanTarget = target.toLowerCase().replace(/\s*(?:fod?le?r|dir(?:ectory)?)\s*$/i, '').trim();
+          const folderMapping: Record<string, string> = {
+            'downloads': '~/Downloads',
+            'donwloads': '~/Downloads',
+            'downlods': '~/Downloads',
+            'desktop': '~/Desktop',
+            'documents': '~/Documents',
+            'pictures': '~/Pictures',
+            'music': '~/Music',
+            'videos': '~/Videos',
+            'movies': '~/Videos',
+            'home': '~',
+            'this': '.',
+            'current': '.',
+            'here': '.'
+          };
+
+          if (folderMapping[cleanTarget]) {
+            resolvedTarget = folderMapping[cleanTarget];
+            isPathOrFolder = true;
+          } else if (target.startsWith('/') || target.startsWith('~/') || target.startsWith('./') || target === '~') {
+            isPathOrFolder = true;
+          }
+
+          if (isPathOrFolder && typeof resolvedTarget === 'string') {
+            if (!resolvedTarget.startsWith('/') && !resolvedTarget.startsWith('~/') && resolvedTarget !== '~') {
+              const baseCwd = (context?.cwd && context.cwd.trim() !== '' && context.cwd !== '/') ? context.cwd : '~';
+              resolvedTarget = resolvedTarget === '.' ? baseCwd : `${baseCwd.replace(/\/+$/, '')}/${resolvedTarget.replace(/^\.\//, '')}`;
+            }
+            if (resolvedTarget.startsWith('~/') || resolvedTarget === '~') {
+              try {
+                const hRes = await invoke<{ stdout: string }>('execute_command', { command: 'sh', args: ['-c', 'echo $HOME'] });
+                const hd = (hRes?.stdout || '').trim();
+                if (hd) resolvedTarget = resolvedTarget === '~' ? hd : resolvedTarget.replace(/^~/, hd);
+              } catch { /* ignore */ }
+            }
+            command = 'xdg-open';
+            cmdArgs = [resolvedTarget];
+          } else {
+            command = 'sh';
+            const extra = extraArgs.length > 0 ? ` "${extraArgs.join(' ')}"` : '';
+            cmdArgs = ['-c', `gtk-launch "${target}"${extra} 2>/dev/null || which "${target.toLowerCase()}" >/dev/null 2>&1 && "${target.toLowerCase()}"${extra} & || xdg-open "${extraArgs.join(' ') || target}" 2>/dev/null`];
+          }
         }
 
         const output = await invoke<{ stdout: string; stderr: string; code: number }>('execute_command', { command, args: cmdArgs });
         if (output.code === 0) {
           this.lastOpenedApp = target;
           const stdoutText = isPathOrFolder
-            ? `Successfully opened folder/path in macOS Finder: ${resolvedTarget}`
+            ? `Successfully opened folder/path: ${resolvedTarget}`
             : extraArgs.length > 0
               ? `Successfully launched ${target} with target: ${extraArgs.join(' ')}`
               : `Successfully launched application: ${target}`;
@@ -245,23 +287,41 @@ export class ApplicationCapability extends BaseCapabilityDriver<AppDriverInput, 
           const stdoutText = `Currently Running Desktop Applications (${apps.length}):\r\n  • ` + apps.join('\r\n  • ');
           return { success: true, data: { apps, stdout: stdoutText }, commandExecuted: `osascript -e 'tell application "System Events" to get GUI processes'` };
         } else {
-          const output = await invoke<{ stdout: string }>('execute_command', { command: 'ps', args: ['-eo', 'comm'] });
-          const apps = (output?.stdout || '').split('\n').filter(Boolean);
-          const stdoutText = `Running Processes (${apps.length}):\r\n  • ` + apps.slice(0, 20).join('\r\n  • ');
+          const output = await invoke<{ stdout: string }>('execute_command', { 
+            command: 'sh', 
+            args: ['-c', 'wmctrl -lx 2>/dev/null | awk \'{print $3}\' | sort -u || ps -eo comm --sort=comm | uniq | grep -v "\\[" | head -n 40'] 
+          });
+          let apps = (output?.stdout || '')
+            .split('\n')
+            .map(s => s.trim())
+            .filter(Boolean)
+            .map(name => {
+              if (name === 'tauri-app') return 'Sentinel Terminal';
+              if (name.toLowerCase().includes('antigravity') || name === 'Electron') return 'Antigravity IDE';
+              if (name.toLowerCase().includes('chrome')) return 'Google Chrome';
+              if (name.toLowerCase().includes('firefox')) return 'Firefox';
+              return name;
+            });
+          apps = Array.from(new Set(apps));
+          const stdoutText = `Currently Running Applications (${apps.length}):\r\n  • ` + apps.join('\r\n  • ');
           return { success: true, data: { apps, stdout: stdoutText }, commandExecuted: `ps -eo comm` };
         }
       }
 
       if (op === 'install') {
-        const cmd = platform === 'macos' ? 'brew' : 'apt';
-        const args = platform === 'macos' ? ['install', target] : ['install', '-y', target];
+        const cmd = platform === 'macos' ? 'brew' : 'sh';
+        const args = platform === 'macos'
+          ? ['install', target]
+          : ['-c', `which pacman >/dev/null 2>&1 && sudo pacman -S --noconfirm "${target}" || which apt-get >/dev/null 2>&1 && sudo apt-get install -y "${target}" || which dnf >/dev/null 2>&1 && sudo dnf install -y "${target}" || which flatpak >/dev/null 2>&1 && flatpak install -y "${target}"`];
         await invoke('execute_command', { command: cmd, args });
         return { success: true, data: { installed: true }, commandExecuted: `${cmd} ${args.join(' ')}`, rollbackPayload: { action: 'uninstall', package: target } };
       }
 
       if (op === 'uninstall') {
-        const cmd = platform === 'macos' ? 'brew' : 'apt';
-        const args = platform === 'macos' ? ['uninstall', target] : ['remove', '-y', target];
+        const cmd = platform === 'macos' ? 'brew' : 'sh';
+        const args = platform === 'macos'
+          ? ['uninstall', target]
+          : ['-c', `which pacman >/dev/null 2>&1 && sudo pacman -R --noconfirm "${target}" || which apt-get >/dev/null 2>&1 && sudo apt-get remove -y "${target}" || which dnf >/dev/null 2>&1 && sudo dnf remove -y "${target}"`];
         await invoke('execute_command', { command: cmd, args });
         return { success: true, data: { uninstalled: true }, commandExecuted: `${cmd} ${args.join(' ')}` };
       }
@@ -275,13 +335,15 @@ export class ApplicationCapability extends BaseCapabilityDriver<AppDriverInput, 
         if (target.toLowerCase() === 'safari' || target.toLowerCase() === 'finder' || target.toLowerCase() === 'system settings') {
           return { 
             success: true, 
-            data: { updated: false, reason: 'System application', stdout: `${target} is a macOS system application and can only be updated via System Settings -> Software Update.` },
+            data: { updated: false, reason: 'System application', stdout: `${target} is a system application and is managed by system software updates.` },
             commandExecuted: 'echo'
           };
         }
 
-        const cmd = platform === 'macos' ? 'brew' : 'apt';
-        const args = platform === 'macos' ? ['upgrade', target] : ['upgrade', '-y', target];
+        const cmd = platform === 'macos' ? 'brew' : 'sh';
+        const args = platform === 'macos'
+          ? ['upgrade', target]
+          : ['-c', `which pacman >/dev/null 2>&1 && sudo pacman -Syu --noconfirm "${target}" || which apt-get >/dev/null 2>&1 && sudo apt-get install --only-upgrade -y "${target}" || which dnf >/dev/null 2>&1 && sudo dnf upgrade -y "${target}" || which flatpak >/dev/null 2>&1 && flatpak update -y "${target}"`];
         
         try {
           const res = await invoke<{ stdout: string; stderr: string; code: number }>('execute_command', { command: cmd, args });

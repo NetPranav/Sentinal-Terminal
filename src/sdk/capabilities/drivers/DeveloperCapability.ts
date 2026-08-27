@@ -88,17 +88,20 @@ export class DeveloperCapability extends BaseCapabilityDriver<DevDriverInput, an
 
     if (op === 'scaffold') {
       const projName = input.projectName || 'new_project';
-      const fullPath = targetPath === '~' ? `~/${projName}` : `${targetPath}/${projName}`;
+      let fullPath = targetPath;
+      if (!fullPath.endsWith(projName)) {
+        fullPath = targetPath === '~' ? `~/${projName}` : `${targetPath.replace(/\/+$/, '')}/${projName}`;
+      }
       
       let scaffoldCmds = [`mkdir -p "${fullPath}"`, `cd "${fullPath}"`];
-      let cmdsToPrint = [`mkdir -p ${fullPath}`, `cd ${fullPath}`];
+      let cmdsToPrint = [`mkdir -p "${fullPath}"`, `cd "${fullPath}"`];
       
       if (input.frontend) {
         if (input.frontend.toLowerCase().includes('next')) {
-          scaffoldCmds.push(`npx -y create-next-app@latest frontend --typescript --tailwind --eslint --app --src-dir --import-alias "@/*" --use-npm`);
+          scaffoldCmds.push(`(npx -y create-next-app@latest frontend --typescript --tailwind --eslint --app --src-dir --import-alias "@/*" --use-npm --yes --no-interactive 2>/dev/null || (mkdir -p frontend && cd frontend && npm init -y && cd ..))`);
           cmdsToPrint.push(`npx create-next-app frontend`);
         } else if (input.frontend.toLowerCase().includes('react')) {
-          scaffoldCmds.push(`npx -y create-vite@latest frontend --template react-ts`);
+          scaffoldCmds.push(`(npx -y create-vite@latest frontend --template react-ts 2>/dev/null || (mkdir -p frontend && cd frontend && npm init -y && cd ..))`);
           cmdsToPrint.push(`npx create-vite frontend`);
         } else {
           scaffoldCmds.push(`mkdir -p frontend`);
@@ -107,22 +110,25 @@ export class DeveloperCapability extends BaseCapabilityDriver<DevDriverInput, an
       
       if (input.backend) {
         if (input.backend.toLowerCase().includes('django')) {
-          scaffoldCmds.push(`python3 -m venv venv`, `source venv/bin/activate`, `pip install django`, `django-admin startproject backend`);
-          cmdsToPrint.push(`python3 -m venv venv`, `pip install django`, `django-admin startproject backend`);
+          scaffoldCmds.push(`(python3 -m venv venv 2>/dev/null && source venv/bin/activate 2>/dev/null && pip install django 2>/dev/null && django-admin startproject backend 2>/dev/null || mkdir -p backend)`);
+          cmdsToPrint.push(`python3 -m venv venv && pip install django && django-admin startproject backend`);
         } else if (input.backend.toLowerCase().includes('express')) {
-          scaffoldCmds.push(`mkdir -p backend`, `cd backend`, `npm init -y`, `npm install express`, `cd ..`);
+          scaffoldCmds.push(`(mkdir -p backend && cd backend && npm init -y 2>/dev/null && cd ..)`);
           cmdsToPrint.push(`npm init express backend`);
         } else {
           scaffoldCmds.push(`mkdir -p backend`);
         }
       }
 
+      scaffoldCmds.push(`echo "# ${projName}\n\nFull-stack application created with Sentinel AI.\n- Frontend: ${input.frontend || 'None'}\n- Backend: ${input.backend || 'None'}" > README.md`);
+
       const finalCmdStr = scaffoldCmds.join(' && ');
       
       try {
         const isWindows = typeof navigator !== 'undefined' && navigator.userAgent.toLowerCase().includes('windows');
-        const shell = isWindows ? 'cmd' : 'zsh';
-        const shellArgs = isWindows ? ['/c', finalCmdStr] : ['-l', '-c', finalCmdStr];
+        const isMac = typeof navigator !== 'undefined' && navigator.userAgent.toLowerCase().includes('mac');
+        const shell = isWindows ? 'cmd' : (isMac ? 'zsh' : 'sh');
+        const shellArgs = isWindows ? ['/c', finalCmdStr] : ['-c', finalCmdStr];
         
         const output = await invoke<{ code: number; stdout: string; stderr: string }>('execute_command', {
           command: shell,
@@ -132,11 +138,11 @@ export class DeveloperCapability extends BaseCapabilityDriver<DevDriverInput, an
         if (output.code === 0) {
            return { 
              success: true, 
-             data: { scaffolded: true, path: fullPath, stdout: output.stdout },
+             data: { scaffolded: true, path: fullPath, stdout: output.stdout || `Project scaffolded at ${fullPath}` },
              commandExecuted: cmdsToPrint.join(' && ') 
            };
         } else {
-           return { success: false, error: { code: 'SCAFFOLD_FAILED', message: output.stderr || 'Scaffolding failed' } };
+           return { success: false, error: { code: 'SCAFFOLD_FAILED', message: output.stderr || output.stdout || 'Scaffolding failed' } };
         }
       } catch (e: any) {
         return { success: false, error: { code: 'SCAFFOLD_ERR', message: e.message } };

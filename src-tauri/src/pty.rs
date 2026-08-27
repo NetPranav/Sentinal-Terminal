@@ -98,21 +98,31 @@ pub fn spawn_pty(
     }
 
     if let Ok(path) = std::env::var("PATH") {
-        let mut path_additions = Vec::new();
+        let mut path_additions: Vec<String> = Vec::new();
         #[cfg(target_os = "macos")]
         {
-            if !path.contains("/opt/homebrew/bin") { path_additions.push("/opt/homebrew/bin"); }
-            if !path.contains("/opt/homebrew/sbin") { path_additions.push("/opt/homebrew/sbin"); }
-            if !path.contains("/usr/local/bin") { path_additions.push("/usr/local/bin"); }
+            if !path.contains("/opt/homebrew/bin") { path_additions.push("/opt/homebrew/bin".to_string()); }
+            if !path.contains("/opt/homebrew/sbin") { path_additions.push("/opt/homebrew/sbin".to_string()); }
+            if !path.contains("/usr/local/bin") { path_additions.push("/usr/local/bin".to_string()); }
         }
         #[cfg(target_os = "linux")]
         {
-            if !path.contains("/usr/local/bin") { path_additions.push("/usr/local/bin"); }
-            if !path.contains("/usr/bin") { path_additions.push("/usr/bin"); }
-            if !path.contains("/bin") { path_additions.push("/bin"); }
-            if !path.contains("/usr/local/sbin") { path_additions.push("/usr/local/sbin"); }
-            if !path.contains("/usr/sbin") { path_additions.push("/usr/sbin"); }
-            if !path.contains("/sbin") { path_additions.push("/sbin"); }
+            if let Ok(home) = std::env::var("HOME") {
+                let local_bin = format!("{}/.local/bin", home);
+                let cargo_bin = format!("{}/.cargo/bin", home);
+                if std::path::Path::new(&local_bin).exists() && !path.contains(&local_bin) {
+                    path_additions.push(local_bin);
+                }
+                if std::path::Path::new(&cargo_bin).exists() && !path.contains(&cargo_bin) {
+                    path_additions.push(cargo_bin);
+                }
+            }
+            if !path.contains("/usr/local/bin") { path_additions.push("/usr/local/bin".to_string()); }
+            if !path.contains("/usr/bin") { path_additions.push("/usr/bin".to_string()); }
+            if !path.contains("/bin") { path_additions.push("/bin".to_string()); }
+            if !path.contains("/usr/local/sbin") { path_additions.push("/usr/local/sbin".to_string()); }
+            if !path.contains("/usr/sbin") { path_additions.push("/usr/sbin".to_string()); }
+            if !path.contains("/sbin") { path_additions.push("/sbin".to_string()); }
         }
         if !path_additions.is_empty() {
             cmd.env("PATH", format!("{}:{}", path, path_additions.join(":")));

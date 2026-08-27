@@ -11,8 +11,10 @@ export interface StatusBarProps {
   currentProfile?: string;
 }
 
+import { ShellAdapter } from '../../domain/shell/ShellAdapter';
+
 export const StatusBar: React.FC<StatusBarProps> = ({ 
-  currentShell = 'zsh', 
+  currentShell = ShellAdapter.getInstance().detectLoginShell().id, 
   currentPath = '~',
   onNavigate,
   memoryUsage: initialMemory = 145,

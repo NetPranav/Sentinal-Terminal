@@ -14,6 +14,7 @@ import { HistoryProvider } from '../domain/autocomplete/HistoryProvider';
 import { GhostTextRenderer } from '../ui/components/GhostText';
 import { ThemeManager } from '../ui/theme/ThemeManager';
 import { ShellAdapter } from '../domain/shell/ShellAdapter';
+import { getPlatform, isMacOS } from '../shared/platform';
 import '@xterm/xterm/css/xterm.css';
 
 interface TerminalViewProps {
@@ -54,27 +55,30 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
         // Fallback for non-Tauri browser development environments
         if (authPassword !== 'admin' && authPassword !== 'password' && authPassword !== 'sentinel') {
           isValid = false;
-          errorMessage = 'Authentication failed: Incorrect system password. Please enter your valid macOS login password.';
+          errorMessage = 'Authentication failed: Incorrect system password. Please enter your valid system login password.';
         } else {
           isValid = true;
         }
       } else {
         const escaped = authPassword.replace(/'/g, "'\\''");
-        // Securely verify system password against macOS Directory Service login credentials
+        const authCmd = isMacOS()
+          ? `dscl . -authonly "$(whoami)" '${escaped}' 2>&1 || (echo '${escaped}' | sudo -S -k -v 2>&1)`
+          : `echo '${escaped}' | sudo -S -k -v 2>&1`;
+        
         const res = await invoke<{ code?: number; stderr?: string; stdout?: string }>('execute_command', {
           command: 'sh',
-          args: ['-c', `dscl . -authonly "$(whoami)" '${escaped}' 2>&1 || (echo '${escaped}' | sudo -S -k -v 2>&1)`]
+          args: ['-c', authCmd]
         });
         if (res && res.code === 0) {
           isValid = true;
         } else {
           isValid = false;
-          errorMessage = 'Authentication failed: Incorrect system password. Please enter your valid macOS login password.';
+          errorMessage = 'Authentication failed: Incorrect system password. Please enter your valid system login password.';
         }
       }
     } catch (err: any) {
       isValid = false;
-      errorMessage = 'Authentication failed: Incorrect system password. Please enter your valid macOS login password.';
+      errorMessage = 'Authentication failed: Incorrect system password. Please enter your valid system login password.';
     }
 
     setIsVerifying(false);
@@ -266,6 +270,11 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
               if (cleanCmd.startsWith('cd ') || cleanCmd === 'cd') {
                 const target = cleanCmd.replace(/^cd\s*/i, '').replace(/["']/g, '').trim() || '~';
                 notifyNavigation(target);
+              } else if ((cleanCmd.startsWith('/') || cleanCmd.startsWith('~/') || cleanCmd.startsWith('./') || cleanCmd.startsWith('../') || cleanCmd.endsWith('/')) && !cleanCmd.includes(' ') && !cleanCmd.startsWith('>')) {
+                // Auto-cd when entering a directory path directly in the shell prompt
+                notifyNavigation(cleanCmd);
+                await sessionManager.write(currentSessionId!, `\x03cd "${cleanCmd}"\r`);
+                return;
               }
 
               // Intercept application mapping slash commands: /app, /apps, /alias, /aliases
@@ -289,14 +298,21 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
                 return;
               }
 
-              // Only trigger AI execution when written after ">" (e.g., ">find me the AAAA folder" or ">go to downloads")
-              if (cleanCmd.startsWith('>')) {
-                const aiGoal = cleanCmd.substring(1).trim();
+              const isExplicitAi = cleanCmd.startsWith('>');
+              const isNaturalLanguagePrompt = (
+                cleanCmd.length > 8 &&
+                /^(?:create|make|init|initialize|initilize|scaffold|setup|show|find|search|scan|check|turn\s+on|turn\s+off|lock|how\s+to|what\s+is|who\s+am|where\s+is|please|help\s+me|can\s+you|could\s+you)\b/i.test(cleanCmd) &&
+                !/^(?:git|npm|cargo|docker|sudo|pacman|apt|pip|python|node|curl|cat|ls|cd|rm|cp|mv|mkdir|touch|export|clear|exit|head|tail|grep|find\s+\/|find\s+\.)\b/i.test(cleanCmd)
+              );
+
+              // Trigger AI execution for explicit ">" or natural language instructions
+              if (isExplicitAi || isNaturalLanguagePrompt) {
+                const aiGoal = isExplicitAi ? cleanCmd.substring(1).trim() : cleanCmd.trim();
                 if (!aiGoal) {
                   return; // Empty AI instruction
                 }
 
-                // Cancel the shell echo of the > command
+                // Cancel the shell echo / execution of the command
                 await sessionManager.write(currentSessionId!, '\x03');
 
                 // Set up event listener for live output
@@ -310,7 +326,7 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
                 });
 
                 // Run the agent loop
-                agentLoop.run(aiGoal, { os: 'mac', cwd: currentPath || '~' }).then(result => {
+                agentLoop.run(aiGoal, { os: getPlatform() === 'macos' ? 'mac' : 'linux', cwd: currentPath || '~' }).then(result => {
                   // Handle clear terminal command
                   if (result.steps.some(s => s.tool === '__clear__')) {
                     term.clear();
@@ -356,7 +372,7 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
                     currentInput: commandText, 
                     cwd: currentPath || '~',
                     cursorPosition: commandText.length,
-                    os: 'macos'
+                    os: getPlatform()
                   });
                   if (suggestions.length > 0) {
                      ghostText.render(suggestions[0].value, commandText);

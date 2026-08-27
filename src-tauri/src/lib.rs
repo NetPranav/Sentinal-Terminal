@@ -50,10 +50,15 @@ pub fn run() {
                 };
                 
                 // Try multiple possible locations for the llama-server binary
-                let possible_paths = vec![
+                let mut possible_paths = vec![
                     exe_dir.join("llama-server"),                    // dev mode: target/debug/llama-server
                     exe_dir.join("../MacOS/llama-server"),           // bundled .app: Contents/MacOS/llama-server
+                    std::path::PathBuf::from("/usr/bin/llama-server"),
+                    std::path::PathBuf::from("/usr/local/bin/llama-server"),
                 ];
+                if let Ok(home) = std::env::var("HOME") {
+                    possible_paths.push(std::path::PathBuf::from(format!("{}/.local/bin/llama-server", home)));
+                }
                 
                 let binary_path = possible_paths.iter().find(|p| p.exists());
                 
@@ -68,17 +73,24 @@ pub fn run() {
                             .unwrap_or(4)
                             .to_string();
                         
+                        #[allow(unused_mut)]
+                        let mut args = vec![
+                            "--port".to_string(), "8847".to_string(),
+                            "-m".to_string(), model_str,
+                            "-t".to_string(), n_threads,
+                            "--flash-attn".to_string(),
+                            "-b".to_string(), "2048".to_string(),
+                            "-c".to_string(), "4096".to_string(),
+                            "--no-warmup".to_string(),
+                        ];
+                        #[cfg(target_os = "macos")]
+                        {
+                            args.push("-ngl".to_string());
+                            args.push("99".to_string());
+                        }
+                        
                         match std::process::Command::new(bin_path)
-                            .args([
-                                "--port", "8847",
-                                "-m", &model_str,
-                                "-ngl", "99",           // Offload ALL layers to Metal GPU
-                                "-t", &n_threads,       // Use all CPU threads for prompt processing
-                                "--flash-attn",         // Flash attention for faster inference
-                                "-b", "2048",           // Larger batch size for throughput
-                                "-c", "4096",           // Context window
-                                "--no-warmup",          // Skip warmup for faster startup
-                            ])
+                            .args(&args)
                             .stdout(std::process::Stdio::null())
                             .stderr(std::process::Stdio::null())
                             .spawn()
@@ -88,20 +100,53 @@ pub fn run() {
                         }
                     },
                     None => {
-                        eprintln!("Could not find llama-server binary. Searched: {:?}", 
-                            possible_paths.iter().map(|p| p.display().to_string()).collect::<Vec<_>>());
+                        println!("llama-server binary not bundled; using Ollama / local API runtime fallback.");
                     }
                 }
             }
             
-            #[cfg(target_os = "macos")]
             {
                 use tauri::menu::{Menu, Submenu, MenuItem, PredefinedMenuItem};
                 use tauri::Emitter;
 
                 let handle = app.handle();
 
-                // 1. App Submenu
+                // 1. File Submenu
+                let new_tab_item = MenuItem::with_id(handle, "new-tab", "New Terminal Tab", true, Some("CmdOrCtrl+T"))?;
+                let close_tab_item = MenuItem::with_id(handle, "close-tab", "Close Tab", true, Some("CmdOrCtrl+W"))?;
+                let file_menu = Submenu::with_items(handle, "File", true, &[
+                    &new_tab_item,
+                    &close_tab_item,
+                ])?;
+
+                // 2. Personalization & Settings Submenu
+                let theme_item = MenuItem::with_id(handle, "open-theme", "Appearance & Color Themes...", true, None::<&str>)?;
+                let ai_item = MenuItem::with_id(handle, "open-ai-settings", "AI Engine & Model Settings...", true, None::<&str>)?;
+                let personalize_menu = Submenu::with_items(handle, "Personalization", true, &[
+                    &theme_item,
+                    &ai_item,
+                ])?;
+
+                // 3. Edit Submenu
+                let edit_menu = Submenu::with_items(handle, "Edit", true, &[
+                    &PredefinedMenuItem::undo(handle, None)?,
+                    &PredefinedMenuItem::redo(handle, None)?,
+                    &PredefinedMenuItem::separator(handle)?,
+                    &PredefinedMenuItem::cut(handle, None)?,
+                    &PredefinedMenuItem::copy(handle, None)?,
+                    &PredefinedMenuItem::paste(handle, None)?,
+                    &PredefinedMenuItem::select_all(handle, None)?,
+                ])?;
+
+                // 4. View / Window
+                let window_menu = Submenu::with_items(handle, "Window", true, &[
+                    &PredefinedMenuItem::minimize(handle, None)?,
+                    &PredefinedMenuItem::fullscreen(handle, None)?,
+                    &PredefinedMenuItem::separator(handle)?,
+                    &PredefinedMenuItem::close_window(handle, None)?,
+                ])?;
+
+                #[cfg(target_os = "macos")]
                 let app_menu = Submenu::with_items(handle, "Sentinel Terminal", true, &[
                     &PredefinedMenuItem::about(handle, None, None)?,
                     &PredefinedMenuItem::separator(handle)?,
@@ -114,41 +159,7 @@ pub fn run() {
                     &PredefinedMenuItem::quit(handle, None)?,
                 ])?;
 
-                // 2. Personalization & Settings Submenu (in the native top menu bar)
-                let theme_item = MenuItem::with_id(handle, "open-theme", "Appearance & Color Themes...", true, None::<&str>)?;
-                let ai_item = MenuItem::with_id(handle, "open-ai-settings", "AI Engine & Model Settings...", true, None::<&str>)?;
-                let personalize_menu = Submenu::with_items(handle, "Personalization", true, &[
-                    &theme_item,
-                    &ai_item,
-                ])?;
-
-                // 3. File Submenu
-                let new_tab_item = MenuItem::with_id(handle, "new-tab", "New Terminal Tab", true, Some("CmdOrCtrl+T"))?;
-                let close_tab_item = MenuItem::with_id(handle, "close-tab", "Close Tab", true, Some("CmdOrCtrl+W"))?;
-                let file_menu = Submenu::with_items(handle, "File", true, &[
-                    &new_tab_item,
-                    &close_tab_item,
-                ])?;
-
-                // 4. Edit Submenu
-                let edit_menu = Submenu::with_items(handle, "Edit", true, &[
-                    &PredefinedMenuItem::undo(handle, None)?,
-                    &PredefinedMenuItem::redo(handle, None)?,
-                    &PredefinedMenuItem::separator(handle)?,
-                    &PredefinedMenuItem::cut(handle, None)?,
-                    &PredefinedMenuItem::copy(handle, None)?,
-                    &PredefinedMenuItem::paste(handle, None)?,
-                    &PredefinedMenuItem::select_all(handle, None)?,
-                ])?;
-
-                // 5. View / Window
-                let window_menu = Submenu::with_items(handle, "Window", true, &[
-                    &PredefinedMenuItem::minimize(handle, None)?,
-                    &PredefinedMenuItem::fullscreen(handle, None)?,
-                    &PredefinedMenuItem::separator(handle)?,
-                    &PredefinedMenuItem::close_window(handle, None)?,
-                ])?;
-
+                #[cfg(target_os = "macos")]
                 let menu = Menu::with_items(handle, &[
                     &app_menu,
                     &personalize_menu,
@@ -157,7 +168,15 @@ pub fn run() {
                     &window_menu,
                 ])?;
 
-                app.set_menu(menu)?;
+                #[cfg(not(target_os = "macos"))]
+                let menu = Menu::with_items(handle, &[
+                    &file_menu,
+                    &personalize_menu,
+                    &edit_menu,
+                    &window_menu,
+                ])?;
+
+                let _ = app.set_menu(menu);
 
                 app.on_menu_event(|app_handle, event| {
                     match event.id().as_ref() {

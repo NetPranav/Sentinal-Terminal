@@ -19,7 +19,7 @@ export interface ToolSpec {
  * Only includes the most commonly used tools to keep the prompt small.
  */
 export function buildToolSpecs(registry: ToolRegistryState): ToolSpec[] {
-  const tools = registry.toolIndex.getAll();
+  const tools = registry?.toolIndex?.getAll ? registry.toolIndex.getAll() : [];
   return tools.map(t => ({
     id: t.definition.id,
     name: t.definition.displayName,

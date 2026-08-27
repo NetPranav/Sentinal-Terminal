@@ -51,7 +51,37 @@ interface LLMResponse {
  * These map natural language directly to tool calls for instant response.
  */
 const FAST_PATHS: { pattern: RegExp; tool: string; paramsFn: (match: RegExpMatchArray, raw: string) => Record<string, any> }[] = [
-  // Navigation
+  // Conversational & Assistance
+  { pattern: /^(?:hello|hi|hey|greetings|good\s+(?:morning|afternoon|evening)|howdy|sup)\b/i, tool: '__greeting__', paramsFn: () => ({}) },
+  { pattern: /^(?:help|what\s+can\s+you\s+do|who\s+are\s+you|capabilities|commands)\b/i, tool: '__help__', paramsFn: () => ({}) },
+
+  // System Specs & Diagnostics
+  { pattern: /^(?:show\s+)?(?:system\s+specs?|system\s+info|specs|check\s+(?:my\s+)?system(?:\s+info)?|check\s+ram|check\s+cpu|diagnostic)\s*$/i, tool: 'system.info', paramsFn: () => ({}) },
+  { pattern: /^(?:check\s+)?(?:my\s+)?battery(?:\s+status|\s+percentage|\s+level)?\s*$/i, tool: 'system.battery', paramsFn: () => ({}) },
+  { pattern: /^(?:lock|lock\s+(?:my\s+)?(?:screen|session|computer|laptop))\s*$/i, tool: 'system.lock', paramsFn: () => ({}) },
+
+  // Running Applications & Processes
+  { pattern: /^(?:list|show)\s+(?:all\s+)?(?:running|open)\s+(?:applications|apps|processes)\s*$/i, tool: 'application.list_running', paramsFn: () => ({}) },
+
+  // Wireless (WiFi & Bluetooth)
+  { pattern: /^(?:scan|list|search)\s+(?:for\s+)?(?:available\s+)?(?:wifi|wi-fi)(?:\s+networks?)?\s*$/i, tool: 'network.wifi.scan', paramsFn: () => ({}) },
+  { pattern: /^(?:turn\s+on|enable|activate)\s+(?:wifi|wi-fi)\s*$/i, tool: 'network.wifi.on', paramsFn: () => ({}) },
+  { pattern: /^(?:turn\s+off|disable|deactivate)\s+(?:wifi|wi-fi)\s*$/i, tool: 'network.wifi.off', paramsFn: () => ({}) },
+
+  { pattern: /^(?:scan|list|search)\s+(?:for\s+)?(?:available\s+)?bluetooth(?:\s+devices?)?\s*$/i, tool: 'network.bluetooth.list', paramsFn: () => ({}) },
+  { pattern: /^(?:turn\s+on|enable|activate)\s+bluetooth\s*$/i, tool: 'network.bluetooth.on', paramsFn: () => ({}) },
+  { pattern: /^(?:turn\s+off|disable|deactivate)\s+bluetooth\s*$/i, tool: 'network.bluetooth.off', paramsFn: () => ({}) },
+
+  // File Search
+  { pattern: /^(?:find|search|locate)\s+(?:me\s+)?(?:all\s+)?(?:files?\s+)?(?:named|with\s+name|matching)\s+['"]?([a-z0-9_.*-]+)['"]?/i, tool: 'filesystem.search', paramsFn: (m) => ({ dir: '.', pattern: m[1].trim() }) },
+
+  // Basic Queries
+  { pattern: /^(?:who\s+am\s+i|whoami)\s*$/i, tool: 'shell.execute', paramsFn: () => ({ command: 'whoami' }) },
+  { pattern: /^(?:what\s+is\s+the\s+time|current\s+time|time|what\s+time\s+is\s+it)\s*$/i, tool: 'shell.execute', paramsFn: () => ({ command: 'date +"%r %Z"' }) },
+  { pattern: /^(?:what\s+is\s+the\s+date|current\s+date|date)\s*$/i, tool: 'shell.execute', paramsFn: () => ({ command: 'date +"%A, %B %d, %Y"' }) },
+
+  // Navigation & Direct Paths (e.g. /home/..., ~/..., ./..., sentinal-windows/, or folder names)
+  { pattern: /^(?:(?:go\s+to|navigate\s+to|take\s+me\s+to|cd|head\s+to|jump\s+to|open)\s+)?((?:\/|~\/|\.\/|\.\.\/|[a-zA-Z0-9_.-]+\/)[^\s]*)\s*$/i, tool: 'filesystem.navigate', paramsFn: (m) => ({ path: resolvePathAlias(m[1].trim()) }) },
   { pattern: /^(?:go\s+to|navigate\s+to|take\s+me\s+to|cd|head\s+to|jump\s+to)\s+(.+)/i, tool: 'filesystem.navigate', paramsFn: (m) => ({ path: resolvePathAlias(m[1].trim()) }) },
   { pattern: /^(?:go\s+back|back|go\s+up|navigate\s+back|\.\.)\s*$/i, tool: 'filesystem.navigate', paramsFn: () => ({ path: '..' }) },
   { pattern: /^(?:go\s+home|home)\s*$/i, tool: 'filesystem.navigate', paramsFn: () => ({ path: '~' }) },
@@ -63,13 +93,8 @@ const FAST_PATHS: { pattern: RegExp; tool: string; paramsFn: (match: RegExpMatch
   // Clear
   { pattern: /^(?:clear|clear\s+(?:terminal|screen)|clean\s+(?:terminal|screen))\s*$/i, tool: '__clear__', paramsFn: () => ({}) },
 
-  // Simple bluetooth on/off
-  { pattern: /^(?:turn\s+on|enable|activate)\s+bluetooth\s*$/i, tool: 'network.bluetooth.on', paramsFn: () => ({}) },
-  { pattern: /^(?:turn\s+off|disable|deactivate)\s+bluetooth\s*$/i, tool: 'network.bluetooth.off', paramsFn: () => ({}) },
-
-  // Simple wifi on/off
-  { pattern: /^(?:turn\s+on|enable|activate)\s+(?:wifi|wi-fi)\s*$/i, tool: 'network.wifi.on', paramsFn: () => ({}) },
-  { pattern: /^(?:turn\s+off|disable|deactivate)\s+(?:wifi|wi-fi)\s*$/i, tool: 'network.wifi.off', paramsFn: () => ({}) },
+  // Single-word folder/directory shorthand (e.g. "sentinal-windows" or "downloads")
+  { pattern: /^(?:(?:cd|go\s+to|navigate\s+to)\s+)?([a-zA-Z0-9_.-]{2,})\s*$/i, tool: 'filesystem.navigate', paramsFn: (m) => ({ path: resolvePathAlias(m[1].trim()) }) },
 ];
 
 function resolvePathAlias(raw: string): string {
@@ -78,7 +103,7 @@ function resolvePathAlias(raw: string): string {
     'downloads': '~/Downloads', 'download': '~/Downloads',
     'desktop': '~/Desktop', 'documents': '~/Documents',
     'pictures': '~/Pictures', 'photos': '~/Pictures',
-    'music': '~/Music', 'movies': '~/Movies', 'videos': '~/Movies',
+    'music': '~/Music', 'movies': '~/Videos', 'videos': '~/Videos',
     'home': '~', 'root': '/',
     'project folder': '~/Project Folder', 'projects': '~/Projects',
   };
@@ -122,14 +147,14 @@ export class AgentLoop {
    * 3. If LLM is unavailable, report error
    */
   public async run(goal: string, context: { os: string; cwd: string }): Promise<AgentResult> {
-    // Strip conversational fluff from the front (but not standalone words like 'there')
+    // Strip conversational fluff from the front
     const cleaned = goal
       .replace(/^(?:(?:please|can you|could you|would you|kindly|just|now|alright|then|so|i want you to|i want to|i need you to|help me to|let's|lets)[\s,]*)+/i, '')
       .trim();
 
     let result: AgentResult;
     if (cleaned.length > 0) {
-      const fastResult = await this.tryFastPath(cleaned, context);
+      const fastResult = await this.tryFastPath(cleaned, context) || await this.tryFastPath(goal.trim(), context);
       if (fastResult) {
         result = fastResult;
       } else {
@@ -159,6 +184,55 @@ export class AgentLoop {
       if (match) {
         const params = fp.paramsFn(match, goal);
 
+        // Special case: greeting
+        if (fp.tool === '__greeting__') {
+          const greeting = `Hello! I'm Sentinel AI, your native Linux terminal assistant.\r\n` +
+            `I can help you monitor system metrics, control wireless hardware, navigate files, manage processes, and run workflows.\r\n\r\n` +
+            `Try typing:\r\n` +
+            `  • > show system specs\r\n` +
+            `  • > check battery status\r\n` +
+            `  • > list running applications\r\n` +
+            `  • > scan for available wifi networks\r\n` +
+            `  • > scan for bluetooth devices\r\n` +
+            `  • > search for files named package.json\r\n` +
+            `  • > go to downloads\r\n` +
+            `  • > lock my screen\r\n` +
+            `  • > help`;
+          this.emit({ type: 'done', message: greeting });
+          return {
+            success: true,
+            summary: greeting,
+            steps: [{ tool: '__greeting__', params: {}, result: { success: true, data: { text: greeting } } }]
+          };
+        }
+
+        // Special case: help
+        if (fp.tool === '__help__') {
+          const helpText = `Sentinel Terminal — AI Assistant & Native Capabilities:\r\n\r\n` +
+            `Prefix any line with '>' to invoke AI natural language control:\r\n\r\n` +
+            `  [System & Diagnostics]\r\n` +
+            `  • > show system specs         (CPU, RAM, kernel, uptime)\r\n` +
+            `  • > check battery status      (Percentage, power source, charging)\r\n` +
+            `  • > lock my screen            (Session locking via loginctl)\r\n` +
+            `  • > list running applications (Active GUI apps & processes)\r\n\r\n` +
+            `  [Wireless & Connectivity]\r\n` +
+            `  • > scan for wifi networks    (List nearby wireless SSIDs via nmcli)\r\n` +
+            `  • > turn on / off wifi        (Toggle WiFi radio)\r\n` +
+            `  • > scan bluetooth devices    (Paired & nearby Bluetooth via bluetoothctl)\r\n` +
+            `  • > turn on / off bluetooth   (Toggle Bluetooth radio)\r\n\r\n` +
+            `  [Filesystem & Navigation]\r\n` +
+            `  • > search for files named <name>  (Recursive directory search)\r\n` +
+            `  • > go to <folder> / > go home     (Navigate terminal directory)\r\n` +
+            `  • > list files in <directory>      (Inspect folder contents)\r\n\r\n` +
+            `Tip: To attach a local Ollama model (e.g. Qwen, Llama 3) or remote API, open Personalization → AI Engine Settings.`;
+          this.emit({ type: 'done', message: helpText });
+          return {
+            success: true,
+            summary: helpText,
+            steps: [{ tool: '__help__', params: {}, result: { success: true, data: { text: helpText } } }]
+          };
+        }
+
         // Special case: clear terminal
         if (fp.tool === '__clear__') {
           return {
@@ -168,7 +242,7 @@ export class AgentLoop {
           };
         }
 
-        this.emit({ type: 'tool_start', message: `Running ${fp.tool}...` });
+        this.emit({ type: 'tool_start', message: this.getToolDisplayName(fp.tool) });
         const result = await this.toolExecutor.execute(fp.tool, params, context.cwd);
         
         const cdPath = this.extractCdPath(fp.tool, params, result);
@@ -194,13 +268,19 @@ export class AgentLoop {
   }
 
   /**
-   * The core LLM agent loop — sends the goal to Ollama, executes tools,
+   * The core LLM agent loop — sends the goal to local model, executes tools,
    * feeds results back, and repeats until done.
    */
   private async runLLMLoop(goal: string, context: { os: string; cwd: string }): Promise<AgentResult> {
     const systemPrompt = buildSystemPrompt(this.toolSpecs, context);
     const steps: { tool: string; params: any; result: ToolExecutionResult }[] = [];
     let cdPath: string | undefined;
+
+    // Check fast heuristic fallback first
+    const earlyFallback = this.tryHeuristicFallback(goal, context);
+    if (earlyFallback) {
+      return await this.executeFallback(earlyFallback, context);
+    }
 
     // Build conversation messages
     const messages: { role: string; content: string }[] = [
@@ -210,16 +290,17 @@ export class AgentLoop {
 
     this.emit({ type: 'thinking', message: 'Thinking...' });
 
-    // Check if the embedded model is available (retry up to 15 seconds to allow sidecar to boot)
+    // Check if the embedded model or Ollama is available
     const provider = this.modelManager.getActiveProvider();
-    let isAvailable = false;
-    for (let attempt = 0; attempt < 8; attempt++) {
-      isAvailable = await provider.isAvailable();
-      if (isAvailable) break;
-      if (attempt === 0) {
-        this.emit({ type: 'thinking', message: 'Waking up embedded AI model...' });
+    let isAvailable = await provider.isAvailable();
+    if (!isAvailable) {
+      // Re-initialize model manager to check for newly launched local providers
+      try {
+        await this.modelManager.initialize();
+        isAvailable = await this.modelManager.getActiveProvider().isAvailable();
+      } catch {
+        isAvailable = false;
       }
-      await new Promise(r => setTimeout(r, 2000));
     }
 
     if (!isAvailable) {
@@ -227,10 +308,13 @@ export class AgentLoop {
       const fallbackResult = this.tryHeuristicFallback(goal, context);
       if (fallbackResult) return await this.executeFallback(fallbackResult, context);
 
-      this.emit({ type: 'error', message: 'The embedded AI model is currently initializing or unavailable. Please try again in a few seconds.' });
+      const msg = `Sentinel AI: Local model server is not running.\r\n` +
+        `• To enable full AI reasoning, launch Ollama (e.g. 'ollama run qwen2.5-coder:7b') or configure models in Personalization → AI Engine Settings.\r\n` +
+        `• Type '>help' to view all supported natural language commands.`;
+      this.emit({ type: 'error', message: msg });
       return {
         success: false,
-        summary: 'The embedded AI model is currently initializing or unavailable.',
+        summary: msg,
         steps: []
       };
     }
@@ -422,8 +506,17 @@ export class AgentLoop {
    */
   private tryHeuristicFallback(goal: string, context: { os: string; cwd: string }): { tool: string; params: Record<string, any> } | null {
     const lower = goal.toLowerCase();
+    const trimmed = goal.trim();
 
-    // Bluetooth
+    // Direct path or directory navigation
+    if (trimmed.startsWith('/') || trimmed.startsWith('~/') || trimmed.startsWith('./') || trimmed.startsWith('../') || trimmed.endsWith('/')) {
+      return { tool: 'filesystem.navigate', params: { path: resolvePathAlias(trimmed) } };
+    }
+
+    if (lower.startsWith('cd ') || lower.startsWith('goto ') || lower.startsWith('go to ') || lower.startsWith('navigate to ') || lower.startsWith('take me to ')) {
+      const target = goal.replace(/^(?:cd|goto|go\s+to|navigate\s+to|take\s+me\s+to)\s+/i, '').trim();
+      return { tool: 'filesystem.navigate', params: { path: resolvePathAlias(target) } };
+    }
     if (lower.includes('bluetooth')) {
       if (lower.includes('on') || lower.includes('enable')) return { tool: 'network.bluetooth.on', params: {} };
       if (lower.includes('off') || lower.includes('disable')) return { tool: 'network.bluetooth.off', params: {} };
@@ -487,17 +580,47 @@ export class AgentLoop {
       return { tool: 'application.update', params: { app: target } };
     }
 
-    // Scaffolding / Project Init
-    if (lower.includes('initialize') || lower.includes('scaffold') || (lower.includes('make') && lower.includes('project'))) {
+    // Scaffolding / Fullstack Project Init (Next.js, Django, React, Express, FastAPI, Flask)
+    if (
+      lower.includes('initialize') || lower.includes('initilize') || lower.includes('init ') ||
+      lower.includes('scaffold') || lower.includes('setup') ||
+      ((lower.includes('make') || lower.includes('create')) && (lower.includes('project') || lower.includes('folder') || lower.includes('app')) && (lower.includes('frontend') || lower.includes('backend') || lower.includes('next') || lower.includes('django') || lower.includes('react') || lower.includes('express')))
+    ) {
       const isNext = lower.includes('next');
       const isReact = lower.includes('react');
       const isDjango = lower.includes('django');
       const isExpress = lower.includes('express');
-      
-      if (isNext || isReact || isDjango || isExpress) {
+      const isFastAPI = lower.includes('fastapi');
+      const isFlask = lower.includes('flask');
+
+      if (isNext || isReact || isDjango || isExpress || isFastAPI || isFlask) {
         let frontend = isNext ? 'nextjs' : isReact ? 'react' : undefined;
-        let backend = isDjango ? 'django' : isExpress ? 'express' : undefined;
-        return { tool: 'developer.scaffold', params: { frontend, backend, projectName: 'new_project' } };
+        let backend = isDjango ? 'django' : isExpress ? 'express' : isFastAPI ? 'fastapi' : isFlask ? 'flask' : undefined;
+
+        // Extract folder / project name
+        let projectName = 'portfolio';
+        const nameMatch = goal.match(/(?:(?:folder|project)\s+(?:named|called)|(?:named|called))\s+['"]?([a-zA-Z0-9_.-]+)['"]?/i) ||
+                          goal.match(/(?:folder|project)\s+['"]?([a-zA-Z0-9_.-]+)['"]?/i);
+        if (nameMatch && nameMatch[1] && !['a', 'the', 'in', 'and', 'named', 'called', 'frontend', 'backend', 'next', 'nextjs', 'django', 'react'].includes(nameMatch[1].toLowerCase())) {
+          projectName = nameMatch[1].trim();
+        }
+
+        // Extract target directory path
+        let targetDir = context.cwd || '~';
+        const pathMatch = goal.match(/(?:in|at|into)\s+['"]?((?:\/|~\/|\.\/)[^\s]+|\/[a-zA-Z0-9_./-]+)(?:\s+directory|\s+folder)?/i);
+        if (pathMatch && pathMatch[1]) {
+          targetDir = pathMatch[1].trim();
+        }
+
+        return {
+          tool: 'developer.scaffold',
+          params: {
+            frontend,
+            backend,
+            projectName,
+            path: targetDir
+          }
+        };
       }
     }
 
@@ -542,6 +665,9 @@ export class AgentLoop {
     if (toolId === 'filesystem.navigate' || toolId === 'filesystem.cd' || toolId === 'shell.cd') {
       return result.data?.path || params.path || params.directory;
     }
+    if (toolId === 'developer.scaffold') {
+      return result.data?.path || params.path;
+    }
     if (result.data?.path && typeof result.data.path === 'string' && (result.data.stdout || '').includes('Changed directory')) {
       return result.data.path;
     }
@@ -556,6 +682,7 @@ export class AgentLoop {
     const action = toolId.split('.').slice(1).join('.');
 
     switch (toolId) {
+      case 'developer.scaffold': return `✓ Scaffolded full-stack project at ${result.data?.path || params.path || params.projectName}`;
       case 'network.bluetooth.on': return '✓ Bluetooth turned on';
       case 'network.bluetooth.off': return '✓ Bluetooth turned off';
       case 'network.bluetooth.connect': return `✓ Connected to ${params.device || 'device'}`;

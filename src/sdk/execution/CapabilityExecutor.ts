@@ -15,6 +15,8 @@ import { PermissionManager } from '../permissions/PermissionManager';
 import { CapabilityContext, CapabilityLogger, VerificationResult, RollbackResult, DiagnosticsReport } from '../capabilities/CapabilityTypes';
 import { CancellationToken } from '../capabilities/CancellationToken';
 
+import { getPlatform } from '../../shared/platform';
+
 /** Extended structure returned by CapabilityExecutor providing deep capability insights */
 export interface SDKActionResult extends ActionResult {
   verification?: VerificationResult;
@@ -105,7 +107,7 @@ export class CapabilityExecutor implements ActionExecutor {
       actionNode: node,
       executionContext: executionContext || this.defaultContext,
       sessionMetadata: { sessionId },
-      runtimeMetadata: { hostOs: 'macos', mockMode: capability.mockMode },
+      runtimeMetadata: { hostOs: getPlatform(), mockMode: capability.mockMode },
       logger: this.logger,
       cancellationToken: new CancellationToken(),
     };
