@@ -17,8 +17,9 @@ This document tracks critical core issues, bugs, and security vulnerabilities id
 - [x] **2.3 Contextual Workspace Sourcing**: Automatically `cd` to target workspace and execute environment sourcing (`source setup.bash`, `conda activate`) before launching.
 
 ### 🔷 Epic 3: System Services & Dotfile "Rice" Orchestration
-- [ ] **3.1 Unified `system.service` Driver**: Support for Linux `systemctl [--user]`, macOS `launchctl`, and Windows Service Manager.
-- [ ] **3.2 Safe `config.patch` Engine**: Atomic dotfile config editing in `~/.config/` with pre-edit `.bak` snapshots and rollback guarantees.
+- [x] **3.1 Unified `system.service` Driver**: Support for Linux `systemctl [--user]`, macOS `launchctl`, and Windows Service Manager.
+- [x] **3.2 Dotfile & Rice Configuration Manager**: Safe dotfile editor with AST/regex parsers for `.bashrc`, `.zshrc`, `~/.config/hypr/`, `~/.config/i3/`, `~/.config/alacritty/`.
+- [x] **3.3 Startup Service Automation**: Natural language intent routing (e.g. `>enable bluetooth on startup`, `>disable auto-launch of gazebo`).
 
 ### 🔷 Epic 4: Small-Model Cognitive Supercharger
 - [ ] **4.1 Dynamic Domain Tool Pruning**: Classify user intent domain and dynamically load only 4–6 relevant tools into local LLM context.

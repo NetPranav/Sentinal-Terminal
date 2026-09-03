@@ -189,6 +189,27 @@ const FAST_PATHS: {
     tool: 'application.open',
     paramsFn: (m) => ({ app: m[1].trim() })
   },
+  // System Service management (start, stop, restart, enable, disable, status)
+  {
+    pattern: /^(?:(start|stop|restart|enable|disable|status)\s+)?(?:service\s+)?([a-z0-9_.-]+)\s+service\s*$/i,
+    tool: 'system.service',
+    paramsFn: (m) => ({ service: m[2].trim(), action: (m[1] || 'status').toLowerCase() })
+  },
+  {
+    pattern: /^(?:(start|stop|restart|enable|disable)\s+service\s+([a-z0-9_.-]+))\s*$/i,
+    tool: 'system.service',
+    paramsFn: (m) => ({ service: m[2].trim(), action: m[1].toLowerCase() })
+  },
+  // Dotfile rice autostart toggling (turn on/off, enable/disable in rice/hyprland/i3)
+  {
+    pattern: /^(?:turn\s+(on|off)|enable|disable)\s+([a-z0-9_.-]+)\s+(?:in\s+rice|on\s+startup|in\s+autostart|in\s+(hyprland|i3|sway))\s*$/i,
+    tool: 'system.dotfile',
+    paramsFn: (m) => ({
+      app: m[2].trim(),
+      enable: m[1] === 'on' || m[0].toLowerCase().startsWith('enable'),
+      target: m[3] ? m[3].toLowerCase() : 'hyprland'
+    })
+  }
 ];
 
 /**
@@ -1029,6 +1050,28 @@ User request: ${goal}`;
     if (lower.includes('disk') || lower.includes('storage') || lower.includes('free space') || lower.includes('disk space')) return { tool: 'system.storage', params: {} };
     if (lower.includes('system info') || lower.includes('specs') || lower.includes('hardware info') || lower.includes('cpu') || lower.includes('ram') || lower.includes('uptime')) return { tool: 'system.info', params: {} };
 
+    // System Services (systemctl / launchctl / Windows Services)
+    if (lower.includes('service') && (lower.includes('status') || lower.includes('start') || lower.includes('stop') || lower.includes('restart') || lower.includes('enable') || lower.includes('disable'))) {
+      const actMatch = lower.match(/(start|stop|restart|enable|disable|status)/);
+      const action = actMatch ? actMatch[1] : 'status';
+      const svcMatch = lower.match(/(?:service\s+([a-z0-9_.-]+)|([a-z0-9_.-]+)\s+service)/i);
+      const service = svcMatch ? (svcMatch[1] || svcMatch[2]) : '';
+      if (service) {
+        return { tool: 'system.service', params: { service, action } };
+      }
+    }
+
+    // Dotfile Rice and Autostart
+    if (lower.includes('rice') || lower.includes('autostart') || lower.includes('hyprland') || lower.includes('i3')) {
+      const toggleMatch = lower.match(/(?:turn\s+(on|off)|enable|disable)\s+([a-z0-9_.-]+)/i);
+      if (toggleMatch) {
+        const enable = toggleMatch[1] === 'on' || lower.includes('enable');
+        const app = toggleMatch[2].trim();
+        const target = lower.includes('i3') ? 'i3' : lower.includes('sway') ? 'sway' : 'hyprland';
+        return { tool: 'system.dotfile', params: { app, enable, target } };
+      }
+    }
+
     // System Operations
     if (lower.includes('lock') && (lower.includes('mac') || lower.includes('screen') || lower.includes('laptop') || lower.includes('computer'))) {
       return { tool: 'system.lock', params: {} };
@@ -1188,6 +1231,8 @@ User request: ${goal}`;
       case 'browser.search': return `✓ Searched: ${params.query}`;
       case 'system.battery': return `✓ Battery: ${result.data?.percentage || result.data?.level || 'unknown'}%`;
       case 'system.info': return '✓ System info retrieved';
+      case 'system.service': return `✓ Service ${params.service} ${params.action} completed`;
+      case 'system.dotfile': return `✓ Dotfile autostart for ${params.app} ${params.enable !== false ? 'enabled' : 'disabled'}`;
       default: return `✓ ${toolId.replace(/\./g, ' ')} completed`;
     }
   }
@@ -1197,6 +1242,8 @@ User request: ${goal}`;
    */
   private getToolDisplayName(toolId: string): string {
     const names: Record<string, string> = {
+      'system.service': 'Managing system service...',
+      'system.dotfile': 'Updating dotfile configuration...',
       'network.bluetooth.on': 'Turning on Bluetooth...',
       'network.bluetooth.off': 'Turning off Bluetooth...',
       'network.bluetooth.connect': 'Connecting Bluetooth device...',

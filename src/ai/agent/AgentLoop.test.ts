@@ -126,4 +126,19 @@ describe('AgentLoop fast-path routing', () => {
     expect(result.steps[2].tool).toBe('shell.execute');
     expect(result.steps[2].params.command).toBe('ros2 launch drone_ws quad.launch.py');
   });
+
+  it('routes system service and dotfile rice commands directly via fast-path', () => {
+    const serviceRes = findFastPath('restart postgresql service');
+    expect(serviceRes).not.toBeNull();
+    expect(serviceRes?.tool).toBe('system.service');
+    expect(serviceRes?.params.service).toBe('postgresql');
+    expect(serviceRes?.params.action).toBe('restart');
+
+    const dotfileRes = findFastPath('turn off gazebo in hyprland');
+    expect(dotfileRes).not.toBeNull();
+    expect(dotfileRes?.tool).toBe('system.dotfile');
+    expect(dotfileRes?.params.app).toBe('gazebo');
+    expect(dotfileRes?.params.enable).toBe(false);
+    expect(dotfileRes?.params.target).toBe('hyprland');
+  });
 });

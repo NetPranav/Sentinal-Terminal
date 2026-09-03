@@ -358,5 +358,32 @@ describe('AdaptivePlanEngine — Dynamic Multi-Phase Planning & Execution', () =
     expect(executedPhases).toEqual(['1', '2', '3']);
     expect(result.cdPath).toBe('/home/user/workspaces/drone_ws');
   });
+
+  it('should generate a 3-phase plan for system service orchestration', async () => {
+    const engine = new AdaptivePlanEngine();
+    const plan = await engine.createPlan('restart postgresql service', { os: 'linux', cwd: '/home/user' });
+
+    expect(plan).toBeDefined();
+    expect(plan.summary).toContain('RESTART system service "postgresql"');
+    expect(plan.phases.length).toBe(3);
+    expect(plan.phases[0].tool).toBe('system.service');
+    expect(plan.phases[0].params?.action).toBe('status');
+    expect(plan.phases[1].tool).toBe('system.service');
+    expect(plan.phases[1].params?.action).toBe('restart');
+    expect(plan.phases[2].tool).toBe('system.service');
+  });
+
+  it('should generate a safe dotfile rice editing plan for toggling startup applications', async () => {
+    const engine = new AdaptivePlanEngine();
+    const plan = await engine.createPlan('turn off gazebo in hyprland', { os: 'linux', cwd: '/home/user' });
+
+    expect(plan).toBeDefined();
+    expect(plan.summary).toContain('Disable "gazebo" in hyprland rice configuration');
+    expect(plan.phases.length).toBe(1);
+    expect(plan.phases[0].tool).toBe('system.dotfile');
+    expect(plan.phases[0].params?.app).toBe('gazebo');
+    expect(plan.phases[0].params?.enable).toBe(false);
+    expect(plan.phases[0].params?.target).toBe('hyprland');
+  });
 });
 

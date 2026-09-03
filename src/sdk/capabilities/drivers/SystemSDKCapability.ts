@@ -8,7 +8,10 @@
 import { BaseCapabilityDriver, CapabilityExecutionResult, ExecutionContext, Platform } from '../CapabilitySDK';
 import { invoke } from '@tauri-apps/api/core';
 
-export type SystemOperation = 'info' | 'battery' | 'cpu' | 'gpu' | 'ram' | 'storage' | 'processes' | 'temperature' | 'uptime' | 'kill_process' | 'kill' | 'lock';
+import { SystemServiceManager, ServiceAction } from '../../../domain/services/SystemServiceManager';
+import { DotfileManager } from '../../../domain/rice/DotfileManager';
+
+export type SystemOperation = 'info' | 'battery' | 'cpu' | 'gpu' | 'ram' | 'storage' | 'processes' | 'temperature' | 'uptime' | 'kill_process' | 'kill' | 'lock' | 'service' | 'dotfile';
 
 export interface SystemDriverInput {
   operation?: SystemOperation;
@@ -214,6 +217,56 @@ export class SystemSDKCapability extends BaseCapabilityDriver<SystemDriverInput,
           data: { uptimeString: '4 days, 4 hours, 12 mins', bootTimestamp: '2026-07-21T08:00:00Z', idlePercentage: 86.4 },
           commandExecuted: 'uptime'
         };
+
+      case 'service': {
+        const action = (input.action || 'status') as ServiceAction;
+        const service = input.service || input.name || '';
+        const userScope = input.userScope ?? false;
+        const cmd = SystemServiceManager.getCommand(action, service, { userScope });
+        if (typeof process !== 'undefined' && process.env.NODE_ENV === 'test') {
+          return {
+            success: true,
+            data: { action, service, command: cmd.fullCommand, stdout: `Service ${service} ${action} completed` },
+            commandExecuted: cmd.fullCommand
+          };
+        }
+        try {
+          const res = await invoke<{ code?: number; stdout?: string; stderr?: string }>('execute_command', {
+            command: cmd.command,
+            args: cmd.args
+          });
+          const success = res && (res.code === 0 || res.code === undefined);
+          const parsed = SystemServiceManager.parseStatus(res?.stdout || '', undefined, service);
+          return {
+            success,
+            data: { ...parsed, stdout: res?.stdout, stderr: res?.stderr },
+            commandExecuted: cmd.fullCommand,
+            error: success ? undefined : { code: 'SERVICE_ERROR', message: res?.stderr || 'Service command failed' }
+          };
+        } catch (err: any) {
+          return { success: false, error: { code: 'EXECUTION_FAILED', message: err.message } };
+        }
+      }
+
+      case 'dotfile': {
+        const app = input.app || input.name || '';
+        const enable = input.enable !== false;
+        const target = input.target || 'hyprland';
+        if (typeof process !== 'undefined' && process.env.NODE_ENV === 'test') {
+          return {
+            success: true,
+            data: { app, enable, target, stdout: `Toggled ${app} in ${target}` },
+            commandExecuted: `dotfile ${enable ? 'enable' : 'disable'} ${app}`
+          };
+        }
+        const changeRes = await DotfileManager.toggleAutostart(app, enable, target);
+        return {
+          success: changeRes.success,
+          data: changeRes,
+          commandExecuted: `dotfile ${enable ? 'enable' : 'disable'} ${app} (${target})`,
+          error: changeRes.error ? { code: 'DOTFILE_ERROR', message: changeRes.error } : undefined
+        };
+      }
 
       case 'lock':
         if (typeof process !== 'undefined' && process.env.NODE_ENV !== 'test') {

@@ -598,6 +598,56 @@ export class AdaptivePlanEngine {
       };
     }
 
+    // 5. System Service Orchestration (Multi-Phase)
+    const serviceMatch = lower.match(/^(?:(start|stop|restart|enable|disable|status|check\s+status\s+of)\s+)?(?:service\s+)?([a-z0-9_.-]+)\s+service$/i)
+      || lower.match(/^(?:(start|stop|restart|enable|disable)\s+service\s+([a-z0-9_.-]+))$/i);
+
+    if (serviceMatch) {
+      const actionRaw = (serviceMatch[1] || 'status').toLowerCase().replace(/check\s+status\s+of/i, 'status');
+      const action = ['start', 'stop', 'restart', 'enable', 'disable', 'status'].includes(actionRaw) ? actionRaw : 'status';
+      const service = (serviceMatch[2] || serviceMatch[1]).replace(/\s+service$/i, '').trim();
+
+      return {
+        summary: `${action.toUpperCase()} system service "${service}"`,
+        steps: [
+          `Inspect current service status for "${service}"`,
+          `Execute ${action} operation on "${service}"`,
+          `Verify service active state`
+        ],
+        phases: [
+          { id: '1', title: `Inspect service status for "${service}"`, tool: 'system.service', params: { service, action: 'status' }, status: 'pending' },
+          { id: '2', title: `Execute ${action} on "${service}"`, tool: 'system.service', params: { service, action }, status: 'pending' },
+          { id: '3', title: `Verify service status for "${service}"`, tool: 'system.service', params: { service, action: 'status' }, status: 'pending' }
+        ]
+      };
+    }
+
+    // 6. Dotfile Rice & Autostart Orchestration
+    const dotfileMatch = lower.match(/(?:turn\s+(on|off)|enable|disable)\s+([a-z0-9_.-]+)\s+(?:in\s+rice|on\s+startup|in\s+autostart|in\s+(hyprland|i3|sway))/i);
+    if (dotfileMatch) {
+      const enable = dotfileMatch[1] === 'on' || lower.startsWith('enable') || (!lower.includes('off') && !lower.includes('disable'));
+      const app = dotfileMatch[2].trim();
+      const targetHint = dotfileMatch[3] || 'hyprland';
+
+      return {
+        summary: `${enable ? 'Enable' : 'Disable'} "${app}" in ${targetHint} rice configuration`,
+        steps: [
+          `Inspect existing ${targetHint} configuration for "${app}"`,
+          `${enable ? 'Enable' : 'Disable'} autostart directive for "${app}" with backup`,
+          'Verify dotfile modification diff'
+        ],
+        phases: [
+          {
+            id: '1',
+            title: `${enable ? 'Enable' : 'Disable'} "${app}" in ${targetHint} config`,
+            tool: 'system.dotfile',
+            params: { app, enable, target: targetHint },
+            status: 'pending'
+          }
+        ]
+      };
+    }
+
     return null;
   }
 
