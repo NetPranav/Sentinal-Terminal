@@ -12,6 +12,9 @@ import { SessionPersistenceEngine } from "./domain/session/SessionPersistenceEng
 import { WorkspaceSwitcherModal } from "./ui/components/WorkspaceSwitcherModal";
 import { ProcessPortManagerDrawer } from "./ui/components/ProcessPortManagerDrawer";
 import { HistorySearchModal } from "./ui/components/HistorySearchModal";
+import { PluginMarketplaceModal } from "./ui/components/PluginMarketplaceModal";
+import { AuditLogger } from "./domain/security/AuditLogger";
+import { DotfileSyncEngine } from "./domain/rice/DotfileSyncEngine";
 import "./App.css";
 
 type SplitDirection = 'vertical' | 'horizontal';
@@ -71,6 +74,7 @@ function App() {
   const [showWorkspaceSwitcher, setShowWorkspaceSwitcher] = useState(false);
   const [showPortManager, setShowPortManager] = useState(false);
   const [showHistorySearch, setShowHistorySearch] = useState(false);
+  const [showPluginMarketplace, setShowPluginMarketplace] = useState(false);
   const [selectedThemeId, setSelectedThemeId] = useState<string>('classic-dark');
 
   const handleHistorySelect = (command: string) => {
@@ -340,6 +344,11 @@ function App() {
         if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key && e.key.toLowerCase() === 'p') {
           e.preventDefault();
           setShowPortManager(prev => !prev);
+          return;
+        }
+        if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key && e.key.toLowerCase() === 'x') {
+          e.preventDefault();
+          setShowPluginMarketplace(prev => !prev);
           return;
         }
         if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key && e.key.toLowerCase() === 't') {
@@ -745,6 +754,10 @@ function App() {
         onSelect={handleHistorySelect}
         currentCwd={currentDisplayPath}
       />
+      <PluginMarketplaceModal 
+        isOpen={showPluginMarketplace}
+        onClose={() => setShowPluginMarketplace(false)}
+      />
       <CommandPalette 
         isOpen={isCommandPaletteOpen} 
         onClose={() => setCommandPaletteOpen(false)} 
@@ -753,9 +766,12 @@ function App() {
           { id: 'personalize', name: 'Personalize UI', description: 'Open color theme and glassmorphic appearance customization' },
           { id: 'workspace_switcher', name: 'Switch Workspace (Cmd+O)', description: 'Jump to ROS, Node, Python, Rust, or Docker projects' },
           { id: 'port_manager', name: 'Active Ports & Processes (Cmd+Shift+P)', description: 'Inspect and free listening network ports' },
-          { id: 'history_search', name: 'Command History (Ctrl+R)', description: 'Search previous commands ranked by frequency and recency' }
+          { id: 'history_search', name: 'Command History (Ctrl+R)', description: 'Search previous commands ranked by frequency and recency' },
+          { id: 'plugin_marketplace', name: 'Plugin Marketplace (Cmd+Shift+X)', description: 'Browse and hot-reload community extensions, tools, and themes' },
+          { id: 'export_audit_log', name: 'Export Cryptographic Audit Log', description: 'Generate SOC 2 / ISO 27001 tamper-evident signed audit trail' },
+          { id: 'export_rice_profile', name: 'Export Rice & AI Profile', description: 'Backup custom themes, aliases, and learned AI patterns' }
         ]}
-        onExecuteCapability={(id) => {
+        onExecuteCapability={async (id) => {
           if (id === 'open_ai_settings') {
             setShowAiSettings(true);
           } else if (id === 'personalize') {
@@ -766,6 +782,20 @@ function App() {
             setShowPortManager(true);
           } else if (id === 'history_search') {
             setShowHistorySearch(true);
+          } else if (id === 'plugin_marketplace') {
+            setShowPluginMarketplace(true);
+          } else if (id === 'export_audit_log') {
+            const report = await AuditLogger.getInstance().exportSignedAuditReport();
+            if (navigator.clipboard) {
+              await navigator.clipboard.writeText(report);
+              alert('Cryptographic tamper-evident audit report copied to clipboard!');
+            }
+          } else if (id === 'export_rice_profile') {
+            const bundle = DotfileSyncEngine.getInstance().exportBundle(selectedThemeId, transparency, blurLevel);
+            if (navigator.clipboard) {
+              await navigator.clipboard.writeText(bundle);
+              alert('Sentinel Rice & AI Profile copied to clipboard!');
+            }
           }
         }}
       />

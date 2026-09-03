@@ -234,6 +234,13 @@ export class DemonstrationLearningEngine {
     return Array.from(this.patterns.values());
   }
 
+  public addPattern(pattern: LearnedPattern): void {
+    if (pattern && pattern.id) {
+      this.patterns.set(pattern.id, pattern);
+      this.savePatterns();
+    }
+  }
+
   /**
    * Remove a learned pattern by ID or original goal text.
    */
