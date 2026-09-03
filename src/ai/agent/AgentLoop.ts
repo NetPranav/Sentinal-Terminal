@@ -170,11 +170,11 @@ const FAST_PATHS: {
   { pattern: /^(?:git\s+status|check\s+git\s+status|show\s+git\s+status|branch\s+status)\s*$/i, tool: 'git.status', paramsFn: () => ({}) },
   { pattern: /^(?:git\s+log|recent\s+commits?|commit\s+history|show\s+git\s+log)\s*$/i, tool: 'git.log', paramsFn: () => ({}) },
 
-  // Search & Find files
+  // Search & Find files & folders
   {
-    pattern: /^(?:find|search|locate)\s+(?:all\s+)?(?:files?\s+)?(.+)/i,
+    pattern: /^(?:(?:can\s+you\s+)?(?:tell\s+me|find|search|locate|show|list)\s+(?:all\s+)?(?:the\s+)?(?:files?|folders?|directories)?\s*(?:for\s+)?[\s\S]+)/i,
     tool: 'filesystem.search',
-    paramsFn: (m) => parseSearchQuery(m[1]),
+    paramsFn: (_m, goal) => parseSearchQuery(goal),
     shouldHandle: isExplicitFilesystemSearch
   },
 
@@ -253,20 +253,28 @@ export function requiresExecutionPlan(goal: string): boolean {
   return hasWorkflowConnector || hasMultipleActions || needsPreparation || isMultiStepOrAmbiguous;
 }
 
-function parseSearchQuery(raw: string): { dir: string; pattern: string } {
+function parseSearchQuery(raw: string): { dir: string; pattern: string; type?: string } {
   let dir = '.';
   let pattern = '*';
-  let clean = raw.trim().replace(/^for\s+/i, '');
+  let clean = raw.trim()
+    .replace(/^for\s+/i, '')
+    .replace(/\s+with\s+(?:there|their)\s+paths?/i, '')
+    .trim();
+  let type: string | undefined = undefined;
 
-  // Extract directory (e.g. "in tools directory", "under src", "in ~/Downloads")
+  if (/\b(?:folders?|directories|dirs)\b/i.test(clean)) {
+    type = 'directory';
+  }
+
+  // Extract directory (e.g. "in tools directory", "under src", "in ~/Downloads", "in my system")
   const inMatch = clean.match(/\s+(?:in|under|inside)\s+([~/a-z0-9_.-]+(?:\s+[a-z0-9_.-]+)*)/i);
   if (inMatch && inMatch[1]) {
     dir = resolvePathAlias(inMatch[1]);
     clean = clean.replace(inMatch[0], '').trim();
   }
 
-  // 1. Check explicit named / matching target first
-  const nameMatch = clean.match(/(?:named|with\s+name|matching|pattern)\s+['"]?([a-z0-9_.*-]+)['"]?/i);
+  // 1. Check explicit named / matching target first (e.g. "named as frontend", "named fronted")
+  const nameMatch = clean.match(/(?:named|with\s+name|matching|pattern)\s+(?:as\s+)?['"]?([a-z0-9_.*-]+)['"]?/i);
   if (nameMatch && nameMatch[1]) {
     pattern = nameMatch[1];
   } else {
@@ -276,11 +284,11 @@ function parseSearchQuery(raw: string): { dir: string; pattern: string } {
     if (extMatch && extMatch[1] && !stopWords.includes(extMatch[1].toLowerCase())) {
       pattern = `*.${extMatch[1]}`;
     } else if (clean && !clean.includes('all') && clean !== 'files') {
-      pattern = clean.replace(/^(?:all\s+)?(?:files?\s+)?(?:for\s+)?/i, '').trim() || '*';
+      pattern = clean.replace(/^(?:all\s+)?(?:files?\s+)?(?:folders?\s+)?(?:for\s+)?/i, '').trim() || '*';
     }
   }
 
-  return { dir, pattern };
+  return { dir, pattern, type };
 }
 
 function resolvePathAlias(raw: string): string {
@@ -292,6 +300,7 @@ function resolvePathAlias(raw: string): string {
     'music': '~/Music', 'movies': '~/Movies', 'videos': '~/Movies',
     'home': '~', 'root': '/',
     'project folder': '~/Project Folder', 'projects': '~/Projects',
+    'system': '~', 'my system': '~', 'mac': '~', 'computer': '~', 'my mac': '~', 'my computer': '~'
   };
   return aliases[lower] || raw.replace(/^(?:the|a|an)\s+/i, '').replace(/\s*(?:folder|directory|dir)$/i, '').trim();
 }

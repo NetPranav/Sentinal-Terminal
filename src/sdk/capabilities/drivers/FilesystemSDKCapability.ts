@@ -294,7 +294,7 @@ export class FilesystemSDKCapability extends BaseCapabilityDriver<FsDriverInput,
           if (startDir === 'here' || startDir === '.' || startDir === './') {
             const cwd = (this as any).context?.cwd;
             startDir = (cwd && cwd.trim() !== '' && cwd !== '/') ? cwd : '.';
-          } else if (startDir === 'unknown') {
+          } else if (startDir === 'unknown' || startDir === 'system' || startDir === 'my system') {
             startDir = '~';
           }
           let resolvedDir = startDir;
@@ -305,32 +305,80 @@ export class FilesystemSDKCapability extends BaseCapabilityDriver<FsDriverInput,
               if (hd) resolvedDir = resolvedDir === '~' ? hd : resolvedDir.replace(/^~/, hd);
             } catch { /* ignore */ }
           }
-          const cleanPattern = pattern.toString().trim() || '*';
-          const inamePattern = cleanPattern.includes('*') ? cleanPattern : `*${cleanPattern}*`;
-          const findArgs = [resolvedDir, '-maxdepth', '10', '-iname', inamePattern, '-not', '-path', '*/.*'];
-          if (input.size) {
-            findArgs.push('-type', 'f', '-size', String(input.size));
-          }
+          const cleanPattern = pattern.toString().trim().replace(/^[*\s]+|[*\s]+$/g, '') || '*';
+          const isFolderSearch = op === 'locate_folders' || input.type === 'directory' || input.type === 'folder' || pattern.toLowerCase().includes('folder');
           let matches: string[] = [];
           let stdout = '';
-          try {
-            const findCmd = await invoke<{ stdout: string; stderr: string; code?: number }>('execute_command', {
-              command: 'find',
-              args: findArgs
-            });
-            if (findCmd && findCmd.stdout) {
-              matches = findCmd.stdout.split('\n').map(l => l.trim()).filter(Boolean);
-            }
-            const sizeMsg = input.size ? ` (size ${input.size})` : '';
-            if (matches.length > 0) {
-              stdout = `Located ${matches.length} match(es) for "${cleanPattern}"${sizeMsg} in ${startDir}:\r\n` + matches.map(m => `  • ${m}`).join('\r\n');
-            } else {
-              stdout = `No folder or file matching "${cleanPattern}"${sizeMsg} was found under ${startDir}.`;
-            }
-          } catch {
-            stdout = `Could not execute search for "${cleanPattern}" in ${startDir}.`;
+
+          // 1. Fast path: macOS Spotlight mdfind index (sub-100ms full-disk search)
+          if (typeof process !== 'undefined' && (process.platform === 'darwin' || (typeof navigator !== 'undefined' && navigator.userAgent.includes('Mac')))) {
+            try {
+              const mdQuery = isFolderSearch
+                ? `kMDItemFSName == '*${cleanPattern}*'c && kMDItemContentType == 'public.folder'`
+                : `kMDItemFSName == '*${cleanPattern}*'c`;
+              const mdCmd = await invoke<{ stdout: string; code?: number }>('execute_command', {
+                command: 'mdfind',
+                args: [mdQuery]
+              });
+              if (mdCmd && mdCmd.stdout) {
+                matches = mdCmd.stdout
+                  .split('\n')
+                  .map(l => l.trim())
+                  .filter(l => Boolean(l) && !l.includes('/node_modules/') && !l.includes('/.git/') && !l.includes('/Library/Caches/'));
+              }
+            } catch { /* fallback to find */ }
           }
-          return { success: true, data: { matches, pattern: cleanPattern, dir: startDir, size: input.size, stdout }, commandExecuted: `find "${resolvedDir}" -iname "${inamePattern}"${input.size ? ` -size ${input.size}` : ''}` };
+
+          // 2. Fallback to find if mdfind produced no matches
+          if (matches.length === 0) {
+            // Check typo variants (e.g. "fronted" -> "frontend")
+            const typoVariant = cleanPattern.toLowerCase() === 'fronted' ? 'frontend' : null;
+            const inamePattern = cleanPattern.includes('*') ? cleanPattern : `*${cleanPattern}*`;
+            const findArgs = [resolvedDir, '-maxdepth', '8', '-iname', inamePattern, '-not', '-path', '*/.*', '-not', '-path', '*/node_modules/*'];
+            if (input.size) {
+              findArgs.push('-type', 'f', '-size', String(input.size));
+            }
+            if (isFolderSearch) {
+              findArgs.push('-type', 'd');
+            }
+            try {
+              const findCmd = await invoke<{ stdout: string; stderr: string; code?: number }>('execute_command', {
+                command: 'find',
+                args: findArgs
+              });
+              if (findCmd && findCmd.stdout) {
+                matches = findCmd.stdout.split('\n').map(l => l.trim()).filter(Boolean);
+              }
+            } catch { /* ignore */ }
+
+            // If still 0 matches and typoVariant exists, try typoVariant with mdfind/find
+            if (matches.length === 0 && typoVariant) {
+              try {
+                const altCmd = await invoke<{ stdout: string; code?: number }>('execute_command', {
+                  command: 'mdfind',
+                  args: [`kMDItemFSName == '*${typoVariant}*'c && kMDItemContentType == 'public.folder'`]
+                });
+                if (altCmd && altCmd.stdout) {
+                  matches = altCmd.stdout
+                    .split('\n')
+                    .map(l => l.trim())
+                    .filter(l => Boolean(l) && !l.includes('/node_modules/') && !l.includes('/.git/') && !l.includes('/Library/Caches/'));
+                }
+              } catch { /* ignore */ }
+            }
+          }
+
+          const sizeMsg = input.size ? ` (size ${input.size})` : '';
+          if (matches.length > 0) {
+            stdout = `Located ${matches.length} match(es) for "${cleanPattern}"${sizeMsg} in ${startDir}:\r\n` + matches.slice(0, 30).map(m => `  • ${m}`).join('\r\n');
+            if (matches.length > 30) {
+              stdout += `\r\n  ... and ${matches.length - 30} more match(es).`;
+            }
+          } else {
+            stdout = `No folder or file matching "${cleanPattern}"${sizeMsg} was found under ${startDir}.`;
+          }
+
+          return { success: true, data: { matches, pattern: cleanPattern, dir: startDir, size: input.size, stdout }, commandExecuted: `search "${cleanPattern}" in ${startDir}` };
         }
 
         case 'grep': {

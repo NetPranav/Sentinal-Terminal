@@ -35,32 +35,46 @@ export class ToolExecutor {
     );
   }
 
-  public static readonly DEFAULT_TIMEOUT_MS = 30000;
+  public static readonly DEFAULT_TIMEOUT_MS = 180000;
+
+  /**
+   * Adaptive timeout based on operation scope to avoid interrupting active tasks.
+   */
+  public static resolveAdaptiveTimeout(toolId: string): number {
+    if (toolId.startsWith('filesystem.search') || toolId.startsWith('filesystem.locate') || toolId.startsWith('filesystem.grep')) {
+      return 180000; // 3 minutes
+    }
+    if (toolId.startsWith('docker.') || toolId.startsWith('git.clone') || toolId.startsWith('developer.') || toolId.startsWith('node.') || toolId.startsWith('python.') || toolId === 'shell.execute') {
+      return 300000; // 5 minutes
+    }
+    return 90000; // 90 seconds
+  }
 
   /**
    * Execute a tool by its registry ID with the given parameters.
-   * Returns a simplified result the LLM can understand, guarded with a timeout.
+   * Returns a simplified result the LLM can understand, guarded with an adaptive timeout.
    */
   public async execute(
     toolId: string,
     params: Record<string, any>,
     cwd?: string,
     onAskPermission?: (plan: ExecutionPreviewPlan) => Promise<boolean>,
-    timeoutMs: number = ToolExecutor.DEFAULT_TIMEOUT_MS
+    timeoutMs?: number
   ): Promise<ToolExecutionResult> {
+    const effectiveTimeout = timeoutMs ?? ToolExecutor.resolveAdaptiveTimeout(toolId);
     let timeoutHandle: any = null;
     try {
       const timeoutPromise = new Promise<ToolExecutionResult>((_, reject) => {
         timeoutHandle = setTimeout(() => {
-          reject(new Error(`Tool execution timed out after ${timeoutMs}ms`));
-        }, timeoutMs);
+          reject(new Error(`Tool execution timed out after ${effectiveTimeout}ms`));
+        }, effectiveTimeout);
       });
 
       const execPromise = (async (): Promise<ToolExecutionResult> => {
         const result = await this.executionEngine.execute(toolId, params, {
           cwd,
           onAskPermission,
-          timeoutMs
+          timeoutMs: effectiveTimeout
         });
 
         if (result.success) {
