@@ -23,6 +23,7 @@ import { ToolExecutor, ToolExecutionResult } from './ToolExecutor';
 import { buildToolSpecs, buildSystemPrompt, ToolSpec } from './SystemPrompt';
 import { ToolRegistryState } from '../../tools/loader/ToolLoader';
 import { ExecutionPreviewPlan } from '../../domain/security/ExecutionEngine';
+import { EmbeddedEngineManager } from '../models/EmbeddedEngineManager';
 
 export interface AgentEvent {
   type: 'thinking' | 'plan' | 'question' | 'tool_start' | 'tool_done' | 'done' | 'error' | 'step_output';
@@ -391,6 +392,32 @@ export class AgentLoop {
       goal = `${pending.goal}\nUser clarification: ${answer}`;
     }
 
+    // Conversational greetings & status fast paths (works instantly offline)
+    const rawLower = goal.trim().toLowerCase();
+    if (/^(?:hey|hi|hello|yo|howdy|sup|greetings)(?:\s+there)?[\s!.]*$/i.test(rawLower)) {
+      const greeting = "Hey there! I am Sentinel AI, your local terminal copilot. You can ask me to inspect listening ports, find high CPU tasks, scaffold projects, automate git workflows, or diagnose broken shell commands.";
+      this.emit({ type: 'done', message: greeting });
+      return { success: true, summary: greeting, steps: [] };
+    }
+
+    if (/^(?:who\s+are\s+you|what\s+can\s+you\s+do|help|what\s+is\s+sentinel)[\s?!.]*$/i.test(rawLower)) {
+      const helpMsg = "I am Sentinel AI — an autonomous terminal agent. You can ask me to:\n• Inspect listening ports: \">what is using port 3000\"\n• Kill zombie processes: \">kill node\"\n• Git actions: \">create a feature branch named auth\"\n• Fix shell errors: Press [Tab] on the Auto-Heal banner\n• Switch projects: Press Cmd+O\n• Search history: Press Ctrl+R\n• Manage Embedded AI (Qwen 2.5 3B): Press Cmd+Shift+P > 'Sentinel Embedded AI'";
+      this.emit({ type: 'done', message: helpMsg });
+      return { success: true, summary: helpMsg, steps: [] };
+    }
+
+    if (/^(?:setup-?ai|download-?model|install-?model|get-?model)[\s]*$/i.test(rawLower)) {
+      this.emit({ type: 'tool_start', message: 'Initiating Sentinel Embedded AI download (Qwen 2.5 Coder 3B)...' });
+      EmbeddedEngineManager.getInstance().downloadRecommendedModel().then(async (ok) => {
+        if (ok) {
+          await EmbeddedEngineManager.getInstance().startEngine();
+        }
+      });
+      const msg = "Starting download of Qwen 2.5 Coder 3B (~1.9 GB) into ~/.sentinel/models/...\nYou can monitor progress in Command Palette (Cmd+Shift+P > 'Sentinel Embedded AI').";
+      this.emit({ type: 'done', message: msg });
+      return { success: true, summary: msg, steps: [] };
+    }
+
     // Strip conversational fluff from the front (but not standalone words like 'there')
     const cleaned = goal
       .replace(/^(?:(?:please|can you|could you|would you|kindly|just|now|alright|then|so|i want you to|i want to|i need you to|help me to|let's|lets)[\s,]*)+/i, '')
@@ -538,14 +565,37 @@ export class AgentLoop {
     }
 
     if (!isAvailable) {
+      try {
+        const embeddedMgr = EmbeddedEngineManager.getInstance();
+        const hasModel = await embeddedMgr.checkModelExists();
+        if (hasModel) {
+          this.emit({ type: 'tool_start', message: 'Starting Sentinel Embedded AI engine...' });
+          await embeddedMgr.startEngine();
+          for (let attempt = 0; attempt < 5; attempt++) {
+            if (await provider.isAvailable()) {
+              isAvailable = true;
+              break;
+            }
+            await new Promise(r => setTimeout(r, 800));
+          }
+        }
+      } catch { /* ignore */ }
+    }
+
+    if (!isAvailable) {
       // Fallback: try to parse the goal with simple heuristics
       const fallbackResult = this.tryHeuristicFallback(goal, context);
       if (fallbackResult) return await this.executeFallback(fallbackResult, context);
 
-      this.emit({ type: 'error', message: 'Local AI model is currently initializing or unavailable. Please start Ollama or Sentinel embedded AI.' });
+      const guidanceMsg = 
+        `Local AI model is not running yet.\n\n` +
+        `⚡ Option 1 (No Ollama needed): Type ">setup-ai" or open Command Palette (Cmd+Shift+P) > "Sentinel Embedded AI" to 1-click download Qwen 2.5 Coder 3B.\n` +
+        `🔌 Option 2 (External Ollama): Start Ollama in your terminal: 'ollama run qwen2.5-coder:3b'`;
+
+      this.emit({ type: 'error', message: guidanceMsg });
       return {
         success: false,
-        summary: 'Local AI model is currently initializing or unavailable.',
+        summary: 'Local AI model not running yet. Use >setup-ai or start Ollama.',
         steps: []
       };
     }
