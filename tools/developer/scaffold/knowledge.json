@@ -1,0 +1,59 @@
+{
+  "toolId": "developer.scaffold",
+  "aliases": [
+    "scaffold project",
+    "initialize project",
+    "create project",
+    "make project",
+    "scaffold app",
+    "bootstrap project"
+  ],
+  "synonyms": [
+    "please scaffold project",
+    "please initialize project",
+    "please create full-stack project",
+    "setup architecture"
+  ],
+  "commonUserWording": [
+    "scaffold project my-app nextjs express",
+    "create project my-web-app with react and django",
+    "scaffold a new fullstack project",
+    "initialize project frontend and backend",
+    "bootstrap project portfolio"
+  ],
+  "commonMistakes": [],
+  "entityHints": {
+    "projectName": [
+      "my-app",
+      "portfolio",
+      "saas-dashboard",
+      "web-service"
+    ],
+    "frontend": [
+      "nextjs",
+      "react",
+      "vue",
+      "svelte"
+    ],
+    "backend": [
+      "express",
+      "django",
+      "fastapi",
+      "nest"
+    ]
+  },
+  "deviceNamingPatterns": [],
+  "commonAbbreviations": {
+    "next": "nextjs",
+    "dj": "django"
+  },
+  "languageVariations": [
+    "scaffold project my-app",
+    "create project with nextjs and express",
+    "bootstrap project architecture"
+  ],
+  "relatedTools": [
+    "developer.git_init",
+    "shell.execute"
+  ]
+}

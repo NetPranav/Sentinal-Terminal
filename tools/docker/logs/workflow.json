@@ -1,16 +1,16 @@
 {
-  "toolId": "browser.navigate",
+  "toolId": "docker.logs",
   "version": "1.0.0",
-  "description": "Executes native driver for Navigate Browser to URL.",
+  "description": "Executes native driver for Retrieve Container Logs.",
   "steps": [
     {
       "id": "step_exec_main",
-      "name": "Execute Navigate Browser to URL",
+      "name": "Execute Retrieve Container Logs",
       "type": "ExecuteCapability",
-      "capabilityId": "browser.navigate",
+      "capabilityId": "docker.logs",
       "parameters": {
-        "url": "{{url}}",
-        "appName": "{{appName}}"
+        "container": "{{container}}",
+        "tail": "{{tail}}"
       },
       "dependencies": [],
       "onError": "fail"

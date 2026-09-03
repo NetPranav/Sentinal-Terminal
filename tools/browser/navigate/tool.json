@@ -38,7 +38,20 @@
       "required": true
     }
   ],
-  "optionalParameters": [],
+  "optionalParameters": [
+    {
+      "name": "appName",
+      "type": "string",
+      "description": "Optional target web browser application (e.g., Safari, Chrome, Firefox, Brave)",
+      "required": false
+    },
+    {
+      "name": "browser",
+      "type": "string",
+      "description": "Alias for appName (e.g., Safari, Chrome, Firefox)",
+      "required": false
+    }
+  ],
   "estimatedExecutionTime": "1s",
   "confirmationRequired": false,
   "rollbackAvailable": false,

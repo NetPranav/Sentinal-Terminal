@@ -13,6 +13,20 @@
         "url": "sample_val"
       },
       "description": "Automated test case for Navigate Browser to URL"
+    },
+    {
+      "id": "browser-navigate-test-2",
+      "userRequest": "open youtube.com in safari",
+      "expectedIntent": {
+        "domain": "browser",
+        "action": "navigate"
+      },
+      "expectedToolId": "browser.navigate",
+      "expectedEntities": {
+        "url": "youtube.com",
+        "appName": "Safari"
+      },
+      "description": "Test case for Navigate Browser to URL in target application Safari"
     }
   ]
 }

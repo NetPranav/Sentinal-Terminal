@@ -139,7 +139,7 @@ export class ModelManager {
   };
 
   constructor(customProviders?: ModelProvider[]) {
-    // Provider priority: Embedded sidecar, then local Ollama runtime
+    // Provider priority: Embedded (bundled llama.cpp) first, fallback to Ollama runtime
     this.providers = customProviders || [new EmbeddedProvider(), new OllamaProvider()];
   }
 
