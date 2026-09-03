@@ -586,7 +586,9 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
             </div>
 
             <p style={{ fontSize: '13px', lineHeight: '1.55', color: 'rgba(255, 255, 255, 0.75)', margin: '0 0 18px 0' }}>
-              To ensure system integrity and prevent unauthorized modifications, please verify your macOS user login password to execute this capability.
+              {securityModalPlan.plan.requiresPassword
+                ? 'To ensure system integrity and prevent unauthorized modifications, please verify your macOS user login password to execute this capability.'
+                : 'This terminal command requires your explicit confirmation before executing. Review the command and intent below.'}
             </p>
 
             <div style={{
@@ -608,47 +610,57 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
                   {String(securityModalPlan.plan.parameters?.path || securityModalPlan.plan.parameters?.source || securityModalPlan.plan.parameters?.command || JSON.stringify(securityModalPlan.plan.parameters))}
                 </span>
               </div>
-            </div>
-
-            <div style={{ marginBottom: '22px' }}>
-              <label style={{ display: 'block', fontSize: '12px', color: 'rgba(255, 255, 255, 0.85)', marginBottom: '8px', fontWeight: 500 }}>
-                macOS User Login Password:
-              </label>
-              <input
-                type="password"
-                value={authPassword}
-                onChange={(e) => { setAuthPassword(e.target.value); setAuthError(''); }}
-                placeholder="Enter system credentials..."
-                autoFocus
-                disabled={isVerifying}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !isVerifying) {
-                    handleAuthorize();
-                  } else if (e.key === 'Escape' && !isVerifying) {
-                    securityModalPlan.resolve(false);
-                    setSecurityModalPlan(null);
-                    setAuthPassword('');
-                  }
-                }}
-                style={{
-                  width: '100%',
-                  padding: '10px 14px',
-                  borderRadius: '8px',
-                  border: authError ? '1px solid rgba(239, 68, 68, 0.6)' : '1px solid rgba(255, 255, 255, 0.15)',
-                  backgroundColor: 'rgba(8, 9, 13, 0.75)',
-                  color: '#fff',
-                  fontSize: '13px',
-                  outline: 'none',
-                  boxSizing: 'border-box',
-                  transition: 'border-color 0.2s ease'
-                }}
-              />
-              {authError && (
-                <div style={{ color: '#ef4444', fontSize: '12px', marginTop: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <span>⚠️</span> {authError}
+              {securityModalPlan.plan.explanation && (
+                <div style={{ marginTop: '8px', paddingTop: '8px', borderTop: '1px solid rgba(255, 255, 255, 0.07)', display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
+                  <span style={{ color: '#a78bfa', flexShrink: 0, fontWeight: 600 }}>ℹ️ Intent:</span>
+                  <span style={{ color: '#f1f5f9', lineHeight: '1.45', wordBreak: 'break-word' }}>
+                    {securityModalPlan.plan.explanation}
+                  </span>
                 </div>
               )}
             </div>
+
+            {securityModalPlan.plan.requiresPassword ? (
+              <div style={{ marginBottom: '22px' }}>
+                <label style={{ display: 'block', fontSize: '12px', color: 'rgba(255, 255, 255, 0.85)', marginBottom: '8px', fontWeight: 500 }}>
+                  macOS User Login Password:
+                </label>
+                <input
+                  type="password"
+                  value={authPassword}
+                  onChange={(e) => { setAuthPassword(e.target.value); setAuthError(''); }}
+                  placeholder="Enter system credentials..."
+                  autoFocus
+                  disabled={isVerifying}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !isVerifying) {
+                      handleAuthorize();
+                    } else if (e.key === 'Escape' && !isVerifying) {
+                      securityModalPlan.resolve(false);
+                      setSecurityModalPlan(null);
+                      setAuthPassword('');
+                    }
+                  }}
+                  style={{
+                    width: '100%',
+                    padding: '10px 14px',
+                    borderRadius: '8px',
+                    border: authError ? '1px solid rgba(239, 68, 68, 0.6)' : '1px solid rgba(255, 255, 255, 0.15)',
+                    backgroundColor: 'rgba(8, 9, 13, 0.75)',
+                    color: '#fff',
+                    fontSize: '13px',
+                    outline: 'none',
+                    boxSizing: 'border-box',
+                    transition: 'border-color 0.2s ease'
+                  }}
+                />
+                {authError && (
+                  <div style={{ color: '#ef4444', fontSize: '12px', marginTop: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span>⚠️</span> {authError}
+                  </div>
+                )}
+              </div>
+            ) : null}
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
               <button
@@ -674,7 +686,14 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
               </button>
               <button
                 disabled={isVerifying}
-                onClick={handleAuthorize}
+                onClick={() => {
+                  if (securityModalPlan.plan.requiresPassword) {
+                    handleAuthorize();
+                  } else {
+                    securityModalPlan.resolve(true);
+                    setSecurityModalPlan(null);
+                  }
+                }}
                 style={{
                   padding: '9px 18px',
                   borderRadius: '8px',
@@ -688,7 +707,7 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
                   transition: 'all 0.2s ease'
                 }}
               >
-                {isVerifying ? 'Authenticating...' : 'Authorize'}
+                {isVerifying ? 'Authenticating...' : securityModalPlan.plan.requiresPassword ? 'Authorize' : 'Approve & Execute'}
               </button>
             </div>
           </div>

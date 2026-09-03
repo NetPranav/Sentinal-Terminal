@@ -10,6 +10,8 @@ import { invoke } from '@tauri-apps/api/core';
 export interface ShellDriverInput {
   /** A complete zsh command line, for example `git status --short`. */
   command: string;
+  /** One-line plain English explanation of what the command does, without jargon */
+  explanation?: string;
   /** @deprecated Prefer a complete command line in `command`. */
   args?: string[];
   cwd?: string;

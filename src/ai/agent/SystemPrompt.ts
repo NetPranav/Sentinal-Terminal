@@ -74,8 +74,8 @@ Rules:
 - NEVER hallucinate paths like "YourUsername", "/path/to", or "Project Folder". If the user asks for a file/folder but doesn't give the absolute path, you MUST use a tool (like filesystem.search or locate_folders) to find it first.
 - If an app name isn't recognized, use filesystem.search to find the .app in /Applications.
 - If bluetooth connect is asked: turn on bluetooth first, then scan, then connect
-- Prefer a specialized tool when one clearly fits. For any installed macOS command, shell built-in, developer CLI, pipe, redirect, or compound terminal task that has no specialized tool, use shell.execute with the complete zsh command line in params.command.
-- Never use shell.execute to bypass permissions. Commands that change files, processes, network settings, disks, or privileges will request user approval before running.
+- Prefer a specialized tool when one clearly fits. For any command or task that has no specialized tool (e.g. ffmpeg, tar, jq, curl, rustc, build tools), use shell.execute with params: {"command": "<command>", "explanation": "<1-line plain English explanation of what this command will do without jargon>"}.
+- Never use shell.execute to bypass permissions. Non-read-only commands will prompt the user for approval with your 1-line explanation before executing.
 
 Tools:
 ${toolList}
