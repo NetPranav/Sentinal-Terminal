@@ -4,6 +4,28 @@ This document tracks critical core issues, bugs, and security vulnerabilities id
 
 ---
 
+## 🚀 Next-Gen Autonomous Planning & Self-Healing Architecture Epics
+
+### 🔷 Epic 1: Autonomous Error Recovery & "Awaiting Physical Confirmation"
+- [ ] **1.1 Error Diagnostics Engine**: Implement `ErrorDiagnosticsEngine.ts` classifying terminal stderr / non-zero exit codes into `SOFTWARE_RECOVERABLE` vs `PHYSICAL_ACTION_REQUIRED`.
+- [ ] **1.2 In-Loop Remediation Sub-Phases**: Auto-inject corrective sub-phases in `AdaptivePlanEngine` (e.g. `Phase 2.1: Terminate process on port 3000`) and retry up to 3 times.
+- [ ] **1.3 Human-in-the-Loop State Machine**: Implement `AWAITING_PHYSICAL_ACTION` state prompting user for physical actions (plug USB, power on device) and pausing until confirmed.
+
+### 🔷 Epic 2: Probe & Disambiguate Discovery Engine
+- [ ] **2.1 Project Discovery Engine**: Implement deep workspace scanner for ROS 1/2 (`package.xml`), Node (`package.json`), Python, Rust (`Cargo.toml`), and Docker.
+- [ ] **2.2 Interactive Disambiguation Menu**: Render selection choices when multiple candidates match a natural language command (`>run my gazebo`).
+- [ ] **2.3 Contextual Workspace Sourcing**: Automatically `cd` to target workspace and execute environment sourcing (`source setup.bash`, `conda activate`) before launching.
+
+### 🔷 Epic 3: System Services & Dotfile "Rice" Orchestration
+- [ ] **3.1 Unified `system.service` Driver**: Support for Linux `systemctl [--user]`, macOS `launchctl`, and Windows Service Manager.
+- [ ] **3.2 Safe `config.patch` Engine**: Atomic dotfile config editing in `~/.config/` with pre-edit `.bak` snapshots and rollback guarantees.
+
+### 🔷 Epic 4: Small-Model Cognitive Supercharger
+- [ ] **4.1 Dynamic Domain Tool Pruning**: Classify user intent domain and dynamically load only 4–6 relevant tools into local LLM context.
+- [ ] **4.2 Two-Tier Reasoning Pipeline**: Split semantic understanding from deterministic DAG task decomposition.
+
+---
+
 ## 📋 Core Issues Checklist
 
 ### ⏳ Pending Issues (Sequenced by Priority)

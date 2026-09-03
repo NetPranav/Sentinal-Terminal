@@ -158,4 +158,123 @@ describe('AdaptivePlanEngine — Dynamic Multi-Phase Planning & Execution', () =
     expect(plan.phases[3].id).toBe('4');
     expect(plan.phases[3].title).toBe('Deploy container artifact');
   });
+
+  it('should autonomously self-heal software errors (e.g. EADDRINUSE port collision)', async () => {
+    const engine = new AdaptivePlanEngine();
+    const plan: AgentPlan = {
+      summary: 'Launch local web service',
+      steps: ['Start service on port 3000'],
+      phases: [
+        { id: '1', title: 'Start service on port 3000', tool: 'shell.execute', params: { command: 'node server.js' }, status: 'pending' }
+      ]
+    };
+
+    let serverAttempts = 0;
+    const mockToolExecutor = {
+      hasDriver: vi.fn().mockReturnValue(true),
+      execute: vi.fn().mockImplementation(async (toolId: string, params: any) => {
+        if (toolId === 'shell.execute') {
+          serverAttempts++;
+          if (serverAttempts === 1) {
+            // First attempt fails with EADDRINUSE port collision
+            return {
+              success: false,
+              stderr: 'Error: listen EADDRINUSE: address already in use :::3000',
+              error: 'Port 3000 is occupied'
+            };
+          }
+          // After self-healing sub-phase frees port, second attempt succeeds!
+          return { success: true, data: { stdout: 'Server listening on http://localhost:3000' } };
+        }
+        if (toolId === 'system.kill_process') {
+          // Remediation sub-phase
+          return { success: true, data: { stdout: 'Killed PID 4912 listening on port 3000' } };
+        }
+        return { success: true, data: {} };
+      })
+    };
+
+    const outputLogs: string[] = [];
+    const result = await engine.executePlan('start server', plan, {
+      cwd: '/workspace',
+      os: 'mac',
+      toolExecutor: mockToolExecutor,
+      onStepOutput: (out) => outputLogs.push(out)
+    });
+
+    expect(result.success).toBe(true);
+    // Sub-phase 1.1 was automatically injected to free port 3000!
+    expect(plan.phases[0].subPhases).toBeDefined();
+    expect(plan.phases[0].subPhases?.length).toBe(1);
+    expect(plan.phases[0].subPhases![0].id).toBe('1.1');
+    expect(plan.phases[0].subPhases![0].title).toBe('Free port 3000');
+    expect(plan.phases[0].subPhases![0].status).toBe('completed');
+
+    // kill_process was called with port 3000
+    expect(mockToolExecutor.execute).toHaveBeenCalledWith(
+      'system.kill_process',
+      { port: 3000 },
+      '/workspace',
+      undefined
+    );
+
+    // Shell execute was called twice (first failed, second succeeded)
+    expect(serverAttempts).toBe(2);
+    expect(plan.phases[0].status).toBe('completed');
+  });
+
+  it('should pause in awaiting_action for physical hardware confirmation and resume on user approval', async () => {
+    const engine = new AdaptivePlanEngine();
+    const plan: AgentPlan = {
+      summary: 'Connect to offline hardware peripheral',
+      steps: ['Connect to USB device'],
+      phases: [
+        { id: '1', title: 'Connect to USB device', tool: 'shell.execute', params: { command: 'flash-firmware' }, status: 'pending' }
+      ]
+    };
+
+    let flashAttempts = 0;
+    const mockToolExecutor = {
+      hasDriver: vi.fn().mockReturnValue(true),
+      execute: vi.fn().mockImplementation(async (toolId: string) => {
+        if (toolId === 'shell.execute') {
+          flashAttempts++;
+          if (flashAttempts === 1) {
+            // First attempt fails due to physical cable disconnect
+            return {
+              success: false,
+              error: 'Error: USB device disconnected or hardware not responding'
+            };
+          }
+          // After physical confirmation, second attempt succeeds!
+          return { success: true, data: { stdout: 'Firmware flashed successfully' } };
+        }
+        return { success: true, data: {} };
+      })
+    };
+
+    let physicalActionPromptReceived = '';
+    const mockPhysicalActionHandler = vi.fn().mockImplementation(async (req: { prompt: string; cause: string }) => {
+      physicalActionPromptReceived = req.prompt;
+      // User plugs in hardware and types "done" or presses Enter!
+      return true;
+    });
+
+    const result = await engine.executePlan('flash firmware', plan, {
+      cwd: '/workspace',
+      os: 'mac',
+      toolExecutor: mockToolExecutor,
+      onPhysicalActionRequired: mockPhysicalActionHandler
+    });
+
+    expect(result.success).toBe(true);
+    expect(mockPhysicalActionHandler).toHaveBeenCalledOnce();
+    expect(physicalActionPromptReceived).toContain('[Physical Action Required]');
+    expect(physicalActionPromptReceived).toContain('type "done" or press Enter');
+
+    // Executed flash tool twice (first failed with disconnect, second succeeded after confirmation)
+    expect(flashAttempts).toBe(2);
+    expect(plan.phases[0].status).toBe('completed');
+  });
 });
+

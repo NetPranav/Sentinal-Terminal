@@ -1,29 +1,68 @@
-# Sentinel Terminal Product Roadmap
+# Sentinel Terminal — Product & Intelligence Roadmap
 
-Sentinel continuously innovates at the intersection of developer workspaces and automated desktop intelligence. Our future roadmap focuses on enriching end-user features, expanding multi-modal interactions, and broadening platform synergy.
-
----
-
-## 📅 Upcoming Product Highlights
-
-### 1. 🌐 SSH Host Intelligence & Remote Server Autonomy
-- **Smart Remote Navigation**: Apply natural language folder traversal and log exploration across remote SSH sessions without manually configuring remote scripts or dependencies.
-- **Automated Remote Diagnostics**: Intercept server performance anomalies and generate localized suggestions for port troubleshooting and system service restoration.
+This roadmap articulates Sentinel's evolution from a fast, local command executor into an **autonomous, self-healing, and context-discovering terminal operating system**.
 
 ---
 
-### 2. 🧩 Visual Workflow Canvas & Custom Agent Creation
-- **Interactive Workflow Designer**: Construct sophisticated multi-step system automation pipelines using a drag-and-drop user interface inside your terminal workspace.
-- **Custom Alias Macros**: Save favorite conversational phrases into instantaneous custom terminal shortcuts that trigger multi-application developer routines with a single keyboard shortcut.
+## 🧭 Core Architectural Epochs
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  Epoch 1: Autonomous Error Recovery & Human-in-the-Loop Confirmation       │
+│  - Stop copy-pasting terminal errors to web AIs                             │
+│  - Auto-diagnose stderr & non-zero exit codes                              │
+│  - Self-healing sub-phases for software errors (free ports, clear locks)   │
+│  - "Awaiting Physical Action" state machine (power on device, plug USB)    │
+├─────────────────────────────────────────────────────────────────────────────┤
+│  Epoch 2: Deep Environment & Workspace Discovery ("Probe & Disambiguate")  │
+│  - Stop blind command execution                                            │
+│  - Autonomous scan for ROS workspaces, launch files, and package manifests │
+│  - Interactive numbered menus for multiple matches ("Which Gazebo setup?")  │
+│  - Automatic environment sourcing (`source setup.bash`, `conda activate`)  │
+├─────────────────────────────────────────────────────────────────────────────┤
+│  Epoch 3: System Services & Dotfile "Rice" Orchestration                   │
+│  - Native `system.service` for systemd user services, launchctl, & WinSC   │
+│  - Safe dotfile config patcher (`config.patch`) with automatic rollback    │
+│  - Toggle startup nodes and desktop environment configurations cleanly      │
+├─────────────────────────────────────────────────────────────────────────────┤
+│  Epoch 4: Small-Model Cognitive Supercharger                               │
+│  - Dynamic Domain Tool Pruning (inject only 4-6 tools per prompt)          │
+│  - Two-tier semantic routing: enables 1.5B/3B/7B models to rival 70B+ LLMs  │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
 
 ---
 
-### 3. 🖼️ Multi-Modal Terminal Intelligence
-- **Embedded Visual Debugging**: Simply paste interface error screenshots or architectural diagrams directly into your active terminal session for immediate local AI interpretation and remedial command generation.
-- **Rich Output Rendering**: Native terminal preview widgets for image assets, markdown preview documentation, and real-time interactive system graph dashboards.
+## 📅 Detailed Phase Breakdown
+
+### 🔷 Phase 1: Autonomous Error Triage & "Awaiting Physical Confirmation"
+- **Goal**: Free users from the endless cycle of error-copying on Windows, Linux, and macOS.
+- **Key Deliverables**:
+  - `ErrorDiagnosticsEngine`: Classifies failures into `SOFTWARE_RECOVERABLE` vs `PHYSICAL_ACTION_REQUIRED`.
+  - Self-Healing Plan Expansion: Injects dynamic sub-phases (e.g., `Phase 2.1: Terminate process on port 3000`) and retries.
+  - Interactive Confirmation State: When hardware/physical interaction is needed, pauses execution with a clean prompt (*"Please plug in USB / power on device and type 'done'"*) and resumes seamlessly upon confirmation.
+
+### 🔷 Phase 2: Probe & Disambiguate Discovery Engine
+- **Goal**: Intelligent exploration for complex developer environments (Ubuntu robotics, ROS 1/ROS 2, monorepos).
+- **Key Deliverables**:
+  - `ProjectDiscoveryEngine`: Deep search for `package.xml`, `*.launch.py`, `Cargo.toml`, `docker-compose.yml`.
+  - Interactive Selection Pills: Prompts user when multiple project workspaces match a generic command (`>run my gazebo`).
+  - Automatic Environment Preparation: Changes working directory, executes environment source scripts, and launches target processes.
+
+### 🔷 Phase 3: System Services & Dotfile Management
+- **Goal**: Effortless configuration and startup daemon control (Arch Linux rice, macOS launchd, Windows services).
+- **Key Deliverables**:
+  - `system.service` Capability Driver: Unified interface for `systemctl --user`, `launchctl`, and Windows Service Manager.
+  - `config.patch` Safe Mutation: Atomic edits to `~/.config/` with pre-modification `.bak` snapshots and syntax validation.
+
+### 🔷 Phase 4: Small-Model Cognitive Supercharger
+- **Goal**: Enable lightweight offline models (1.5B–7B) to reason with the deterministic reliability of frontier models.
+- **Key Deliverables**:
+  - Dynamic Tool Pruning: Classifies prompt domain and loads only the 4–6 relevant tool schemas instead of 100+.
+  - Two-Tier Intent Architecture: Separates semantic understanding from deterministic task graph execution.
 
 ---
 
-### 4. 🌍 Broad Software & IDE Integrations
-- **Seamless IDE Hand-Offs**: Synchronize active terminal directory sessions and Git branch memory seamlessly with Cursor, VS Code, and JetBrains editors.
-- **Deep Windows 11 Synergy**: Introducing optimized native Windows installer packages (`.msi` and `.exe`) featuring Windows Terminal styling and integrated PowerShell hardware AI acceleration.
+## 🔗 Technical Specifications
+- Detailed architecture and interface definitions are documented in [Intelligent Planner Architecture](INTELLIGENT_PLANNER_ARCHITECTURE.md).
+- Active issues and pending work items are tracked in the [Engineering Roadmap Checklist](TODO.md).

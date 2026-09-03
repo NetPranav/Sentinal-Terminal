@@ -1,4 +1,4 @@
-# Sentinel Terminal Local AI Runtime Engine
+# Sentinel Terminal — Local AI Cognitive Architecture
 
 Sentinel brings native desktop computing and offline artificial intelligence together. Instead of requiring subscription APIs or transmitting sensitive project code across external internet servers, Sentinel natively coordinates an offline Large Language Model engine operating directly on your computer hardware.
 
@@ -17,16 +17,30 @@ Traditional developer AI assistants transmit command terminal history, environme
 
 Sentinel works alongside modern runtime infrastructure (including **Ollama**) to deliver near-instantaneous command processing:
 - **Apple Silicon & CoreML Adaptations**: Takes full advantage of unified memory architectures (M1, M2, M3, and M4 chips) using dedicated GPU/NPU Metal hardware pipelines for sub-second responses.
-- **Lightweight Intelligence Models**: By utilizing optimized architectural profiles like **Qwen 2.5 (1.5B)**, Sentinel delivers high-precision shell navigation translations and operating system automation without slowing down your machine or eating into compiling CPU resources.
+- **Lightweight Intelligence Models**: By utilizing optimized architectural profiles like **Qwen 2.5 (1.5B / 3B / 7B)**, Sentinel delivers high-precision shell navigation translations and operating system automation without slowing down your machine or eating into compiling CPU resources.
 
 ---
 
-## 🧠 Smart Intent Recognition
+## 🧠 Cognitive Architecture: How Small Models Punch Above Their Weight
 
-Sentinel distinguishes between everyday language instructions and exact terminal syntax in real-time:
-- **Hybrid Execution (Heuristic Fast-Paths)**: Sentinel employs native heuristic intercepts that capture complex structural commands (like `"update brave browser"` or `"make a folder and initialize a nextjs frontend"`). These specific intents instantly bypass LLM inference, triggering native capabilities directly to eliminate execution latency and LLM hallucinations.
-- **Resilient Reasoning (Curly-Brace Engine)**: When delegating complex multi-step plans to the offline 3B model, Sentinel uses a custom character-by-character curly-brace JSON counting algorithm. This guarantees flawless tool execution even if the LLM output is malformed, abruptly interrupted, or intermingled with conversational text.
-- **Automatic Shell Synchronization**: When an AI automated workflow executes a directory jump or workspace transformation, Sentinel immediately sends the confirmed commands straight into your active terminal shell session. Your actual working directory updates instantly on screen!
+Small local models often hallucinate or fail when presented with dozens of tool schemas at once. Sentinel solves this through a **Three-Pillar Cognitive Architecture**:
+
+### 1. Dynamic Domain Tool Pruning (Laser-Focused Context)
+Instead of dumping 100+ raw tool definitions into a small model's prompt:
+1. Sentinel's lightweight classifier determines the intent domain (`DevOps`, `SystemServices`, `Filesystem`, `Hardware`, `AppControl`).
+2. Only the **4 to 6 tools relevant to that domain** are dynamically injected into the context window.
+3. This eliminates context clutter, prevents argument hallucination, and enables a 3B model to execute with the precision of a 70B frontier model.
+
+### 2. "Probe Before You Leap" Discovery Engine
+When a user asks for a target not in the current directory (`>run my gazebo`, `>start robotics node`):
+- Sentinel does not blindly guess or fail with `command not found`.
+- It executes a **Discovery Probe** across development workspaces (scanning for `package.xml`, `launch.py`, `docker-compose.yml`, `Cargo.toml`).
+- If multiple candidates exist, it pauses and presents an **Interactive Disambiguation Menu** so the user can select their target with 1 keystroke.
+
+### 3. In-Loop Error Self-Healing & Physical Action Pausing
+When a command fails:
+- **Software Errors**: Sentinel inspects `stderr` and exit codes, formulates a corrective sub-phase (e.g. `Phase 2.1: Free port 3000`), and retries automatically.
+- **Physical Action Required**: If the error requires human intervention (`device offline`, `insert USB`, `power on hardware`), Sentinel enters the **`AwaitingPhysicalConfirmation`** state, prompts the user clearly, and resumes execution the moment confirmation is provided.
 
 ---
 

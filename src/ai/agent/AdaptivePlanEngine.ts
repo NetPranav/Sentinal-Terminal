@@ -12,7 +12,9 @@
  * 4. Pluggable design supporting both small local models and future frontier cloud AI APIs.
  */
 
-export type PhaseStatus = 'pending' | 'running' | 'completed' | 'skipped' | 'failed';
+import { ErrorDiagnosticsEngine, DiagnosticResult } from './ErrorDiagnosticsEngine';
+
+export type PhaseStatus = 'pending' | 'running' | 'completed' | 'skipped' | 'failed' | 'awaiting_action';
 
 export interface PlanPhase {
   /** Hierarchical identifier: e.g. "1", "2", "2.1", "2.2", "3" */
@@ -67,6 +69,7 @@ export interface AdaptiveExecutionOptions {
   onPhaseStart?: (phase: PlanPhase) => void;
   onPhaseDone?: (phase: PlanPhase) => void;
   onStepOutput?: (output: string) => void;
+  onPhysicalActionRequired?: (action: { prompt: string; cause: string; phaseId: string }) => Promise<boolean>;
   toolExecutor: {
     execute: (toolId: string, params: any, cwd?: string, authHandler?: any) => Promise<any>;
     hasDriver: (toolId: string) => boolean;
@@ -251,10 +254,54 @@ export class AdaptivePlanEngine {
           phaseCdPath = phase.params.path;
         }
 
-        // Check if execution indicates sub-phases are required (e.g. prerequisite failure)
-        const subSteps = this.detectSubPhasePrerequisites(phase, result, goal);
+        // Handle Physical Action Requirements (Human-in-the-Loop)
+        if (!result.success) {
+          const rawErr = [result.error, result.stderr, typeof result.data === 'string' ? result.data : result.data?.stderr].filter(Boolean).join(' ');
+          const diag = ErrorDiagnosticsEngine.diagnose(rawErr, phase.tool, phase.params, options.cwd);
+
+          if (diag.category === 'PHYSICAL_ACTION_REQUIRED') {
+            phase.status = 'awaiting_action';
+            plan.activePhaseId = phase.id;
+            options.onPlanUpdate?.(plan);
+            if (diag.physicalPrompt) {
+              options.onStepOutput?.(diag.physicalPrompt);
+            }
+
+            if (options.onPhysicalActionRequired) {
+              const confirmed = await options.onPhysicalActionRequired({
+                prompt: diag.physicalPrompt || `⚠️ ${diag.cause}`,
+                cause: diag.cause,
+                phaseId: phase.id
+              });
+
+              if (confirmed) {
+                options.onStepOutput?.(`✓ Action confirmed. Resuming execution of Phase ${phase.id}...`);
+                const physicalRetry = await options.toolExecutor.execute(
+                  phase.tool,
+                  phase.params || {},
+                  options.cwd,
+                  options.authorizationHandler
+                );
+                executedSteps.push({
+                  phaseId: `${phase.id}.post_confirmation`,
+                  tool: phase.tool,
+                  params: phase.params || {},
+                  result: physicalRetry
+                });
+                phase.status = physicalRetry.success ? 'completed' : 'failed';
+                phase.resultSummary = physicalRetry.success
+                  ? (physicalRetry.data?.stdout || 'Phase completed after user confirmation')
+                  : (physicalRetry.error || 'Phase execution failed after confirmation');
+                return { success: physicalRetry.success, cdPath: phaseCdPath };
+              }
+            }
+          }
+        }
+
+        // Check if execution indicates sub-phases are required (e.g. self-healing or prerequisite failure)
+        const subSteps = this.detectSubPhasePrerequisites(phase, result, goal, options.cwd);
         if (subSteps && subSteps.length > 0) {
-          // Dynamic Sub-Phase Expansion
+          // Dynamic Sub-Phase Expansion & Self-Healing
           this.injectSubPhases(phase, subSteps, plan, options);
 
           // Execute each injected sub-phase 1 by 1
@@ -286,7 +333,9 @@ export class AdaptivePlanEngine {
             result: retryResult
           });
           phase.status = retryResult.success ? 'completed' : 'failed';
-          phase.resultSummary = retryResult.success ? 'Completed after resolving sub-phase prerequisites' : 'Failed after sub-phases';
+          phase.resultSummary = retryResult.success
+            ? (retryResult.data?.stdout || 'Completed via autonomous self-healing')
+            : (retryResult.error || 'Failed after self-healing');
           return { success: retryResult.success, cdPath: phaseCdPath };
         }
 
@@ -399,12 +448,27 @@ export class AdaptivePlanEngine {
   private detectSubPhasePrerequisites(
     phase: PlanPhase,
     result: any,
-    goal: string
+    goal: string,
+    cwd?: string
   ): { title: string; tool?: string; params?: Record<string, any> }[] | null {
     // If the step succeeded without issues, no sub-phases needed
     if (result.success) return null;
 
-    const errMsg = (result.error || result.stderr || '').toLowerCase();
+    const rawErr = [result.error, result.stderr, typeof result.data === 'string' ? result.data : result.data?.stderr].filter(Boolean).join(' ');
+    const diag = ErrorDiagnosticsEngine.diagnose(rawErr, phase.tool, phase.params, cwd);
+
+    // If ErrorDiagnosticsEngine found an autonomous software remediation:
+    if (diag.category === 'SOFTWARE_RECOVERABLE' && diag.remediation) {
+      return [
+        {
+          title: diag.remediation.title,
+          tool: diag.remediation.tool,
+          params: diag.remediation.params
+        }
+      ];
+    }
+
+    const errMsg = rawErr.toLowerCase();
 
     // Case 1: Bluetooth connection failed because Bluetooth is off
     if (phase.tool === 'network.bluetooth.connect' && (errMsg.includes('power is off') || errMsg.includes('off') || errMsg.includes('disabled'))) {

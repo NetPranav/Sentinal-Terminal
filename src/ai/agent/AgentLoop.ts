@@ -492,11 +492,18 @@ export class AgentLoop {
               this.emit({ type: 'tool_start', message: `Phase ${phase.id}: ${phase.title}` });
             },
             onPhaseDone: (phase) => {
-              const icon = phase.status === 'completed' ? '✓' : phase.status === 'skipped' ? '⊘' : '⚠';
+              const icon = phase.status === 'completed' ? '✓' : phase.status === 'skipped' ? '⊘' : phase.status === 'awaiting_action' ? '⏳' : '⚠';
               this.emit({ 
                 type: 'tool_done', 
                 message: `${icon} Phase ${phase.id}: ${phase.title}${phase.skippedReason ? ` (${phase.skippedReason})` : ''}` 
               });
+            },
+            onStepOutput: (output) => {
+              this.emit({ type: 'text', message: output });
+            },
+            onPhysicalActionRequired: async (req) => {
+              this.emit({ type: 'question', message: req.prompt, data: req });
+              return true;
             },
             toolExecutor: this.toolExecutor,
             authorizationHandler: this.authorizationHandler
