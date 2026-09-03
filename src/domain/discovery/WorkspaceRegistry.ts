@@ -6,7 +6,10 @@
  */
 
 import { DiscoveredProject, ProjectDiscoveryEngine } from './ProjectDiscoveryEngine';
-import * as path from 'path';
+
+function joinPath(...parts: string[]): string {
+  return parts.map((p, i) => i === 0 ? p.replace(/\/+$/, '') : p.replace(/^\/+|\/+$/g, '')).filter(Boolean).join('/');
+}
 
 export class WorkspaceRegistry {
   private static instance: WorkspaceRegistry;
@@ -48,11 +51,11 @@ export class WorkspaceRegistry {
       const rootsToScan: string[] = [];
 
       if (home) {
-        rootsToScan.push(path.join(home, 'Projects'));
-        rootsToScan.push(path.join(home, 'Project Folder'));
-        rootsToScan.push(path.join(home, 'workspace'));
-        rootsToScan.push(path.join(home, 'Developer'));
-        rootsToScan.push(path.join(home, 'src'));
+        rootsToScan.push(joinPath(home, 'Projects'));
+        rootsToScan.push(joinPath(home, 'Project Folder'));
+        rootsToScan.push(joinPath(home, 'workspace'));
+        rootsToScan.push(joinPath(home, 'Developer'));
+        rootsToScan.push(joinPath(home, 'src'));
       }
 
       // Also include current working directory if available
