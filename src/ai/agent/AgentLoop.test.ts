@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest';
-import { isExplicitFilesystemSearch, findFastPath } from './AgentLoop';
+import { describe, expect, it, vi } from 'vitest';
+import { isExplicitFilesystemSearch, findFastPath, AgentLoop } from './AgentLoop';
+import { DemonstrationLearningEngine } from '../../domain/learning/DemonstrationLearningEngine';
 
 describe('AgentLoop fast-path routing', () => {
   it('uses the filesystem shortcut only for explicit file-oriented searches', () => {
@@ -140,5 +141,41 @@ describe('AgentLoop fast-path routing', () => {
     expect(dotfileRes?.params.app).toBe('gazebo');
     expect(dotfileRes?.params.enable).toBe(false);
     expect(dotfileRes?.params.target).toBe('hyprland');
+  });
+
+  it('executes user request via learned demonstration pattern without invoking LLM', async () => {
+    const learningEngine = DemonstrationLearningEngine.getInstance();
+    learningEngine.clear();
+    learningEngine.learnExplicit(
+      'compress backups into archive',
+      'tar -czvf backups.tar.gz ./backups',
+      'Compresses backups directory into tar.gz archive'
+    );
+
+    const mockToolExecutor = {
+      hasDriver: vi.fn().mockReturnValue(true),
+      execute: vi.fn().mockResolvedValue({
+        success: true,
+        data: { stdout: 'backups.tar.gz created' }
+      })
+    };
+
+    const loop = new AgentLoop(
+      { toolIndex: { has: () => false, getAll: () => [] } } as any,
+      undefined
+    );
+    (loop as any).toolExecutor = mockToolExecutor;
+
+    const res = await loop.run('compress backups into archive', { os: 'mac', cwd: '/test' });
+    expect(res.success).toBe(true);
+    expect(mockToolExecutor.execute).toHaveBeenCalledWith(
+      'shell.execute',
+      expect.objectContaining({
+        command: 'tar -czvf backups.tar.gz ./backups'
+      }),
+      '/test',
+      undefined
+    );
+    expect(res.summary).toContain('Executed learned workflow: tar -czvf backups.tar.gz ./backups');
   });
 });

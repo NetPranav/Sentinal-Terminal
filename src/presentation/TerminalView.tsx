@@ -7,6 +7,7 @@ import { SessionManager } from '../domain/SessionManager';
 import { ToolLoader } from '../tools/loader/ToolLoader';
 import { AppAliasRegistry } from '../domain/capabilities/AppAliasRegistry';
 import { AgentLoop, AgentPlan } from '../ai/agent/AgentLoop';
+import { DemonstrationLearningEngine } from '../domain/learning/DemonstrationLearningEngine';
 import { formatAgentEvent, formatDataOutput } from './OutputFormatter';
 
 import { AutocompleteEngine } from '../domain/autocomplete/AutocompleteEngine';
@@ -38,6 +39,7 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
   const [authError, setAuthError] = useState('');
   const [isVerifying, setIsVerifying] = useState(false);
   const [latestPlan, setLatestPlan] = useState<AgentPlan | null>(null);
+  const lastUnresolvedGoalRef = useRef<{ goal: string; timestamp: number } | null>(null);
 
   const handleAuthorize = async () => {
     if (!authPassword.trim()) {
@@ -293,6 +295,72 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
                 return;
               }
 
+              // Intercept demonstration learning slash commands: /learn, /learned, /forget
+              if (cleanCmd.startsWith('/learn') || cleanCmd.startsWith('/learned') || cleanCmd.startsWith('/forget')) {
+                await sessionManager.write(currentSessionId!, '\x03');
+                if (cleanCmd.startsWith('/learned')) {
+                  const patterns = DemonstrationLearningEngine.getInstance().getAllPatterns();
+                  if (patterns.length === 0) {
+                    writeTerm(`\r\n\x1b[33m[Learning Engine] No custom patterns learned yet.\x1b[0m\r\n`);
+                    writeTerm(`\x1b[37mTeach Sentinel via:\x1b[0m \x1b[1;32m/learn <goal> -> <command>\x1b[0m\r\n\r\n`);
+                  } else {
+                    writeTerm(`\r\n\x1b[1;35m[Learning Engine] Currently Learned Workflows (${patterns.length}):\x1b[0m\r\n`);
+                    patterns.forEach((p, idx) => {
+                      writeTerm(`  ${idx + 1}. \x1b[36m"${p.originalGoal}"\x1b[0m\r\n     ──► \x1b[33m${p.commandTemplate}\x1b[0m\r\n     \x1b[90mID: ${p.id} | Used: ${p.timesUsed}x\x1b[0m\r\n`);
+                    });
+                    writeTerm(`\r\n\x1b[37mTo remove a pattern:\x1b[0m \x1b[1;31m/forget <id or goal>\x1b[0m\r\n\r\n`);
+                  }
+                } else if (cleanCmd.startsWith('/forget')) {
+                  const target = cleanCmd.replace(/^\/forget\s*/i, '').trim();
+                  if (target) {
+                    const ok = DemonstrationLearningEngine.getInstance().forgetPattern(target);
+                    if (ok) {
+                      writeTerm(`\r\n\x1b[1;32m[Learning Engine] Successfully removed learned pattern:\x1b[0m ${target}\r\n\r\n`);
+                    } else {
+                      writeTerm(`\r\n\x1b[1;31m[Learning Engine] Could not find pattern matching:\x1b[0m ${target}\r\n\r\n`);
+                    }
+                  } else {
+                    writeTerm(`\r\n\x1b[37mUsage:\x1b[0m \x1b[1;31m/forget <pattern_id or goal>\x1b[0m\r\n\r\n`);
+                  }
+                } else {
+                  // /learn <trigger> -> <command>
+                  const match = cleanCmd.match(/^\/learn\s+(.+?)\s*(?:->|=>|──►|to)\s*(.+)$/i);
+                  if (match && match[1] && match[2]) {
+                    const pattern = DemonstrationLearningEngine.getInstance().learnExplicit(match[1], match[2]);
+                    writeTerm(`\r\n\x1b[1;32m[Learning Engine] Successfully learned new workflow:\x1b[0m\r\n`);
+                    writeTerm(`  • Trigger: \x1b[1;36m"${pattern.originalGoal}"\x1b[0m\r\n`);
+                    writeTerm(`  • Command: \x1b[1;33m${pattern.commandTemplate}\x1b[0m\r\n`);
+                    writeTerm(`\x1b[37m[Learning Engine] Saved to persistent storage (~/.sentinel/learned_patterns.json).\x1b[0m\r\n\r\n`);
+                  } else {
+                    writeTerm(`\r\n\x1b[37mUsage:\x1b[0m \x1b[1;32m/learn <natural language goal> -> <command>\x1b[0m\r\n`);
+                    writeTerm(`Example: \x1b[36m/learn compress backups -> tar -czvf backups.tar.gz ./backups\x1b[0m\r\n\r\n`);
+                  }
+                }
+                return;
+              }
+
+              // If there was an unresolved AI goal within the last 3 minutes and the user demonstrates a command
+              if (
+                lastUnresolvedGoalRef.current &&
+                Date.now() - lastUnresolvedGoalRef.current.timestamp < 180000 &&
+                !['ls', 'pwd', 'clear', 'exit'].includes(cleanCmd.toLowerCase()) &&
+                !cleanCmd.startsWith('cd ') &&
+                !cleanCmd.startsWith('>') &&
+                !cleanCmd.startsWith('/')
+              ) {
+                const learned = DemonstrationLearningEngine.getInstance().learnFromDemonstration(
+                  lastUnresolvedGoalRef.current.goal,
+                  cleanCmd
+                );
+                if (learned) {
+                  writeTerm(`\r\n\x1b[1;35m💡 Sentinel learned this workflow from your demonstration!\x1b[0m\r\n`);
+                  writeTerm(`  • \x1b[36mTrigger:\x1b[0m "${lastUnresolvedGoalRef.current.goal}"\r\n`);
+                  writeTerm(`  • \x1b[33mCommand:\x1b[0m ${cleanCmd}\r\n`);
+                  writeTerm(`  • \x1b[37mSaved to ~/.sentinel/learned_patterns.json. Next time you ask, Sentinel will know this!\x1b[0m\r\n\r\n`);
+                  lastUnresolvedGoalRef.current = null;
+                }
+              }
+
               // `>` starts an AI request. Once it asks a clarification question,
               // the next normal terminal entry is treated as the answer so the
               // workflow can resume without making the user retype the request.
@@ -330,6 +398,12 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
 
                 // Run the agent loop
                 agentLoop.run(aiGoal, { os: 'mac', cwd: currentPath || '~' }).then(result => {
+                  if (!result.success) {
+                    lastUnresolvedGoalRef.current = { goal: aiGoal, timestamp: Date.now() };
+                  } else {
+                    lastUnresolvedGoalRef.current = null;
+                  }
+
                   // Handle clear terminal command
                   if (result.steps.some(s => s.tool === '__clear__')) {
                     term.clear();
@@ -348,6 +422,7 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
                     sessionManager.write(currentSessionId!, '\r');
                   }
                 }).catch(err => {
+                  lastUnresolvedGoalRef.current = { goal: aiGoal, timestamp: Date.now() };
                   writeTerm(`\r\n\x1b[1;31m  ✗ ${err.message || 'Something went wrong'}\x1b[0m\r\n\r\n`);
                   sessionManager.write(currentSessionId!, '\r');
                 });

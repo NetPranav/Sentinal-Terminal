@@ -45,7 +45,8 @@ import { AdaptivePlanEngine, AgentPlan, PlanPhase, PhaseStatus } from './Adaptiv
 import { ProjectDiscoveryEngine } from '../../domain/discovery/ProjectDiscoveryEngine';
 import { ToolParameterValidator } from './ToolParameterValidator';
 import { DynamicToolPruner } from './DynamicToolPruner';
-export { AdaptivePlanEngine, AgentPlan, PlanPhase, PhaseStatus, ToolParameterValidator, DynamicToolPruner };
+import { DemonstrationLearningEngine } from '../../domain/learning/DemonstrationLearningEngine';
+export { AdaptivePlanEngine, AgentPlan, PlanPhase, PhaseStatus, ToolParameterValidator, DynamicToolPruner, DemonstrationLearningEngine };
 
 interface LLMResponse {
   action: 'tool' | 'done' | 'error';
@@ -392,7 +393,43 @@ export class AgentLoop {
     // Strip conversational fluff from the front (but not standalone words like 'there')
     const cleaned = goal
       .replace(/^(?:(?:please|can you|could you|would you|kindly|just|now|alright|then|so|i want you to|i want to|i need you to|help me to|let's|lets)[\s,]*)+/i, '')
-      .trim();
+    // 0. Check Learned Patterns from Demonstration / Human Corrections
+    const learnedEngine = DemonstrationLearningEngine.getInstance();
+    const learnedMatch = learnedEngine.matchGoal(cleaned || goal);
+    if (learnedMatch.matched && learnedMatch.interpolatedCommand) {
+      this.emit({
+        type: 'thinking',
+        message: `💡 Using learned workflow: ${learnedMatch.interpolatedCommand}`
+      });
+
+      const params = {
+        command: learnedMatch.interpolatedCommand,
+        explanation: learnedMatch.explanation || `Using learned pattern: ${learnedMatch.interpolatedCommand}`
+      };
+
+      this.emit({ type: 'tool_start', message: 'Executing learned workflow...' });
+      const toolRes = await this.toolExecutor.execute(
+        'shell.execute',
+        params,
+        context.cwd,
+        this.authorizationHandler
+      );
+
+      const success = toolRes.success;
+      const summary = success
+        ? `✓ Executed learned workflow: ${learnedMatch.interpolatedCommand}`
+        : `⚠ Failed to execute learned workflow: ${toolRes.error || 'unknown error'}`;
+
+      this.emit({ type: success ? 'done' : 'error', message: summary });
+
+      const cdPath = this.extractCdPath('shell.execute', params, toolRes);
+      return {
+        success,
+        summary,
+        steps: [{ tool: 'shell.execute', params, result: toolRes }],
+        cdPath
+      };
+    }
 
     let result: AgentResult;
     if (cleaned.length > 0) {
