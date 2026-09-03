@@ -324,7 +324,14 @@ export class FilesystemSDKCapability extends BaseCapabilityDriver<FsDriverInput,
                 matches = mdCmd.stdout
                   .split('\n')
                   .map(l => l.trim())
-                  .filter(l => Boolean(l) && !l.includes('/node_modules/') && !l.includes('/.git/') && !l.includes('/Library/Caches/'));
+                  .filter(l => {
+                    if (!l) return false;
+                    if (l.includes('/node_modules/') || l.includes('/.git/') || l.includes('/Library/Caches/') || l.includes('/.Trash/')) return false;
+                    if (isFolderSearch && (l.endsWith('.app') || l.includes('.app/') || l.endsWith('.framework') || l.includes('.framework/') || l.endsWith('.appex'))) {
+                      return false;
+                    }
+                    return true;
+                  });
               }
             } catch { /* fallback to find */ }
           }
@@ -347,7 +354,16 @@ export class FilesystemSDKCapability extends BaseCapabilityDriver<FsDriverInput,
                 args: findArgs
               });
               if (findCmd && findCmd.stdout) {
-                matches = findCmd.stdout.split('\n').map(l => l.trim()).filter(Boolean);
+                matches = findCmd.stdout
+                  .split('\n')
+                  .map(l => l.trim())
+                  .filter(l => {
+                    if (!l) return false;
+                    if (isFolderSearch && (l.endsWith('.app') || l.includes('.app/') || l.endsWith('.framework') || l.includes('.framework/') || l.endsWith('.appex'))) {
+                      return false;
+                    }
+                    return true;
+                  });
               }
             } catch { /* ignore */ }
 
@@ -362,7 +378,14 @@ export class FilesystemSDKCapability extends BaseCapabilityDriver<FsDriverInput,
                   matches = altCmd.stdout
                     .split('\n')
                     .map(l => l.trim())
-                    .filter(l => Boolean(l) && !l.includes('/node_modules/') && !l.includes('/.git/') && !l.includes('/Library/Caches/'));
+                    .filter(l => {
+                      if (!l) return false;
+                      if (l.includes('/node_modules/') || l.includes('/.git/') || l.includes('/Library/Caches/') || l.includes('/.Trash/')) return false;
+                      if (isFolderSearch && (l.endsWith('.app') || l.includes('.app/') || l.endsWith('.framework') || l.includes('.framework/') || l.endsWith('.appex'))) {
+                        return false;
+                      }
+                      return true;
+                    });
                 }
               } catch { /* ignore */ }
             }

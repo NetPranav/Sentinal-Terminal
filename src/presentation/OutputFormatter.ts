@@ -179,8 +179,13 @@ function formatSearchResults(results: any[]): string {
   
   const lines = results.slice(0, 30).map(r => {
     const path = typeof r === 'string' ? r : (r.path || r.name || String(r));
+    const isDir = typeof r === 'object'
+      ? (r.isDirectory || r.type === 'directory')
+      : (!path.split('/').pop()?.includes('.') || path.endsWith('/'));
+    const icon = isDir ? '📁' : '📄';
+    const color = isDir ? C.boldCyan : C.white;
     const size = typeof r === 'object' && r.size ? ` ${C.dim}(${formatSize(r.size)})${C.reset}` : '';
-    return `  📄 ${C.white}${path}${C.reset}${size}`;
+    return `  ${icon} ${color}${path}${C.reset}${size}`;
   });
 
   if (results.length > 30) {

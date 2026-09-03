@@ -256,12 +256,16 @@ export function requiresExecutionPlan(goal: string): boolean {
 function parseSearchQuery(raw: string): { dir: string; pattern: string; type?: string } {
   let dir = '.';
   let pattern = '*';
-  let clean = raw.trim()
-    .replace(/^for\s+/i, '')
-    .replace(/\s+with\s+(?:there|their)\s+paths?/i, '')
-    .trim();
-  let type: string | undefined = undefined;
+  let clean = raw.trim();
 
+  // Strip conversational greetings & politeness
+  clean = clean.replace(/^(?:hey(?:\s+there)?|hi|hello|yo|please|can\s+you|could\s+you)[\s,]+/gi, '');
+  clean = clean.replace(/^(?:can\s+you\s+)?(?:tell\s+me|find|search|locate|show|list|get)\s+/i, '');
+  clean = clean.replace(/^all\s+(?:the\s+)?/i, '');
+  clean = clean.replace(/\s+with\s+(?:there|their)\s+paths?/i, '');
+  clean = clean.trim();
+
+  let type: string | undefined = undefined;
   if (/\b(?:folders?|directories|dirs)\b/i.test(clean)) {
     type = 'directory';
   }
@@ -273,18 +277,33 @@ function parseSearchQuery(raw: string): { dir: string; pattern: string; type?: s
     clean = clean.replace(inMatch[0], '').trim();
   }
 
+  clean = clean.replace(/^(?:for\s+|all\s+|the\s+)*/i, '').trim();
+
   // 1. Check explicit named / matching target first (e.g. "named as frontend", "named fronted")
   const nameMatch = clean.match(/(?:named|with\s+name|matching|pattern)\s+(?:as\s+)?['"]?([a-z0-9_.*-]+)['"]?/i);
   if (nameMatch && nameMatch[1]) {
     pattern = nameMatch[1];
   } else {
-    // 2. Check extension (e.g. "json files", "*.ts")
-    const extMatch = clean.match(/\b([a-z0-9_-]+)\s+files?\b/i);
-    const stopWords = ['all', 'the', 'some', 'any', 'my', 'locate', 'search', 'find', 'for', 'these', 'those', 'large'];
-    if (extMatch && extMatch[1] && !stopWords.includes(extMatch[1].toLowerCase())) {
-      pattern = `*.${extMatch[1]}`;
-    } else if (clean && !clean.includes('all') && clean !== 'files') {
-      pattern = clean.replace(/^(?:all\s+)?(?:files?\s+)?(?:folders?\s+)?(?:for\s+)?/i, '').trim() || '*';
+    // 2. Check "<target> (folders|directories|files)" e.g. "frontend folders"
+    const targetFolderMatch = clean.match(/^([a-z0-9_.*-]+)\s+(?:folders?|directories|dirs|files?)\b/i);
+    if (targetFolderMatch && targetFolderMatch[1]) {
+      const candidate = targetFolderMatch[1].toLowerCase();
+      const stopWords = ['all', 'the', 'some', 'any', 'my', 'locate', 'search', 'find', 'these', 'those'];
+      if (!stopWords.includes(candidate)) {
+        pattern = targetFolderMatch[1];
+      }
+    } else {
+      // 3. Check extension (e.g. "json files", "*.ts")
+      const extMatch = clean.match(/\b([a-z0-9_-]+)\s+files?\b/i);
+      const stopWords = ['all', 'the', 'some', 'any', 'my', 'locate', 'search', 'find', 'for', 'these', 'those', 'large'];
+      if (extMatch && extMatch[1] && !stopWords.includes(extMatch[1].toLowerCase())) {
+        pattern = `*.${extMatch[1]}`;
+      } else {
+        const stripped = clean.replace(/\b(?:folders?|directories|dirs|files?)\b/gi, '').trim();
+        if (stripped && stripped !== '*' && stripped !== 'all') {
+          pattern = stripped;
+        }
+      }
     }
   }
 
@@ -309,8 +328,9 @@ function resolvePathAlias(raw: string): string {
  * Find matching fast path definition and extracted parameters for a goal.
  */
 export function findFastPath(goal: string): { tool: string; params: Record<string, any> } | null {
+  const cleanGoal = goal.trim().replace(/^(?:hey(?:\s+there)?|hi|hello|yo|please)[\s,]+/i, '');
   for (const fp of FAST_PATHS) {
-    const match = goal.match(fp.pattern);
+    const match = cleanGoal.match(fp.pattern) || goal.match(fp.pattern);
     if (match && (!fp.shouldHandle || fp.shouldHandle(goal))) {
       return { tool: fp.tool, params: fp.paramsFn(match, goal) };
     }
