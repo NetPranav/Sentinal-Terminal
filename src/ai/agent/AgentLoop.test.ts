@@ -72,4 +72,58 @@ describe('AgentLoop fast-path routing', () => {
     expect(webRes?.params.engine).toBe('google');
     expect(webRes?.params.query).toBe('quantum computing advances');
   });
+
+  it('should resolve workspace disambiguation and execute project plan on user selection', async () => {
+    const { AgentLoop } = await import('./AgentLoop');
+    const mockToolExecutor = {
+      hasDriver: () => true,
+      execute: (tool: string, params: any) => Promise.resolve({ success: true, data: { stdout: `Executed ${tool}` } })
+    };
+    const mockRegistry = {
+      toolIndex: { getAll: () => [] }
+    };
+    const loop = new AgentLoop(mockRegistry as any, mockToolExecutor as any);
+
+    // Simulate pending clarification from a multi-project discovery
+    (loop as any).pendingClarification = {
+      goal: 'run gazebo',
+      plan: {
+        summary: 'Disambiguate project for "gazebo"',
+        steps: [],
+        phases: [],
+        question: 'Found 2 projects: [1] drone_ws [2] rover_ws',
+        discoveredProjects: [
+          {
+            id: '1',
+            name: 'drone_ws',
+            path: '/home/user/drone_ws',
+            type: 'ros2',
+            setupScript: 'source install/setup.bash',
+            launchTarget: 'ros2 launch drone_ws quad.launch.py',
+            confidence: 100
+          },
+          {
+            id: '2',
+            name: 'rover_ws',
+            path: '/home/user/rover_ws',
+            type: 'ros1',
+            setupScript: 'source devel/setup.bash',
+            launchTarget: 'roslaunch rover_ws sim.launch',
+            confidence: 90
+          }
+        ]
+      }
+    };
+
+    // User chooses option 1
+    const result = await loop.run('1', { os: 'linux', cwd: '/home/user' });
+    expect(result.success).toBe(true);
+    expect(result.cdPath).toBe('/home/user/drone_ws');
+    expect(result.steps.length).toBe(3);
+    expect(result.steps[0].tool).toBe('filesystem.navigate');
+    expect(result.steps[1].tool).toBe('shell.execute');
+    expect(result.steps[1].params.command).toBe('source install/setup.bash');
+    expect(result.steps[2].tool).toBe('shell.execute');
+    expect(result.steps[2].params.command).toBe('ros2 launch drone_ws quad.launch.py');
+  });
 });

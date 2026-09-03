@@ -42,6 +42,7 @@ export interface AgentResult {
 }
 
 import { AdaptivePlanEngine, AgentPlan, PlanPhase, PhaseStatus } from './AdaptivePlanEngine';
+import { ProjectDiscoveryEngine } from '../../domain/discovery/ProjectDiscoveryEngine';
 export { AdaptivePlanEngine, AgentPlan, PlanPhase, PhaseStatus };
 
 interface LLMResponse {
@@ -334,6 +335,34 @@ export class AgentLoop {
     if (this.pendingClarification && answer) {
       const pending = this.pendingClarification;
       this.pendingClarification = undefined;
+
+      // Check if this clarification was for workspace project disambiguation
+      if (pending.plan.discoveredProjects && pending.plan.discoveredProjects.length > 0) {
+        const selected = ProjectDiscoveryEngine.resolveSelection(answer, pending.plan.discoveredProjects);
+        if (selected) {
+          const adaptiveEngine = new AdaptivePlanEngine();
+          const executionPlan = adaptiveEngine.createProjectExecutionPlan(selected, pending.goal);
+          this.emit({ type: 'plan', message: executionPlan.summary, data: executionPlan });
+          const execRes = await adaptiveEngine.executePlan(pending.goal, executionPlan, {
+            cwd: context.cwd,
+            os: context.os,
+            onPlanUpdate: (updatedPlan) => this.emit({ type: 'plan', message: updatedPlan.summary, data: updatedPlan }),
+            onPhaseStart: (phase) => this.emit({ type: 'tool_start', message: `Phase ${phase.id}: ${phase.title}` }),
+            onPhaseDone: (phase) => this.emit({ type: 'tool_done', message: `✓ Phase ${phase.id}: ${phase.title}` }),
+            onStepOutput: (output) => this.emit({ type: 'text', message: output }),
+            toolExecutor: this.toolExecutor,
+            authorizationHandler: this.authorizationHandler
+          });
+          this.emit({ type: 'done', message: execRes.summary });
+          return {
+            success: execRes.success,
+            summary: execRes.summary,
+            steps: execRes.steps.map(s => ({ tool: s.tool, params: s.params, result: s.result })),
+            cdPath: execRes.cdPath
+          };
+        }
+      }
+
       goal = `${pending.goal}\nUser clarification: ${answer}`;
     }
 

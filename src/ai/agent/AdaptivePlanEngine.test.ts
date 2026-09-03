@@ -276,5 +276,87 @@ describe('AdaptivePlanEngine — Dynamic Multi-Phase Planning & Execution', () =
     expect(flashAttempts).toBe(2);
     expect(plan.phases[0].status).toBe('completed');
   });
+
+  it('should probe workspaces and formulate disambiguation question when multiple ROS/projects match', async () => {
+    const engine = new AdaptivePlanEngine();
+    const mockScanner = {
+      readdir: async (dir: string) => {
+        if (dir === '/workspaces') return ['drone_ws', 'rover_ws'];
+        if (dir === '/workspaces/drone_ws') return ['package.xml', 'install', 'src'];
+        if (dir === '/workspaces/drone_ws/src') return ['gazebo_quad.launch.py'];
+        if (dir === '/workspaces/rover_ws') return ['package.xml', 'devel', 'src'];
+        if (dir === '/workspaces/rover_ws/src') return ['rover_gazebo.launch'];
+        return [];
+      },
+      stat: async () => ({ isDirectory: () => true }),
+      readFile: async (p: string) => {
+        if (p.includes('drone_ws')) return '<package><name>quad</name><buildtool_depend>ament_cmake</buildtool_depend></package>';
+        if (p.includes('rover_ws')) return '<package><name>rover</name><buildtool_depend>catkin</buildtool_depend></package>';
+        return '';
+      },
+      exists: async () => true
+    };
+
+    const plan = await engine.probeProjectWorkspaces(
+      'run my gazebo',
+      { os: 'linux', cwd: '/workspaces' },
+      mockScanner as any
+    );
+
+    expect(plan).toBeDefined();
+    expect(plan?.question).toBeDefined();
+    expect(plan?.question).toContain('Found 2 project workspaces matching "gazebo":');
+    expect(plan?.discoveredProjects?.length).toBe(2);
+    expect(plan?.discoveredProjects![0].name).toBe('drone_ws');
+    expect(plan?.discoveredProjects![1].name).toBe('rover_ws');
+  });
+
+  it('should formulate and execute a 3-phase plan (cd + source + launch) for a chosen ROS 2 workspace', async () => {
+    const engine = new AdaptivePlanEngine();
+    const chosenProject = {
+      id: '1',
+      name: 'drone_ws',
+      path: '/home/user/workspaces/drone_ws',
+      type: 'ros2' as const,
+      setupScript: 'source install/setup.bash',
+      launchTarget: 'ros2 launch drone_ws gazebo_quad.launch.py',
+      confidence: 100
+    };
+
+    const plan = engine.createProjectExecutionPlan(chosenProject, 'gazebo');
+
+    expect(plan.phases.length).toBe(3);
+    expect(plan.phases[0].id).toBe('1');
+    expect(plan.phases[0].title).toBe('Navigate to workspace: drone_ws');
+    expect(plan.phases[0].tool).toBe('filesystem.navigate');
+    expect(plan.phases[0].params?.path).toBe('/home/user/workspaces/drone_ws');
+
+    expect(plan.phases[1].id).toBe('2');
+    expect(plan.phases[1].title).toBe('Source environment: source install/setup.bash');
+    expect(plan.phases[1].tool).toBe('shell.execute');
+    expect(plan.phases[1].params?.command).toBe('source install/setup.bash');
+
+    expect(plan.phases[2].id).toBe('3');
+    expect(plan.phases[2].title).toBe('Launch drone_ws: ros2 launch drone_ws gazebo_quad.launch.py');
+    expect(plan.phases[2].tool).toBe('shell.execute');
+
+    // Execute plan
+    const mockToolExecutor = {
+      hasDriver: vi.fn().mockReturnValue(true),
+      execute: vi.fn().mockResolvedValue({ success: true, data: { stdout: '[INFO] Launching Gazebo simulator node...' } })
+    };
+
+    const executedPhases: string[] = [];
+    const result = await engine.executePlan('run gazebo', plan, {
+      cwd: '/home/user',
+      os: 'linux',
+      toolExecutor: mockToolExecutor,
+      onPhaseStart: (p) => executedPhases.push(p.id)
+    });
+
+    expect(result.success).toBe(true);
+    expect(executedPhases).toEqual(['1', '2', '3']);
+    expect(result.cdPath).toBe('/home/user/workspaces/drone_ws');
+  });
 });
 

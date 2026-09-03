@@ -12,7 +12,10 @@
  * 4. Pluggable design supporting both small local models and future frontier cloud AI APIs.
  */
 
+import * as fs from 'fs';
+import * as path from 'path';
 import { ErrorDiagnosticsEngine, DiagnosticResult } from './ErrorDiagnosticsEngine';
+import { ProjectDiscoveryEngine, DiscoveredProject, FileSystemScanner } from '../../domain/discovery/ProjectDiscoveryEngine';
 
 export type PhaseStatus = 'pending' | 'running' | 'completed' | 'skipped' | 'failed' | 'awaiting_action';
 
@@ -47,6 +50,8 @@ export interface AgentPlan {
   activePhaseId?: string;
   /** Optional clarification question */
   question?: string;
+  /** Discovered candidate projects for disambiguation */
+  discoveredProjects?: DiscoveredProject[];
 }
 
 export interface PhaseExecutionStep {
@@ -95,6 +100,12 @@ export class AdaptivePlanEngine {
     const heuristic = this.createHeuristicPhases(goal, context);
     if (heuristic) {
       return heuristic;
+    }
+
+    // 2. Try Project & Workspace Discovery Probe (e.g. "run gazebo", "launch node", "run rover")
+    const discoveredPlan = await this.probeProjectWorkspaces(goal, context);
+    if (discoveredPlan) {
+      return discoveredPlan;
     }
 
     // 2. Fall back to model-based planning if provider is available
@@ -653,6 +664,92 @@ User request: ${goal}`;
       return { tool: 'git.pull', params: {} };
     }
     return null;
+  }
+
+  /**
+   * Probe filesystem workspaces for project matching the goal keyword (e.g. "gazebo", "navigation").
+   */
+  public async probeProjectWorkspaces(
+    goal: string,
+    context: { os: string; cwd: string },
+    scanner?: FileSystemScanner
+  ): Promise<AgentPlan | null> {
+    const match = goal.match(/^(?:run|launch|start|execute)\s+(?:my\s+|the\s+)?([a-z0-9_.-]+(?:\s+[a-z0-9_.-]+)*)$/i);
+    if (!match) return null;
+
+    const rawTarget = match[1].trim();
+    const lowerTarget = rawTarget.toLowerCase();
+    const commonIgnored = ['terminal', 'app', 'application', 'bluetooth', 'wifi', 'wi-fi', 'browser', 'server'];
+    if (commonIgnored.includes(lowerTarget)) return null;
+
+    const home = process.env.HOME || process.env.USERPROFILE || '';
+    const searchRoots = [
+      context.cwd,
+      path.join(context.cwd, 'workspaces'),
+      path.join(context.cwd, 'src'),
+      path.join(home, 'workspaces'),
+      path.join(home, 'ros_ws'),
+      path.join(home, 'catkin_ws'),
+      path.join(home, 'colcon_ws'),
+      path.join(home, 'projects')
+    ].filter(r => fs.existsSync(r) || scanner !== undefined);
+
+    const probe = await ProjectDiscoveryEngine.probe(rawTarget, searchRoots, scanner);
+    if (probe.matches.length === 0) return null;
+
+    if (probe.disambiguationRequired) {
+      return {
+        summary: `Disambiguate project for "${rawTarget}"`,
+        steps: [],
+        phases: [],
+        question: probe.disambiguationPrompt,
+        discoveredProjects: probe.matches
+      };
+    }
+
+    return this.createProjectExecutionPlan(probe.matches[0], rawTarget);
+  }
+
+  /**
+   * Formulate a 3-phase execution plan for a discovered project workspace:
+   * Phase 1: Navigate to project workspace
+   * Phase 2: Source required environment setup script (if present)
+   * Phase 3: Launch target binary / node
+   */
+  public createProjectExecutionPlan(proj: DiscoveredProject, targetKeyword: string): AgentPlan {
+    const phases: PlanPhase[] = [
+      {
+        id: '1',
+        title: `Navigate to workspace: ${proj.name}`,
+        tool: 'filesystem.navigate',
+        params: { path: proj.path },
+        status: 'pending'
+      }
+    ];
+
+    if (proj.setupScript) {
+      phases.push({
+        id: '2',
+        title: `Source environment: ${proj.setupScript}`,
+        tool: 'shell.execute',
+        params: { command: proj.setupScript },
+        status: 'pending'
+      });
+    }
+
+    phases.push({
+      id: `${phases.length + 1}`,
+      title: `Launch ${proj.name}: ${proj.launchTarget || targetKeyword}`,
+      tool: 'shell.execute',
+      params: { command: proj.launchTarget || targetKeyword },
+      status: 'pending'
+    });
+
+    return {
+      summary: `Launch ${proj.description || proj.name} (${proj.type.toUpperCase()})`,
+      steps: phases.map(p => p.title),
+      phases
+    };
   }
 
   private flattenPlanSteps(phases: PlanPhase[]): string[] {

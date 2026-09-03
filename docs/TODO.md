@@ -12,9 +12,9 @@ This document tracks critical core issues, bugs, and security vulnerabilities id
 - [x] **1.3 Human-in-the-Loop State Machine**: Implement `AWAITING_PHYSICAL_ACTION` state prompting user for physical actions (plug USB, power on device) and pausing until confirmed.
 
 ### 🔷 Epic 2: Probe & Disambiguate Discovery Engine
-- [ ] **2.1 Project Discovery Engine**: Implement deep workspace scanner for ROS 1/2 (`package.xml`), Node (`package.json`), Python, Rust (`Cargo.toml`), and Docker.
-- [ ] **2.2 Interactive Disambiguation Menu**: Render selection choices when multiple candidates match a natural language command (`>run my gazebo`).
-- [ ] **2.3 Contextual Workspace Sourcing**: Automatically `cd` to target workspace and execute environment sourcing (`source setup.bash`, `conda activate`) before launching.
+- [x] **2.1 Project Discovery Engine**: Implement deep workspace scanner for ROS 1/2 (`package.xml`), Node (`package.json`), Python, Rust (`Cargo.toml`), and Docker.
+- [x] **2.2 Interactive Disambiguation Menu**: Render selection choices when multiple candidates match a natural language command (`>run my gazebo`).
+- [x] **2.3 Contextual Workspace Sourcing**: Automatically `cd` to target workspace and execute environment sourcing (`source setup.bash`, `conda activate`) before launching.
 
 ### 🔷 Epic 3: System Services & Dotfile "Rice" Orchestration
 - [ ] **3.1 Unified `system.service` Driver**: Support for Linux `systemctl [--user]`, macOS `launchctl`, and Windows Service Manager.
