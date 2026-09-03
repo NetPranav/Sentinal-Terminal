@@ -7,23 +7,22 @@
   "category": "Networking",
   "tags": [
     "network",
-    "wifi.connect",
     "wifi",
     "connect",
-    "network.wifi.connect",
-    "to",
-    "wi-fi",
-    "join"
+    "join",
+    "ssid",
+    "wireless",
+    "network"
   ],
   "aliases": [
     "connect wifi",
-    "join wifi network",
+    "join wifi",
     "wifi connect",
-    "connect me to",
     "connect to network",
     "join network",
-    "connect it to",
-    "connect to wifi"
+    "connect to wifi",
+    "connect me to",
+    "join wifi network"
   ],
   "supportedPlatforms": [
     "macos",

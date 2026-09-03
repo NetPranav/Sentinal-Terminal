@@ -110,35 +110,68 @@ export class PermissionManager implements IPermissionManager {
         this.permissions.set('Network', 'AlwaysAllow');
         this.permissions.set('Clipboard', 'AlwaysAllow');
         this.permissions.set('ProcessManagement', 'AlwaysAllow');
+        this.permissions.set('Git', 'AlwaysAllow');
+        this.permissions.set('Docker', 'AlwaysAllow');
+        this.permissions.set('SSH', 'AlwaysAllow');
+        this.permissions.set('EnvironmentVariables', 'AlwaysAllow');
+        this.permissions.set('SystemSettings', 'AlwaysAllow');
         break;
       case 'Administrator':
         // Extremely permissive
-        Object.values(['ReadFiles', 'WriteFiles', 'DeleteFiles', 'RenameFiles', 'ShellExecution', 'Network', 'Clipboard', 'ProcessManagement'] as PermissionCategory[])
-          .forEach(cat => this.permissions.set(cat, 'AlwaysAllow'));
-        this.permissions.set('Administrator', 'AlwaysAllow');
+        const allCategories: PermissionCategory[] = [
+          'ReadFiles', 'WriteFiles', 'DeleteFiles', 'RenameFiles', 'ShellExecution',
+          'Network', 'Clipboard', 'ProcessManagement', 'Git', 'Docker', 'SSH',
+          'EnvironmentVariables', 'SystemSettings', 'Administrator'
+        ];
+        allCategories.forEach(cat => this.permissions.set(cat, 'AlwaysAllow'));
         break;
       case 'ReadOnly':
         this.permissions.set('ReadFiles', 'AlwaysAllow');
         this.permissions.set('Network', 'AlwaysAllow');
         this.permissions.set('Clipboard', 'AlwaysAllow');
-        // Everything else defaults to AskEveryTime or could be explicitly denied
         this.permissions.set('WriteFiles', 'AlwaysDeny');
         this.permissions.set('DeleteFiles', 'AlwaysDeny');
+        this.permissions.set('RenameFiles', 'AlwaysDeny');
         this.permissions.set('ShellExecution', 'AlwaysDeny');
+        this.permissions.set('ProcessManagement', 'AlwaysDeny');
+        this.permissions.set('Git', 'AlwaysDeny');
+        this.permissions.set('Docker', 'AlwaysDeny');
+        this.permissions.set('SSH', 'AlwaysDeny');
+        this.permissions.set('EnvironmentVariables', 'AlwaysDeny');
+        this.permissions.set('SystemSettings', 'AlwaysDeny');
+        this.permissions.set('Administrator', 'AlwaysDeny');
         break;
       case 'SafeMode':
         this.permissions.set('ReadFiles', 'AlwaysAllow');
         this.permissions.set('Network', 'AskEveryTime');
         this.permissions.set('WriteFiles', 'AskEveryTime');
         this.permissions.set('DeleteFiles', 'AlwaysDeny'); // Default deny deletes in safe mode
+        this.permissions.set('RenameFiles', 'AskEveryTime');
         this.permissions.set('ShellExecution', 'AskEveryTime');
         this.permissions.set('ProcessManagement', 'AskEveryTime');
+        this.permissions.set('Git', 'AskEveryTime');
+        this.permissions.set('Docker', 'AskEveryTime');
+        this.permissions.set('SSH', 'AskEveryTime');
+        this.permissions.set('EnvironmentVariables', 'AskEveryTime');
+        this.permissions.set('SystemSettings', 'AskEveryTime');
+        this.permissions.set('Clipboard', 'AlwaysAllow');
+        this.permissions.set('Administrator', 'AlwaysDeny');
         break;
       case 'Guest':
         this.permissions.set('ReadFiles', 'AskEveryTime');
+        this.permissions.set('Network', 'AskEveryTime');
+        this.permissions.set('Clipboard', 'AskEveryTime');
         this.permissions.set('WriteFiles', 'AlwaysDeny');
         this.permissions.set('DeleteFiles', 'AlwaysDeny');
+        this.permissions.set('RenameFiles', 'AlwaysDeny');
         this.permissions.set('ShellExecution', 'AlwaysDeny');
+        this.permissions.set('ProcessManagement', 'AlwaysDeny');
+        this.permissions.set('Git', 'AlwaysDeny');
+        this.permissions.set('Docker', 'AlwaysDeny');
+        this.permissions.set('SSH', 'AlwaysDeny');
+        this.permissions.set('EnvironmentVariables', 'AlwaysDeny');
+        this.permissions.set('SystemSettings', 'AlwaysDeny');
+        this.permissions.set('Administrator', 'AlwaysDeny');
         break;
     }
     this.saveState();

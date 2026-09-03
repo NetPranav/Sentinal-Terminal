@@ -1,0 +1,23 @@
+{
+  "toolId": "system.lock",
+  "examples": [
+    {
+      "input": "lock my mac",
+      "expectedIntent": {
+        "domain": "system",
+        "action": "lock"
+      },
+      "expectedEntities": {},
+      "description": "Immediately lock the macOS session display"
+    },
+    {
+      "input": "lock screen",
+      "expectedIntent": {
+        "domain": "system",
+        "action": "lock"
+      },
+      "expectedEntities": {},
+      "description": "Lock computer screen"
+    }
+  ]
+}

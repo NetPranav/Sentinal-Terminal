@@ -7,20 +7,23 @@
   "category": "Networking",
   "tags": [
     "network",
-    "bluetooth.on",
     "bluetooth",
     "on",
-    "network.bluetooth.on",
-    "turn",
     "enable",
-    "start"
+    "turn",
+    "activate",
+    "switch",
+    "power"
   ],
   "aliases": [
     "turn on bluetooth",
     "enable bluetooth",
+    "bluetooth on",
+    "activate bluetooth",
+    "switch on bluetooth",
     "start bluetooth",
-    "turn my bluetooth on",
-    "bluetooth on"
+    "turn bluetooth on",
+    "power on bluetooth"
   ],
   "supportedPlatforms": [
     "macos",

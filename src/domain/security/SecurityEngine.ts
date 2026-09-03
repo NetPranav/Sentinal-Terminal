@@ -61,6 +61,17 @@ export class SecurityEngine implements ISecurityEngine {
       };
     }
 
+    // 4. Session & Screen Lock Commands
+    if (lowerCmd.includes('displaysleepnow') || lowerCmd.includes('lockworkstation') || lowerCmd.includes('lock-session')) {
+      return {
+        score: 65,
+        level: 'SENSITIVE',
+        explanation: 'Operating system screen lock command detected. User confirmation required before locking the display.',
+        requiresPassword: false,
+        requiresConsent: true
+      };
+    }
+
     // 4. Safe Read-Only Commands
     const safeCommands = ['ls', 'pwd', 'echo', 'cat', 'whoami', 'date', 'time', 'cal', 'env', 'clear', 'uptime', 'uname', 'which', 'head', 'tail', 'grep', 'system_profiler', 'ps', 'osascript', 'df', 'du', 'top', 'htop', 'id', 'hostname', 'groups', 'printenv'];
     const firstWord = lowerCmd.trim().split(/\s+/)[0];
@@ -68,7 +79,7 @@ export class SecurityEngine implements ISecurityEngine {
       return { score: 5, level: 'SAFE', explanation: 'Safe read-only system command.', requiresPassword: false, requiresConsent: false };
     }
 
-    return { score: 50, level: 'UNKNOWN', explanation: 'Standard terminal utility execution.', requiresPassword: false, requiresConsent: false };
+    return { score: 10, level: 'SAFE', explanation: 'Standard terminal utility execution.', requiresPassword: false, requiresConsent: false };
   }
 
   analyzeWorkflow(actions: any[]): RiskAnalysisResult {
@@ -139,11 +150,25 @@ export class SecurityEngine implements ISecurityEngine {
           requiresConsent: true
         };
       }
+      if (action.includes('lock') || action.includes('displaysleepnow')) {
+        return {
+          score: 65,
+          level: 'SENSITIVE',
+          explanation: `System display or session lock (${capabilityId}) detected. User confirmation required before locking screen.`,
+          requiresPassword: false,
+          requiresConsent: true
+        };
+      }
     }
 
     // 3. Mid-Level Network & Hardware Controls
     if (capabilityId.startsWith('network.') || capabilityId.startsWith('bluetooth.') || capabilityId.startsWith('hardware.')) {
       const action = capabilityId.toLowerCase();
+      // Exclude basic bluetooth toggles from ADMIN risk
+      if (capabilityId.includes('bluetooth') && (action.includes('on') || action.includes('off') || action.includes('connect') || action.includes('disconnect'))) {
+        return { score: 30, level: 'SAFE', explanation: 'Standard user-level Bluetooth control.', requiresPassword: false, requiresConsent: false };
+      }
+      
       if (action.includes('toggle') || action.includes('off') || action.includes('on') || action.includes('disconnect') || action.includes('bind') || action.includes('config')) {
         return {
           score: 80,
@@ -153,6 +178,53 @@ export class SecurityEngine implements ISecurityEngine {
           requiresConsent: true
         };
       }
+    }
+
+    // 4. Git, Docker, SSH & Software Package Operations
+    if (capabilityId.startsWith('git.')) {
+      const gitOp = capabilityId.replace('git.', '').toLowerCase();
+      if (['push', 'commit', 'merge', 'checkout', 'clone', 'stash'].includes(gitOp)) {
+        return {
+          score: 55,
+          level: 'SENSITIVE',
+          explanation: `Git repository modification (${capabilityId}) detected. Requires user review.`,
+          requiresPassword: false,
+          requiresConsent: false
+        };
+      }
+    }
+
+    if (capabilityId.startsWith('docker.')) {
+      const docOp = capabilityId.replace('docker.', '').toLowerCase();
+      if (['stop', 'restart', 'compose_down', 'compose_up', 'exec'].includes(docOp)) {
+        return {
+          score: 65,
+          level: 'SENSITIVE',
+          explanation: `Docker container lifecycle modification (${capabilityId}) detected. Requires user review.`,
+          requiresPassword: false,
+          requiresConsent: false
+        };
+      }
+    }
+
+    if (capabilityId === 'developer.ssh' || capabilityId.startsWith('ssh.')) {
+      return {
+        score: 60,
+        level: 'SENSITIVE',
+        explanation: 'Remote SSH connection detected. Requires user review.',
+        requiresPassword: false,
+        requiresConsent: false
+      };
+    }
+
+    if (capabilityId === 'application.install' || capabilityId === 'application.uninstall' || capabilityId === 'application.update') {
+      return {
+        score: 70,
+        level: 'SENSITIVE',
+        explanation: `Software package management operation (${capabilityId}) detected. Requires user review.`,
+        requiresPassword: false,
+        requiresConsent: false
+      };
     }
 
     return { score: 20, level: 'SAFE', explanation: 'Standard read-only or low-risk capability execution.', requiresPassword: false, requiresConsent: false };

@@ -7,25 +7,23 @@
   "category": "Networking",
   "tags": [
     "network",
-    "wifi.off",
     "wifi",
     "off",
-    "network.wifi.off",
-    "turn",
-    "wi-fi",
     "disable",
-    "stop",
-    "disconnect"
+    "turn",
+    "deactivate",
+    "wireless"
   ],
   "aliases": [
     "turn off wifi",
     "disable wifi",
-    "stop wifi",
-    "turn my wifi off",
     "wifi off",
+    "deactivate wifi",
+    "switch off wifi",
+    "stop wifi",
+    "turn wifi off",
     "turn the wifi off",
-    "disconnect wifi",
-    "turn wifi off"
+    "disable wireless"
   ],
   "supportedPlatforms": [
     "macos",

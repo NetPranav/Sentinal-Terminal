@@ -1,0 +1,34 @@
+{
+  "toolId": "developer.scaffold",
+  "tests": [
+    {
+      "id": "developer-scaffold-test-1",
+      "userRequest": "scaffold project my-app nextjs express",
+      "expectedIntent": {
+        "domain": "developer",
+        "action": "scaffold"
+      },
+      "expectedToolId": "developer.scaffold",
+      "expectedEntities": {
+        "projectName": "my-app",
+        "frontend": "nextjs",
+        "backend": "express"
+      },
+      "description": "Automated regression test for developer.scaffold with frontend and backend frameworks"
+    },
+    {
+      "id": "developer-scaffold-test-2",
+      "userRequest": "create project portfolio with react",
+      "expectedIntent": {
+        "domain": "developer",
+        "action": "scaffold"
+      },
+      "expectedToolId": "developer.scaffold",
+      "expectedEntities": {
+        "projectName": "portfolio",
+        "frontend": "react"
+      },
+      "description": "Automated regression test for developer.scaffold frontend only"
+    }
+  ]
+}

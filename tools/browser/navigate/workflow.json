@@ -9,7 +9,8 @@
       "type": "ExecuteCapability",
       "capabilityId": "browser.navigate",
       "parameters": {
-        "url": "{{url}}"
+        "url": "{{url}}",
+        "appName": "{{appName}}"
       },
       "dependencies": [],
       "onError": "fail"

@@ -7,22 +7,22 @@
   "category": "Networking",
   "tags": [
     "network",
-    "wifi.scan",
     "wifi",
     "scan",
-    "network.wifi.scan",
-    "wi-fi",
-    "networks",
-    "show",
     "list",
-    "find"
+    "available",
+    "nearby",
+    "wireless",
+    "networks"
   ],
   "aliases": [
     "scan wifi",
-    "show wireless networks",
-    "list wifi networks",
-    "find wifi",
-    "scan for wireless networks"
+    "list wifi",
+    "available wifi",
+    "nearby wireless",
+    "wifi networks",
+    "show wifi networks",
+    "wifi scan"
   ],
   "supportedPlatforms": [
     "macos",

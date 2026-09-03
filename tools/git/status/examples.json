@@ -1,0 +1,14 @@
+{
+  "toolId": "git.status",
+  "examples": [
+    {
+      "input": "check git status",
+      "expectedIntent": {
+        "domain": "git",
+        "action": "status"
+      },
+      "expectedEntities": {},
+      "description": "Example execution of Check Git Status"
+    }
+  ]
+}

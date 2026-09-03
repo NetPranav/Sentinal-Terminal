@@ -12,7 +12,8 @@
     "new",
     "file",
     "make",
-    "touch"
+    "touch",
+    "add"
   ],
   "aliases": [
     "create file",
@@ -20,7 +21,14 @@
     "new file",
     "touch file",
     "create a new file",
-    "make new file"
+    "make new file",
+    "add file",
+    "make a file",
+    "create a file",
+    "set up a file",
+    "i need a file",
+    "make me a file",
+    "create me a file"
   ],
   "supportedPlatforms": [
     "macos",

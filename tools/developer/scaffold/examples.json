@@ -1,0 +1,31 @@
+{
+  "toolId": "developer.scaffold",
+  "examples": [
+    {
+      "input": "scaffold project my-app nextjs express",
+      "expectedIntent": {
+        "domain": "developer",
+        "action": "scaffold"
+      },
+      "expectedEntities": {
+        "projectName": "my-app",
+        "frontend": "nextjs",
+        "backend": "express"
+      },
+      "description": "Initialize a full-stack Next.js and Express project architecture"
+    },
+    {
+      "input": "create project dashboard with react and fastapi",
+      "expectedIntent": {
+        "domain": "developer",
+        "action": "scaffold"
+      },
+      "expectedEntities": {
+        "projectName": "dashboard",
+        "frontend": "react",
+        "backend": "fastapi"
+      },
+      "description": "Bootstrap a dashboard repository with React and FastAPI"
+    }
+  ]
+}

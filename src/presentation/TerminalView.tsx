@@ -4,23 +4,10 @@ import { FitAddon } from '@xterm/addon-fit';
 import { WebglAddon } from '@xterm/addon-webgl';
 import { invoke } from '@tauri-apps/api/core';
 import { SessionManager } from '../domain/SessionManager';
-import { Planner } from '../domain/planner/Planner';
-import { CapabilityManager } from '../domain/Capability';
-import { ShellCapability } from '../domain/capabilities/ShellCapability';
-import { FilesystemCapability } from '../domain/capabilities/FilesystemCapability';
-import { ProcessCapability } from '../domain/capabilities/ProcessCapability';
-import { NetworkCapability } from '../domain/capabilities/NetworkCapability';
-import { SystemCapability } from '../domain/capabilities/SystemCapability';
-import { ClipboardCapability } from '../domain/capabilities/ClipboardCapability';
-import { WorkflowEngine } from '../domain/workflow/WorkflowEngine';
-import { ExecutionEngine } from '../domain/security/ExecutionEngine';
-import { PermissionManager } from '../domain/security/PermissionManager';
-import { SecurityEngine } from '../domain/security/SecurityEngine';
-import { PolicyEngine } from '../domain/security/PolicyEngine';
-import { AuditLogger } from '../domain/security/AuditLogger';
-import { AgentRuntime } from '../domain/agent/AgentRuntime';
 import { ToolLoader } from '../tools/loader/ToolLoader';
 import { AppAliasRegistry } from '../domain/capabilities/AppAliasRegistry';
+import { AgentLoop, AgentPlan } from '../ai/agent/AgentLoop';
+import { formatAgentEvent, formatDataOutput } from './OutputFormatter';
 
 import { AutocompleteEngine } from '../domain/autocomplete/AutocompleteEngine';
 import { HistoryProvider } from '../domain/autocomplete/HistoryProvider';
@@ -50,6 +37,7 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
   const [authPassword, setAuthPassword] = useState('');
   const [authError, setAuthError] = useState('');
   const [isVerifying, setIsVerifying] = useState(false);
+  const [latestPlan, setLatestPlan] = useState<AgentPlan | null>(null);
 
   const handleAuthorize = async () => {
     if (!authPassword.trim()) {
@@ -188,21 +176,14 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
 
         sessionManager.onOutput(currentSessionId, outputCallback);
 
-        // Initialize AI Operating Knowledge Base (Tool Registry) & Planner
+        // Initialize AI Tool Registry & Agent Loop
         const toolLoader = new ToolLoader();
-        toolLoader.loadAll(); // Loads JSON metadata, workflows, knowledge & builds indexes
+        toolLoader.loadAll();
         
-        const capabilityManager = CapabilityManager.getInstance();
-        
-        // Register Core Execution Capabilities (consumed by Workflow/Execution Engine)
-        capabilityManager.register(new ShellCapability());
-        capabilityManager.register(new FilesystemCapability());
-        capabilityManager.register(new ProcessCapability());
-        capabilityManager.register(new NetworkCapability());
-        capabilityManager.register(new SystemCapability());
-        capabilityManager.register(new ClipboardCapability());
-
-        const planner = new Planner(toolLoader.getState());
+        const agentLoop = new AgentLoop(toolLoader.getState());
+        agentLoop.setAuthorizationHandler((plan) => new Promise(resolve => {
+          setSecurityModalPlan({ plan, resolve });
+        }));
 
         // Initialize Autocomplete
         const autocompleteEngine = new AutocompleteEngine();
@@ -312,275 +293,63 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
                 return;
               }
 
-              // Only trigger AI execution when written after ">" (e.g., ">find me the AAAA folder" or ">go to downloads")
-              if (cleanCmd.startsWith('>')) {
-                const aiGoal = cleanCmd.substring(1).trim();
+              // `>` starts an AI request. Once it asks a clarification question,
+              // the next normal terminal entry is treated as the answer so the
+              // workflow can resume without making the user retype the request.
+              const answeringAgentQuestion = agentLoop.hasPendingQuestion();
+              if (answeringAgentQuestion && cleanCmd === '/cancel') {
+                await sessionManager.write(currentSessionId!, '\x03');
+                agentLoop.cancelPendingQuestion();
+                setLatestPlan(null);
+                writeTerm('\r\n\x1b[33m  Workflow cancelled.\x1b[0m\r\n\r\n');
+                sessionManager.write(currentSessionId!, '\r');
+                return;
+              }
+
+              if (cleanCmd.startsWith('>') || answeringAgentQuestion) {
+                const aiGoal = answeringAgentQuestion ? cleanCmd : cleanCmd.substring(1).trim();
                 if (!aiGoal) {
                   return; // Empty AI instruction
                 }
 
-                const lowerCmd = aiGoal.toLowerCase().replace(/[^a-z0-9\/~\-._ ]/g, '').trim();
+                // Cancel the shell echo of the > command
+                await sessionManager.write(currentSessionId!, '\x03');
 
-                // 1. Check for AI Natural Language navigation shortcuts
-                const backCmds = ['go back', 'navigate back', 'move back', 'step back', 'go backward', 'go up', 'navigate up', 'move up', 'up a folder', 'up a dir', 'up a directory', 'go out', 'parent folder', 'parent directory', 'exit folder', 'exit directory', 'back', 'take me back', 'bring me back'];
-                const homeCmds = ['go home', 'navigate home', 'move home', 'take me home', 'home folder', 'home directory', 'return home', 'go to home', 'navigate to home', 'switch to home', 'cd home', 'bring me home'];
-                const strippedCmd = aiGoal.replace(/^(?:(?:hey|hi|hello|please|can you|could you|would you|kindly|just|now|alright|there|then|so|friend|dude|mate|i want you to|i wnat you to|i want to|i need you to|help me to|we need to|you should|let's|lets)(?:\s+|,)*)+/i, '').trim();
-                const lowerStripped = strippedCmd.toLowerCase();
+                // Set up event listener for live output
+                agentLoop.onEvent((event) => {
+                  writeTerm(formatAgentEvent(event));
+                  if (event.type === 'plan' && event.data) {
+                    setLatestPlan(event.data as AgentPlan);
+                  }
+                  // Show structured data (file lists, devices, etc.) when available
+                  if (event.data && (event.type === 'tool_done' || event.type === 'done')) {
+                    const dataOutput = formatDataOutput(event.data);
+                    if (dataOutput) writeTerm(dataOutput);
+                  }
+                });
 
-                if (backCmds.includes(lowerCmd) || backCmds.includes(lowerStripped)) {
-                  notifyNavigation('..');
-                  await sessionManager.write(currentSessionId!, '\x03');
-                  writeTerm('\r\n\x1b[36m[AI Navigation] Translated command to: \x1b[1;32mcd ..\x1b[0m\r\n');
-                  setTimeout(() => sessionManager.write(currentSessionId!, 'cd ..\r'), 80);
-                  return;
-                } else if (homeCmds.includes(lowerCmd) || homeCmds.includes(lowerStripped)) {
-                  notifyNavigation('~');
-                  await sessionManager.write(currentSessionId!, '\x03');
-                  writeTerm('\r\n\x1b[36m[AI Navigation] Translated command to: \x1b[1;32mcd ~\x1b[0m\r\n');
-                  setTimeout(() => sessionManager.write(currentSessionId!, 'cd ~\r'), 80);
-                  return;
-                } else {
-                  // Detect multi-step commands: if the instruction contains sequential conjunctions, skip navigation and route to AI Planner
-                  const isMultiStep = /\b(?:and\s+then|then\s+(?:open|create|make|list|delete|remove|run|launch|show|find|search|check)|,\s*then|after\s+that|afterwards|next\s+(?:open|create|make|list)|;\s*(?:open|create|make|list|delete|remove|run|launch))\b/i.test(aiGoal);
-
-                  const navMatch = !isMultiStep ? aiGoal.match(/(?:go to|navigate to|move to|switch to|jump to|enter|cd into|goto|take me to|bring me to|head to|head over to|change directory to|change folder to|switch folder to|switch dir to|access|open folder|open dir|open directory)\s+(.+)$/i) : null;
-                  if (navMatch && navMatch[1]) {
-                    const knownDirs: Record<string, string> = {
-                      'downloads': '~/Downloads', 'donwloads': '~/Downloads', 'downlaods': '~/Downloads', 'dwonloads': '~/Downloads', 'dowloads': '~/Downloads', 'dwnload': '~/Downloads',
-                      'desktop': '~/Desktop', 'dekstop': '~/Desktop', 'desktp': '~/Desktop', 'deskop': '~/Desktop', 'dektsop': '~/Desktop',
-                      'documents': '~/Documents', 'documets': '~/Documents', 'documens': '~/Documents',
-                      'pictures': '~/Pictures', 'pictues': '~/Pictures', 'photos': '~/Pictures',
-                      'music': '~/Music', 'audio': '~/Music', 'songs': '~/Music',
-                      'movies': '~/Movies', 'videos': '~/Movies',
-                      'applications': '~/Applications', 'apps': '~/Applications',
-                      'home': '~', 'root': '/', 'project': '~/Project Folder', 'projects': '~/Project Folder'
-                    };
-
-                    let rawText = navMatch[1].trim();
-                    const isReverse = /\b(?:inside|in|under|within|from|at)\b(?!\s+(?:it|that|there|this|the\s+(?:folder|dir)))/i.test(rawText) && !/\b(?:inside\s+it|in\s+it|then|->|=>|\\|\/)/i.test(rawText);
-
-                    // Split into segments across any relational connector and strip all variations of folder/dir words
-                    let segments = rawText
-                      .split(/(?:\s+(?:inside|into|in|under|within)(?:\s+(?:it|that|this|the|of))?\s+|\s*(?:->|=>|\\|\/)\s*|\s+(?:and\s+)?(?:then\s+)?(?:inside|into|open|enter|switch\s+to|goto)\s+)/i)
-                      .map(s => s.replace(/\b(?:folders?|fod?le?rs?|floders?|folers?|foders?|dir(?:ectory|ectories)?|dirs|app(?:lication)?s?)\b/gi, '').trim())
-                      .filter(Boolean);
-
-                    if (isReverse && segments.length > 1) {
-                      segments = segments.reverse();
-                    }
-
-                    // Ensure if any segment matches a known system base dir (like Desktop or Downloads), it is moved to index 0 as root parent
-                    const baseDirIndex = segments.findIndex(seg => knownDirs[seg.toLowerCase()]);
-                    if (baseDirIndex > 0) {
-                      const [baseSeg] = segments.splice(baseDirIndex, 1);
-                      segments.unshift(baseSeg);
-                    }
-
-                    let resolvedParts: string[] = [];
-                    for (let idx = 0; idx < segments.length; idx++) {
-                      let seg = segments[idx];
-                      const lowerSeg = seg.toLowerCase();
-                      if (idx === 0 && knownDirs[lowerSeg]) {
-                        resolvedParts.push(knownDirs[lowerSeg]);
-                      } else {
-                        // Intelligent fuzzy resolution against real filesystem structure via OS shell inspection
-                        const baseSoFar = resolvedParts.length > 0 ? resolvedParts.join('/') : '.';
-                        try {
-                          const lsRes = await invoke<{ code?: number; stdout?: string }>('execute_command', {
-                            command: 'sh',
-                            args: ['-c', `ls -1 "${baseSoFar.replace(/^~/, '$HOME')}" 2>/dev/null`]
-                          });
-                          if (lsRes && (lsRes.code === 0 || lsRes.code === undefined) && lsRes.stdout) {
-                            const entries = lsRes.stdout.split('\n').map(e => e.trim()).filter(Boolean);
-                            const cleanQuery = seg.toLowerCase().replace(/[\s_\-]/g, '');
-                            let matches: { name: string; score: number }[] = [];
-
-                            for (const entry of entries) {
-                              const cleanEntry = entry.toLowerCase().replace(/[\s_\-]/g, '');
-                              if (entry === seg) {
-                                matches.push({ name: entry, score: 100 });
-                              } else if (cleanEntry === cleanQuery) {
-                                matches.push({ name: entry, score: 90 });
-                              } else if (cleanEntry.includes(cleanQuery) || cleanQuery.includes(cleanEntry)) {
-                                matches.push({ name: entry, score: 85 });
-                              } else {
-                                let overlap = 0;
-                                for (let i = 0; i < Math.min(cleanEntry.length, cleanQuery.length); i++) {
-                                  if (cleanEntry[i] === cleanQuery[i]) overlap++;
-                                  else break;
-                                }
-                                if (overlap >= 3 && overlap >= cleanQuery.length * 0.5) {
-                                  matches.push({ name: entry, score: Math.round((overlap / Math.max(cleanEntry.length, cleanQuery.length)) * 100) });
-                                }
-                              }
-                            }
-                            matches.sort((a, b) => b.score - a.score);
-                            const topMatches = matches.filter(m => m.score >= 65);
-
-                            if (topMatches.length > 0) {
-                              const best = topMatches[0];
-                              seg = best.name;
-                              if (best.score < 100) {
-                                await sessionManager.write(currentSessionId!, '\x03');
-                                const matchText = topMatches.length === 1
-                                  ? `Found only 1 file matching (${best.score}%):`
-                                  : `Found ${topMatches.length} matching items, selecting highest confidence (${best.score}%):`;
-                                writeTerm(`\r\n\x1b[33m[AI Resolution] ${matchText} \x1b[1;32m${best.name}\x1b[0m\r\n`);
-                              }
-                            }
-                          }
-                        } catch (err) {
-                          // Ignore shell errors if fallback path synthesis works
-                        }
-                        resolvedParts.push(seg);
-                      }
-                    }
-                    const target = resolvedParts.join('/');
-                    notifyNavigation(target.replace(/["']/g, ''));
-                    const cdCmd = target.includes(' ') && !target.startsWith('"') && !target.startsWith("'") ? `cd "${target}"` : `cd ${target}`;
-                    await sessionManager.write(currentSessionId!, '\x03');
-                    writeTerm(`\r\n\x1b[36m[AI Navigation] Translated command to: \x1b[1;32m${cdCmd}\x1b[0m\r\n`);
-                    setTimeout(() => sessionManager.write(currentSessionId!, `${cdCmd}\r`), 80);
+                // Run the agent loop
+                agentLoop.run(aiGoal, { os: 'mac', cwd: currentPath || '~' }).then(result => {
+                  // Handle clear terminal command
+                  if (result.steps.some(s => s.tool === '__clear__')) {
+                    term.clear();
+                    writeTerm('\x1b[2J\x1b[H');
+                    sessionManager.write(currentSessionId!, '\r');
                     return;
                   }
-                }
 
-                // 2. If not a simple navigation shortcut, route to AI Planner
-                console.log("[TerminalView] Triggering AI Planner for goal:", aiGoal);
-                await sessionManager.write(currentSessionId, '\x03');
-                writeTerm(`\r\n\x1b[35m[AI Planner] Analyzing instruction: "${aiGoal}"...\x1b[0m\r\n`);
-                
-                // Trigger planner asynchronously
-                planner.plan({
-                  goal: aiGoal,
-                  context: { os: 'mac', shell: 'zsh', cwd: currentPath || '~' }
-                }).then(response => {
-                  if (response.success && response.workflow) {
-                    writeTerm(`\r\n\x1b[32m[AI Planner] Created workflow: ${response.workflow.name}\x1b[0m\r\n`);
-                    writeTerm(`\x1b[36mSummary: ${response.summary}\x1b[0m\r\n`);
-                    if (response.intentResult) {
-                      writeTerm(`\x1b[35m[Local Intent AI] Active Model: ${response.intentResult.modelId} (${response.intentResult.providerId}) | Confidence: ${Math.round(response.intentResult.confidence * 100)}%\x1b[0m\r\n`);
-                      if (response.intentResult.tasks && response.intentResult.tasks.length > 1) {
-                        writeTerm(`\x1b[33m[Execution Plan] Sequential Tasks (${response.intentResult.tasks.length}):\x1b[0m\r\n`);
-                        response.intentResult.tasks.forEach((t, idx) => {
-                          writeTerm(`   ${idx + 1}. Tool: \x1b[1;36m${t.tool}\x1b[0m | Entities: ${JSON.stringify(t.entities)}\r\n`);
-                        });
-                      }
-                    }
-                    
-                    // Instantiate execution dependencies
-                    const permissionManager = PermissionManager.getInstance();
-                    const securityEngine = new SecurityEngine();
-                    const policyEngine = new PolicyEngine();
-                    const auditLogger = AuditLogger.getInstance();
-                    const executionEngine = new ExecutionEngine(
-                      capabilityManager, permissionManager, securityEngine, policyEngine, auditLogger
-                    );
-                    const workflowEngine = new WorkflowEngine();
-                    
-                    const runtime = new AgentRuntime(workflowEngine, executionEngine, planner, response.workflow);
-                    let targetCdPath: string | null = null;
-                    
-                    runtime.setAuthorizationHandler((plan: any) => {
-                      return new Promise<boolean>((resolve) => {
-                        setAuthPassword('');
-                        setAuthError('');
-                        setSecurityModalPlan({ plan, resolve });
-                      });
-                    });
-
-                    runtime.on((event, payload) => {
-                      if (event === 'ApprovalRequested' && payload?.plan) {
-                        const p = payload.plan;
-                        writeTerm(`\r\n\x1b[1;31m[Security Engine: ${p.riskLevel || 'CRITICAL'} RISK ACTION DETECTED]\x1b[0m\r\n`);
-                        writeTerm(`  • Operation: \x1b[1;36m${p.capabilityId}\x1b[0m\r\n`);
-                        writeTerm(`  • Target: \x1b[1;33m${p.parameters?.path || p.parameters?.source || p.parameters?.directory || p.parameters?.command || JSON.stringify(p.parameters)}\x1b[0m\r\n`);
-                        writeTerm(`  • Explanation: \x1b[37m${p.explanation || 'Destructive filesystem operation requires authorization'}\x1b[0m\r\n`);
-                        writeTerm(`\x1b[1;33m[Security Authentication Hold]\x1b[0m Paused workflow execution. Awaiting mandatory user consent & password authentication in popup modal...\r\n`);
-                        return;
-                      } else if (event === 'ApprovalGranted') {
-                        writeTerm(`\x1b[1;32m[Security Authentication Verified]\x1b[0m User consent granted & password credentials verified. Continuing execution.\r\n`);
-                        return;
-                      }
-
-                      // Format log nicely
-                      let msg = payload?.log || event;
-                      if (event === 'VerificationFailed' && payload?.error) {
-                        msg = `VerificationFailed: ${payload.error.message || payload.error.code || 'Unknown error'}`;
-                      } else if (event === 'StepCompleted' && payload?.step) {
-                        msg = `StepCompleted: ${payload.step.name}`;
-                        if (payload.data?.path && typeof payload.data.path === 'string' && (payload.step.capabilityId === 'filesystem.navigate' || payload.step.capabilityId === 'filesystem.cd' || payload.step.action?.capability === 'filesystem.cd' || payload.step.action?.capability === 'filesystem.navigate' || payload.step.action?.capability === 'shell.cd' || String(payload.data?.stdout || '').includes('Changed directory to:'))) {
-                          targetCdPath = payload.data.path;
-                        }
-                        if (payload.step.action?.capability === 'shell.execute' && (payload.step.action?.parameters?.command === 'clear' || payload.step.parameters?.command === 'clear')) {
-                          term.clear();
-                          writeTerm('\x1b[2J\x1b[H');
-                          return;
-                        } else if (payload.data?.stdout) {
-                          writeTerm(`\r\n\x1b[32m[Command Output]\x1b[0m\r\n${String(payload.data.stdout).replace(/\n/g, '\r\n')}\r\n`);
-                        } else if (payload.data?.stderr) {
-                          writeTerm(`\r\n\x1b[33m[Command Output (Stderr)]\x1b[0m\r\n${String(payload.data.stderr).replace(/\n/g, '\r\n')}\r\n`);
-                        } else if (payload.data && typeof payload.data === 'object' && Object.keys(payload.data).length > 0) {
-                          const formatted = Object.entries(payload.data)
-                            .filter(([k]) => k !== 'commandExecuted' && k !== 'dryRun')
-                            .map(([k, v]) => {
-                              if (Array.isArray(v)) {
-                                const hasObjects = v.some(item => typeof item === 'object' && item !== null);
-                                if (hasObjects) {
-                                  const listStr = v.map((item, idx) => {
-                                    if (typeof item === 'object' && item !== null) {
-                                      const details = Object.entries(item)
-                                        .map(([propK, propV]) => `\x1b[36m${propK}:\x1b[0m ${propV}`)
-                                        .join(' | ');
-                                      return `\r\n    \x1b[33m${idx + 1}.\x1b[0m ${details}`;
-                                    }
-                                    return `\r\n    ${idx + 1}. ${item}`;
-                                  }).join('');
-                                  return `  • \x1b[1;37m${k}\x1b[0m:${listStr}`;
-                                }
-                                return `  • ${k}: ${v.join(', ')}`;
-                              }
-                              return `  • ${k}: ${typeof v === 'object' && v !== null ? JSON.stringify(v) : v}`;
-                            })
-                            .join('\r\n');
-                          if (formatted.trim()) {
-                            writeTerm(`\r\n\x1b[32m[Capability Output]\x1b[0m\r\n${formatted}\r\n`);
-                          }
-                        }
-                      }
-                      writeTerm(`\x1b[34m[AgentRuntime] ${msg}\x1b[0m\r\n`);
-                    });
-
-                    writeTerm(`\x1b[33mStarting Agent Runtime...\x1b[0m\r\n`);
-                    runtime.start().then(summary => {
-                      const isClearCmd = aiGoal.toLowerCase() === 'clear' || aiGoal.toLowerCase().includes('clear terminal') || aiGoal.toLowerCase().includes('clear screen') || aiGoal.toLowerCase().includes('clean screen') || aiGoal.toLowerCase().includes('clean terminal');
-                      if (isClearCmd && summary.finalResult === 'Success') {
-                        term.clear();
-                        writeTerm('\x1b[2J\x1b[H');
-                        sessionManager.write(currentSessionId!, '\r');
-                        return;
-                      }
-                      writeTerm(`\r\n\x1b[35m[Execution Summary]\x1b[0m\r\n`);
-                      writeTerm(`Goal: ${summary.goal}\r\n`);
-                      writeTerm(`Result: ${summary.finalResult}\r\n`);
-                      writeTerm(`Time: ${summary.executionTimeMs.toFixed(2)}ms\r\n`);
-                      writeTerm(`Completed: ${summary.completedSteps.length}\r\n`);
-                      writeTerm(`Failed: ${summary.failedSteps.length}\r\n`);
-                      writeTerm(`Retries: ${Object.keys(summary.retries).length}\r\n`);
-                      writeTerm(`Repairs: ${summary.repairCount}\r\n`);
-                      writeTerm('\r\n');
-                      if (targetCdPath) {
-                        notifyNavigation(targetCdPath);
-                        const cdCmd = targetCdPath.includes(' ') && !targetCdPath.startsWith('"') && !targetCdPath.startsWith("'") ? `cd "${targetCdPath}"` : `cd ${targetCdPath}`;
-                        setTimeout(() => sessionManager.write(currentSessionId!, `${cdCmd}\r`), 50);
-                      } else {
-                        sessionManager.write(currentSessionId!, '\r');
-                      }
-                    });
+                  // Handle directory navigation
+                  if (result.cdPath) {
+                    notifyNavigation(result.cdPath);
+                    const cdCmd = result.cdPath.includes(' ') && !result.cdPath.startsWith('"') && !result.cdPath.startsWith("'") ? `cd "${result.cdPath}"` : `cd ${result.cdPath}`;
+                    setTimeout(() => sessionManager.write(currentSessionId!, `${cdCmd}\r`), 50);
                   } else {
-                    writeTerm(`\x1b[31m[AI Planner Failed] ${response.error?.message || 'Unknown error'}\x1b[0m\r\n\r\n`);
+                    writeTerm('\r\n');
                     sessionManager.write(currentSessionId!, '\r');
                   }
+                }).catch(err => {
+                  writeTerm(`\r\n\x1b[1;31m  ✗ ${err.message || 'Something went wrong'}\x1b[0m\r\n\r\n`);
+                  sessionManager.write(currentSessionId!, '\r');
                 });
                 
                 return; // Do NOT send the \r to the shell
@@ -687,6 +456,79 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
         ref={terminalRef} 
         style={{ position: 'relative', width: '100%', height: '100%', overflow: 'hidden' }} 
       />
+
+      {latestPlan && (
+        <details style={{
+          position: 'absolute',
+          top: '12px',
+          right: '14px',
+          width: 'min(360px, calc(100% - 28px))',
+          padding: '10px 12px',
+          borderRadius: '10px',
+          border: '1px solid rgba(192, 132, 252, 0.28)',
+          background: 'rgba(20, 16, 29, 0.9)',
+          boxShadow: '0 10px 32px rgba(0, 0, 0, 0.35)',
+          backdropFilter: 'blur(12px)',
+          color: '#f5f3ff',
+          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+          fontSize: '12px',
+          zIndex: 30
+        }}>
+          <summary style={{ cursor: 'pointer', fontWeight: 650, color: '#d8b4fe', outline: 'none', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span>Execution Plan {latestPlan.phases ? `· ${latestPlan.phases.length} Phases` : `· ${latestPlan.steps.length} Steps`}</span>
+            {latestPlan.activePhaseId && (
+              <span style={{ fontSize: '10px', background: 'rgba(56, 189, 248, 0.25)', color: '#38bdf8', padding: '1px 6px', borderRadius: '4px' }}>
+                Running Phase {latestPlan.activePhaseId}
+              </span>
+            )}
+          </summary>
+          <p style={{ margin: '8px 0 8px', color: 'rgba(255,255,255,0.72)', lineHeight: 1.4 }}>
+            {latestPlan.summary}
+          </p>
+          {latestPlan.phases && latestPlan.phases.length > 0 ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', margin: '4px 0 2px' }}>
+              {latestPlan.phases.map((phase) => (
+                <div key={phase.id} style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    color: phase.status === 'completed' ? '#4ade80' : phase.status === 'running' ? '#38bdf8' : phase.status === 'skipped' ? '#94a3b8' : phase.status === 'failed' ? '#f87171' : '#e2e8f0',
+                    fontSize: '11px',
+                    fontWeight: phase.status === 'running' ? 600 : 400
+                  }}>
+                    <span>{phase.status === 'completed' ? '✓' : phase.status === 'running' ? '▸' : phase.status === 'skipped' ? '⊘' : phase.status === 'failed' ? '✗' : '○'}</span>
+                    <span>Phase {phase.id}: {phase.title}</span>
+                    {phase.skippedReason && <span style={{ fontSize: '10px', color: '#64748b' }}>({phase.skippedReason})</span>}
+                  </div>
+                  {phase.subPhases && phase.subPhases.map((sub) => (
+                    <div key={sub.id} style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      paddingLeft: '16px',
+                      color: sub.status === 'completed' ? '#4ade80' : sub.status === 'running' ? '#38bdf8' : sub.status === 'skipped' ? '#94a3b8' : '#cbd5e1',
+                      fontSize: '10.5px'
+                    }}>
+                      <span>{sub.status === 'completed' ? '✓' : sub.status === 'running' ? '▸' : '○'}</span>
+                      <span>Phase {sub.id}: {sub.title}</span>
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
+          ) : latestPlan.steps.length > 0 ? (
+            <ol style={{ margin: '0 0 2px', paddingLeft: '20px', color: '#ede9fe', lineHeight: 1.55 }}>
+              {latestPlan.steps.map((step, index) => <li key={`${index}-${step}`}>{step}</li>)}
+            </ol>
+          ) : null}
+          {latestPlan.question && (
+            <p style={{ margin: '10px 0 0', color: '#fcd34d', lineHeight: 1.4 }}>
+              Needs your answer: {latestPlan.question}
+            </p>
+          )}
+        </details>
+      )}
 
       {/* Security & Deletion Authorization Overlay Modal */}
       {securityModalPlan && (

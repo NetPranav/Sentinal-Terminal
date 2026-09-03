@@ -1,0 +1,21 @@
+{
+  "toolId": "system.lock",
+  "version": "1.0.0",
+  "description": "Executes native driver to lock the system screen.",
+  "steps": [
+    {
+      "id": "step_exec_main",
+      "name": "Execute Lock Screen",
+      "type": "ExecuteCapability",
+      "capabilityId": "system.lock",
+      "parameters": {},
+      "dependencies": [],
+      "onError": "fail"
+    }
+  ],
+  "successCondition": "step:step_exec_main:success",
+  "errorHandling": {
+    "strategy": "fail_fast",
+    "maxRetries": 0
+  }
+}

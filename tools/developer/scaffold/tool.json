@@ -1,0 +1,67 @@
+{
+  "id": "developer.scaffold",
+  "version": "1.0.0",
+  "displayName": "Scaffold Project Architecture",
+  "description": "Initializes a full-stack project architecture with the specified frontend and backend frameworks.",
+  "domain": "developer",
+  "category": "Developer",
+  "tags": [
+    "developer",
+    "scaffold",
+    "init",
+    "project",
+    "nextjs",
+    "django",
+    "react",
+    "express"
+  ],
+  "aliases": [
+    "scaffold project",
+    "initialize project",
+    "create project",
+    "make project"
+  ],
+  "supportedPlatforms": [
+    "macos",
+    "linux",
+    "windows"
+  ],
+  "requiredPermissions": [
+    "ShellExecution",
+    "FileSystemWrite"
+  ],
+  "securityRisk": "MEDIUM",
+  "parameters": [
+    {
+      "name": "projectName",
+      "type": "string",
+      "required": false,
+      "description": "The name of the root project folder to create."
+    },
+    {
+      "name": "frontend",
+      "type": "string",
+      "required": false,
+      "description": "Frontend framework to use (e.g., 'nextjs', 'react')."
+    },
+    {
+      "name": "backend",
+      "type": "string",
+      "required": false,
+      "description": "Backend framework to use (e.g., 'django', 'express')."
+    }
+  ],
+  "optionalParameters": [
+    {
+      "name": "path",
+      "type": "string",
+      "description": "Working directory path to create the project in",
+      "required": false
+    }
+  ],
+  "estimatedExecutionTime": "45s",
+  "confirmationRequired": false,
+  "rollbackAvailable": false,
+  "verificationSupported": false,
+  "deprecationStatus": "stable"
+}
