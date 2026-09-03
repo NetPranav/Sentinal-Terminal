@@ -148,13 +148,15 @@ export class GitCapability extends BaseCapabilityDriver<GitDriverInput, any> {
           args = [op];
       }
 
+      const targetCwd = input.directory || _context?.cwd;
       const output = await invoke<{ code: number; stdout: string; stderr: string }>('execute_command', {
         command: 'git',
-        args
+        args,
+        cwd: targetCwd
       });
 
       if (output.code === 0) {
-        return { success: true, data: { stdout: output.stdout, operation: op }, commandExecuted: `git ${args.join(' ')}`, rollbackPayload };
+        return { success: true, data: { stdout: output.stdout, operation: op }, commandExecuted: `git ${args.join(' ')}`, rollbackPayload: { ...rollbackPayload, directory: targetCwd } };
       } else {
         return { success: false, error: { code: 'GIT_ERROR', message: output.stderr || `Git command ${op} failed` } };
       }
@@ -175,17 +177,18 @@ export class GitCapability extends BaseCapabilityDriver<GitDriverInput, any> {
     if (typeof process !== 'undefined' && process.env.NODE_ENV === 'test') return true;
 
     const payload = result.rollbackPayload;
+    const rollbackCwd = payload.directory || _input.directory;
     try {
       if (payload.action === 'reset_hard') {
-        await invoke('execute_command', { command: 'git', args: ['reset', '--hard', payload.hash] });
+        await invoke('execute_command', { command: 'git', args: ['reset', '--hard', payload.hash], cwd: rollbackCwd });
         return true;
       }
       if (payload.action === 'checkout') {
-        await invoke('execute_command', { command: 'git', args: ['checkout', payload.target] });
+        await invoke('execute_command', { command: 'git', args: ['checkout', payload.target], cwd: rollbackCwd });
         return true;
       }
       if (payload.action === 'stash_pop') {
-        await invoke('execute_command', { command: 'git', args: ['stash', 'pop'] });
+        await invoke('execute_command', { command: 'git', args: ['stash', 'pop'], cwd: rollbackCwd });
         return true;
       }
     } catch {

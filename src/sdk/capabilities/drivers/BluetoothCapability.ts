@@ -265,6 +265,10 @@ export class BluetoothCapability extends BaseCapabilityDriver<BluetoothInput, an
         if (blueutilBin) {
           let actualTarget = target;
 
+          // Sanitize peripheral category nouns (Issue 8 / GitHub #6)
+          const peripheralNouns = /\b(headphones?|earbuds?|earphones?|buds|headset|speaker|mouse|keyboard|trackpad|airpods)\b/gi;
+          const targetClean = target.replace(peripheralNouns, '').replace(/\s+/g, ' ').trim() || target;
+
           // Try to fuzzy-match the device name against paired devices
           try {
             const listOutput = await invoke<{ stdout: string; code: number }>('execute_command', {
@@ -282,17 +286,19 @@ export class BluetoothCapability extends BaseCapabilityDriver<BluetoothInput, an
                 if (nameMatch && nameMatch[1]) {
                   const devName = nameMatch[1];
                   const devAddr = addrMatch ? addrMatch[1] : devName;
+                  const devLower = devName.toLowerCase();
+                  const targetLower = targetClean.toLowerCase();
                   
-                  // Exact substring match check first
-                  if (devName.toLowerCase().includes(target.toLowerCase())) {
+                  // Bidirectional substring match check
+                  if (devLower.includes(targetLower) || targetLower.includes(devLower)) {
                     actualTarget = devAddr;
                     bestScore = 0;
                     break;
                   }
                   
                   // Fuzzy match fallback
-                  const dist = levenshtein(target, devName);
-                  if (dist < bestScore && dist < Math.max(3, target.length / 2)) {
+                  const dist = levenshtein(targetClean, devName);
+                  if (dist < bestScore && dist < Math.max(3, targetClean.length / 2)) {
                     bestScore = dist;
                     actualTarget = devAddr;
                   }

@@ -69,6 +69,42 @@ export class FilesystemSDKCapability extends BaseCapabilityDriver<FsDriverInput,
     return this.execute({ operation: 'delete', path });
   }
 
+  private static cachedHomeDir: string | null = null;
+
+  public static async getHomeDir(): Promise<string> {
+    if (FilesystemSDKCapability.cachedHomeDir) {
+      return FilesystemSDKCapability.cachedHomeDir;
+    }
+
+    if (typeof process !== 'undefined' && (process.env.HOME || process.env.USERPROFILE)) {
+      FilesystemSDKCapability.cachedHomeDir = process.env.HOME || process.env.USERPROFILE || '';
+      return FilesystemSDKCapability.cachedHomeDir;
+    }
+
+    try {
+      const hRes = await invoke<{ stdout: string }>('execute_command', {
+        command: 'sh',
+        args: ['-c', 'echo $HOME']
+      });
+      const hd = (hRes?.stdout || '').trim();
+      if (hd) {
+        FilesystemSDKCapability.cachedHomeDir = hd;
+        return hd;
+      }
+    } catch {
+      // fallback
+    }
+
+    return '';
+  }
+
+  public static async expandTilde(p: string): Promise<string> {
+    if (!p || !p.startsWith('~')) return p;
+    const home = await FilesystemSDKCapability.getHomeDir();
+    if (!home) return p;
+    return p === '~' ? home : p.replace(/^~(?=$|\/|\\)/, home);
+  }
+
   protected async performExecution(
     input: FsDriverInput,
     _context: ExecutionContext,
@@ -89,13 +125,10 @@ export class FilesystemSDKCapability extends BaseCapabilityDriver<FsDriverInput,
     if (typeof process !== 'undefined' && process.env.NODE_ENV === 'test') {
       const commandExecuted = `fs.${op}(${JSON.stringify(input)})`;
       switch (op) {
-        case 'read': return { success: true, data: { content: 'mock filesystem content' }, commandExecuted };
-        case 'list': return { success: true, data: { entries: [{ name: 'file1.ts', isDirectory: false }, { name: 'folder', isDirectory: true }] }, commandExecuted };
-        case 'search': return { success: true, data: { matches: [`${targetPath}/matched_file.ts`] }, commandExecuted };
+        case 'read': return { success: true, data: { content: 'mock filesystem content', stdout: 'mock filesystem content' }, commandExecuted };
+        case 'list': return { success: true, data: { entries: [{ name: 'file1.txt', isFile: true }, { name: 'folder1', isDirectory: true }], stdout: 'file1.txt\nfolder1/' }, commandExecuted };
+        case 'search': return { success: true, data: { matches: ['/workspace/src/app.ts'], stdout: '/workspace/src/app.ts' }, commandExecuted };
         case 'copy': return { success: true, data: { copied: true }, commandExecuted, rollbackPayload: { action: 'remove', target: input.destination } };
-        case 'locate_files': return { success: true, data: { files: [`/Users/mock/Documents/${input.name}`] }, commandExecuted };
-        case 'locate_folders': return { success: true, data: { folders: [`/Users/mock/Workspace/${input.name}`] }, commandExecuted };
-        case 'grep': return { success: true, data: { matches: [{ file: `${targetPath}/config.ts`, line: 10, content: `// matched ${input.query}` }] }, commandExecuted };
         case 'move': return { success: true, data: { moved: true }, commandExecuted, rollbackPayload: { action: 'move', source: input.destination, destination: input.source } };
         case 'rename': return { success: true, data: { renamed: true }, commandExecuted, rollbackPayload: { action: 'rename', oldName: input.path, newName: input.newName } };
         case 'compress': return { success: true, data: { archive: input.archiveName }, commandExecuted };
@@ -122,13 +155,7 @@ export class FilesystemSDKCapability extends BaseCapabilityDriver<FsDriverInput,
         const baseCwd = (_context?.cwd && _context.cwd.trim() !== '' && _context.cwd !== '/') ? _context.cwd : '~';
         resolvedPath = `${baseCwd.replace(/\/+$/, '')}/${resolvedPath.replace(/^\.\//, '')}`;
       }
-      if (resolvedPath.startsWith('~/') || resolvedPath === '~') {
-        try {
-          const hRes = await invoke<{ stdout: string }>('execute_command', { command: 'sh', args: ['-c', 'echo $HOME'] });
-          const hd = (hRes?.stdout || '').trim();
-          if (hd) resolvedPath = resolvedPath === '~' ? hd : resolvedPath.replace(/^~/, hd);
-        } catch { /* ignore */ }
-      }
+      resolvedPath = await FilesystemSDKCapability.expandTilde(resolvedPath);
 
       switch (op) {
         case 'read': {
@@ -219,16 +246,8 @@ export class FilesystemSDKCapability extends BaseCapabilityDriver<FsDriverInput,
           let src = input.source || input.path || '';
           let dest = input.destination || '';
           if (!src || !dest) return { success: false, error: { code: 'MISSING_PATHS', message: 'Source and destination required' } };
-          if (src.startsWith('~/') || dest.startsWith('~/')) {
-            try {
-              const hRes = await invoke<{ stdout: string }>('execute_command', { command: 'sh', args: ['-c', 'echo $HOME'] });
-              const hd = (hRes?.stdout || '').trim();
-              if (hd) {
-                src = src.replace(/^~/, hd);
-                dest = dest.replace(/^~/, hd);
-              }
-            } catch { /* ignore */ }
-          }
+          src = await FilesystemSDKCapability.expandTilde(src);
+          dest = await FilesystemSDKCapability.expandTilde(dest);
           await copyFile(src, dest);
           return { success: true, data: { copied: true }, commandExecuted: `fs.copyFile("${src}", "${dest}")`, rollbackPayload: { action: 'remove', target: dest } };
         }
@@ -237,16 +256,8 @@ export class FilesystemSDKCapability extends BaseCapabilityDriver<FsDriverInput,
           let src = input.source || input.path || '';
           let dest = input.destination || '';
           if (!src || !dest) return { success: false, error: { code: 'MISSING_PATHS', message: 'Source and destination required' } };
-          if (src.startsWith('~/') || dest.startsWith('~/')) {
-            try {
-              const hRes = await invoke<{ stdout: string }>('execute_command', { command: 'sh', args: ['-c', 'echo $HOME'] });
-              const hd = (hRes?.stdout || '').trim();
-              if (hd) {
-                src = src.replace(/^~/, hd);
-                dest = dest.replace(/^~/, hd);
-              }
-            } catch { /* ignore */ }
-          }
+          src = await FilesystemSDKCapability.expandTilde(src);
+          dest = await FilesystemSDKCapability.expandTilde(dest);
           await rename(src, dest);
           return { success: true, data: { moved: true }, commandExecuted: `fs.rename("${src}", "${dest}")`, rollbackPayload: { action: 'move', source: dest, destination: src } };
         }

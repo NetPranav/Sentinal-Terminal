@@ -190,6 +190,24 @@ describe('ExecutionEngine Pipeline', () => {
     expect(res.error?.code).toBe('POLICY_DENIED');
   });
 
+  it('should deny deletion of nested files within protected system paths (/etc/hosts, /System/Library) (Issue 11 / GitHub #3)', async () => {
+    permissionManager.setProfile('Developer');
+    const res1 = await executionEngine.execute('filesystem.delete', { path: '/etc/hosts' });
+    expect(res1.success).toBe(false);
+    expect(res1.error?.code).toBe('POLICY_DENIED');
+
+    const res2 = await executionEngine.execute('filesystem.delete', { path: '/System/Library/CoreServices' });
+    expect(res2.success).toBe(false);
+    expect(res2.error?.code).toBe('POLICY_DENIED');
+  });
+
+  it('should block directory traversal bypasses attempting to delete protected paths', async () => {
+    permissionManager.setProfile('Developer');
+    const res = await executionEngine.execute('filesystem.delete', { path: '/Users/test/../../etc/hosts' });
+    expect(res.success).toBe(false);
+    expect(res.error?.code).toBe('POLICY_DENIED');
+  });
+
   describe('Permission Category Mapping & Profile Enforcement', () => {
     it('should accurately resolve capability IDs to their respective PermissionCategory', () => {
       expect(ExecutionEngine.resolvePermissionCategory('application.install')).toBe('ShellExecution');

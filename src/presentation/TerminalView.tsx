@@ -8,10 +8,13 @@ import { ToolLoader } from '../tools/loader/ToolLoader';
 import { AppAliasRegistry } from '../domain/capabilities/AppAliasRegistry';
 import { AgentLoop, AgentPlan } from '../ai/agent/AgentLoop';
 import { DemonstrationLearningEngine } from '../domain/learning/DemonstrationLearningEngine';
+import { PtyOutputObserver } from '../domain/observer/PtyOutputObserver';
 import { formatAgentEvent, formatDataOutput } from './OutputFormatter';
 
 import { AutocompleteEngine } from '../domain/autocomplete/AutocompleteEngine';
 import { HistoryProvider } from '../domain/autocomplete/HistoryProvider';
+import { DemonstrationProvider } from '../domain/autocomplete/DemonstrationProvider';
+import { WorkspaceContextProvider } from '../domain/autocomplete/WorkspaceContextProvider';
 import { GhostTextRenderer } from '../ui/components/GhostText';
 import { ThemeManager } from '../ui/theme/ThemeManager';
 import { ShellAdapter } from '../domain/shell/ShellAdapter';
@@ -153,6 +156,7 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
     
     // We must define the callback here so we can remove it later
     let outputCallback: ((data: Uint8Array) => void) | null = null;
+    let unsubRemediation: (() => void) | null = null;
 
     const initSession = async () => {
       try {
@@ -174,7 +178,19 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
 
         outputCallback = (data: Uint8Array) => {
           term.write(data);
+          try {
+            const str = new TextDecoder().decode(data);
+            PtyOutputObserver.getInstance().ingest(str, currentPath);
+          } catch { /* ignore decode error */ }
         };
+
+        unsubRemediation = PtyOutputObserver.getInstance().onRemediation((rem) => {
+          if (rem) {
+            writeTerm(`\r\n\x1b[1;33m⚡ Sentinel Auto-Heal:\x1b[0m ${rem.cause}\r\n`);
+            writeTerm(`  • \x1b[36mSuggested Fix:\x1b[0m ${rem.actionTitle}\r\n`);
+            writeTerm(`  • \x1b[35mType \x1b[1m>fix\x1b[0m\x1b[35m or press \x1b[1m[Tab]\x1b[0m\x1b[35m to auto-resolve with Sentinel.\x1b[0m\r\n\r\n`);
+          }
+        });
 
         sessionManager.onOutput(currentSessionId, outputCallback);
 
@@ -187,10 +203,14 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
           setSecurityModalPlan({ plan, resolve });
         }));
 
-        // Initialize Autocomplete
+        // Initialize Autocomplete with History, Demonstration, and Workspace Context providers
         const autocompleteEngine = new AutocompleteEngine();
         const historyProvider = new HistoryProvider();
+        const demonstrationProvider = new DemonstrationProvider();
+        const workspaceContextProvider = new WorkspaceContextProvider();
         autocompleteEngine.registerProvider(historyProvider);
+        autocompleteEngine.registerProvider(demonstrationProvider);
+        autocompleteEngine.registerProvider(workspaceContextProvider);
         
         const ghostText = new GhostTextRenderer(term);
         ghostText.attach(terminalRef.current!);
@@ -205,6 +225,16 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
                await sessionManager.write(currentSessionId, remaining);
                ghostText.clear();
                return; // Intercept key
+             }
+
+             // If Tab is pressed and an auto-heal remediation is active
+             const activeRem = PtyOutputObserver.getInstance().getActiveRemediation();
+             if (activeRem) {
+               await sessionManager.write(currentSessionId, '\x03');
+               writeTerm(`\r\n\x1b[1;32m⚡ [Sentinel Auto-Heal] Executing: ${activeRem.actionTitle}...\x1b[0m\r\n`);
+               PtyOutputObserver.getInstance().clearRemediation();
+               await agentLoop.run(`fix error: ${activeRem.actionTitle}`, { os: 'mac', cwd: currentPath || '~' });
+               return;
              }
           }
 
@@ -335,6 +365,20 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
                     writeTerm(`\r\n\x1b[37mUsage:\x1b[0m \x1b[1;32m/learn <natural language goal> -> <command>\x1b[0m\r\n`);
                     writeTerm(`Example: \x1b[36m/learn compress backups -> tar -czvf backups.tar.gz ./backups\x1b[0m\r\n\r\n`);
                   }
+                }
+                return;
+              }
+
+              // Intercept auto-heal remediation commands: >fix, >heal
+              if (cleanCmd === '>fix' || cleanCmd === '>heal') {
+                await sessionManager.write(currentSessionId!, '\x03');
+                const rem = PtyOutputObserver.getInstance().getActiveRemediation();
+                if (rem) {
+                  writeTerm(`\r\n\x1b[1;32m⚡ [Sentinel Auto-Heal] Executing: ${rem.actionTitle}...\x1b[0m\r\n`);
+                  PtyOutputObserver.getInstance().clearRemediation();
+                  await agentLoop.run(`fix error: ${rem.actionTitle}`, { os: 'mac', cwd: currentPath || '~' });
+                } else {
+                  writeTerm(`\r\n\x1b[33m[Sentinel Auto-Heal] No active error diagnosed in recent output.\x1b[0m\r\n\r\n`);
                 }
                 return;
               }
@@ -507,6 +551,7 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
       if (currentSessionId && outputCallback) {
         sessionManager.offOutput(currentSessionId, outputCallback);
       }
+      unsubRemediation?.();
       unsubscribeTheme();
       term.dispose();
     };
@@ -607,22 +652,36 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
 
       {/* Security & Deletion Authorization Overlay Modal */}
       {securityModalPlan && (
-        <div style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(0, 0, 0, 0.75)',
-          backdropFilter: 'blur(16px)',
-          WebkitBackdropFilter: 'blur(16px)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 9999,
-          padding: '20px',
-          transition: 'all 0.3s ease'
-        }}>
+        <div 
+          tabIndex={0}
+          ref={(el) => { if (el && !securityModalPlan.plan.requiresPassword) el.focus(); }}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape' || e.key === 'n' || e.key === 'N') {
+              securityModalPlan.resolve(false);
+              setSecurityModalPlan(null);
+              setAuthPassword('');
+            } else if ((e.key === 'Enter' || e.key === 'y' || e.key === 'Y') && !securityModalPlan.plan.requiresPassword) {
+              securityModalPlan.resolve(true);
+              setSecurityModalPlan(null);
+            }
+          }}
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.75)',
+            backdropFilter: 'blur(16px)',
+            WebkitBackdropFilter: 'blur(16px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+            padding: '20px',
+            transition: 'all 0.3s ease',
+            outline: 'none'
+          }}>
           <div style={{
             width: '100%',
             maxWidth: '460px',
@@ -757,7 +816,7 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
                   transition: 'background-color 0.2s ease'
                 }}
               >
-                Cancel
+                Cancel <span style={{ opacity: 0.6, fontSize: '11px', marginLeft: '4px' }}>[Esc]</span>
               </button>
               <button
                 disabled={isVerifying}
@@ -779,10 +838,14 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
                   cursor: isVerifying ? 'wait' : 'pointer',
                   fontWeight: 600,
                   boxShadow: isVerifying ? 'none' : '0 2px 10px rgba(245, 158, 11, 0.3)',
-                  transition: 'all 0.2s ease'
+                  transition: 'all 0.2s ease',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px'
                 }}
               >
                 {isVerifying ? 'Authenticating...' : securityModalPlan.plan.requiresPassword ? 'Authorize' : 'Approve & Execute'}
+                {!isVerifying && <span style={{ opacity: 0.75, fontSize: '11px', background: 'rgba(0,0,0,0.18)', padding: '1px 5px', borderRadius: '4px' }}>↵ Enter</span>}
               </button>
             </div>
           </div>

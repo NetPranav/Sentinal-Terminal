@@ -26,16 +26,22 @@ This document tracks critical core issues, bugs, and security vulnerabilities id
 - [x] **4.2 Two-Tier Reasoning Pipeline**: Split semantic understanding from deterministic DAG task decomposition.
 - [x] **4.3 Zero-Hallucination Schema Enforcement**: Validate LLM parameter JSON against schemas and auto-repair types/aliases before invocation.
 
+### 🔷 Epic 5: Production-Grade Addictive Terminal Enhancements
+- [x] **5.1 Passive PTY Output Stream Observer**: Real-time terminal stderr and non-zero exit code monitoring with 1-click `[Tab]` auto-remediation chip.
+- [x] **5.2 Predictive Ghost-Text from Demonstration & Workspace Context**: Sub-5ms auto-suggest powered by `DemonstrationLearningEngine` and `ProjectDiscoveryEngine`.
+- [x] **5.3 Crash-Proof Session & Workspace State Serialization**: Multi-tab and split-pane layout auto-save and restore (`~/.sentinel/sessions/last_session.json`).
+- [x] **5.4 Keyboard-First Ergonomics**: Zero-mouse modal navigation (`[Enter]`/`[y]` to approve, `[Esc]`/`[n]` to cancel, global summon toggle).
+
 ---
 
 ## 📋 Core Issues Checklist
 
 ### ⏳ Pending Issues (Sequenced by Priority)
-- [ ] **Priority 1 [P0 — Critical] — [GitHub #2](https://github.com/NetPranav/Sentinal-Terminal/issues/2) — Issue 9**: Compound shell command chaining (`&&`, `;`, `||`) bypasses `ShellCommandGuard` risk analysis
-- [ ] **Priority 2 [P0 — Critical] — [GitHub #3](https://github.com/NetPranav/Sentinal-Terminal/issues/3) — Issue 11**: `PolicyEngine.protect-system-dirs` fails to block deletion of subdirectories and files within protected system paths
-- [ ] **Priority 3 [P1 — High] — [GitHub #4](https://github.com/NetPranav/Sentinal-Terminal/issues/4) — Issue 10**: `GitCapability` and `ShellSDKCapability` drop process working directory context (`cwd`), breaking repository-relative operations
-- [ ] **Priority 4 [P2 — Medium] — [GitHub #5](https://github.com/NetPranav/Sentinal-Terminal/issues/5) — Issue 12**: `FilesystemSDKCapability` invokes redundant shell child processes (`sh -c 'echo $HOME'`) on every tilde path expansion
-- [ ] **Priority 5 [P3 — Low] — [GitHub #6](https://github.com/NetPranav/Sentinal-Terminal/issues/6) — Issue 8**: Bluetooth device connection fails when natural language queries include peripheral category nouns (e.g., "headphone")
+- [x] **Priority 1 [P0 — Critical] — [GitHub #2](https://github.com/NetPranav/Sentinal-Terminal/issues/2) — Issue 9**: Compound shell command chaining (`&&`, `;`, `||`) bypasses `ShellCommandGuard` risk analysis
+- [x] **Priority 2 [P0 — Critical] — [GitHub #3](https://github.com/NetPranav/Sentinal-Terminal/issues/3) — Issue 11**: `PolicyEngine.protect-system-dirs` fails to block deletion of subdirectories and files within protected system paths
+- [x] **Priority 3 [P1 — High] — [GitHub #4](https://github.com/NetPranav/Sentinal-Terminal/issues/4) — Issue 10**: `GitCapability` and `ShellSDKCapability` drop process working directory context (`cwd`), breaking repository-relative operations
+- [x] **Priority 4 [P2 — Medium] — [GitHub #5](https://github.com/NetPranav/Sentinal-Terminal/issues/5) — Issue 12**: `FilesystemSDKCapability` invokes redundant shell child processes (`sh -c 'echo $HOME'`) on every tilde path expansion
+- [x] **Priority 5 [P3 — Low] — [GitHub #6](https://github.com/NetPranav/Sentinal-Terminal/issues/6) — Issue 8**: Bluetooth device connection fails when natural language queries include peripheral category nouns (e.g., "headphone")
 
 ### ✅ Resolved Issues Archive
 - [x] **Issue 1**: `browser.navigate` ignores target application and drops `-a <browser>` in macOS `open` command

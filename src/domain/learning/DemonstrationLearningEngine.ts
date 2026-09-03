@@ -256,6 +256,10 @@ export class DemonstrationLearningEngine {
     this.savePatterns();
   }
 
+  public clearAll(): void {
+    this.clear();
+  }
+
   private escapeRegex(str: string): string {
     return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   }

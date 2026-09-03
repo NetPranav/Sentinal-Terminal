@@ -196,18 +196,25 @@ describe('Capability SDK — End-to-End Concrete Execution Drivers', () => {
         const btDriver = new BluetoothCapability('network.bluetooth.on');
         const onRes = await btDriver.turnOn();
         expect(onRes.success).toBe(true);
-        expect(onRes.data?.fallback).toBe('settings');
-        expect(onRes.data?.openedSettings).toBe(true);
+        expect((onRes.data as any)?.fallback).toBe('settings');
+        expect((onRes.data as any)?.openedSettings).toBe(true);
         expect(onRes.commandExecuted).toContain('x-apple.systempreferences:com.apple.BluetoothSettings');
 
         const connectRes = await btDriver.connect('Soundcore Space One');
         expect(connectRes.success).toBe(true);
-        expect(connectRes.data?.fallback).toBe('settings');
-        expect(connectRes.data?.openedSettings).toBe(true);
+        expect((connectRes.data as any)?.fallback).toBe('settings');
+        expect((connectRes.data as any)?.openedSettings).toBe(true);
         expect(connectRes.commandExecuted).toContain('x-apple.systempreferences:com.apple.BluetoothSettings');
       } finally {
         BluetoothCapability.mockBlueutilMissing = false;
       }
+    });
+
+    it('should connect to peripherals even when queries include accessory nouns (Issue 8 / GitHub #6)', async () => {
+      const btDriver = new BluetoothCapability();
+      const res = await btDriver.connect('soundcore space one headphone');
+      expect(res.success).toBe(true);
+      expect(res.data?.connected).toBe(true);
     });
   });
 
@@ -268,6 +275,13 @@ describe('Capability SDK — End-to-End Concrete Execution Drivers', () => {
 
       const rolledBack = await gitDriver.rollback({ directory: './core_repo' }, cloneRes);
       expect(rolledBack).toBe(true);
+    });
+
+    it('should propagate working directory (cwd) context across git invocations (Issue 10 / GitHub #4)', async () => {
+      const gitDriver = new GitCapability('git.status');
+      const res = await gitDriver.execute({ directory: '/workspace/custom-repo' }, { cwd: '/workspace/custom-repo' } as any);
+      expect(res.success).toBe(true);
+      expect(res.commandExecuted).toContain('git status');
     });
   });
 

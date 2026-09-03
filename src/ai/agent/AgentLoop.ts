@@ -46,7 +46,8 @@ import { ProjectDiscoveryEngine } from '../../domain/discovery/ProjectDiscoveryE
 import { ToolParameterValidator } from './ToolParameterValidator';
 import { DynamicToolPruner } from './DynamicToolPruner';
 import { DemonstrationLearningEngine } from '../../domain/learning/DemonstrationLearningEngine';
-export { AdaptivePlanEngine, AgentPlan, PlanPhase, PhaseStatus, ToolParameterValidator, DynamicToolPruner, DemonstrationLearningEngine };
+export { AdaptivePlanEngine, ToolParameterValidator, DynamicToolPruner, DemonstrationLearningEngine };
+export type { AgentPlan, PlanPhase, PhaseStatus };
 
 interface LLMResponse {
   action: 'tool' | 'done' | 'error';
@@ -373,7 +374,7 @@ export class AgentLoop {
             onPlanUpdate: (updatedPlan) => this.emit({ type: 'plan', message: updatedPlan.summary, data: updatedPlan }),
             onPhaseStart: (phase) => this.emit({ type: 'tool_start', message: `Phase ${phase.id}: ${phase.title}` }),
             onPhaseDone: (phase) => this.emit({ type: 'tool_done', message: `✓ Phase ${phase.id}: ${phase.title}` }),
-            onStepOutput: (output) => this.emit({ type: 'text', message: output }),
+            onStepOutput: (output) => this.emit({ type: 'step_output', message: output }),
             toolExecutor: this.toolExecutor,
             authorizationHandler: this.authorizationHandler
           });
@@ -588,7 +589,7 @@ export class AgentLoop {
               });
             },
             onStepOutput: (output) => {
-              this.emit({ type: 'text', message: output });
+              this.emit({ type: 'step_output', message: output });
             },
             onPhysicalActionRequired: async (req) => {
               this.emit({ type: 'question', message: req.prompt, data: req });
@@ -757,6 +758,21 @@ export class AgentLoop {
     return prompt;
   }
 
+  private createAgentPlan(summary: string, steps: string[], question?: string): AgentPlan {
+    const phases: PlanPhase[] = steps.map((s, idx) => ({
+      id: String(idx + 1),
+      title: s,
+      status: 'pending',
+      dependencies: idx === 0 ? [] : [String(idx)]
+    }));
+    return {
+      summary,
+      steps,
+      phases,
+      question
+    };
+  }
+
   /**
    * Fast, deterministic workflow decomposition for common multi-step tasks and
    * instant clarification questions for ambiguous goals.
@@ -766,121 +782,83 @@ export class AgentLoop {
 
     // 1. Ambiguous goals requiring immediate clarification
     if (/^(?:connect\s+bluetooth|pair\s+bluetooth|bluetooth\s+connect|pair\s+device)\s*$/i.test(lower)) {
-      return {
-        summary: 'Bluetooth device connection',
-        steps: [],
-        question: 'Which Bluetooth device would you like to connect to?'
-      };
+      return this.createAgentPlan('Bluetooth device connection', [], 'Which Bluetooth device would you like to connect to?');
     }
 
     if (/^(?:kill|terminate|stop|force\s+quit)\s+(?:process|app|application)?\s*$/i.test(lower)) {
-      return {
-        summary: 'Process termination',
-        steps: [],
-        question: 'Which application or process name would you like to terminate?'
-      };
+      return this.createAgentPlan('Process termination', [], 'Which application or process name would you like to terminate?');
     }
 
     if (/^(?:git\s+checkout|checkout\s+branch|switch\s+branch|switch\s+to\s+branch)\s*$/i.test(lower)) {
-      return {
-        summary: 'Git branch switch',
-        steps: [],
-        question: 'Which Git branch would you like to switch to?'
-      };
+      return this.createAgentPlan('Git branch switch', [], 'Which Git branch would you like to switch to?');
     }
 
     if (/^(?:scaffold|init|bootstrap|create\s+project|new\s+project)\s*$/i.test(lower)) {
-      return {
-        summary: 'Fullstack project scaffold',
-        steps: [],
-        question: 'What stack would you like to scaffold (e.g., Next.js frontend, Express/Django backend)?'
-      };
+      return this.createAgentPlan('Fullstack project scaffold', [], 'What stack would you like to scaffold (e.g., Next.js frontend, Express/Django backend)?');
     }
 
     if (/^(?:open|launch|start|run)\s+(?:the\s+|an?\s+)?(?:application|app)\s*$/i.test(lower)) {
-      return {
-        summary: 'Open desktop application',
-        steps: [],
-        question: 'Which application would you like to open (e.g. Safari, Chrome, VS Code, Sentinel Terminal)?'
-      };
+      return this.createAgentPlan('Open desktop application', [], 'Which application would you like to open (e.g. Safari, Chrome, VS Code, Sentinel Terminal)?');
     }
 
     // 2. Concrete Multi-Step Workflows
     // Build & launch workflow
     if ((lower.includes('build') || lower.includes('compile')) && lower.includes('open')) {
-      return {
-        summary: 'Build and launch application bundle',
-        steps: [
-          'Compile frontend assets and native binary',
-          'Locate packaged application bundle and release artifacts',
-          'Launch application in desktop environment',
-          'Open release build folder in Finder'
-        ]
-      };
+      return this.createAgentPlan('Build and launch application bundle', [
+        'Compile frontend assets and native binary',
+        'Locate packaged application bundle and release artifacts',
+        'Launch application in desktop environment',
+        'Open release build folder in Finder'
+      ]);
     }
     // Bluetooth connection workflow with target
     if (lower.includes('bluetooth') && (lower.includes('connect') || lower.includes('pair'))) {
       const rawTarget = goal.replace(/^.*(?:connect|pair)(?:\s+to)?\s+(?:the\s+)?(?:bluetooth\s+)?(?:device\s+)?/i, '').trim();
       const target = rawTarget && rawTarget.toLowerCase() !== 'bluetooth' ? rawTarget : 'device';
-      return {
-        summary: `Connect to Bluetooth device "${target}"`,
-        steps: [
-          'Verify Bluetooth adapter power state',
-          'Enable Bluetooth radio if currently disabled',
-          'Scan for active Bluetooth peripherals in range',
-          `Locate and establish connection with "${target}"`
-        ]
-      };
+      return this.createAgentPlan(`Connect to Bluetooth device "${target}"`, [
+        'Verify Bluetooth adapter power state',
+        'Enable Bluetooth radio if currently disabled',
+        'Scan for active Bluetooth peripherals in range',
+        `Locate and establish connection with "${target}"`
+      ]);
     }
 
     // Scaffolding workflow
     if (lower.includes('scaffold') || (lower.includes('create') && lower.includes('project')) || (lower.includes('init') && (lower.includes('next') || lower.includes('react')))) {
-      return {
-        summary: 'Scaffold project environment',
-        steps: [
-          'Create target project directory structure',
-          'Initialize frontend application scaffold',
-          'Initialize backend service framework',
-          'Configure dependencies and environment'
-        ]
-      };
+      return this.createAgentPlan('Scaffold project environment', [
+        'Create target project directory structure',
+        'Initialize frontend application scaffold',
+        'Initialize backend service framework',
+        'Configure dependencies and environment'
+      ]);
     }
 
     // Git sync workflow
     if ((lower.includes('git') || lower.includes('repo')) && (lower.includes('sync') || (lower.includes('pull') && lower.includes('push')) || (lower.includes('commit') && lower.includes('push')))) {
-      return {
-        summary: 'Synchronize Git repository with remote',
-        steps: [
-          'Inspect working tree status and modified files',
-          'Pull upstream changes from remote branch',
-          'Stage and commit local modifications',
-          'Push commit history to origin'
-        ]
-      };
+      return this.createAgentPlan('Synchronize Git repository with remote', [
+        'Inspect working tree status and modified files',
+        'Pull upstream changes from remote branch',
+        'Stage and commit local modifications',
+        'Push commit history to origin'
+      ]);
     }
 
     // Network diagnostic workflow
     if (lower.includes('diagnos') || (lower.includes('troubleshoot') && lower.includes('network')) || (lower.includes('test') && lower.includes('latency') && lower.includes('ping'))) {
-      return {
-        summary: 'Comprehensive network & connectivity diagnostic',
-        steps: [
-          'Probe active network interfaces and IP allocation',
-          'Measure ICMP packet reachability and latency to gateway',
-          'Audit open listening TCP/UDP ports for conflicts'
-        ]
-      };
+      return this.createAgentPlan('Comprehensive network & connectivity diagnostic', [
+        'Probe active network interfaces and IP allocation',
+        'Measure ICMP packet reachability and latency to gateway',
+        'Audit open listening TCP/UDP ports for conflicts'
+      ]);
     }
 
     // System troubleshooting workflow
     if (lower.includes('troubleshoot') || lower.includes('system stuck') || lower.includes('system slow') || (lower.includes('check') && lower.includes('cpu') && lower.includes('memory') && lower.includes('processes'))) {
-      return {
-        summary: 'System resource and performance triage',
-        steps: [
-          'Inspect system CPU load, memory pressure, and uptime',
-          'Identify top resource-consuming background processes',
-          'Check available APFS disk and volume storage'
-        ]
-      };
+      return this.createAgentPlan('System resource and performance triage', [
+        'Inspect system CPU load, memory pressure, and uptime',
+        'Identify top resource-consuming background processes',
+        'Check available APFS disk and volume storage'
+      ]);
     }
 
     return null;
@@ -968,9 +946,9 @@ User request: ${goal}`;
       : [];
 
     if (parsed.decision === 'clarify') {
-      return question ? { summary, steps: [], question } : null;
+      return question ? this.createAgentPlan(summary, [], question) : null;
     }
-    return steps.length > 0 ? { summary, steps } : null;
+    return steps.length > 0 ? this.createAgentPlan(summary, steps) : null;
   }
 
   /**

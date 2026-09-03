@@ -58,7 +58,7 @@ export class ShellSDKCapability extends BaseCapabilityDriver<ShellDriverInput, a
         // developer tools without maintaining a tool definition for each one.
         command: '/bin/zsh',
         args: ['-lc', commandLine],
-        cwd: input.cwd
+        cwd: input.cwd || _context?.cwd
       });
 
       if (output.pid) {

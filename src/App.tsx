@@ -8,6 +8,7 @@ import { AiSettingsPage } from "./ui/components/AiSettingsPage";
 import { SessionManager } from "./domain/SessionManager";
 import { InstallerWizard } from "./ui/components/InstallerWizard";
 import { UrlSchemeHandler } from "./domain/integration/UrlSchemeHandler";
+import { SessionPersistenceEngine } from "./domain/session/SessionPersistenceEngine";
 import "./App.css";
 
 type SplitDirection = 'vertical' | 'horizontal';
@@ -40,24 +41,40 @@ function App() {
     data: { id: getUniqueId('pane') }
   });
 
-  const [tabs, setTabs] = useState<Tab[]>([{ 
-    id: 'tab_initial', 
-    name: 'Terminal 1', 
-    rootPane: createTerminalPane() 
-  }]);
-  const [activeTabId, setActiveTabId] = useState<string>('tab_initial');
+  const initialSession = SessionPersistenceEngine.getInstance().loadSession();
+
+  const [tabs, setTabs] = useState<Tab[]>(() => {
+    if (initialSession && initialSession.tabs.length > 0) {
+      return initialSession.tabs;
+    }
+    return [{ 
+      id: 'tab_initial', 
+      name: 'Terminal 1', 
+      rootPane: createTerminalPane() 
+    }];
+  });
+  const [activeTabId, setActiveTabId] = useState<string>(() => {
+    return initialSession?.activeTabId || 'tab_initial';
+  });
   const [activePaneId, setActivePaneId] = useState<string>(''); // For focusing
   const [isCommandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [showAiSettings, setShowAiSettings] = useState(false);
 
   // New UI & Theme customization states
-  const [panePaths, setPanePaths] = useState<Record<string, string>>({});
+  const [panePaths, setPanePaths] = useState<Record<string, string>>(() => {
+    return initialSession?.panePaths || {};
+  });
   const [showThemeModal, setShowThemeModal] = useState(false);
   const [selectedThemeId, setSelectedThemeId] = useState<string>('classic-dark');
   const [transparency, setTransparency] = useState<number>(0.82);
   const [blurLevel, setBlurLevel] = useState<number>(20);
   const [activeShellMenuPaneId, setActiveShellMenuPaneId] = useState<string | null>(null);
   const [showWizard, setShowWizard] = useState<boolean>(() => !localStorage.getItem('sentinel_onboarded'));
+
+  // Auto-persist session tabs, splits, and paths across app reloads and crashes
+  useEffect(() => {
+    SessionPersistenceEngine.getInstance().saveSession(tabs, activeTabId, panePaths);
+  }, [tabs, activeTabId, panePaths]);
 
   useEffect(() => {
     ThemeManager.getInstance();
