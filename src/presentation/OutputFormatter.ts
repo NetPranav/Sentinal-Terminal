@@ -38,49 +38,10 @@ export function formatAgentEvent(event: AgentEventFormatted): string {
     case 'thinking':
       return `\r\n${C.dim}${C.cyan}● ${event.message}${C.reset}\r\n`;
 
-    case 'plan': {
-      const plan = event.data;
-      if (plan && Array.isArray(plan.phases) && plan.phases.length > 0) {
-        let out = `\r\n${C.magenta}● Execution Plan: ${event.message}${C.reset}\r\n`;
-        for (const phase of plan.phases) {
-          const icon = phase.status === 'completed'
-            ? `${C.green}✓${C.reset}`
-            : phase.status === 'running'
-            ? `${C.boldCyan}▸${C.reset}`
-            : phase.status === 'skipped'
-            ? `${C.gray}⊘${C.reset}`
-            : phase.status === 'failed'
-            ? `${C.red}✗${C.reset}`
-            : `${C.dim}○${C.reset}`;
-          const titleColor = phase.status === 'running'
-            ? C.boldCyan
-            : phase.status === 'completed'
-            ? C.green
-            : phase.status === 'skipped'
-            ? C.gray
-            : C.white;
-          const skippedNote = phase.skippedReason ? ` ${C.dim}(${phase.skippedReason})${C.reset}` : '';
-          out += `  ${icon} ${titleColor}Phase ${phase.id}:${C.reset} ${phase.title}${skippedNote}\r\n`;
-
-          if (phase.subPhases && phase.subPhases.length > 0) {
-            for (const sub of phase.subPhases) {
-              const subIcon = sub.status === 'completed'
-                ? `${C.green}✓${C.reset}`
-                : sub.status === 'running'
-                ? `${C.boldCyan}▸${C.reset}`
-                : sub.status === 'skipped'
-                ? `${C.gray}⊘${C.reset}`
-                : sub.status === 'failed'
-                ? `${C.red}✗${C.reset}`
-                : `${C.dim}○${C.reset}`;
-              out += `      ${subIcon} ${C.dim}Phase ${sub.id}:${C.reset} ${sub.title}\r\n`;
-            }
-          }
-        }
-        return out;
-      }
-      return `\r\n${C.magenta}● Plan ready: ${event.message}${C.reset}\r\n`;
-    }
+    case 'plan':
+      // The interactive execution plan is presented via the floating HUD dropdown in the UI.
+      // Do not duplicate or dump multi-line ASCII blocks into the main terminal buffer.
+      return '';
 
     case 'question':
       return `\r\n${C.boldYellow}  ? ${event.message}${C.reset}\r\n${C.dim}  Type your answer to continue, or /cancel to stop this workflow.${C.reset}\r\n`;

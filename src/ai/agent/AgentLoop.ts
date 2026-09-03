@@ -145,9 +145,14 @@ const FAST_PATHS: {
   { pattern: /^(?:turn\s+on|enable|activate)\s+bluetooth\s*$/i, tool: 'network.bluetooth.on', paramsFn: () => ({}) },
   { pattern: /^(?:turn\s+off|disable|deactivate)\s+bluetooth\s*$/i, tool: 'network.bluetooth.off', paramsFn: () => ({}) },
 
-  // Simple wifi on/off
+  // Simple wifi on/off & network scanning
   { pattern: /^(?:turn\s+on|enable|activate)\s+(?:wifi|wi-fi)\s*$/i, tool: 'network.wifi.on', paramsFn: () => ({}) },
   { pattern: /^(?:turn\s+off|disable|deactivate)\s+(?:wifi|wi-fi)\s*$/i, tool: 'network.wifi.off', paramsFn: () => ({}) },
+  {
+    pattern: /^(?:(?:can\s+you\s+)?(?:check|list|show|get|view|what\s+are|see)\s+(?:for\s+)?(?:all\s+)?(?:the\s+)?(?:available|saved|preferred|connected|known|past|previous|history\s+of)?\s*(?:wifi|wi-fi)\s*(?:networks?|connections?|ssids?)|(?:all\s+)?(?:the\s+)?(?:saved|connected|previous|known)?\s*(?:wifi|wi-fi)\s*networks?\s*(?:i\s+(?:have\s+)?(?:been\s+)?connected\s+to|saved|known|available)?)$/i,
+    tool: 'network.wifi.scan',
+    paramsFn: () => ({})
+  },
 
   // Simple system & hardware checks
   { pattern: /^(?:what\s+is\s+my\s+battery(?:\s+level|\s+status)?|battery\s+level|battery\s+status|show\s+battery|battery)\s*$/i, tool: 'system.battery', paramsFn: () => ({}) },
@@ -506,12 +511,13 @@ export class AgentLoop {
       
       const cdPath = this.extractCdPath(tool, params, result);
       const summary = result.success
-        ? this.formatSuccessSummary(tool, params, result)
+        ? (result.data?.stdout || this.formatSuccessSummary(tool, params, result))
         : `Failed: ${result.error}`;
 
       this.emit({ 
         type: result.success ? 'done' : 'error', 
-        message: summary 
+        message: summary,
+        data: result.data
       });
 
       return {
@@ -649,7 +655,12 @@ export class AgentLoop {
             authorizationHandler: this.authorizationHandler
           });
 
-          this.emit({ type: 'done', message: adaptiveResult.summary });
+          const lastStepWithData = [...adaptiveResult.steps].reverse().find(s => s.result?.data);
+          this.emit({ 
+            type: adaptiveResult.success ? 'done' : 'error', 
+            message: adaptiveResult.summary,
+            data: lastStepWithData?.result?.data
+          });
           return {
             success: adaptiveResult.success,
             summary: adaptiveResult.summary,

@@ -42,6 +42,7 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
   const [authError, setAuthError] = useState('');
   const [isVerifying, setIsVerifying] = useState(false);
   const [latestPlan, setLatestPlan] = useState<AgentPlan | null>(null);
+  const [isPlanOpen, setIsPlanOpen] = useState(true);
   const [activeRemediation, setActiveRemediation] = useState<RemediationPrompt | null>(null);
   const agentLoopRef = useRef<AgentLoop | null>(null);
   const lastUnresolvedGoalRef = useRef<{ goal: string; timestamp: number } | null>(null);
@@ -447,10 +448,23 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
 
                 // Set up event listener for live output
                 agentLoop.onEvent((event) => {
-                  writeTerm(formatAgentEvent(event));
-                  if (event.type === 'plan' && event.data) {
-                    setLatestPlan(event.data as AgentPlan);
+                  if (event.type === 'plan') {
+                    if (event.data) {
+                      setLatestPlan(event.data as AgentPlan);
+                      setIsPlanOpen(true);
+                    }
+                    // Keep execution plan strictly in dropdown overlay; avoid terminal buffer spam
+                    return;
                   }
+
+                  if (event.type === 'done') {
+                    // Automatically collapse the dropdown plan when goal completes successfully
+                    setIsPlanOpen(false);
+                  }
+
+                  const text = formatAgentEvent(event);
+                  if (text) writeTerm(text);
+
                   // Show structured data (file lists, devices, etc.) when available
                   if (event.data && (event.type === 'tool_done' || event.type === 'done')) {
                     const dataOutput = formatDataOutput(event.data);
@@ -596,24 +610,48 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
       />
 
       {latestPlan && (
-        <details style={{
-          position: 'absolute',
-          top: '12px',
-          right: '14px',
-          width: 'min(360px, calc(100% - 28px))',
-          padding: '10px 12px',
-          borderRadius: '10px',
-          border: '1px solid rgba(192, 132, 252, 0.28)',
-          background: 'rgba(20, 16, 29, 0.9)',
-          boxShadow: '0 10px 32px rgba(0, 0, 0, 0.35)',
-          backdropFilter: 'blur(12px)',
-          color: '#f5f3ff',
-          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-          fontSize: '12px',
-          zIndex: 30
-        }}>
-          <summary style={{ cursor: 'pointer', fontWeight: 650, color: '#d8b4fe', outline: 'none', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span>Execution Plan {latestPlan.phases ? `· ${latestPlan.phases.length} Phases` : `· ${latestPlan.steps.length} Steps`}</span>
+        <details 
+          open={isPlanOpen}
+          onToggle={(e) => setIsPlanOpen(e.currentTarget.open)}
+          style={{
+            position: 'absolute',
+            top: '12px',
+            right: '14px',
+            width: 'min(380px, calc(100% - 28px))',
+            padding: '10px 14px',
+            borderRadius: '10px',
+            border: latestPlan.phases?.every(p => p.status === 'completed')
+              ? '1px solid rgba(74, 222, 128, 0.35)'
+              : '1px solid rgba(192, 132, 252, 0.28)',
+            background: 'rgba(20, 16, 29, 0.94)',
+            boxShadow: '0 10px 32px rgba(0, 0, 0, 0.45)',
+            backdropFilter: 'blur(12px)',
+            color: '#f5f3ff',
+            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+            fontSize: '12px',
+            zIndex: 30,
+            transition: 'all 0.2s ease'
+          }}
+        >
+          <summary style={{
+            cursor: 'pointer',
+            fontWeight: 650,
+            color: latestPlan.phases?.every(p => p.status === 'completed') ? '#4ade80' : '#d8b4fe',
+            outline: 'none',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            userSelect: 'none'
+          }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span>{latestPlan.phases?.every(p => p.status === 'completed') ? '✓' : '⚡'}</span>
+              <span>Execution Plan {latestPlan.phases ? `· ${latestPlan.phases.length} Phases` : `· ${latestPlan.steps.length} Steps`}</span>
+              {latestPlan.phases?.every(p => p.status === 'completed') && (
+                <span style={{ fontSize: '10px', color: '#4ade80', background: 'rgba(34, 197, 94, 0.15)', padding: '1px 6px', borderRadius: '4px' }}>
+                  Completed
+                </span>
+              )}
+            </span>
             {latestPlan.activePhaseId && (
               <span style={{ fontSize: '10px', background: 'rgba(56, 189, 248, 0.25)', color: '#38bdf8', padding: '1px 6px', borderRadius: '4px' }}>
                 Running Phase {latestPlan.activePhaseId}

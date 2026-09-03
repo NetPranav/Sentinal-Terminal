@@ -209,9 +209,30 @@ export class AdaptivePlanEngine {
     const completedPhases = plan.phases.filter(p => p.status === 'completed').length;
     const skippedPhases = plan.phases.filter(p => p.status === 'skipped').length;
 
-    const summary = skippedPhases > 0
-      ? `Completed goal in ${completedPhases} phase(s); ${skippedPhases} subsequent phase(s) skipped.`
-      : `Successfully executed all ${completedPhases} phase(s) of workflow plan.`;
+    // Collect all substantive textual outputs from executed steps
+    const stepOutputs: string[] = [];
+    for (const step of executedSteps) {
+      const data = step.result?.data;
+      if (!data) continue;
+      if (typeof data.stdout === 'string' && data.stdout.trim()) {
+        stepOutputs.push(data.stdout.trim());
+      } else if (typeof data.output === 'string' && data.output.trim()) {
+        stepOutputs.push(data.output.trim());
+      } else if (typeof data === 'string' && data.trim()) {
+        stepOutputs.push(data.trim());
+      } else if (Array.isArray(data.networks) && data.networks.length > 0) {
+        stepOutputs.push(`Wi-Fi Networks:\n` + data.networks.map((n: string) => `  • ${n}`).join('\n'));
+      }
+    }
+
+    let summary: string;
+    if (stepOutputs.length > 0) {
+      summary = stepOutputs.join('\n\n');
+    } else {
+      summary = skippedPhases > 0
+        ? `Completed goal in ${completedPhases} phase(s); ${skippedPhases} subsequent phase(s) skipped.`
+        : `Successfully executed all ${completedPhases} phase(s) of workflow plan.`;
+    }
 
     return {
       success: anySuccess,
@@ -692,26 +713,50 @@ User request: ${goal}`;
 
   private resolveToolForPhase(phaseTitle: string, goal: string, cwd: string): { tool: string; params: any } | null {
     const lower = phaseTitle.toLowerCase();
+    const combined = `${phaseTitle} ${goal}`.toLowerCase();
+
     if (lower.includes('bluetooth') && (lower.includes('power on') || lower.includes('enable') || lower.includes('turn on'))) {
       return { tool: 'network.bluetooth.on', params: {} };
     }
     if (lower.includes('bluetooth') && (lower.includes('power off') || lower.includes('disable') || lower.includes('turn off'))) {
       return { tool: 'network.bluetooth.off', params: {} };
     }
-    if (lower.includes('bluetooth') && (lower.includes('scan') || lower.includes('locate'))) {
-      return { tool: 'network.bluetooth.scan', params: {} };
+    if (lower.includes('bluetooth') && (lower.includes('scan') || lower.includes('locate') || lower.includes('device') || lower.includes('list'))) {
+      return { tool: 'network.bluetooth.list', params: {} };
     }
     if (lower.includes('connect') && lower.includes('bluetooth')) {
       return { tool: 'network.bluetooth.connect', params: { device: goal } };
     }
-    if (lower.includes('wifi') && (lower.includes('turn on') || lower.includes('enable'))) {
-      return { tool: 'network.wifi.on', params: {} };
+
+    if (combined.includes('wifi') || combined.includes('wi-fi')) {
+      if (lower.includes('power on') || lower.includes('enable') || lower.includes('turn on')) {
+        return { tool: 'network.wifi.on', params: {} };
+      }
+      if (lower.includes('power off') || lower.includes('disable') || lower.includes('turn off')) {
+        return { tool: 'network.wifi.off', params: {} };
+      }
+      if (combined.includes('network') || combined.includes('connected') || combined.includes('saved') || combined.includes('preferred') || combined.includes('list') || combined.includes('scan') || combined.includes('retrieve') || combined.includes('check') || combined.includes('display')) {
+        return { tool: 'network.wifi.scan', params: {} };
+      }
     }
+
     if (lower.includes('git') && lower.includes('status')) {
       return { tool: 'git.status', params: {} };
     }
     if (lower.includes('git') && lower.includes('pull')) {
       return { tool: 'git.pull', params: {} };
+    }
+    if (lower.includes('port') || lower.includes('listening')) {
+      return { tool: 'network.ports', params: {} };
+    }
+    if (lower.includes('process') || lower.includes('cpu') || lower.includes('ram')) {
+      return { tool: 'system.processes', params: { sort: lower.includes('ram') ? 'ram' : 'cpu' } };
+    }
+    if (lower.includes('disk') || lower.includes('storage') || lower.includes('space')) {
+      return { tool: 'system.storage', params: {} };
+    }
+    if (lower.includes('battery')) {
+      return { tool: 'system.battery', params: {} };
     }
     return null;
   }
