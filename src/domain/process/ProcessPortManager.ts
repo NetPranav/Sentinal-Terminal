@@ -12,7 +12,38 @@ export interface ListeningPortInfo {
   pid: number;
   processName: string;
   protocol: 'TCP' | 'UDP';
+  status: 'LISTEN' | 'ACTIVE';
+  category: 'Dev Server' | 'Database' | 'AI Sidecar' | 'API Service' | 'System Service' | 'Other';
+  description: string;
   commandLine?: string;
+}
+
+export function getPortMetadata(port: number, processName: string): {
+  category: ListeningPortInfo['category'];
+  description: string;
+} {
+  const pName = processName.toLowerCase();
+
+  if (port === 8847 || pName.includes('llama')) {
+    return { category: 'AI Sidecar', description: 'Sentinel Embedded AI (llama.cpp Metal GPU)' };
+  }
+  if (port === 11434 || pName.includes('ollama')) {
+    return { category: 'AI Sidecar', description: 'Ollama LLM Runtime Daemon' };
+  }
+  if ([3000, 5173, 8080, 8000, 4200, 3001, 8081].includes(port) || pName.includes('node') || pName.includes('vite') || pName.includes('next')) {
+    return { category: 'Dev Server', description: 'Frontend / Fullstack Web Dev Server' };
+  }
+  if ([5432, 3306, 27017, 6379, 9200].includes(port) || pName.includes('postgres') || pName.includes('mysql') || pName.includes('mongod') || pName.includes('redis')) {
+    return { category: 'Database', description: 'Database Engine (Storage & Cache)' };
+  }
+  if ([11311, 7400, 7411].includes(port) || pName.includes('ros') || pName.includes('gzserver')) {
+    return { category: 'API Service', description: 'Robotics DDS / ROS Core' };
+  }
+  if ([22, 80, 443].includes(port)) {
+    return { category: 'System Service', description: 'System Network Service' };
+  }
+
+  return { category: 'Other', description: `${processName} active on port ${port}` };
 }
 
 export class ProcessPortManager {
@@ -31,9 +62,33 @@ export class ProcessPortManager {
   public async getListeningPorts(): Promise<ListeningPortInfo[]> {
     if (typeof process !== 'undefined' && process.env.NODE_ENV === 'test') {
       return [
-        { port: 3000, pid: 14210, processName: 'node', protocol: 'TCP' },
-        { port: 5173, pid: 14582, processName: 'vite', protocol: 'TCP' },
-        { port: 8080, pid: 18931, processName: 'python3', protocol: 'TCP' }
+        {
+          port: 3000,
+          pid: 14210,
+          processName: 'node',
+          protocol: 'TCP',
+          status: 'LISTEN',
+          category: 'Dev Server',
+          description: 'Frontend / Fullstack Web Dev Server'
+        },
+        {
+          port: 5173,
+          pid: 14582,
+          processName: 'vite',
+          protocol: 'TCP',
+          status: 'LISTEN',
+          category: 'Dev Server',
+          description: 'Vite Development Server'
+        },
+        {
+          port: 8847,
+          pid: 18931,
+          processName: 'llama-server',
+          protocol: 'TCP',
+          status: 'LISTEN',
+          category: 'AI Sidecar',
+          description: 'Sentinel Embedded AI (llama.cpp Metal GPU)'
+        }
       ];
     }
 
@@ -75,11 +130,15 @@ export class ProcessPortManager {
           const port = parseInt(portMatch[1], 10);
           if (!seenPorts.has(port) && !isNaN(pid)) {
             seenPorts.add(port);
+            const meta = getPortMetadata(port, processName);
             results.push({
               port,
               pid,
               processName,
-              protocol: 'TCP'
+              protocol: 'TCP',
+              status: 'LISTEN',
+              category: meta.category,
+              description: meta.description
             });
           }
         }
