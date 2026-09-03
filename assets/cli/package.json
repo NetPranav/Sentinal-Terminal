@@ -1,0 +1,29 @@
+{
+  "name": "@netpranav/sentinel-cli",
+  "version": "1.0.0",
+  "description": "Command line launcher for Sentinel Terminal",
+  "bin": {
+    "sentinel": "./sentinel"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/NetPranav/Sentinal-Terminal.git"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
+  "keywords": [
+    "sentinel",
+    "terminal",
+    "cli"
+  ],
+  "author": "Pranav Dubey",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/NetPranav/Sentinal-Terminal/issues"
+  },
+  "homepage": "https://github.com/NetPranav/Sentinal-Terminal#readme"
+}

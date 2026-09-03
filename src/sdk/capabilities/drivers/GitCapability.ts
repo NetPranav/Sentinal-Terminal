@@ -8,7 +8,7 @@
 import { BaseCapabilityDriver, CapabilityExecutionResult, ExecutionContext, Platform } from '../CapabilitySDK';
 import { invoke } from '@tauri-apps/api/core';
 
-export type GitOperation = 'clone' | 'commit' | 'push' | 'pull' | 'checkout' | 'merge' | 'stash' | 'branch' | 'log' | 'diff';
+export type GitOperation = 'clone' | 'commit' | 'push' | 'pull' | 'checkout' | 'merge' | 'stash' | 'branch' | 'status' | 'log' | 'diff';
 
 export interface GitDriverInput {
   operation?: GitOperation;
@@ -129,6 +129,10 @@ export class GitCapability extends BaseCapabilityDriver<GitDriverInput, any> {
 
         case 'branch':
           args = input.name ? ['branch', input.name] : ['branch', '-a'];
+          break;
+
+        case 'status':
+          args = ['status', '-s'];
           break;
 
         case 'log':

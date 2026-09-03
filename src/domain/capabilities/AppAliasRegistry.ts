@@ -50,6 +50,48 @@ export class AppAliasRegistry {
     'finder': 'Finder'
   };
 
+  private defaultCasks: Record<string, string> = {
+    'brave': 'brave-browser',
+    'brave browser': 'brave-browser',
+    'chrome': 'google-chrome',
+    'google chrome': 'google-chrome',
+    'googlechrome': 'google-chrome',
+    'vscode': 'visual-studio-code',
+    'vs code': 'visual-studio-code',
+    'code': 'visual-studio-code',
+    'visual studio code': 'visual-studio-code',
+    'sublime': 'sublime-text',
+    'sublime text': 'sublime-text',
+    'firefox': 'firefox',
+    'edge': 'microsoft-edge',
+    'microsoft edge': 'microsoft-edge',
+    'pycharm': 'pycharm',
+    'intellij': 'intellij-idea',
+    'intellij idea': 'intellij-idea',
+    'webstorm': 'webstorm',
+    'spotify': 'spotify',
+    'discord': 'discord',
+    'slack': 'slack',
+    'zoom': 'zoom',
+    'cursor': 'cursor',
+    'cursor ai': 'cursor',
+    'vlc': 'vlc',
+    'postman': 'postman',
+    'notion': 'notion',
+    'obs': 'obs',
+    'obs studio': 'obs',
+    'docker': 'docker',
+    'raycast': 'raycast',
+    'alacritty': 'alacritty',
+    'kitty': 'kitty',
+    'iterm': 'iterm2',
+    'iterm2': 'iterm2',
+    'arc': 'arc',
+    'arc browser': 'arc',
+    'telegram': 'telegram',
+    'whatsapp': 'whatsapp'
+  };
+
   private constructor() {
     this.resetToDefaults();
     this.initStorage();
@@ -143,6 +185,31 @@ export class AppAliasRegistry {
 
     // Otherwise return original trimmed name
     return clean;
+  }
+
+  /**
+   * Resolves an application name to its Homebrew package/cask identifier on macOS.
+   * e.g., "Brave Browser" -> { name: "brave-browser", isCask: true }
+   */
+  public resolvePackage(appNameOrAlias: string): { name: string; isCask: boolean } {
+    if (!appNameOrAlias) return { name: '', isCask: false };
+    const clean = appNameOrAlias.trim().replace(/^(?:the|my|a|an)\s+/i, '');
+    const lower = clean.toLowerCase().replace(/\.app$/i, '').trim();
+
+    if (this.defaultCasks[lower]) {
+      return { name: this.defaultCasks[lower], isCask: true };
+    }
+
+    // Check if the canonical resolved desktop name matches a known cask
+    const resolvedLower = this.resolve(appNameOrAlias).toLowerCase().replace(/\.app$/i, '').trim();
+    if (this.defaultCasks[resolvedLower]) {
+      return { name: this.defaultCasks[resolvedLower], isCask: true };
+    }
+
+    // Heuristic: If it has spaces or desktop app suffixes, normalize to kebab-case cask
+    const isLikelyCask = clean.includes(' ') || lower.endsWith('browser') || lower.endsWith('app') || lower.endsWith('ide') || lower.endsWith('studio');
+    const kebab = lower.replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+    return { name: kebab, isCask: isLikelyCask };
   }
 
   /**

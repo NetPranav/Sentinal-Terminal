@@ -7,6 +7,7 @@
 
 import { BaseCapabilityDriver, CapabilityExecutionResult, ExecutionContext, Platform } from '../CapabilitySDK';
 import { invoke } from '@tauri-apps/api/core';
+import { AppAliasRegistry } from '../../../domain/capabilities/AppAliasRegistry';
 
 export type BrowserOperation = 'navigate' | 'search' | 'new_tab' | 'bookmarks' | 'downloads' | 'history' | 'reload' | 'close_tabs';
 
@@ -18,6 +19,9 @@ export interface BrowserInput {
   filter?: string;
   limit?: number;
   target?: string;
+  appName?: string;
+  browser?: string;
+  app?: string;
   [key: string]: any;
 }
 
@@ -32,16 +36,16 @@ export class BrowserCapability extends BaseCapabilityDriver<BrowserInput, any> {
   }
 
   /** Express driver methods */
-  public async navigate(url: string): Promise<CapabilityExecutionResult<{ url: string }>> {
-    return this.execute({ operation: 'navigate', url });
+  public async navigate(url: string, browser?: string): Promise<CapabilityExecutionResult<{ url: string; browser?: string }>> {
+    return this.execute({ operation: 'navigate', url, appName: browser });
   }
 
   public async search(query: string, engine: string = 'google'): Promise<CapabilityExecutionResult<{ url: string }>> {
     return this.execute({ operation: 'search', query, engine });
   }
 
-  public async newTab(url?: string): Promise<CapabilityExecutionResult<{ tabOpened: boolean }>> {
-    return this.execute({ operation: 'new_tab', url });
+  public async newTab(url?: string, browser?: string): Promise<CapabilityExecutionResult<{ tabOpened: boolean; browser?: string }>> {
+    return this.execute({ operation: 'new_tab', url, appName: browser });
   }
 
   protected async performExecution(
@@ -72,14 +76,33 @@ export class BrowserCapability extends BaseCapabilityDriver<BrowserInput, any> {
       targetUrl = u;
     }
 
+    // Resolve target browser application name if specified (e.g., "safari" -> "Safari", "chrome" -> "Google Chrome")
+    const rawBrowser = input.appName || input.browser || input.app;
+    let resolvedBrowser: string | undefined = undefined;
+    if (rawBrowser && typeof rawBrowser === 'string' && rawBrowser.trim().length > 0) {
+      try {
+        resolvedBrowser = AppAliasRegistry.getInstance().resolve(rawBrowser.trim());
+      } catch {
+        resolvedBrowser = rawBrowser.trim();
+      }
+    }
+
     // Automated test & mock runtime environments
     if (typeof process !== 'undefined' && process.env.NODE_ENV === 'test') {
-      const commandExecuted = `open "${targetUrl}"`;
+      const commandExecuted = resolvedBrowser
+        ? `open -a "${resolvedBrowser}" "${targetUrl}"`
+        : `open "${targetUrl}"`;
+
       switch (op) {
         case 'navigate':
         case 'search':
         case 'new_tab':
-          return { success: true, data: { url: targetUrl, tabOpened: true }, commandExecuted, rollbackPayload: { url: targetUrl } };
+          return {
+            success: true,
+            data: { url: targetUrl, tabOpened: true, ...(resolvedBrowser ? { browser: resolvedBrowser } : {}) },
+            commandExecuted,
+            rollbackPayload: { url: targetUrl }
+          };
         case 'bookmarks':
           return { success: true, data: { bookmarks: [{ title: 'GitHub', url: 'https://github.com' }, { title: 'Sentinel Docs', url: 'https://sentinel.ai' }] }, commandExecuted };
         case 'downloads':
@@ -97,14 +120,23 @@ export class BrowserCapability extends BaseCapabilityDriver<BrowserInput, any> {
 
     try {
       if (op === 'navigate' || op === 'search' || op === 'new_tab') {
+        const cmdArgs = resolvedBrowser ? ['-a', resolvedBrowser, targetUrl] : [targetUrl];
+        const commandExecuted = resolvedBrowser
+          ? `open -a "${resolvedBrowser}" "${targetUrl}"`
+          : `open "${targetUrl}"`;
 
         const output = await invoke<{ code: number; stderr?: string; stdout?: string }>('execute_command', {
           command: 'open',
-          args: [targetUrl]
+          args: cmdArgs
         });
 
         if (output.code === 0) {
-          return { success: true, data: { url: targetUrl }, commandExecuted: `open "${targetUrl}"`, rollbackPayload: { url: targetUrl } };
+          return {
+            success: true,
+            data: { url: targetUrl, ...(resolvedBrowser ? { browser: resolvedBrowser } : {}) },
+            commandExecuted,
+            rollbackPayload: { url: targetUrl }
+          };
         } else {
           return { success: false, error: { code: 'BROWSER_FAILED', message: output.stderr || 'Failed to launch browser URL' } };
         }

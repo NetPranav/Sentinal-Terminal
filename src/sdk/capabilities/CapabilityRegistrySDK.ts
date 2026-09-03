@@ -24,6 +24,12 @@ import { PythonCapability } from './drivers/PythonCapability';
 import { NetworkingCapability } from './drivers/NetworkingCapability';
 import { DeveloperCapability } from './drivers/DeveloperCapability';
 
+// Avoid a static `node:module` import: Vite must be able to bundle this class
+// for the Tauri webview, while the CLI still needs synchronous filesystem access.
+const nodeRequire = typeof process !== 'undefined'
+  ? (process as any).getBuiltinModule?.('node:module')?.createRequire(import.meta.url) ?? null
+  : null;
+
 export class CapabilityRegistrySDK {
   private static instance: CapabilityRegistrySDK;
   private drivers: Map<string, ICapabilityDriver<any, any>> = new Map();
@@ -41,11 +47,54 @@ export class CapabilityRegistrySDK {
   }
 
   private initializeDefaultMappings(): void {
-    const toolModules = import.meta.glob('../../../tools/**/tool.json', { eager: true });
-    for (const module of Object.values(toolModules)) {
-      const toolDef: any = (module as any).default || module;
-      const toolId: string = toolDef.id;
-      if (!toolId) continue;
+    const toolIds: string[] = [];
+
+    if (typeof (import.meta as any).glob === 'function') {
+      const toolModules = (import.meta as any).glob('../../../tools/**/tool.json', { eager: true });
+      for (const module of Object.values(toolModules)) {
+        const toolDef: any = (module as any).default || module;
+        if (toolDef?.id) toolIds.push(toolDef.id);
+      }
+    } else if (nodeRequire) {
+      // Node.js CLI runtime fallback
+      try {
+        const fs = nodeRequire('node:fs');
+        const path = nodeRequire('node:path');
+        const rootDir = process.cwd();
+        const toolsDir = path.resolve(rootDir, 'tools');
+
+        if (fs.existsSync(toolsDir)) {
+          const findToolJsons = (dir: string): string[] => {
+            let results: string[] = [];
+            const list = fs.readdirSync(dir, { withFileTypes: true });
+            for (const dirent of list) {
+              if (dirent.isDirectory()) {
+                const full = path.join(dir, dirent.name);
+                const toolJson = path.join(full, 'tool.json');
+                if (fs.existsSync(toolJson)) {
+                  results.push(toolJson);
+                } else {
+                  results = results.concat(findToolJsons(full));
+                }
+              }
+            }
+            return results;
+          };
+
+          const files = findToolJsons(toolsDir);
+          for (const f of files) {
+            try {
+              const def = JSON.parse(fs.readFileSync(f, 'utf-8'));
+              if (def?.id) toolIds.push(def.id);
+            } catch {}
+          }
+        }
+      } catch (e) {
+        console.warn('[CapabilityRegistrySDK] Node.js directory scan error:', e);
+      }
+    }
+
+    for (const toolId of toolIds) {
 
       if (toolId.startsWith('filesystem.')) {
         this.register(toolId, new FilesystemSDKCapability(toolId));

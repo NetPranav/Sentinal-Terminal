@@ -1,0 +1,27 @@
+{
+  "toolId": "system.lock",
+  "tests": [
+    {
+      "id": "system-lock-test-1",
+      "userRequest": "lock my mac",
+      "expectedIntent": {
+        "domain": "system",
+        "action": "lock"
+      },
+      "expectedToolId": "system.lock",
+      "expectedEntities": {},
+      "description": "Automated regression test for system.lock"
+    },
+    {
+      "id": "system-lock-test-2",
+      "userRequest": "lock computer screen",
+      "expectedIntent": {
+        "domain": "system",
+        "action": "lock"
+      },
+      "expectedToolId": "system.lock",
+      "expectedEntities": {},
+      "description": "Automated regression test for locking display"
+    }
+  ]
+}

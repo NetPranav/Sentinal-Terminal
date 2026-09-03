@@ -25,13 +25,14 @@
     "linux"
   ],
   "requiredPermissions": [
+    "SystemSettings",
     "ShellExecution"
   ],
-  "securityRisk": "SAFE",
+  "securityRisk": "MEDIUM",
   "parameters": [],
   "optionalParameters": [],
   "estimatedExecutionTime": "1s",
-  "confirmationRequired": false,
+  "confirmationRequired": true,
   "rollbackAvailable": false,
   "verificationSupported": false,
   "deprecationStatus": "stable"

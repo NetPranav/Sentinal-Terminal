@@ -24,7 +24,7 @@
   "requiredPermissions": [
     "ShellExecution"
   ],
-  "securityRisk": "MODERATE",
+  "securityRisk": "MEDIUM",
   "parameters": [
     {
       "name": "app",

@@ -15,6 +15,9 @@
   "commonUserWording": [
     "go to youtube.com",
     "could you go to youtube.com",
+    "navigate to youtube.com in safari",
+    "launch github.com using chrome",
+    "open url in browser",
     "go to website",
     "open url",
     "navigate to",
@@ -23,13 +26,24 @@
   "commonMistakes": [],
   "entityHints": {
     "url": [
-      "test_value"
+      "youtube.com",
+      "github.com",
+      "https://google.com"
+    ],
+    "appName": [
+      "Safari",
+      "Chrome",
+      "Firefox",
+      "Brave",
+      "Edge"
     ]
   },
   "deviceNamingPatterns": [],
   "commonAbbreviations": {},
   "languageVariations": [
     "go to youtube.com",
+    "visit youtube.com in safari",
+    "navigate to https://github.com using chrome",
     "go to website",
     "open url",
     "navigate to",

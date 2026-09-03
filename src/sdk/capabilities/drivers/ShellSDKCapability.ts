@@ -8,7 +8,9 @@ import { BaseCapabilityDriver, CapabilityExecutionResult, ExecutionContext, Plat
 import { invoke } from '@tauri-apps/api/core';
 
 export interface ShellDriverInput {
+  /** A complete zsh command line, for example `git status --short`. */
   command: string;
+  /** @deprecated Prefer a complete command line in `command`. */
   args?: string[];
   cwd?: string;
 }
@@ -20,8 +22,8 @@ export class ShellSDKCapability extends BaseCapabilityDriver<ShellDriverInput, a
 
   private runningPid?: number;
 
-  public async run(command: string, args: string[] = []): Promise<CapabilityExecutionResult<{ stdout: string; stderr: string; code: number }>> {
-    return this.execute({ command, args });
+  public async run(command: string, cwd?: string): Promise<CapabilityExecutionResult<{ stdout: string; stderr: string; code: number }>> {
+    return this.execute({ command, cwd });
   }
 
   protected async performExecution(
@@ -38,17 +40,22 @@ export class ShellSDKCapability extends BaseCapabilityDriver<ShellDriverInput, a
     }
 
     if (typeof process !== 'undefined' && process.env.NODE_ENV === 'test') {
+      const commandLine = this.toCommandLine(input);
       return {
         success: true,
-        data: { stdout: `mock output for ${input.command}`, stderr: '', code: 0 },
-        commandExecuted: `${input.command} ${(input.args || []).join(' ')}`
+        data: { stdout: `mock output for ${commandLine}`, stderr: '', code: 0 },
+        commandExecuted: commandLine
       };
     }
 
     try {
+      const commandLine = this.toCommandLine(input);
       const output = await invoke<{ stdout: string; stderr: string; code: number; pid?: number }>('execute_command', {
-        command: input.command,
-        args: input.args || [],
+        // macOS users expect a command *line*, not only a binary name.  zsh
+        // supports pipes, redirects, built-ins, quoted paths, and installed
+        // developer tools without maintaining a tool definition for each one.
+        command: '/bin/zsh',
+        args: ['-lc', commandLine],
         cwd: input.cwd
       });
 
@@ -61,7 +68,7 @@ export class ShellSDKCapability extends BaseCapabilityDriver<ShellDriverInput, a
         success: isSuccess,
         data: { stdout: output.stdout, stderr: output.stderr, code: output.code },
         error: !isSuccess ? { code: 'NON_ZERO_EXIT', message: `Command exited with status code ${output.code}: ${output.stderr || output.stdout}` } : undefined,
-        commandExecuted: `${input.command} ${(input.args || []).join(' ')}`
+        commandExecuted: commandLine
       };
     } catch (e: any) {
       return { success: false, error: { code: 'SHELL_INVOKER_ERROR', message: e.message || 'Error occurred while executing command in shell' } };
@@ -82,5 +89,12 @@ export class ShellSDKCapability extends BaseCapabilityDriver<ShellDriverInput, a
       }
     }
     return cancelled;
+  }
+
+  private toCommandLine(input: ShellDriverInput): string {
+    if (!input.args?.length) return input.command;
+    // Backward-compatible support for callers that still pass a binary and
+    // separate arguments. JSON-string quoting is shell-safe for zsh values.
+    return [input.command, ...input.args.map(arg => JSON.stringify(arg))].join(' ');
   }
 }

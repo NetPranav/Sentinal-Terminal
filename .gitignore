@@ -26,3 +26,8 @@ dist-ssr
 # Embedded AI Models & Binaries
 src-tauri/binaries/
 src-tauri/resources/models/
+
+# Build artifacts & scratch
+*.dmg
+build/
+scratch/

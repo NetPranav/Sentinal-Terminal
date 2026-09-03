@@ -6,7 +6,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { SessionManager } from '../domain/SessionManager';
 import { ToolLoader } from '../tools/loader/ToolLoader';
 import { AppAliasRegistry } from '../domain/capabilities/AppAliasRegistry';
-import { AgentLoop } from '../ai/agent/AgentLoop';
+import { AgentLoop, AgentPlan } from '../ai/agent/AgentLoop';
 import { formatAgentEvent, formatDataOutput } from './OutputFormatter';
 
 import { AutocompleteEngine } from '../domain/autocomplete/AutocompleteEngine';
@@ -37,6 +37,7 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
   const [authPassword, setAuthPassword] = useState('');
   const [authError, setAuthError] = useState('');
   const [isVerifying, setIsVerifying] = useState(false);
+  const [latestPlan, setLatestPlan] = useState<AgentPlan | null>(null);
 
   const handleAuthorize = async () => {
     if (!authPassword.trim()) {
@@ -180,6 +181,9 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
         toolLoader.loadAll();
         
         const agentLoop = new AgentLoop(toolLoader.getState());
+        agentLoop.setAuthorizationHandler((plan) => new Promise(resolve => {
+          setSecurityModalPlan({ plan, resolve });
+        }));
 
         // Initialize Autocomplete
         const autocompleteEngine = new AutocompleteEngine();
@@ -289,9 +293,21 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
                 return;
               }
 
-              // Only trigger AI execution when written after ">" (e.g., ">find me the AAAA folder" or ">go to downloads")
-              if (cleanCmd.startsWith('>')) {
-                const aiGoal = cleanCmd.substring(1).trim();
+              // `>` starts an AI request. Once it asks a clarification question,
+              // the next normal terminal entry is treated as the answer so the
+              // workflow can resume without making the user retype the request.
+              const answeringAgentQuestion = agentLoop.hasPendingQuestion();
+              if (answeringAgentQuestion && cleanCmd === '/cancel') {
+                await sessionManager.write(currentSessionId!, '\x03');
+                agentLoop.cancelPendingQuestion();
+                setLatestPlan(null);
+                writeTerm('\r\n\x1b[33m  Workflow cancelled.\x1b[0m\r\n\r\n');
+                sessionManager.write(currentSessionId!, '\r');
+                return;
+              }
+
+              if (cleanCmd.startsWith('>') || answeringAgentQuestion) {
+                const aiGoal = answeringAgentQuestion ? cleanCmd : cleanCmd.substring(1).trim();
                 if (!aiGoal) {
                   return; // Empty AI instruction
                 }
@@ -302,6 +318,9 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
                 // Set up event listener for live output
                 agentLoop.onEvent((event) => {
                   writeTerm(formatAgentEvent(event));
+                  if (event.type === 'plan' && event.data) {
+                    setLatestPlan(event.data as AgentPlan);
+                  }
                   // Show structured data (file lists, devices, etc.) when available
                   if (event.data && (event.type === 'tool_done' || event.type === 'done')) {
                     const dataOutput = formatDataOutput(event.data);
@@ -437,6 +456,79 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
         ref={terminalRef} 
         style={{ position: 'relative', width: '100%', height: '100%', overflow: 'hidden' }} 
       />
+
+      {latestPlan && (
+        <details style={{
+          position: 'absolute',
+          top: '12px',
+          right: '14px',
+          width: 'min(360px, calc(100% - 28px))',
+          padding: '10px 12px',
+          borderRadius: '10px',
+          border: '1px solid rgba(192, 132, 252, 0.28)',
+          background: 'rgba(20, 16, 29, 0.9)',
+          boxShadow: '0 10px 32px rgba(0, 0, 0, 0.35)',
+          backdropFilter: 'blur(12px)',
+          color: '#f5f3ff',
+          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+          fontSize: '12px',
+          zIndex: 30
+        }}>
+          <summary style={{ cursor: 'pointer', fontWeight: 650, color: '#d8b4fe', outline: 'none', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span>Execution Plan {latestPlan.phases ? `· ${latestPlan.phases.length} Phases` : `· ${latestPlan.steps.length} Steps`}</span>
+            {latestPlan.activePhaseId && (
+              <span style={{ fontSize: '10px', background: 'rgba(56, 189, 248, 0.25)', color: '#38bdf8', padding: '1px 6px', borderRadius: '4px' }}>
+                Running Phase {latestPlan.activePhaseId}
+              </span>
+            )}
+          </summary>
+          <p style={{ margin: '8px 0 8px', color: 'rgba(255,255,255,0.72)', lineHeight: 1.4 }}>
+            {latestPlan.summary}
+          </p>
+          {latestPlan.phases && latestPlan.phases.length > 0 ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', margin: '4px 0 2px' }}>
+              {latestPlan.phases.map((phase) => (
+                <div key={phase.id} style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    color: phase.status === 'completed' ? '#4ade80' : phase.status === 'running' ? '#38bdf8' : phase.status === 'skipped' ? '#94a3b8' : phase.status === 'failed' ? '#f87171' : '#e2e8f0',
+                    fontSize: '11px',
+                    fontWeight: phase.status === 'running' ? 600 : 400
+                  }}>
+                    <span>{phase.status === 'completed' ? '✓' : phase.status === 'running' ? '▸' : phase.status === 'skipped' ? '⊘' : phase.status === 'failed' ? '✗' : '○'}</span>
+                    <span>Phase {phase.id}: {phase.title}</span>
+                    {phase.skippedReason && <span style={{ fontSize: '10px', color: '#64748b' }}>({phase.skippedReason})</span>}
+                  </div>
+                  {phase.subPhases && phase.subPhases.map((sub) => (
+                    <div key={sub.id} style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      paddingLeft: '16px',
+                      color: sub.status === 'completed' ? '#4ade80' : sub.status === 'running' ? '#38bdf8' : sub.status === 'skipped' ? '#94a3b8' : '#cbd5e1',
+                      fontSize: '10.5px'
+                    }}>
+                      <span>{sub.status === 'completed' ? '✓' : sub.status === 'running' ? '▸' : '○'}</span>
+                      <span>Phase {sub.id}: {sub.title}</span>
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
+          ) : latestPlan.steps.length > 0 ? (
+            <ol style={{ margin: '0 0 2px', paddingLeft: '20px', color: '#ede9fe', lineHeight: 1.55 }}>
+              {latestPlan.steps.map((step, index) => <li key={`${index}-${step}`}>{step}</li>)}
+            </ol>
+          ) : null}
+          {latestPlan.question && (
+            <p style={{ margin: '10px 0 0', color: '#fcd34d', lineHeight: 1.4 }}>
+              Needs your answer: {latestPlan.question}
+            </p>
+          )}
+        </details>
+      )}
 
       {/* Security & Deletion Authorization Overlay Modal */}
       {securityModalPlan && (

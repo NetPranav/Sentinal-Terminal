@@ -36,6 +36,7 @@ describe('ExecutionEngine Pipeline', () => {
   let registry: CapabilityRegistry;
   let permissionManager: PermissionManager;
   let auditLogger: AuditLogger;
+  let securityEngine: SecurityEngine;
 
   beforeEach(() => {
     // Reset singleton for testing (hacky but works for vitest isolated modules)
@@ -45,7 +46,7 @@ describe('ExecutionEngine Pipeline', () => {
 
     permissionManager = new PermissionManager();
     auditLogger = new AuditLogger();
-    const securityEngine = new SecurityEngine();
+    securityEngine = new SecurityEngine();
     const policyEngine = new PolicyEngine();
 
     executionEngine = new ExecutionEngine(
@@ -164,5 +165,72 @@ describe('ExecutionEngine Pipeline', () => {
     const res = await executionEngine.execute('filesystem.delete', { path: '/System' });
     expect(res.success).toBe(false);
     expect(res.error?.code).toBe('POLICY_DENIED');
+  });
+
+  describe('Permission Category Mapping & Profile Enforcement', () => {
+    it('should accurately resolve capability IDs to their respective PermissionCategory', () => {
+      expect(ExecutionEngine.resolvePermissionCategory('application.install')).toBe('ShellExecution');
+      expect(ExecutionEngine.resolvePermissionCategory('application.update')).toBe('ShellExecution');
+      expect(ExecutionEngine.resolvePermissionCategory('application.uninstall')).toBe('ShellExecution');
+      expect(ExecutionEngine.resolvePermissionCategory('git.push')).toBe('Git');
+      expect(ExecutionEngine.resolvePermissionCategory('git.commit')).toBe('Git');
+      expect(ExecutionEngine.resolvePermissionCategory('docker.stop')).toBe('Docker');
+      expect(ExecutionEngine.resolvePermissionCategory('docker.compose_down')).toBe('Docker');
+      expect(ExecutionEngine.resolvePermissionCategory('developer.ssh')).toBe('SSH');
+      expect(ExecutionEngine.resolvePermissionCategory('clipboard.read')).toBe('Clipboard');
+      expect(ExecutionEngine.resolvePermissionCategory('system.lock')).toBe('SystemSettings');
+      expect(ExecutionEngine.resolvePermissionCategory('system.env_set')).toBe('EnvironmentVariables');
+      expect(ExecutionEngine.resolvePermissionCategory('filesystem.read')).toBe('ReadFiles');
+    });
+
+    it('should deny Git, Docker, SSH, and package installs under ReadOnly profile', async () => {
+      permissionManager.setProfile('ReadOnly');
+
+      const gitRes = await executionEngine.execute('git.push', { remote: 'origin', branch: 'main' });
+      expect(gitRes.success).toBe(false);
+      expect(gitRes.error?.code).toBe('PERMISSION_DENIED');
+      expect(gitRes.error?.message).toContain('Permission Git is always denied');
+
+      const installRes = await executionEngine.execute('application.install', { package: 'htop' });
+      expect(installRes.success).toBe(false);
+      expect(installRes.error?.code).toBe('PERMISSION_DENIED');
+      expect(installRes.error?.message).toContain('Permission ShellExecution is always denied');
+
+      const dockerRes = await executionEngine.execute('docker.stop', { container: 'web' });
+      expect(dockerRes.success).toBe(false);
+      expect(dockerRes.error?.code).toBe('PERMISSION_DENIED');
+      expect(dockerRes.error?.message).toContain('Permission Docker is always denied');
+
+      const sshRes = await executionEngine.execute('developer.ssh', { target: 'user@server' });
+      expect(sshRes.success).toBe(false);
+      expect(sshRes.error?.code).toBe('PERMISSION_DENIED');
+      expect(sshRes.error?.message).toContain('Permission SSH is always denied');
+    });
+
+    it('should prompt user in SafeMode with correct required permissions for Git and Docker operations', async () => {
+      permissionManager.setProfile('SafeMode');
+      let askedGit = false;
+
+      const gitRes = await executionEngine.execute('git.commit', { message: 'feat: new feature' }, {
+        onAskPermission: async (plan) => {
+          askedGit = true;
+          expect(plan.permissionsRequired).toContain('Git');
+          return true;
+        }
+      });
+
+      expect(askedGit).toBe(true);
+      expect(gitRes.success).toBe(true);
+    });
+
+    it('should classify system.lock and display sleep commands as SENSITIVE requiring user confirmation', () => {
+      const risk = securityEngine.calculateRisk('system.lock', {});
+      expect(risk.level).toBe('SENSITIVE');
+      expect(risk.requiresConsent).toBe(true);
+
+      const cmdRisk = securityEngine.analyzeCommand('pmset displaysleepnow');
+      expect(cmdRisk.level).toBe('SENSITIVE');
+      expect(cmdRisk.requiresConsent).toBe(true);
+    });
   });
 });

@@ -12,6 +12,7 @@
 
 import { ModelProvider, ModelMetadata } from '../provider/Provider';
 import { EmbeddedProvider } from '../provider/EmbeddedProvider';
+import { OllamaProvider } from '../provider/OllamaProvider';
 
 export interface CandidateModelSpec {
   id: string;
@@ -138,8 +139,8 @@ export class ModelManager {
   };
 
   constructor(customProviders?: ModelProvider[]) {
-    // Provider priority: Embedded (bundled) is the sole targeted provider
-    this.providers = customProviders || [new EmbeddedProvider()];
+    // Provider priority: Embedded (bundled llama.cpp) first, fallback to Ollama runtime
+    this.providers = customProviders || [new EmbeddedProvider(), new OllamaProvider()];
   }
 
   /**

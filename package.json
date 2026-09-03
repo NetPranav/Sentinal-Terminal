@@ -6,10 +6,12 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "build:app": "tauri build --bundles app",
+    "build:app": "tauri build --bundles app && mkdir -p build && cp -R \"src-tauri/target/release/bundle/macos/Sentinel Terminal.app\" build/",
     "preview": "vite preview",
     "tauri": "tauri",
-    "test": "vitest run"
+    "test": "vitest run",
+    "agent": "tsx scripts/agent-cli.ts",
+    "cli": "tsx scripts/agent-cli.ts"
   },
   "dependencies": {
     "@tauri-apps/api": "^2",
@@ -36,6 +38,7 @@
     "@types/uuid": "^10.0.0",
     "@vitejs/plugin-react": "^4.6.0",
     "@vitest/ui": "^4.1.10",
+    "tsx": "^4.23.12",
     "typescript": "~5.8.3",
     "vite": "^7.0.4",
     "vitest": "^4.1.10"

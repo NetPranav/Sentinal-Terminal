@@ -95,7 +95,30 @@ export abstract class BaseCapabilityDriver<I = any, O = any> implements ICapabil
         };
       }
 
-      const result = await this.performExecution(input, context, this.activeCancelToken);
+      let timeoutHandle: any = null;
+      const timeoutPromise = context.timeoutMs && context.timeoutMs > 0
+        ? new Promise<CapabilityExecutionResult<O>>((resolve) => {
+            timeoutHandle = setTimeout(async () => {
+              if (this.activeCancelToken) {
+                this.activeCancelToken.cancelled = true;
+              }
+              await this.cancel();
+              resolve({
+                success: false,
+                cancelled: true,
+                error: {
+                  code: 'EXECUTION_TIMEOUT',
+                  message: `Execution timed out after ${context.timeoutMs}ms`
+                }
+              });
+            }, context.timeoutMs);
+          })
+        : null;
+
+      const execPromise = this.performExecution(input, context, this.activeCancelToken);
+      const result = timeoutPromise ? await Promise.race([execPromise, timeoutPromise]) : await execPromise;
+      if (timeoutHandle) clearTimeout(timeoutHandle);
+
       result.executionTimeMs = performance.now() - startTime;
       return result;
     } catch (err: any) {

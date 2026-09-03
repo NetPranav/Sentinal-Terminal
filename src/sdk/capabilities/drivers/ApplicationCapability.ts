@@ -49,6 +49,10 @@ export class ApplicationCapability extends BaseCapabilityDriver<AppDriverInput, 
     return this.execute({ operation: 'list_running' });
   }
 
+  public async update(appName: string): Promise<CapabilityExecutionResult<{ updated: boolean; package?: string }>> {
+    return this.execute({ operation: 'update', app: appName });
+  }
+
   protected async performExecution(
     input: AppDriverInput,
     context: ExecutionContext,
@@ -64,7 +68,7 @@ export class ApplicationCapability extends BaseCapabilityDriver<AppDriverInput, 
     }
 
     const rawTarget = input.app || input.package || '';
-    const target = (op === 'open' || op === 'close' || op === 'force_quit' || op === 'focus' || op === 'minimize' || op === 'maximize')
+    const target = (op === 'open' || op === 'close' || op === 'force_quit' || op === 'focus' || op === 'minimize' || op === 'maximize' || op === 'update' || op === 'install' || op === 'uninstall')
       ? AppAliasRegistry.getInstance().resolve(rawTarget)
       : rawTarget;
 
@@ -89,10 +93,38 @@ export class ApplicationCapability extends BaseCapabilityDriver<AppDriverInput, 
           const mockApps = ['Sentinel Terminal', 'Antigravity IDE', 'Google Chrome', 'Safari', 'Preview'];
           return { success: true, data: { apps: mockApps, stdout: `Currently Running Desktop Applications (${mockApps.length}):\r\n  • ` + mockApps.join('\r\n  • ') }, commandExecuted };
         }
-        case 'install':
-          return { success: true, data: { installed: true, package: target }, commandExecuted, rollbackPayload: { action: 'uninstall', package: target } };
-        case 'uninstall':
-          return { success: true, data: { uninstalled: true, package: target }, commandExecuted };
+        case 'install': {
+          const pkgInfo = AppAliasRegistry.getInstance().resolvePackage(target);
+          return { success: true, data: { installed: true, package: pkgInfo.name, isCask: pkgInfo.isCask }, commandExecuted: `brew install ${pkgInfo.isCask ? '--cask ' : ''}${pkgInfo.name}`, rollbackPayload: { action: 'uninstall', package: pkgInfo.name } };
+        }
+        case 'uninstall': {
+          const pkgInfo = AppAliasRegistry.getInstance().resolvePackage(target);
+          return { success: true, data: { uninstalled: true, package: pkgInfo.name, isCask: pkgInfo.isCask }, commandExecuted: `brew uninstall ${pkgInfo.isCask ? '--cask ' : ''}${pkgInfo.name}` };
+        }
+        case 'update': {
+          if (target.toLowerCase() === 'safari' || target.toLowerCase() === 'finder' || target.toLowerCase() === 'system settings') {
+            return {
+              success: true,
+              data: { updated: false, reason: 'System application', stdout: `${target} is a macOS system application and can only be updated via System Settings -> Software Update.` },
+              commandExecuted: 'echo'
+            };
+          }
+          const pkgInfo = AppAliasRegistry.getInstance().resolvePackage(target);
+          const pkgName = pkgInfo.name;
+          const isCask = pkgInfo.isCask;
+          const mockCmd = `brew upgrade ${isCask ? '--cask ' : ''}${pkgName}`;
+          return {
+            success: true,
+            data: {
+              updated: true,
+              app: target,
+              package: pkgName,
+              isCask,
+              stdout: `Successfully upgraded ${target} (${pkgName}) via Homebrew.`
+            },
+            commandExecuted: mockCmd
+          };
+        }
         default:
           return { success: true, data: { executed: true }, commandExecuted };
       }
@@ -165,6 +197,12 @@ export class ApplicationCapability extends BaseCapabilityDriver<AppDriverInput, 
             'movies': '~/Movies',
             'home': '~',
             'project folder': '~/Project Folder',
+            'build': './build',
+            'build folder': './build',
+            'the build folder': './build',
+            'build directory': './build',
+            'dist': './dist',
+            'dist folder': './dist',
             'this': '.',
             'current': '.',
             'here': '.'
@@ -173,6 +211,8 @@ export class ApplicationCapability extends BaseCapabilityDriver<AppDriverInput, 
           if (folderMapping[cleanTarget]) {
             resolvedTarget = folderMapping[cleanTarget];
             isPathOrFolder = true;
+          } else if (cleanTarget === 'application' || cleanTarget === 'app' || cleanTarget === 'the app' || cleanTarget === 'the application' || cleanTarget === 'built app' || cleanTarget === 'built application') {
+            resolvedTarget = 'Sentinel Terminal';
           } else if (target.startsWith('/') || target.startsWith('~/') || target.startsWith('./') || target === '~') {
             isPathOrFolder = true;
           }
@@ -253,17 +293,29 @@ export class ApplicationCapability extends BaseCapabilityDriver<AppDriverInput, 
       }
 
       if (op === 'install') {
-        const cmd = platform === 'macos' ? 'brew' : 'apt';
-        const args = platform === 'macos' ? ['install', target] : ['install', '-y', target];
-        await invoke('execute_command', { command: cmd, args });
-        return { success: true, data: { installed: true }, commandExecuted: `${cmd} ${args.join(' ')}`, rollbackPayload: { action: 'uninstall', package: target } };
+        if (platform === 'macos') {
+          const pkgInfo = AppAliasRegistry.getInstance().resolvePackage(target);
+          const args = pkgInfo.isCask ? ['install', '--cask', pkgInfo.name] : ['install', pkgInfo.name];
+          await invoke('execute_command', { command: 'brew', args });
+          return { success: true, data: { installed: true, package: pkgInfo.name, isCask: pkgInfo.isCask }, commandExecuted: `brew ${args.join(' ')}`, rollbackPayload: { action: 'uninstall', package: pkgInfo.name } };
+        } else {
+          const args = ['install', '-y', target];
+          await invoke('execute_command', { command: 'apt', args });
+          return { success: true, data: { installed: true, package: target }, commandExecuted: `apt ${args.join(' ')}`, rollbackPayload: { action: 'uninstall', package: target } };
+        }
       }
 
       if (op === 'uninstall') {
-        const cmd = platform === 'macos' ? 'brew' : 'apt';
-        const args = platform === 'macos' ? ['uninstall', target] : ['remove', '-y', target];
-        await invoke('execute_command', { command: cmd, args });
-        return { success: true, data: { uninstalled: true }, commandExecuted: `${cmd} ${args.join(' ')}` };
+        if (platform === 'macos') {
+          const pkgInfo = AppAliasRegistry.getInstance().resolvePackage(target);
+          const args = pkgInfo.isCask ? ['uninstall', '--cask', pkgInfo.name] : ['uninstall', pkgInfo.name];
+          await invoke('execute_command', { command: 'brew', args });
+          return { success: true, data: { uninstalled: true, package: pkgInfo.name, isCask: pkgInfo.isCask }, commandExecuted: `brew ${args.join(' ')}` };
+        } else {
+          const args = ['remove', '-y', target];
+          await invoke('execute_command', { command: 'apt', args });
+          return { success: true, data: { uninstalled: true, package: target }, commandExecuted: `apt ${args.join(' ')}` };
+        }
       }
 
       if (op === 'update') {
@@ -272,7 +324,8 @@ export class ApplicationCapability extends BaseCapabilityDriver<AppDriverInput, 
         }
         
         // Exclude system apps
-        if (target.toLowerCase() === 'safari' || target.toLowerCase() === 'finder' || target.toLowerCase() === 'system settings') {
+        const systemApps = ['safari', 'finder', 'system settings', 'system preferences', 'calculator', 'calendar', 'notes', 'mail', 'messages', 'preview'];
+        if (systemApps.includes(target.toLowerCase())) {
           return { 
             success: true, 
             data: { updated: false, reason: 'System application', stdout: `${target} is a macOS system application and can only be updated via System Settings -> Software Update.` },
@@ -280,26 +333,51 @@ export class ApplicationCapability extends BaseCapabilityDriver<AppDriverInput, 
           };
         }
 
-        const cmd = platform === 'macos' ? 'brew' : 'apt';
-        const args = platform === 'macos' ? ['upgrade', target] : ['upgrade', '-y', target];
-        
-        try {
-          const res = await invoke<{ stdout: string; stderr: string; code: number }>('execute_command', { command: cmd, args });
-          if (res.code === 0) {
-            return { success: true, data: { updated: true, stdout: res.stdout }, commandExecuted: `${cmd} ${args.join(' ')}` };
-          } else {
+        if (platform === 'macos') {
+          const pkgInfo = AppAliasRegistry.getInstance().resolvePackage(target);
+          const pkgName = pkgInfo.name;
+          const isCask = pkgInfo.isCask;
+          const args = isCask ? ['upgrade', '--cask', pkgName] : ['upgrade', pkgName];
+          
+          try {
+            const res = await invoke<{ stdout: string; stderr: string; code: number }>('execute_command', { command: 'brew', args });
+            if (res.code === 0) {
+              return { success: true, data: { updated: true, app: target, package: pkgName, isCask, stdout: res.stdout }, commandExecuted: `brew ${args.join(' ')}` };
+            } else {
+              // Try fallback to formula or cask
+              const fallbackArgs = isCask ? ['upgrade', pkgName] : ['upgrade', '--cask', pkgName];
+              const fbRes = await invoke<{ stdout: string; stderr: string; code: number }>('execute_command', { command: 'brew', args: fallbackArgs });
+              if (fbRes.code === 0) {
+                return { success: true, data: { updated: true, app: target, package: pkgName, isCask: !isCask, stdout: fbRes.stdout }, commandExecuted: `brew ${fallbackArgs.join(' ')}` };
+              }
+
+              return { 
+                success: true, 
+                data: { updated: false, app: target, package: pkgName, stdout: `Could not update ${target} (${pkgName}) via Homebrew. It might not be managed by a package manager, or it is already up to date. \n\n${res.stderr || res.stdout}` },
+                commandExecuted: `brew ${args.join(' ')}` 
+              };
+            }
+          } catch (err: any) {
             return { 
               success: true, 
-              data: { updated: false, stdout: `Could not update ${target} via ${cmd}. It might not be managed by a package manager, or it is already up to date. \n\n${res.stderr || res.stdout}` },
-              commandExecuted: `${cmd} ${args.join(' ')}` 
+              data: { updated: false, app: target, package: pkgName, error: err.message, stdout: `Could not update ${target}. Please update it from within the app itself.` },
+              commandExecuted: `brew ${args.join(' ')}` 
             };
           }
-        } catch (err: any) {
-           return { 
-              success: true, 
-              data: { updated: false, error: err.message, stdout: `Could not update ${target}. Please update it from within the app itself.` },
-              commandExecuted: `${cmd} ${args.join(' ')}` 
+        } else {
+          // Linux apt
+          const pkgName = target.toLowerCase().replace(/\s+/g, '-');
+          const args = ['upgrade', '-y', pkgName];
+          try {
+            const res = await invoke<{ stdout: string; stderr: string; code: number }>('execute_command', { command: 'apt', args });
+            return {
+              success: res.code === 0,
+              data: { updated: res.code === 0, stdout: res.stdout || res.stderr },
+              commandExecuted: `apt ${args.join(' ')}`
             };
+          } catch (err: any) {
+            return { success: false, error: { code: 'UPDATE_FAILED', message: err.message } };
+          }
         }
       }
 

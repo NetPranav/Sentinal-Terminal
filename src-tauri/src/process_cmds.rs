@@ -73,9 +73,15 @@ pub struct CommandOutput {
 }
 
 #[tauri::command]
-pub async fn execute_command(command: String, args: Vec<String>) -> Result<CommandOutput, String> {
-    let output = std::process::Command::new(&command)
-        .args(&args)
+pub async fn execute_command(command: String, args: Vec<String>, cwd: Option<String>) -> Result<CommandOutput, String> {
+    let mut process = std::process::Command::new(&command);
+    process.args(&args);
+
+    if let Some(directory) = cwd.filter(|path| !path.trim().is_empty()) {
+        process.current_dir(directory);
+    }
+
+    let output = process
         .output()
         .map_err(|e| format!("Failed to execute {}: {}", command, e))?;
 
@@ -90,4 +96,3 @@ pub async fn execute_command(command: String, args: Vec<String>) -> Result<Comma
 pub fn get_launch_args() -> Vec<String> {
     std::env::args().collect()
 }
-

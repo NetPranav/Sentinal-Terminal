@@ -1,0 +1,38 @@
+{
+  "toolId": "system.lock",
+  "aliases": [
+    "lock laptop",
+    "lock screen",
+    "lock mac",
+    "lock computer",
+    "sleep display",
+    "lock workstation"
+  ],
+  "synonyms": [
+    "please lock screen",
+    "please lock laptop",
+    "please lock mac",
+    "secure workstation"
+  ],
+  "commonUserWording": [
+    "lock my mac",
+    "lock the screen",
+    "lock computer",
+    "sleep display now",
+    "lock screen immediately"
+  ],
+  "commonMistakes": [],
+  "entityHints": {},
+  "deviceNamingPatterns": [],
+  "commonAbbreviations": {},
+  "languageVariations": [
+    "lock screen",
+    "lock my computer",
+    "lock the display"
+  ],
+  "relatedTools": [
+    "system.sleep",
+    "system.shutdown",
+    "system.restart"
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "id": "git.status",
+  "version": "1.0.0",
+  "displayName": "Check Git Status",
+  "description": "Inspects git repository branch, tracked changes, modified files, and staging status.",
+  "domain": "git",
+  "category": "Git",
+  "tags": ["git", "status", "branch", "working-tree", "vcs", "diff"],
+  "aliases": ["git status", "show git status", "check git status", "branch status"],
+  "supportedPlatforms": ["macos", "windows", "linux"],
+  "requiredPermissions": ["ShellExecution"],
+  "securityRisk": "SAFE",
+  "parameters": [],
+  "optionalParameters": [],
+  "estimatedExecutionTime": "100ms",
+  "confirmationRequired": false,
+  "rollbackAvailable": false,
+  "verificationSupported": true,
+  "deprecationStatus": "stable"
+}
