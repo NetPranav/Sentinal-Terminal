@@ -7,9 +7,9 @@ This document tracks critical core issues, bugs, and security vulnerabilities id
 ## 🚀 Next-Gen Autonomous Planning & Self-Healing Architecture Epics
 
 ### 🔷 Epic 1: Autonomous Error Recovery & "Awaiting Physical Confirmation"
-- [ ] **1.1 Error Diagnostics Engine**: Implement `ErrorDiagnosticsEngine.ts` classifying terminal stderr / non-zero exit codes into `SOFTWARE_RECOVERABLE` vs `PHYSICAL_ACTION_REQUIRED`.
-- [ ] **1.2 In-Loop Remediation Sub-Phases**: Auto-inject corrective sub-phases in `AdaptivePlanEngine` (e.g. `Phase 2.1: Terminate process on port 3000`) and retry up to 3 times.
-- [ ] **1.3 Human-in-the-Loop State Machine**: Implement `AWAITING_PHYSICAL_ACTION` state prompting user for physical actions (plug USB, power on device) and pausing until confirmed.
+- [x] **1.1 Error Diagnostics Engine**: Implement `ErrorDiagnosticsEngine.ts` classifying terminal stderr / non-zero exit codes into `SOFTWARE_RECOVERABLE` vs `PHYSICAL_ACTION_REQUIRED`.
+- [x] **1.2 In-Loop Remediation Sub-Phases**: Auto-inject corrective sub-phases in `AdaptivePlanEngine` (e.g. `Phase 2.1: Terminate process on port 3000`) and retry up to 3 times.
+- [x] **1.3 Human-in-the-Loop State Machine**: Implement `AWAITING_PHYSICAL_ACTION` state prompting user for physical actions (plug USB, power on device) and pausing until confirmed.
 
 ### 🔷 Epic 2: Probe & Disambiguate Discovery Engine
 - [ ] **2.1 Project Discovery Engine**: Implement deep workspace scanner for ROS 1/2 (`package.xml`), Node (`package.json`), Python, Rust (`Cargo.toml`), and Docker.
