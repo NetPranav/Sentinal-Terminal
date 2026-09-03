@@ -1,5 +1,6 @@
 mod pty;
 mod process_cmds;
+mod embedded_server;
 
 #[cfg(target_os = "macos")]
 fn request_bluetooth_permission() {
@@ -181,6 +182,7 @@ pub fn run() {
         })
         .manage(pty::PtyState::default())
         .manage(process_cmds::SystemState(std::sync::Mutex::new(sysinfo::System::new())))
+        .manage(embedded_server::EmbeddedLlmState::default())
         .plugin(tauri_plugin_os::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_process::init())
@@ -197,7 +199,10 @@ pub fn run() {
             process_cmds::kill_process,
             process_cmds::get_system_stats,
             process_cmds::execute_command,
-            process_cmds::get_launch_args
+            process_cmds::get_launch_args,
+            embedded_server::start_embedded_llm,
+            embedded_server::stop_embedded_llm,
+            embedded_server::get_embedded_llm_status
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

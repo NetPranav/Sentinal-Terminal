@@ -13,6 +13,7 @@ import { WorkspaceSwitcherModal } from "./ui/components/WorkspaceSwitcherModal";
 import { ProcessPortManagerDrawer } from "./ui/components/ProcessPortManagerDrawer";
 import { HistorySearchModal } from "./ui/components/HistorySearchModal";
 import { PluginMarketplaceModal } from "./ui/components/PluginMarketplaceModal";
+import { EmbeddedModelManagerModal } from "./ui/components/EmbeddedModelManagerModal";
 import { AuditLogger } from "./domain/security/AuditLogger";
 import { DotfileSyncEngine } from "./domain/rice/DotfileSyncEngine";
 import "./App.css";
@@ -75,6 +76,7 @@ function App() {
   const [showPortManager, setShowPortManager] = useState(false);
   const [showHistorySearch, setShowHistorySearch] = useState(false);
   const [showPluginMarketplace, setShowPluginMarketplace] = useState(false);
+  const [showEmbeddedModal, setShowEmbeddedModal] = useState(false);
   const [selectedThemeId, setSelectedThemeId] = useState<string>('classic-dark');
 
   const handleHistorySelect = (command: string) => {
@@ -758,10 +760,15 @@ function App() {
         isOpen={showPluginMarketplace}
         onClose={() => setShowPluginMarketplace(false)}
       />
+      <EmbeddedModelManagerModal 
+        isOpen={showEmbeddedModal}
+        onClose={() => setShowEmbeddedModal(false)}
+      />
       <CommandPalette 
         isOpen={isCommandPaletteOpen} 
         onClose={() => setCommandPaletteOpen(false)} 
         capabilities={[
+          { id: 'open_embedded_ai', name: 'Sentinel Embedded AI (Qwen 2.5 3B)', description: 'Manage self-contained local model — Zero Ollama required' },
           { id: 'open_ai_settings', name: 'Open AI Settings', description: 'Configure local AI models (Ollama, Qwen)' },
           { id: 'personalize', name: 'Personalize UI', description: 'Open color theme and glassmorphic appearance customization' },
           { id: 'workspace_switcher', name: 'Switch Workspace (Cmd+O)', description: 'Jump to ROS, Node, Python, Rust, or Docker projects' },
@@ -772,7 +779,9 @@ function App() {
           { id: 'export_rice_profile', name: 'Export Rice & AI Profile', description: 'Backup custom themes, aliases, and learned AI patterns' }
         ]}
         onExecuteCapability={async (id) => {
-          if (id === 'open_ai_settings') {
+          if (id === 'open_embedded_ai') {
+            setShowEmbeddedModal(true);
+          } else if (id === 'open_ai_settings') {
             setShowAiSettings(true);
           } else if (id === 'personalize') {
             setShowThemeModal(true);
