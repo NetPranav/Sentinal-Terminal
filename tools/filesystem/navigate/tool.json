@@ -20,7 +20,8 @@
     "move",
     "enter",
     "bring",
-    "open"
+    "open",
+    "folder"
   ],
   "aliases": [
     "cd",
@@ -28,12 +29,15 @@
     "go to folder",
     "navigate to",
     "take me to",
-    "switch directory",
-    "move to directory",
-    "enter folder",
     "bring me to",
-    "open directory",
-    "cd into"
+    "switch to folder",
+    "jump to folder",
+    "head to",
+    "go to directory",
+    "enter folder",
+    "move to folder",
+    "cd into",
+    "access folder"
   ],
   "supportedPlatforms": [
     "macos",

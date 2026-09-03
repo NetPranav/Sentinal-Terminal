@@ -34,7 +34,9 @@
     "halt",
     "kill antigravity",
     "stop antigravity",
-    "kill chrome"
+    "kill chrome",
+    "kill port",
+    "stop port"
   ],
   "supportedPlatforms": [
     "macos",

@@ -1,0 +1,26 @@
+{
+  "toolId": "developer.scaffold",
+  "version": "1.0.0",
+  "description": "Executes native driver to scaffold a project.",
+  "steps": [
+    {
+      "id": "step_exec_main",
+      "name": "Execute Scaffold Project",
+      "type": "ExecuteCapability",
+      "capabilityId": "developer.scaffold",
+      "parameters": {
+        "projectName": "${projectName}",
+        "frontend": "${frontend}",
+        "backend": "${backend}",
+        "path": "${path}"
+      },
+      "dependencies": [],
+      "onError": "fail"
+    }
+  ],
+  "successCondition": "step:step_exec_main:success",
+  "errorHandling": {
+    "strategy": "fail_fast",
+    "maxRetries": 0
+  }
+}

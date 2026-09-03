@@ -1,0 +1,23 @@
+{
+  "toolId": "application.update",
+  "version": "1.0.0",
+  "description": "Executes native driver to update an application.",
+  "steps": [
+    {
+      "id": "step_exec_main",
+      "name": "Execute Application Update",
+      "type": "ExecuteCapability",
+      "capabilityId": "application.update",
+      "parameters": {
+        "app": "${app}"
+      },
+      "dependencies": [],
+      "onError": "fail"
+    }
+  ],
+  "successCondition": "step:step_exec_main:success",
+  "errorHandling": {
+    "strategy": "fail_fast",
+    "maxRetries": 0
+  }
+}

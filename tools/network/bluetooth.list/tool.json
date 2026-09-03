@@ -7,20 +7,25 @@
   "category": "Networking",
   "tags": [
     "network",
-    "bluetooth.list",
     "bluetooth",
     "list",
-    "network.bluetooth.list",
-    "devices",
     "show",
-    "what"
+    "devices",
+    "paired",
+    "scan",
+    "available"
   ],
   "aliases": [
-    "list bluetooth devices",
+    "list bluetooth",
     "show bluetooth",
     "bluetooth devices",
-    "show me all the bluetooth devices",
-    "what bt devices are nearby"
+    "paired devices",
+    "available bluetooth",
+    "scan bluetooth",
+    "bluetooth list",
+    "show bluetooth devices",
+    "show all bluetooth devices",
+    "show all the bluetooth devices"
   ],
   "supportedPlatforms": [
     "macos",

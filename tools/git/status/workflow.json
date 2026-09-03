@@ -1,0 +1,21 @@
+{
+  "toolId": "git.status",
+  "version": "1.0.0",
+  "description": "Executes native driver for Check Git Status.",
+  "steps": [
+    {
+      "id": "step_exec_main",
+      "name": "Execute Check Git Status",
+      "type": "ExecuteCapability",
+      "capabilityId": "git.status",
+      "parameters": {},
+      "dependencies": [],
+      "onError": "fail"
+    }
+  ],
+  "successCondition": "step:step_exec_main:success",
+  "errorHandling": {
+    "strategy": "fail_fast",
+    "maxRetries": 0
+  }
+}

@@ -7,20 +7,23 @@
   "category": "Networking",
   "tags": [
     "network",
-    "bluetooth.off",
     "bluetooth",
     "off",
-    "network.bluetooth.off",
-    "turn",
     "disable",
-    "stop"
+    "turn",
+    "deactivate",
+    "switch",
+    "power"
   ],
   "aliases": [
     "turn off bluetooth",
     "disable bluetooth",
+    "bluetooth off",
+    "deactivate bluetooth",
+    "switch off bluetooth",
     "stop bluetooth",
     "turn bluetooth off",
-    "bluetooth off"
+    "power off bluetooth"
   ],
   "supportedPlatforms": [
     "macos",

@@ -1,0 +1,31 @@
+{
+  "toolId": "application.update",
+  "tests": [
+    {
+      "id": "application-update-test-1",
+      "userRequest": "update app Brave Browser",
+      "expectedIntent": {
+        "domain": "application",
+        "action": "update"
+      },
+      "expectedToolId": "application.update",
+      "expectedEntities": {
+        "app": "Brave Browser"
+      },
+      "description": "Automated regression test for application.update with cask app"
+    },
+    {
+      "id": "application-update-test-2",
+      "userRequest": "upgrade application Discord",
+      "expectedIntent": {
+        "domain": "application",
+        "action": "update"
+      },
+      "expectedToolId": "application.update",
+      "expectedEntities": {
+        "app": "Discord"
+      },
+      "description": "Automated regression test for application.update with Discord"
+    }
+  ]
+}

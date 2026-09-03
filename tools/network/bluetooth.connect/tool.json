@@ -7,19 +7,25 @@
   "category": "Networking",
   "tags": [
     "network",
-    "bluetooth.connect",
     "bluetooth",
     "connect",
-    "network.bluetooth.connect",
-    "to",
+    "pair",
     "device",
-    "pair"
+    "headphones",
+    "airpods",
+    "speaker"
   ],
   "aliases": [
-    "connect bluetooth device",
-    "pair bluetooth headphones",
+    "connect bluetooth",
+    "pair device",
+    "bluetooth connect",
+    "connect headphones",
+    "pair headphones",
     "connect airpods",
-    "connect bluetooth"
+    "pair airpods",
+    "connect speaker",
+    "pair bluetooth",
+    "connect my headphones"
   ],
   "supportedPlatforms": [
     "macos",

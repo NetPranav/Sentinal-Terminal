@@ -1,0 +1,42 @@
+{
+  "id": "application.update",
+  "version": "1.0.0",
+  "displayName": "Update Application",
+  "description": "Checks for updates and upgrades an application using the system package manager (e.g., Homebrew). Cannot update system apps like Safari or Finder.",
+  "domain": "application",
+  "category": "Application",
+  "tags": [
+    "application",
+    "update",
+    "upgrade",
+    "mac",
+    "brew"
+  ],
+  "aliases": [
+    "update app",
+    "upgrade app",
+    "update application"
+  ],
+  "supportedPlatforms": [
+    "macos",
+    "linux"
+  ],
+  "requiredPermissions": [
+    "ShellExecution"
+  ],
+  "securityRisk": "MEDIUM",
+  "parameters": [
+    {
+      "name": "app",
+      "type": "string",
+      "required": true,
+      "description": "Name of the application to update."
+    }
+  ],
+  "optionalParameters": [],
+  "estimatedExecutionTime": "30s",
+  "confirmationRequired": true,
+  "rollbackAvailable": false,
+  "verificationSupported": false,
+  "deprecationStatus": "stable"
+}

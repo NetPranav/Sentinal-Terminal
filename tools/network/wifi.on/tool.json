@@ -7,24 +7,23 @@
   "category": "Networking",
   "tags": [
     "network",
-    "wifi.on",
     "wifi",
     "on",
-    "network.wifi.on",
-    "turn",
-    "wi-fi",
     "enable",
-    "start",
-    "activate"
+    "turn",
+    "activate",
+    "wireless"
   ],
   "aliases": [
     "turn on wifi",
     "enable wifi",
-    "start wifi",
-    "turn my wifi on",
     "wifi on",
+    "activate wifi",
+    "switch on wifi",
+    "start wifi",
+    "turn wifi on",
     "turn the wifi on",
-    "activate wifi"
+    "enable wireless"
   ],
   "supportedPlatforms": [
     "macos",

@@ -10,6 +10,7 @@ export interface ExecutionOptions {
   skipPreview?: boolean; // For automated workflows where 'Ask' might trigger UI if not skipped
   onAskPermission?: (plan: ExecutionPreviewPlan) => Promise<boolean>;
   cwd?: string; // Terminal current working directory for SDK capabilities
+  timeoutMs?: number;
 }
 
 export interface ExecutionPreviewPlan {
@@ -32,6 +33,61 @@ export class ExecutionEngine {
     private auditLogger: IAuditLogger
   ) {}
 
+  public static resolvePermissionCategory(capabilityId: string): PermissionCategory {
+    if (capabilityId === 'filesystem.delete' || capabilityId === 'filesystem.trash') {
+      return 'DeleteFiles';
+    }
+    if (capabilityId === 'filesystem.rename') {
+      return 'RenameFiles';
+    }
+    if (capabilityId.startsWith('filesystem.') && ['create', 'mkdir', 'copy', 'move', 'duplicate', 'compress', 'extract', 'restore', 'permissions'].some(op => capabilityId.includes(op))) {
+      return 'WriteFiles';
+    }
+    if (capabilityId === 'system.kill_process' || capabilityId === 'application.force_quit' || capabilityId.startsWith('process.')) {
+      return 'ProcessManagement';
+    }
+    if (
+      capabilityId.startsWith('shell.') || 
+      capabilityId === 'application.install' || 
+      capabilityId === 'application.uninstall' || 
+      capabilityId === 'application.update' ||
+      capabilityId === 'node.run' ||
+      capabilityId === 'python.run'
+    ) {
+      return 'ShellExecution';
+    }
+    if (capabilityId.startsWith('git.')) {
+      return 'Git';
+    }
+    if (capabilityId.startsWith('docker.')) {
+      return 'Docker';
+    }
+    if (capabilityId === 'developer.ssh' || capabilityId.startsWith('ssh.') || capabilityId.includes('.ssh')) {
+      return 'SSH';
+    }
+    if (capabilityId.startsWith('network.') || capabilityId.startsWith('wifi.') || capabilityId.startsWith('browser.')) {
+      return 'Network';
+    }
+    if (capabilityId.startsWith('clipboard.')) {
+      return 'Clipboard';
+    }
+    if (capabilityId === 'system.env_get' || capabilityId === 'system.env_set' || capabilityId === 'developer.env' || capabilityId.startsWith('env.')) {
+      return 'EnvironmentVariables';
+    }
+    if (
+      capabilityId === 'system.lock' || 
+      capabilityId === 'system.sleep' || 
+      capabilityId === 'system.volume' || 
+      capabilityId === 'system.brightness' || 
+      capabilityId === 'system.appearance' ||
+      capabilityId.startsWith('system.settings')
+    ) {
+      return 'SystemSettings';
+    }
+
+    return 'ReadFiles';
+  }
+
   public async execute<I, O>(
     capabilityId: string, 
     input: I, 
@@ -51,13 +107,7 @@ export class ExecutionEngine {
         }
 
         // 2. Evaluate permissions against current Profile
-        let permCategory: PermissionCategory = 'ReadFiles';
-        if (capabilityId === 'filesystem.delete' || capabilityId === 'filesystem.trash') permCategory = 'DeleteFiles';
-        else if (capabilityId === 'filesystem.rename') permCategory = 'RenameFiles';
-        else if (capabilityId.startsWith('filesystem.') && ['create', 'mkdir', 'copy', 'move', 'duplicate', 'compress', 'extract', 'restore', 'permissions'].some(op => capabilityId.includes(op))) permCategory = 'WriteFiles';
-        else if (capabilityId === 'system.kill_process' || capabilityId === 'application.force_quit') permCategory = 'ProcessManagement';
-        else if (capabilityId.startsWith('shell.')) permCategory = 'ShellExecution';
-        else if (capabilityId.startsWith('network.') || capabilityId.startsWith('wifi.')) permCategory = 'Network';
+        const permCategory: PermissionCategory = ExecutionEngine.resolvePermissionCategory(capabilityId);
 
         let permState = this.permissionManager.checkPermission(permCategory);
         if (this.permissionManager.getCurrentProfile() === 'SafeMode' && capabilityId === 'filesystem.trash') {
@@ -70,23 +120,28 @@ export class ExecutionEngine {
         }
 
         const risk = this.securityEngine.calculateRisk(capabilityId, input);
-        const isSafeShell = (permCategory === 'ShellExecution' || capabilityId.startsWith('shell.')) && risk.level === 'SAFE';
-        const needsAsk = (!isSafeShell && permState === 'AskEveryTime') || policyResult === 'Ask' || risk.level === 'CRITICAL' || risk.level === 'ADMIN' || risk.requiresConsent || risk.requiresPassword || capabilityId === 'filesystem.delete' || capabilityId === 'filesystem.trash';
+        const isSafeAction = risk.level === 'SAFE';
+        const needsAsk = (!isSafeAction && permState === 'AskEveryTime') || policyResult === 'Ask' || risk.level === 'CRITICAL' || risk.level === 'ADMIN' || risk.requiresConsent || risk.requiresPassword || capabilityId === 'filesystem.delete' || capabilityId === 'filesystem.trash';
         if (needsAsk) {
           if (!options.onAskPermission && (typeof process === 'undefined' || process.env.NODE_ENV !== 'test')) {
             await this.logAudit(capabilityId, input, risk.score, 'Denied', startTime);
             return this.errorResult('PERMISSION_REQUIRED', 'Destructive/admin capability execution requires explicit user consent and password authentication.', startTime);
           }
           if (options.onAskPermission) {
+            const requiresAuth = risk.requiresPassword ?? (risk.level === 'CRITICAL' || risk.level === 'ADMIN');
+            const requiresConsent = risk.requiresConsent ?? (risk.level === 'CRITICAL' || risk.level === 'ADMIN');
+            const authPerms = requiresAuth ? ['system.password_auth', 'user_consent'] : [];
+            const fsAdmin = (capabilityId.startsWith('filesystem.') && (risk.level === 'CRITICAL' || risk.level === 'ADMIN')) ? ['filesystem.admin'] : [];
+
             const plan: ExecutionPreviewPlan = {
               capabilityId,
               parameters: input,
               riskLevel: risk.level,
               riskScore: risk.score,
-              permissionsRequired: ['filesystem.admin', 'system.password_auth', 'user_consent'],
+              permissionsRequired: [permCategory, ...fsAdmin, ...authPerms],
               explanation: risk.explanation,
-              requiresPassword: risk.requiresPassword ?? (risk.level === 'CRITICAL' || risk.level === 'ADMIN'),
-              requiresConsent: risk.requiresConsent ?? (risk.level === 'CRITICAL' || risk.level === 'ADMIN')
+              requiresPassword: requiresAuth,
+              requiresConsent
             };
             const approved = await options.onAskPermission(plan);
             if (!approved) {
@@ -95,7 +150,7 @@ export class ExecutionEngine {
             }
           }
         }
-        const res = await sdkDriver.execute(input, { isDryRun: options.isDryRun, cwd: options.cwd });
+        const res = await sdkDriver.execute(input, { isDryRun: options.isDryRun, cwd: options.cwd, timeoutMs: options.timeoutMs });
         const isVerified = res.success ? await sdkDriver.verify(input, res) : false;
         await this.logAudit(capabilityId, input, risk.score || 10, 'Granted', startTime, isVerified ? 'Success' : 'NotApplicable', !!res.rollbackPayload);
         return {
@@ -135,14 +190,13 @@ export class ExecutionEngine {
       let permissionResult: 'Granted' | 'Denied' | 'Bypassed' = 'Granted';
       let needsAsk = policyResult === 'Ask' || risk.level === 'CRITICAL' || risk.level === 'ADMIN' || risk.requiresConsent || risk.requiresPassword;
 
-      const isSafeShell = (capabilityId.startsWith('shell.') || capabilityId === 'terminal.run') && risk.level === 'SAFE';
       for (const requiredPerm of capability.metadata.requiredPermissions) {
         const state = this.permissionManager.checkPermission(requiredPerm as PermissionCategory);
         if (state === 'AlwaysDeny') {
           await this.logAudit(capabilityId, input, risk.score, 'Denied', startTime);
           return this.errorResult('PERMISSION_DENIED', `Permission ${requiredPerm} is always denied.`, startTime);
         }
-        if (state === 'AskEveryTime' && !isSafeShell) {
+        if (state === 'AskEveryTime') {
           needsAsk = true;
         }
       }

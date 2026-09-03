@@ -1,0 +1,39 @@
+{
+  "id": "system.lock",
+  "version": "1.0.0",
+  "displayName": "Lock System",
+  "description": "Locks the operating system screen immediately.",
+  "domain": "system",
+  "category": "System",
+  "tags": [
+    "system",
+    "lock",
+    "sleep",
+    "screen",
+    "security"
+  ],
+  "aliases": [
+    "lock laptop",
+    "lock screen",
+    "lock mac",
+    "lock computer",
+    "sleep display"
+  ],
+  "supportedPlatforms": [
+    "macos",
+    "windows",
+    "linux"
+  ],
+  "requiredPermissions": [
+    "SystemSettings",
+    "ShellExecution"
+  ],
+  "securityRisk": "MEDIUM",
+  "parameters": [],
+  "optionalParameters": [],
+  "estimatedExecutionTime": "1s",
+  "confirmationRequired": true,
+  "rollbackAvailable": false,
+  "verificationSupported": false,
+  "deprecationStatus": "stable"
+}

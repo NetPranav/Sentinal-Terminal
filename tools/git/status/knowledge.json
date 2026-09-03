@@ -1,0 +1,28 @@
+{
+  "toolId": "git.status",
+  "aliases": [
+    "git status",
+    "show git status",
+    "check git status",
+    "branch status"
+  ],
+  "synonyms": [
+    "please git status",
+    "please check git status"
+  ],
+  "commonUserWording": [
+    "check git status",
+    "git status",
+    "show branch status"
+  ],
+  "commonMistakes": [],
+  "entityHints": {},
+  "deviceNamingPatterns": [],
+  "commonAbbreviations": {},
+  "languageVariations": [
+    "check git status",
+    "git status",
+    "show git status"
+  ],
+  "relatedTools": ["git.log", "git.branch", "git.diff"]
+}
