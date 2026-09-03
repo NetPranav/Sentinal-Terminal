@@ -1,6 +1,6 @@
 import { AutocompleteSuggestion, AutocompleteContext, IAutocompleteProvider } from './types';
 
-interface HistoryEntry {
+export interface HistoryEntry {
   command: string;
   count: number;
   lastUsed: number;
@@ -8,8 +8,20 @@ interface HistoryEntry {
 }
 
 export class HistoryProvider implements IAutocompleteProvider {
+  private static instance: HistoryProvider;
   id = 'provider.history';
   enabled = true;
+
+  public static getInstance(): HistoryProvider {
+    if (!HistoryProvider.instance) {
+      HistoryProvider.instance = new HistoryProvider();
+    }
+    return HistoryProvider.instance;
+  }
+
+  public getHistory(): HistoryEntry[] {
+    return this.history;
+  }
   
   // Enriched default history database for intelligent developer & AI command suggestions
   private history: HistoryEntry[] = [

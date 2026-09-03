@@ -6,6 +6,8 @@ export interface StatusBarProps {
   currentShell?: string;
   currentPath?: string;
   onNavigate?: (targetPath: string, commandToExecute: string) => void;
+  onOpenPorts?: () => void;
+  onOpenWorkspaces?: () => void;
   memoryUsage?: number; // MB
   cpuUsage?: number; // %
   currentProfile?: string;
@@ -15,6 +17,8 @@ export const StatusBar: React.FC<StatusBarProps> = ({
   currentShell = 'zsh', 
   currentPath = '~',
   onNavigate,
+  onOpenPorts,
+  onOpenWorkspaces,
   memoryUsage: initialMemory = 145,
   cpuUsage: initialCpu = 2.4,
   currentProfile = 'Developer'
@@ -120,7 +124,49 @@ export const StatusBar: React.FC<StatusBarProps> = ({
         </div>
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexShrink: 0 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
+        {onOpenWorkspaces && (
+          <button
+            onClick={onOpenWorkspaces}
+            style={{
+              background: 'rgba(255, 255, 255, 0.05)',
+              border: '1px solid rgba(255, 255, 255, 0.12)',
+              borderRadius: '4px',
+              padding: '2px 8px',
+              color: '#e2e8f0',
+              fontSize: '11px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px'
+            }}
+            title="Switch Workspace (Cmd+O)"
+          >
+            <span>📁</span> Projects <kbd style={{ opacity: 0.5, fontSize: '9px' }}>⌘O</kbd>
+          </button>
+        )}
+
+        {onOpenPorts && (
+          <button
+            onClick={onOpenPorts}
+            style={{
+              background: 'rgba(255, 255, 255, 0.05)',
+              border: '1px solid rgba(255, 255, 255, 0.12)',
+              borderRadius: '4px',
+              padding: '2px 8px',
+              color: '#e2e8f0',
+              fontSize: '11px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px'
+            }}
+            title="Inspect & Free Listening Ports"
+          >
+            <span>🔌</span> Ports
+          </button>
+        )}
+
         <span style={{ opacity: 0.75, fontSize: '11px' }}>Mem: <strong>{memoryUsage} MB</strong></span>
         <span style={{ opacity: 0.75, fontSize: '11px' }}>CPU: <strong>{cpuUsage}%</strong></span>
         <span style={{ 

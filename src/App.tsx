@@ -9,6 +9,9 @@ import { SessionManager } from "./domain/SessionManager";
 import { InstallerWizard } from "./ui/components/InstallerWizard";
 import { UrlSchemeHandler } from "./domain/integration/UrlSchemeHandler";
 import { SessionPersistenceEngine } from "./domain/session/SessionPersistenceEngine";
+import { WorkspaceSwitcherModal } from "./ui/components/WorkspaceSwitcherModal";
+import { ProcessPortManagerDrawer } from "./ui/components/ProcessPortManagerDrawer";
+import { HistorySearchModal } from "./ui/components/HistorySearchModal";
 import "./App.css";
 
 type SplitDirection = 'vertical' | 'horizontal';
@@ -65,11 +68,41 @@ function App() {
     return initialSession?.panePaths || {};
   });
   const [showThemeModal, setShowThemeModal] = useState(false);
+  const [showWorkspaceSwitcher, setShowWorkspaceSwitcher] = useState(false);
+  const [showPortManager, setShowPortManager] = useState(false);
+  const [showHistorySearch, setShowHistorySearch] = useState(false);
   const [selectedThemeId, setSelectedThemeId] = useState<string>('classic-dark');
+
+  const handleHistorySelect = (command: string) => {
+    if (activeTerminal && activeTerminal.sessionId) {
+      SessionManager.getInstance().write(activeTerminal.sessionId, command);
+    }
+  };
   const [transparency, setTransparency] = useState<number>(0.82);
   const [blurLevel, setBlurLevel] = useState<number>(20);
   const [activeShellMenuPaneId, setActiveShellMenuPaneId] = useState<string | null>(null);
   const [showWizard, setShowWizard] = useState<boolean>(() => !localStorage.getItem('sentinel_onboarded'));
+
+  const handleWorkspaceSelect = (targetPath: string, action: 'navigate' | 'new-tab', setupScript?: string) => {
+    if (action === 'new-tab') {
+      addTab(targetPath);
+      if (setupScript && activeTerminal && activeTerminal.sessionId) {
+        setTimeout(() => {
+          SessionManager.getInstance().write(activeTerminal.sessionId!, `source "${setupScript}"\r`);
+        }, 300);
+      }
+    } else {
+      if (activeTerminal && activeTerminal.sessionId) {
+        setPanePaths(prev => ({ ...prev, [activeTerminal.id]: targetPath }));
+        SessionManager.getInstance().write(activeTerminal.sessionId, `cd "${targetPath}"\r`);
+        if (setupScript) {
+          setTimeout(() => {
+            SessionManager.getInstance().write(activeTerminal.sessionId!, `source "${setupScript}"\r`);
+          }, 150);
+        }
+      }
+    }
+  };
 
   // Auto-persist session tabs, splits, and paths across app reloads and crashes
   useEffect(() => {
@@ -299,9 +332,14 @@ function App() {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       try {
+        if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key && e.key.toLowerCase() === 'o') {
+          e.preventDefault();
+          setShowWorkspaceSwitcher(prev => !prev);
+          return;
+        }
         if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key && e.key.toLowerCase() === 'p') {
           e.preventDefault();
-          setCommandPaletteOpen(true);
+          setShowPortManager(prev => !prev);
           return;
         }
         if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key && e.key.toLowerCase() === 't') {
@@ -326,7 +364,12 @@ function App() {
           }
           return;
         }
-        if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key && e.key.toLowerCase() === 'r') {
+        if (e.ctrlKey && !e.metaKey && e.key && e.key.toLowerCase() === 'r') {
+          e.preventDefault();
+          setShowHistorySearch(prev => !prev);
+          return;
+        }
+        if (e.metaKey && !e.shiftKey && e.key && e.key.toLowerCase() === 'r') {
           e.preventDefault();
           if (activeTerminal && activeTerminal.sessionId) {
             SessionManager.getInstance().write(activeTerminal.sessionId, 'clear && printf "\\033c"\r');
@@ -684,19 +727,45 @@ function App() {
       <StatusBar 
         currentPath={currentDisplayPath}
         onNavigate={handleStatusBarNavigate}
+        onOpenWorkspaces={() => setShowWorkspaceSwitcher(true)}
+        onOpenPorts={() => setShowPortManager(true)}
+      />
+      <WorkspaceSwitcherModal 
+        isOpen={showWorkspaceSwitcher}
+        onClose={() => setShowWorkspaceSwitcher(false)}
+        onSelect={handleWorkspaceSelect}
+      />
+      <ProcessPortManagerDrawer 
+        isOpen={showPortManager}
+        onClose={() => setShowPortManager(false)}
+      />
+      <HistorySearchModal 
+        isOpen={showHistorySearch}
+        onClose={() => setShowHistorySearch(false)}
+        onSelect={handleHistorySelect}
+        currentCwd={currentDisplayPath}
       />
       <CommandPalette 
         isOpen={isCommandPaletteOpen} 
         onClose={() => setCommandPaletteOpen(false)} 
         capabilities={[
           { id: 'open_ai_settings', name: 'Open AI Settings', description: 'Configure local AI models (Ollama, Qwen)' },
-          { id: 'personalize', name: 'Personalize UI', description: 'Open color theme and glassmorphic appearance customization' }
+          { id: 'personalize', name: 'Personalize UI', description: 'Open color theme and glassmorphic appearance customization' },
+          { id: 'workspace_switcher', name: 'Switch Workspace (Cmd+O)', description: 'Jump to ROS, Node, Python, Rust, or Docker projects' },
+          { id: 'port_manager', name: 'Active Ports & Processes (Cmd+Shift+P)', description: 'Inspect and free listening network ports' },
+          { id: 'history_search', name: 'Command History (Ctrl+R)', description: 'Search previous commands ranked by frequency and recency' }
         ]}
         onExecuteCapability={(id) => {
           if (id === 'open_ai_settings') {
             setShowAiSettings(true);
           } else if (id === 'personalize') {
             setShowThemeModal(true);
+          } else if (id === 'workspace_switcher') {
+            setShowWorkspaceSwitcher(true);
+          } else if (id === 'port_manager') {
+            setShowPortManager(true);
+          } else if (id === 'history_search') {
+            setShowHistorySearch(true);
           }
         }}
       />

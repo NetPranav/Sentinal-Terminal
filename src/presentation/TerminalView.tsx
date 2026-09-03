@@ -8,7 +8,7 @@ import { ToolLoader } from '../tools/loader/ToolLoader';
 import { AppAliasRegistry } from '../domain/capabilities/AppAliasRegistry';
 import { AgentLoop, AgentPlan } from '../ai/agent/AgentLoop';
 import { DemonstrationLearningEngine } from '../domain/learning/DemonstrationLearningEngine';
-import { PtyOutputObserver } from '../domain/observer/PtyOutputObserver';
+import { PtyOutputObserver, type RemediationPrompt } from '../domain/observer/PtyOutputObserver';
 import { formatAgentEvent, formatDataOutput } from './OutputFormatter';
 
 import { AutocompleteEngine } from '../domain/autocomplete/AutocompleteEngine';
@@ -42,7 +42,23 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
   const [authError, setAuthError] = useState('');
   const [isVerifying, setIsVerifying] = useState(false);
   const [latestPlan, setLatestPlan] = useState<AgentPlan | null>(null);
+  const [activeRemediation, setActiveRemediation] = useState<RemediationPrompt | null>(null);
+  const agentLoopRef = useRef<AgentLoop | null>(null);
   const lastUnresolvedGoalRef = useRef<{ goal: string; timestamp: number } | null>(null);
+
+  const handleExecuteRemediation = async (rem: RemediationPrompt) => {
+    setActiveRemediation(null);
+    PtyOutputObserver.getInstance().clearRemediation();
+    if (sessionId) {
+      await SessionManager.getInstance().write(sessionId, '\x03');
+    }
+    if (xtermRef.current) {
+      xtermRef.current.write(`\r\n\x1b[1;32m⚡ [Sentinel Auto-Heal] Executing: ${rem.actionTitle}...\x1b[0m\r\n`);
+    }
+    if (agentLoopRef.current) {
+      await agentLoopRef.current.run(`fix error: ${rem.actionTitle}`, { os: 'mac', cwd: currentPath || '~' });
+    }
+  };
 
   const handleAuthorize = async () => {
     if (!authPassword.trim()) {
@@ -185,6 +201,7 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
         };
 
         unsubRemediation = PtyOutputObserver.getInstance().onRemediation((rem) => {
+          setActiveRemediation(rem);
           if (rem) {
             writeTerm(`\r\n\x1b[1;33m⚡ Sentinel Auto-Heal:\x1b[0m ${rem.cause}\r\n`);
             writeTerm(`  • \x1b[36mSuggested Fix:\x1b[0m ${rem.actionTitle}\r\n`);
@@ -199,6 +216,7 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
         toolLoader.loadAll();
         
         const agentLoop = new AgentLoop(toolLoader.getState());
+        agentLoopRef.current = agentLoop;
         agentLoop.setAuthorizationHandler((plan) => new Promise(resolve => {
           setSecurityModalPlan({ plan, resolve });
         }));
@@ -648,6 +666,84 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
             </p>
           )}
         </details>
+      )}
+
+      {/* Floating Auto-Heal Action Banner HUD */}
+      {activeRemediation && (
+        <div style={{
+          position: 'absolute',
+          top: '16px',
+          right: '20px',
+          maxWidth: '420px',
+          backgroundColor: 'rgba(15, 23, 42, 0.92)',
+          backdropFilter: 'blur(16px)',
+          WebkitBackdropFilter: 'blur(16px)',
+          border: '1px solid rgba(245, 158, 11, 0.4)',
+          borderRadius: '12px',
+          boxShadow: '0 12px 32px rgba(0, 0, 0, 0.65), 0 0 12px rgba(245, 158, 11, 0.15)',
+          padding: '14px 16px',
+          zIndex: 8000,
+          color: '#f8fafc',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '10px',
+          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '15px' }}>⚡</span>
+              <span style={{ fontSize: '12px', fontWeight: 700, color: '#f59e0b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                Sentinel Auto-Heal
+              </span>
+            </div>
+            <button
+              onClick={() => {
+                setActiveRemediation(null);
+                PtyOutputObserver.getInstance().clearRemediation();
+              }}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: 'rgba(255,255,255,0.4)',
+                cursor: 'pointer',
+                fontSize: '14px',
+                padding: '2px 4px',
+                lineHeight: 1
+              }}
+              title="Dismiss"
+            >
+              ✕
+            </button>
+          </div>
+          <div style={{ fontSize: '12px', color: '#e2e8f0', lineHeight: 1.4 }}>
+            {activeRemediation.cause}
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '2px', gap: '8px' }}>
+            <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.55)', fontStyle: 'italic', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              Fix: {activeRemediation.actionTitle}
+            </span>
+            <button
+              onClick={() => handleExecuteRemediation(activeRemediation)}
+              style={{
+                background: '#f59e0b',
+                color: '#000',
+                border: 'none',
+                borderRadius: '6px',
+                padding: '6px 12px',
+                fontSize: '12px',
+                fontWeight: 600,
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                flexShrink: 0,
+                boxShadow: '0 2px 8px rgba(245, 158, 11, 0.3)'
+              }}
+            >
+              Auto-Fix <span style={{ opacity: 0.8, fontSize: '10px', background: 'rgba(0,0,0,0.18)', padding: '1px 4px', borderRadius: '3px' }}>Tab</span>
+            </button>
+          </div>
+        </div>
       )}
 
       {/* Security & Deletion Authorization Overlay Modal */}
