@@ -2,7 +2,7 @@
   "id": "shell.execute",
   "version": "1.0.0",
   "displayName": "Execute Terminal Shell Command",
-  "description": "Executes standard Unix command or shell instruction inside interactive terminal session.",
+  "description": "Executes a complete macOS zsh command line, including installed CLI tools, pipes, redirects, and shell built-ins.",
   "domain": "shell",
   "category": "Shell",
   "tags": [
@@ -33,7 +33,7 @@
     {
       "name": "command",
       "type": "string",
-      "description": "Command line parameter string to run",
+      "description": "Complete zsh command line to run, for example: git status --short",
       "required": true
     }
   ],

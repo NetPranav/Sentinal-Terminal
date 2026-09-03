@@ -1,0 +1,56 @@
+{
+  "toolId": "application.update",
+  "aliases": [
+    "update app",
+    "upgrade app",
+    "update application",
+    "brew upgrade",
+    "upgrade cask",
+    "update software"
+  ],
+  "synonyms": [
+    "please update app",
+    "please upgrade app",
+    "please update application",
+    "please upgrade package"
+  ],
+  "commonUserWording": [
+    "update app Brave Browser",
+    "update Brave",
+    "upgrade app discord",
+    "update application vscode",
+    "upgrade slack",
+    "update spotify"
+  ],
+  "commonMistakes": [
+    "update Safari",
+    "update Finder"
+  ],
+  "entityHints": {
+    "app": [
+      "Brave Browser",
+      "Google Chrome",
+      "Visual Studio Code",
+      "Discord",
+      "Slack",
+      "Spotify"
+    ]
+  },
+  "deviceNamingPatterns": [],
+  "commonAbbreviations": {
+    "vscode": "visual-studio-code",
+    "chrome": "google-chrome",
+    "brave": "brave-browser"
+  },
+  "languageVariations": [
+    "update app Brave Browser",
+    "update Brave Browser to latest version",
+    "upgrade application Discord",
+    "update software package"
+  ],
+  "relatedTools": [
+    "application.install",
+    "application.uninstall",
+    "application.list"
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "toolId": "git.status",
+  "tests": [
+    {
+      "id": "git-status-test-1",
+      "userRequest": "check git status",
+      "expectedIntent": {
+        "domain": "git",
+        "action": "status"
+      },
+      "expectedToolId": "git.status",
+      "expectedEntities": {},
+      "description": "Automated test case for Check Git Status"
+    }
+  ]
+}

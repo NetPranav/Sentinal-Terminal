@@ -4,7 +4,10 @@
     "run command",
     "execute shell",
     "terminal exec",
-    "bash command"
+    "bash command",
+    "run this in terminal",
+    "use zsh",
+    "run a mac command"
   ],
   "synonyms": [
     "please run command",
@@ -15,6 +18,8 @@
   "commonUserWording": [
     "run shell command ls -l",
     "could you run shell command ls -l",
+    "run git status --short",
+    "find the ten largest files here",
     "run command",
     "execute shell",
     "terminal exec",

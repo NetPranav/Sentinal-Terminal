@@ -1,17 +1,14 @@
 {
-  "toolId": "browser.navigate",
+  "toolId": "git.status",
   "version": "1.0.0",
-  "description": "Executes native driver for Navigate Browser to URL.",
+  "description": "Executes native driver for Check Git Status.",
   "steps": [
     {
       "id": "step_exec_main",
-      "name": "Execute Navigate Browser to URL",
+      "name": "Execute Check Git Status",
       "type": "ExecuteCapability",
-      "capabilityId": "browser.navigate",
-      "parameters": {
-        "url": "{{url}}",
-        "appName": "{{appName}}"
-      },
+      "capabilityId": "git.status",
+      "parameters": {},
       "dependencies": [],
       "onError": "fail"
     }
