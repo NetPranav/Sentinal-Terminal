@@ -1,0 +1,28 @@
+name: Sentinel CI — Test Suite & Lint
+
+on:
+  push:
+    branches: [ main, windows, linux, shared-core ]
+  pull_request:
+    branches: [ main, windows, linux ]
+
+jobs:
+  test:
+    name: Run Automated Tests (680+ Tests)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run Test Verification Suite
+        run: npm test

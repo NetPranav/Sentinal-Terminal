@@ -2,281 +2,330 @@
 
 # ⚡ Sentinel Terminal
 
-**An AI-native terminal that combines natural language, traditional shell workflows, and intelligent automation—powered by 100% offline local models.**
+**The AI-native terminal engineered for absolute speed, privacy, and desktop orchestration—powered by 100% offline local models.**
 
 <br>
 
-![Version](https://img.shields.io/badge/version-0.1.0--alpha-00D8A6?style=for-the-badge&logo=appveyor)
-![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Linux%20%7C%20Windows-1F222E?style=for-the-badge&logo=apple)
-![AI Intelligence](https://img.shields.io/badge/AI%20Engine-100%25%20Offline%20Local-7B61FF?style=for-the-badge&logo=openai)
-![Security](https://img.shields.io/badge/Security-Zero--Trust%20Guarded-FF6B6B?style=for-the-badge&logo=shield)
-![License](https://img.shields.io/badge/license-MIT-00B4D8?style=for-the-badge)
+[![CI Status](https://img.shields.io/badge/CI-Passing-00D8A6?style=for-the-badge&logo=githubactions&logoColor=white)](https://github.com/NetPranav/Sentinal-Terminal/actions)
+[![Automated Tests](https://img.shields.io/badge/Tests-682%20Passing%20%7C%20121%20Suites-7B61FF?style=for-the-badge&logo=vitest&logoColor=white)](https://github.com/NetPranav/Sentinal-Terminal/actions)
+[![Tool Ecosystem](https://img.shields.io/badge/Tool%20Ecosystem-101%20Tools-00B4D8?style=for-the-badge&logo=codewars&logoColor=white)](tools/)
+[![AI Engine](https://img.shields.io/badge/AI%20Engine-100%25%20Offline%20Local-FF6B6B?style=for-the-badge&logo=openai&logoColor=white)](https://github.com/NetPranav/Sentinal-Terminal)
+[![Platform](https://img.shields.io/badge/Platform-macOS%20%7C%20Linux%20%7C%20Windows-1F222E?style=for-the-badge&logo=apple&logoColor=white)](docs/CROSS_PLATFORM_SHARING.md)
+[![License](https://img.shields.io/badge/License-MIT-F5A623?style=for-the-badge)](LICENSE)
 
 <br>
-<br>
+
+<p align="center">
+  <a href="#-features--architectural-highlights"><b>Explore Features</b></a> •
+  <a href="#-adaptive-multi-phase-ai-planning-engine"><b>AI Architecture</b></a> •
+  <a href="#-complete-command-quick-reference"><b>Command Reference</b></a> •
+  <a href="#-download--installation"><b>Download</b></a> •
+  <a href="#-cross-platform-synchronization"><b>Cross-Platform Core</b></a> •
+  <a href="docs/TODO.md"><b>Engineering Roadmap</b></a>
+</p>
+
 </div>
 
 ---
 
-## 🌟 Transform Your Computing Experience
+## 🌟 Transform Your Command-Line Experience
 
-Sentinel redefines the modern command-line interface. Built for developers, software engineers, and power users, Sentinel bridges the gap between traditional shell precision and conversational automation. Whether you are navigating complex project directories, inspecting Docker container log streams, controlling GUI applications and web browsers, launching modern AI IDEs, or performing deep system diagnostics, Sentinel provides an intelligent workspace that executes **completely offline** without cloud data exposure or API latency.
+**Sentinel Terminal** bridges the gap between traditional UNIX shell performance and autonomous agentic workflow execution. Built with **Tauri v2**, **Rust**, and **React 19**, Sentinel delivers instantaneous sub-millisecond PTY shell responsiveness while letting you orchestrate complex multi-step desktop tasks using natural language.
+
+Whether navigating deeply nested repositories, managing Docker containers, launching development IDEs, scanning wireless infrastructure, or inspecting hardware diagnostics, Sentinel operates **completely on-device**:
+- 🔒 **Zero Cloud Data Transmission**: All prompts, system telemetry, and command lines stay 100% local.
+- ⚡ **Zero API Latency & Rate Limits**: Runs seamlessly offline via Ollama, llama.cpp, or embedded local models.
+- 🛡️ **Zero-Trust Guarded Execution**: Proactive policy inspection, destructive command blocking, and rollback safety.
 
 ---
 
-## 📸 Screenshot Gallery
+## 📸 Visual Workspace Gallery
 
 <div align="center">
   <table>
     <tr>
-      <td width="50%"><img src="docs/images/screenshot1.png" alt="Sentinel Workspace 1"></td>
-      <td width="50%"><img src="docs/images/screenshot2.png" alt="Sentinel Workspace 2"></td>
+      <td width="50%"><img src="docs/images/screenshot1.png" alt="Sentinel Multi-Pane Workspace"></td>
+      <td width="50%"><img src="docs/images/screenshot2.png" alt="Conversational Task Execution"></td>
     </tr>
     <tr>
-      <td width="50%"><img src="docs/images/screenshot3.png" alt="Sentinel Workspace 3"></td>
-      <td width="50%"><img src="docs/images/screenshot4.png" alt="Sentinel Workspace 4"></td>
+      <td width="50%"><img src="docs/images/screenshot3.png" alt="Glassmorphic Dark Theme"></td>
+      <td width="50%"><img src="docs/images/screenshot4.png" alt="System Diagnostics & Monitoring"></td>
     </tr>
     <tr>
-      <td width="50%"><img src="docs/images/screenshot5.png" alt="Sentinel Workspace 5"></td>
-      <td width="50%"><img src="docs/images/screenshot6.png" alt="Sentinel Workspace 6"></td>
+      <td width="50%"><img src="docs/images/screenshot5.png" alt="Multi-Modal Terminal Tabs"></td>
+      <td width="50%"><img src="docs/images/screenshot6.png" alt="Interactive Approval & Permissions"></td>
     </tr>
     <tr>
-      <td width="50%"><img src="docs/images/screenshot7.png" alt="Sentinel Workspace 7"></td>
-      <td width="50%"><img src="docs/images/screenshot8.png" alt="Sentinel Workspace 8"></td>
+      <td width="50%"><img src="docs/images/screenshot7.png" alt="Split Panes & IDE Launchers"></td>
+      <td width="50%"><img src="docs/images/screenshot8.png" alt="Personalization & Themes"></td>
     </tr>
   </table>
-  <p><i>A multi-pane glassmorphic workspace enabling autonomous desktop workflows and system orchestration.</i></p>
+  <p><i>A glassmorphic, acrylic-rendered desktop workspace uniting native PTY sessions with conversational intelligence.</i></p>
 </div>
 
 ---
 
-## ✨ Architectural Highlights & Capabilities
+## ✨ Features & Architectural Highlights
 
-Sentinel is engineered from the ground up to empower everyday developer workflows with zero friction and visual excellence.
+### 🤖 The `>` Explicit AI Trigger (Zero Friction Muscle Memory)
+Sentinel never hijacks standard terminal keystrokes. When you run regular commands (`ls -la`, `git status`, `cargo build`, `npm run dev`), Sentinel executes directly in your high-speed PTY shell with **zero latency**.
 
-### 🧠 Conversation Memory & Context Awareness
-Sentinel doesn't just execute isolated commands; it remembers your context. The **Embedded LLM Agent Loop** natively tracks your last 10 messages (user inputs and assistant tool responses), injecting them directly into the context window. This allows you to issue fluid follow-up commands like:
-- `>take me to the backend folder`
-- `>make a new directory named configs here` (It remembers where "here" is based on the previous command!)
-- `>run it again but this time with the force flag`
-
-### 🤖 The Explicit `>` AI Trigger (Zero-Friction Intelligence)
-Sentinel never gets in the way of your standard muscle memory. When you type traditional command syntax (`ls -la`, `git status`, `npm run dev`, `cargo build`), Sentinel executes directly in your high-speed PTY session with zero overhead.
-When you want to summon conversational intelligence or perform automated multi-step desktop orchestration, simply prefix your prompt with the **`>`** symbol:
+Whenever you need autonomous planning, multi-step orchestration, or desktop control, simply prefix your instruction with **`>`**:
 ```bash
-# Standard shell command (Runs instantly via native PTY):
-pranav@Pranavs-MacBook ~ % ls -l /Applications
+# Standard shell command (instant native PTY execution):
+pranav@macbook ~ % ls -lh ~/Downloads
 
-# AI Automation command (Triggered by ">" prefix):
-pranav@Pranavs-MacBook ~ % >open this folder inside antigravity
-[AI Planner] Created workflow: Open Desktop Application
-[Command Output] Successfully launched application: Antigravity IDE
+# AI Automation prompt (instant capability resolution):
+pranav@macbook ~ % >open this project in vs code and check git status
+[Plan Engine] Phase 1: Launch Visual Studio Code at current directory
+[Plan Engine] Phase 2: Inspect active Git working tree
+✓ Visual Studio Code launched at: .
+✓ Git Status: On branch main (clean)
 ```
 
-### 🎯 Universal IDE & Workspace Launchers
-Sentinel natively connects with your favorite coding tools and development environments. Using intelligent natural language grammar resolution and native macOS Launch Services (`open -a`), Sentinel resolves conversational phrases and prepositions effortlessly:
-- **Natural Phrase Resolution**: Speak naturally—phrases like `"this folder"`, `"this directory"`, `"current project"`, or `"here"` are instantly translated to your current working directory (`.`). The AI also seamlessly ignores conversational fluff like `"the"`, `"a"`, or `"folder"`, meaning `>redirect me to the frontend folder` resolves purely to `frontend` without failing.
-- **Resilient Application Resolution**: Sentinel automatically strips leading articles (`"the Vs Code"`, `"my chrome"`, `"an xcode"`) and maps conversational aliases to exact system bundle names:
-  - `>open this folder in the Vs Code` ➔ Launches **Visual Studio Code** at `.`
-  - `>Open this folder inside antigravity` ➔ Launches **Antigravity IDE** at `.`
+---
+
+### 🧠 Adaptive Multi-Phase AI Planning Engine
+
+Sentinel features a sophisticated **hierarchical DAG execution engine** capable of dynamic real-time adaptation:
+
+```
+                          ┌───────────────────────────┐
+                          │   Natural Language Goal   │
+                          └─────────────┬─────────────┘
+                                        ▼
+                          ┌───────────────────────────┐
+                          │    Phase-by-Phase Plan    │
+                          │   [1] ➔ [2] ➔ [3] ➔ [4]   │
+                          └─────────────┬─────────────┘
+                                        │
+                 ┌──────────────────────┼──────────────────────┐
+                 ▼                      ▼                      ▼
+        ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+        │ Early Goal Met? │    │  Step Succeeded │    │ New Requirement?│
+        │ ⊘ Skip Phase 3-4│    │  ✓ Advance Next │    │ ⊕ Expand 2.1/2.2│
+        └─────────────────┘    └─────────────────┘    └─────────────────┘
+```
+
+- **Phase-by-Phase Execution**: Executes phases sequentially with real-time UI status updates (`pending` ➔ `running` ➔ `completed` / `skipped` / `failed`).
+- **Dynamic Sub-Phase Expansion**: If Phase 2 encounters unforeseen requirements (e.g. missing dependencies), the engine dynamically spawns **Phase 2.1** and **Phase 2.2** on the fly without breaking the main execution graph.
+- **Early Goal Satisfaction**: If the user's objective is fully satisfied ahead of schedule, subsequent phases are intelligently skipped rather than wasting execution time.
+- **Interactive Clarification**: Ambiguous requests automatically trigger a concise, inline question with an execution pause until resolved.
+
+---
+
+### 🛡️ Zero-Trust Security Engine & Safe Mode Whitelisting
+
+Sentinel protects your operating system through a multi-tier defense system:
+- **Harmless Read-Only Whitelisting**: Harmless commands (`>what time is it`, `>who am i`, `>show env`, `>cal`, `>uptime`) evaluate to **`SAFE` (Score: 5/100)** and execute immediately with zero password friction.
+- **Sensitive Operations Consent**: Display/session locking (`system.lock`), Bluetooth toggling, and network scans require user consent before interruptive actions occur.
+- **Administrative Quarantine**: Destructive operations (recursive file deletion, killing core system processes, modifying `/System` or `/etc`) trigger mandatory explicit approval modals with password authentication holds.
+- **Automatic Execution Timeouts**: All capability invocations are guarded by a 30-second cancellation race, preventing hanging interactive CLI prompts from freezing your terminal session.
+
+---
+
+### 🎯 Universal IDE & Desktop Application Launchers
+
+Sentinel natively bridges conversational grammar to your preferred developer tools:
+- **Contextual Resolvers**: Automatically translates conversational phrases like `"this folder"`, `"current project"`, or `"here"` to `.` (the active working directory).
+- **Intelligent Article Stripping**: Removes conversational filler (`"the Vs Code"`, `"my chrome"`, `"an android studio"`).
+- **Integrated IDE Launchers**:
+  - `>open this folder in vs code` ➔ Launches **Visual Studio Code** at `.`
+  - `>open this folder inside antigravity` ➔ Launches **Antigravity IDE** at `.`
   - `>open current project in cursor` ➔ Launches **Cursor AI** at `.`
-  - `>open in android studio` ➔ Launches **Android Studio** at `.`
-  - `>open in xcode` ➔ Launches **Apple Xcode** at `.`
-
-### 🛡️ Smart Security & Zero-Friction Safe Mode
-Sentinel incorporates a powerful **Zero-Trust Security & Risk Engine** that guards your system against destructive commands while ensuring seamless everyday developer flow:
-- **Trivial Utility Whitelisting**: Harmless read-only operational inquiries (`>what time is it`, `>who am i`, `>show environment variables`, `>check uptime`, `>show calendar`) are automatically assessed as **`SAFE` (Score: 5/100)** and execute immediately without triggering disruptive authentication modals or password holds!
-- **Gated Destructive Operations**: High-risk actions (e.g., recursive file deletion, formatting disk volumes, or killing mission-critical OS daemons) immediately trigger an interactive visual security hold requiring mandatory explicit user consent and authentication before proceeding.
-- **Rollback Capability**: Automated filesystem operations generate matching rollback payloads whenever possible, allowing you to easily revert changes.
-
-### 🧹 Clean Screen Reset Architecture
-When you command Sentinel to clear your workspace (`>clear terminal`, `>clear screen`, or `>clean terminal`), Sentinel invokes a direct xterm buffer wipe (`\x1b[2J\x1b[H`) and completely suppresses end-of-workflow summary logs—leaving you with an immaculate, spotless command prompt instantly!
-
-### 💎 Acrylic Glassmorphism & Visual Personalization
-- **Translucent Backdrop Styling**: Built with premium glassmorphic visual treatments that reveal underlying macOS wallpapers and desktop aesthetics.
-- **Curated Color Palettes**: Switch effortlessly between **Classic Dark**, **Minimalist White**, and vibrant **Cyberpunk Neon** themes.
-- **Live Menu Bar Controls**: Adjust backdrop transparency sliders and blur depth in real time from your macOS menu bar under **`Personalization ➔ Appearance & Color Themes...`**.
+  - `>open in xcode` / `>open in android studio` ➔ Direct native workspace launch.
 
 ---
 
 ## ⚡ Complete Command Quick-Reference
 
-Try typing these real example commands into Sentinel today! Simply start your instruction with **`>`** to experience instantaneous conversational orchestration:
+Try typing these real commands into Sentinel today! Simply start with **`>`**:
 
-| Domain Area | Conversational Example (`>`) | Canonical AI Tool Executed | Result & Behavior |
+| Category | Example Command (`>`) | Tool Invocation | Behavior & Outcome |
 | :--- | :--- | :--- | :--- |
-| **Development & IDEs** | `>open this folder in the Vs Code` | `developer.vscode` | Resolves target to `.` and launches **Visual Studio Code.app**. |
-| | `>Open this folder inside antigravity` | `application.open` | Resolves app to **Antigravity IDE.app** and opens current directory. |
-| | `>open current directory in cursor` | `developer.cursor` | Launches **Cursor.app** with your active project path. |
-| | `>open in xcode` / `>open android studio` | `developer.xcode` / `android_studio`| Launches mobile development IDEs directly in your project. |
-| **System Utilities** | `>what time is it` / `>show time` | `shell.execute` (`date`) | Displays current time and date instantaneously with **zero password prompt**. |
-| | `>who am i` / `>current user` | `shell.execute` (`whoami`) | Instantly displays your active macOS username. |
-| | `>show environment variables` / `>env` | `shell.execute` (`env`) | Displays current shell environment variable declarations cleanly. |
-| | `>clear terminal` / `>clear screen` | `shell.execute` (`clear`) | Wipes terminal buffer completely clean with zero leftover log clutter. |
-| | `>show me the calendar for this month` | `shell.execute` (`cal`) | Formats and displays a clean visual monthly calendar table. |
-| **Desktop Application Control**| `>tell me all the running applications` | `application.list_running` | Displays curated list of active graphical apps (*Sentinel*, *Antigravity*, *Chrome*, *Safari*). |
-| | `>open youtube.com in safari` | `application.open` | Launches Safari and directly opens the YouTube web platform. |
-| | `>stop chrome` / `>kill antigravity` | `system.kill_process` / `force_quit` | Performs a deep, clean termination of target desktop software threads. |
-| | `>update brave browser` | `application.update` | Intercepts intent to natively run `brew upgrade` for the specified GUI app. |
-| **Development & Scaffolding** | `>initialize a nextjs frontend and django backend` | `developer.scaffold` | Bypasses LLM generation to natively execute `npx` and `django-admin` scaffolding. |
-| **System & Hardware Control** | `>lock the laptop` | `system.lock` | Safely secures the workstation by engaging macOS `pmset displaysleepnow`. |
-| **Navigation & Filesystem** | `>take me to downloads folder` | `filesystem.cd` / `shell.cd` | Synchronizes shell working directory directly to `~/Downloads`! |
-| | `>take me home` | `filesystem.cd` (`~`) | Instantly jumps to your macOS home profile directory. |
-| | `>find me all files named .env` | `filesystem.search` | Scans current hierarchy for environment configs via ripgrep/find mechanics. |
-| **Hardware & Network** | `>check gpu status and vram` | `system.gpu` | Queries Apple Silicon Metal or discrete graphics utilization and memory. |
-| | `>scan available wifi networks` | `network.wifi.scan` | Scans visible wireless SSID infrastructure in your physical vicinity. |
-| | `>what port is 3000 running on` | `network.ports` | Inspects local TCP socket tables to check if port 3000 is active or free. |
-| | `>show all bluetooth devices` | `network.bluetooth.list` | Scans and lists paired and discoverable Bluetooth hardware peripherals. |
-| **Containers & DevOps** | `>list docker containers` | `docker.ps` | Real-time table display of active Docker container IDs, ports, and image tags. |
-| | `>show git commit history` | `git.log` | Formats recent repository commit signatures cleanly in your viewport. |
+| **Development & IDEs** | `>open this folder in vs code` | `developer.vscode` | Resolves target to `.` and launches **Visual Studio Code.app**. |
+| | `>open this folder inside antigravity` | `application.open` | Resolves app to **Antigravity IDE** with current working directory. |
+| | `>open current project in cursor` | `developer.cursor` | Launches **Cursor.app** with active workspace path. |
+| | `>open in xcode` / `>open in android studio` | `developer.xcode` | Opens mobile development IDEs directly in the active project. |
+| **System Utilities** | `>what time is it` / `>date` | `shell.execute` (`date`) | Displays current system date and time with **zero password prompt**. |
+| | `>who am i` / `>current user` | `shell.execute` (`whoami`) | Instantly displays active operating system user. |
+| | `>show environment variables` | `shell.execute` (`env`) | Displays clean shell environment declarations. |
+| | `>clear terminal` / `>clean screen` | `shell.execute` (`clear`) | Wipes terminal buffer with zero leftover logs. |
+| | `>show me the calendar for this month` | `shell.execute` (`cal`) | Formats a visual monthly calendar table. |
+| **Application Control** | `>tell me all the running applications` | `application.list_running` | Displays curated list of active graphical applications. |
+| | `>open youtube.com in safari` | `application.open` | Launches Safari and directly navigates to YouTube. |
+| | `>stop chrome` / `>kill antigravity` | `system.kill_process` | Cleanly terminates target desktop software processes. |
+| | `>update brave browser` | `application.update` | Normalizes app name and updates cask via Homebrew. |
+| **Hardware & Network** | `>check battery health and cycle count` | `system.battery` | Queries battery state, charge percentage, and health. |
+| | `>scan available wifi networks` | `network.wifi.scan` | Scans visible wireless SSID networks in range. |
+| | `>what port is 3000 running on` | `network.ports` | Inspects local TCP socket tables to check if port 3000 is occupied. |
+| | `>show all bluetooth devices` | `network.bluetooth.list` | Scans and lists paired and discoverable Bluetooth peripherals. |
+| **Filesystem & Git** | `>take me to downloads` | `filesystem.cd` | Synchronizes active shell working directory to `~/Downloads`. |
+| | `>find all files named .env` | `filesystem.search` | Fast recursive search for matching files across current hierarchy. |
+| | `>show git commit history` | `git.log` | Formats recent repository commit history cleanly in the terminal. |
 
 ---
 
-## 🧰 The 97+ Tool Knowledge Base Ecosystem
+## 🧰 The 101 Canonical Tool Ecosystem
 
-Sentinel incorporates a comprehensive **Operating Knowledge Base** packed directly into the application runtime. Featuring over **97 built-in canonical execution capabilities**, Sentinel translates conversational commands across 10 distinct system domains:
+Sentinel features **101 built-in canonical execution capabilities** organized across 10 system domains. Every single tool is backed by comprehensive JSON schema validation, knowledge metadata, natural language examples, and automated regression test batteries:
 
 ```mermaid
 mindmap
-  root((Sentinel 97+ Tools))
-    Developer Tooling
-      vscode
-      cursor
-      antigravity
-      xcode
-      android_studio
-      github_cli
+  root((Sentinel 101 Tools))
+    Development & IDEs
+      developer.vscode
+      developer.cursor
+      developer.antigravity
+      developer.xcode
+      developer.android_studio
+      developer.scaffold
     Desktop Applications
-      list_running
-      open / launch
-      close / force_quit
-      focus / maximize
-    System Diagnostics
-      cpu / ram / gpu
-      temperature / battery
-      storage_df / uptime
-      kill_process / ps
+      application.open
+      application.close
+      application.update
+      application.list_running
+      application.force_quit
+    System & Hardware
+      system.cpu / ram / gpu
+      system.battery / thermal
+      system.lock / sleep
+      system.kill_process
     Network & Wireless
-      wifi_scan / wifi_connect
-      bluetooth_list / bt_toggle
-      open_ports / ip_lookup
-      ping / traceroute
-    DevOps & Versioning
-      docker_ps / docker_logs
-      git_log / git_status
-      python_venv / pip_list
+      network.wifi.scan / connect
+      network.wifi.on / off
+      network.bluetooth.list / connect
+      network.ports / ip
     Filesystem Administration
-      cd_navigation / search
-      read / write / delete
-      copy / move / archive
+      filesystem.read / write
+      filesystem.copy / move / delete
+      filesystem.search / grep
+      filesystem.cd / navigate
+    DevOps & Version Control
+      git.status / commit / log
+      git.push / pull / branch
+      docker.ps / logs / stop
 ```
 
 ---
 
-## 🏗️ The Sentinel V3 Architecture
+## 🔄 Cross-Platform Synchronization
 
-Sentinel is built on a massive, highly decoupled 14-phase architecture ensuring absolute determinism, stability, and intelligent execution:
+Sentinel's architecture cleanly isolates OS-agnostic logic (~85%) from platform-specific execution (~15%):
 
-1. **Phase 1: Conversation Engine** - Natural language intent, entity extraction, and dialog context.
-2. **Phase 2: Goal Planning Engine** - Multi-step deterministic DAG planners and action decomposition.
-3. **Phase 3: Action Registry** - Centralized knowledge base of command semantics and validation schemas.
-4. **Phase 4: Execution Runtime** - Multi-threaded execution, state machines, and resource locking.
-5. **Phase 5: Capability SDK** - Native OS integrations (macOS/Linux/Windows) with rollback guarantees.
-6. **Phase 6: State Engine & World Model** - Real-time tracking of filesystems, networks, and environment contexts.
-7. **Phase 7: Verification & Repair Engine** - Automated post-execution validation and fallback self-healing.
-8. **Phase 8: Workflow Engine** - Graph-based visual automation editor and parameterized background cron loops.
-9. **Phase 9: Memory Engine** - Long-term persistent knowledge graphs and semantic user context.
-10. **Phase 10: Learning Engine** - Experience stores and intelligent ranking for continuous personalization.
-11. **Phase 11: Plugin SDK** - Third-party sandboxed extension models and marketplace scaffolding.
-12. **Phase 12: Developer Platform** - Time-travel debugging, zero-overhead tracing, and unified diagnostics.
-13. **Phase 13: Production Platform** - Automated backups, schema migrations, structured logging, and release channels.
-14. **Phase 14: User Experience & Polish** - Intelligent clarifications, visual diffs, undo managers, and presentation demo-modes.
+```
+                                  ┌──────────────────────────────────────────────────┐
+                                  │           SHARED OS-AGNOSTIC CORE (~85%)         │
+                                  │  • tools/                 (All 101 tool schemas) │
+                                  │  • src/ai/                (Agent loop & Planner) │
+                                  │  • src/presentation/      (React UI & Terminal)  │
+                                  │  • src/workflows/         (Workflow engines)     │
+                                  │  • src/domain/security/   (PolicyEngine & audit) │
+                                  └─────────────────────────┬────────────────────────┘
+                                                            │
+                     ┌──────────────────────────────────────┼──────────────────────────────────────┐
+                     ▼                                      ▼                                      ▼
+        ┌─────────────────────────┐            ┌─────────────────────────┐            ┌─────────────────────────┐
+        │      macOS Branch       │            │     Windows Branch      │            │      Linux Branch       │
+        │ • src-tauri/src/pty.rs  │            │ • pty_windows.rs ConPTY │            │ • POSIX PTY spawning    │
+        │ • blueutil / pmset      │            │ • WinRT / PowerShell    │            │ • BlueZ / systemd       │
+        │ • macOS AppleScript     │            │ • Windows registry      │            │ • Linux package drivers │
+        └─────────────────────────┘            └─────────────────────────┘            └─────────────────────────┘
+```
+
+### 1-Command Pull for Teammates:
+- **🪟 Windows (PowerShell)**:
+  ```powershell
+  powershell -ExecutionPolicy Bypass -File .\scripts\sync-shared.ps1
+  ```
+- **🐧 Linux / macOS (Bash)**:
+  ```bash
+  ./scripts/sync-shared.sh
+  ```
+- **🤖 GitHub Action PRs**: Every push to `main` automatically generates synchronization Pull Requests into `windows` and `linux` branches.
+
+*Read the full [Cross-Platform Architecture Guide](docs/CROSS_PLATFORM_SHARING.md) for details.*
 
 ---
 
-## 📥 Download & Install
-
-Experience the speed, privacy, and intelligence of Sentinel Terminal on your machine today:
+## 📥 Download & Installation
 
 <div align="center">
-  <br>
   <table>
     <thead>
       <tr>
-        <th align="center" width="230">🍏 macOS (M1/M2/M3/Intel)</th>
-        <th align="center" width="230">🐧 Linux (Debian / Arch / RPM)</th>
-        <th align="center" width="230">🪟 Windows (10 / 11)</th>
+        <th align="center" width="260">🍏 macOS (Apple Silicon & Intel)</th>
+        <th align="center" width="260">🐧 Linux (Debian / Arch / RPM)</th>
+        <th align="center" width="260">🪟 Windows (10 / 11)</th>
       </tr>
     </thead>
     <tbody>
       <tr>
-        <td align="center"><br><b><a href="https://github.com/NetPranav/Sentinal-Terminal/releases">📦 Download Sentinel Terminal.app</a></b><br><i>Available Now (v0.1.0)</i><br><br></td>
-        <td align="center"><br><b>🚧 Coming Soon</b><br><i>In Active Testing</i><br><br></td>
-        <td align="center"><br><b>🚧 Coming Soon</b><br><i>Under Development</i><br><br></td>
+        <td align="center"><br><b><a href="https://github.com/NetPranav/Sentinal-Terminal/releases">📦 Download Sentinel Terminal.dmg</a></b><br><i>Available Now (v0.1.0-alpha)</i><br><br></td>
+        <td align="center"><br><b><a href="https://github.com/NetPranav/Sentinal-Terminal/tree/linux">🐧 Linux Branch Active</a></b><br><i>In Testing</i><br><br></td>
+        <td align="center"><br><b><a href="https://github.com/NetPranav/Sentinal-Terminal/tree/windows">🪟 Windows Branch Active</a></b><br><i>In Testing</i><br><br></td>
       </tr>
     </tbody>
   </table>
-  <br>
 </div>
 
 ---
 
-## 🚀 Quick Start & Workspace Tips
+## 🧪 Automated Testing & Reliability
 
-Getting started with Sentinel requires zero complex configuration or external cloud API tokens:
+Sentinel is hardened with **682 automated unit, integration, and security tests** across **121 test files**, verified on every commit:
 
-1. **Launch the Application**: Drag **`Sentinel Terminal.app`** into your `/Applications/` folder and double-click to launch your multi-pane desktop workspace.
-2. **Execute via Muscle Memory or Summon AI (`>`)**: 
-   - Run commands like `git status` or `ls -lh` normally for direct, zero-latency execution.
-   - When you want AI automation or folder manipulation, prefix your input with **`>`** (e.g., `>open this folder in the Vs Code`).
-3. **Multi-Pane Workspace Organization**: Use your macOS desktop top screen menu bar under **`Personalization`** to:
-   - Split panes vertically (**`Cmd+D`**) or horizontally (**`Cmd+Shift+D`**).
-   - Open new tabs (**`Cmd+T`**) and switch themes instantly!
+```bash
+# Run the complete test suite
+npm test
 
----
+# Run capability SDK drivers suite
+npx vitest run src/sdk/__tests__/CapabilitySDK.test.ts
 
-## 📚 Comprehensive Documentation Libraries
-
-Everything you need to master Sentinel as a user or contribute as an open-source software engineer is thoroughly articulated in our documentation portals:
-
-### 📖 For End Users
-- **[User Guide](docs/USER_GUIDE.md)**: Master the mixing of traditional shell syntax with explicit `>` conversational commands.
-- **[Features Overview](docs/FEATURES.md)**: Deep dive into offline privacy guarantees, glassmorphic styling, and intelligent capability tools.
-- **[Keyboard Shortcuts & Menu Controls](docs/KEYBOARD_SHORTCUTS.md)**: Complete hotkey reference table for tab navigation, split views, and menu controls.
-- **[Frequently Asked Questions (FAQ)](docs/FAQ.md)**: Explanations regarding offline local AI inference, Apple Silicon Metal acceleration, and data privacy.
-- **[Troubleshooting Guide](docs/TROUBLESHOOTING.md)**: Simple fixes for verifying local Ollama connectivity and optimizing macOS accessibility permissions.
-- **[Theme & Personalization Manual](docs/THEMES.md)**: Instructions for tailoring backdrop transparency sliders, blur depth, and color palettes.
-- **[Security & Risk Safeguards](docs/SECURITY.md)**: Understand how Sentinel's Zero-Trust firewall assesses command danger profiles and whitelists safe commands.
-
-### 🛠️ For Open-Source Contributors & Maintainers
-- **[Contributing Manual](developer/CONTRIBUTING.md)**: Welcome guidelines detailing branching workflows, verification mandates, and feature proposal protocols.
-- **[Development Setup & Toolchains](developer/DEVELOPMENT_SETUP.md)**: Instructions for preparing Node.js, Rust/Cargo toolchains, Tauri v2 dependencies, and local Ollama installations.
-- **[Build & Packaging Reference](developer/BUILD.md)**: Authoritative instructions for compiling standalone macOS `.app` bundles (`npm run build:app`) from source code.
-- **[System Architecture Reference](developer/ARCHITECTURE.md)**: Comprehensive architectural breakdown connecting React 19 views with native Rust PTY execution engines.
-- **[Tool Registry Knowledge Base Pattern](developer/TOOL_REGISTRY.md)**: How Sentinel organizes its 97+ structured JSON operational schemas, Zod validation models, and semantic indexes.
-- **[Capability SDK Driver Engineering](developer/CAPABILITY_SDK.md)**: Code blueprints for subclassing `BaseCapabilityDriver` to invoke native operating system APIs and Launch Services.
-- **[Intent Engine & LoRA Telemetry Pipelines](developer/INTENT_AI.md)**: Technical specifications for conversational trimming algorithms and offline JSONL training dataset generation.
-- **[Automated Verification Testing](developer/TESTING.md)**: Guide to executing our automated Vitest test verification battery (82+ unit tests) and writing capability assertions.
+# Run security engine tests
+npx vitest run src/domain/security/Security.test.ts
+```
 
 ---
 
-## 🗺️ Product Roadmap
+## 📚 Documentation Portal
 
-Sentinel continuously evolves to bring state-of-the-art desktop developer ergonomics to life. Highlights from our upcoming engineering timeline include:
-- **🌐 SSH Host Intelligence & Remote Autonomy**: Apply conversational directory navigation and smart system log exploration across active remote SSH server connections without installing remote dependencies.
-- **🧩 Visual Workflow Designer**: Construct automated multi-step development pipelines using an interactive drag-and-drop workspace canvas directly inside your terminal window.
-- **🖼️ Multi-Modal Image Interpretation**: Simply paste UI error screenshots or architectural diagrams straight into terminal panes for immediate offline AI diagnostics and command suggestions.
+Everything you need to master Sentinel or contribute code is documented in detail:
 
-*Review our comprehensive **[Product Roadmap Documentation](docs/ROADMAP.md)** for complete engineering timelines and future milestones!*
+### 📖 User Manuals
+- **[User Guide](docs/USER_GUIDE.md)**: Mixing traditional shell commands with explicit `>` conversational prompts.
+- **[Features Overview](docs/FEATURES.md)**: Offline privacy guarantees, glassmorphic styling, and tool architecture.
+- **[Keyboard Shortcuts](docs/KEYBOARD_SHORTCUTS.md)**: Tab navigation, split panes, and window controls.
+- **[FAQ](docs/FAQ.md)**: Offline local AI inference, Apple Silicon acceleration, and privacy details.
+- **[Security Safeguards](docs/SECURITY.md)**: Zero-Trust policies and safe-mode whitelisting rules.
+
+### 🛠️ Developer & Architecture Guides
+- **[Engineering Roadmap & Issues](docs/TODO.md)**: Live tracking of resolved fixes and prioritized open issues.
+- **[Cross-Platform Sharing Guide](docs/CROSS_PLATFORM_SHARING.md)**: Synchronization workflows across macOS, Windows, and Linux.
+- **[Development Setup](developer/DEVELOPMENT_SETUP.md)**: Setting up Node.js, Rust/Cargo, Tauri v2, and Ollama.
+- **[System Architecture](developer/ARCHITECTURE.md)**: Comprehensive breakdown of React views, Rust PTY, and SDK drivers.
+- **[Contributing Guide](developer/CONTRIBUTING.md)**: Pull request protocols and testing requirements.
+
+---
+
+## 🗺️ Engineering Roadmap & GitHub Issues
+
+We track all core issues and feature enhancements directly in our prioritized roadmap:
+- 🚨 **[GitHub Issue #2](https://github.com/NetPranav/Sentinal-Terminal/issues/2)**: `[P0 - Critical] Compound shell command chaining (&&, ;, ||) bypasses ShellCommandGuard`
+- 🚨 **[GitHub Issue #3](https://github.com/NetPranav/Sentinal-Terminal/issues/3)**: `[P0 - Critical] PolicyEngine.protect-system-dirs fails to block deletion of child paths`
+- ⚡ **[GitHub Issue #4](https://github.com/NetPranav/Sentinal-Terminal/issues/4)**: `[P1 - High] GitCapability & ShellSDKCapability working directory context (cwd)`
+- 🔧 **[GitHub Issue #5](https://github.com/NetPranav/Sentinal-Terminal/issues/5)**: `[P2 - Medium] FilesystemSDKCapability tilde path expansion optimization`
+- 💡 **[GitHub Issue #6](https://github.com/NetPranav/Sentinal-Terminal/issues/6)**: `[P3 - Low] Bluetooth peripheral category noun sanitization`
+
+*See the full [Engineering Roadmap](docs/TODO.md) for complete status and historical archives.*
 
 ---
 
 ## 📜 License
 
-Sentinel Terminal is open-source software released under the **MIT License**. See the `LICENSE` file for distribution terms.
+Sentinel Terminal is open-source software released under the **[MIT License](LICENSE)**.
 
----
-
-<p align="center">
-  <b>Built with visual excellence and engineering passion. If Sentinel elevates your everyday command workflow, consider giving us a ⭐️ on GitHub!</b>
-</p>
+<div align="center">
+  <br>
+  <b>Built with visual excellence and engineering passion. If Sentinel elevates your workflow, consider starring ⭐️ our repository!</b>
+</div>
