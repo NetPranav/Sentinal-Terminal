@@ -128,7 +128,30 @@ export class CapabilityRegistrySDK {
       }
     }
 
-    // 2. Register legacy short ID aliases for network capabilities
+    // 2. Pre-register core standard tool IDs ensuring 100% availability across desktop bundle
+    const standardToolIds = [
+      'network.wifi.on', 'network.wifi.off', 'network.wifi.scan', 'network.wifi.connect',
+      'network.bluetooth.on', 'network.bluetooth.off', 'network.bluetooth.list', 'network.bluetooth.connect',
+      'network.ports', 'network.ping', 'network.traceroute', 'network.interfaces', 'network.dns', 'network.ip',
+      'filesystem.list', 'filesystem.read', 'filesystem.search', 'filesystem.copy', 'filesystem.move',
+      'filesystem.delete', 'filesystem.trash', 'filesystem.mkdir', 'filesystem.create', 'filesystem.navigate',
+      'filesystem.locate_files', 'filesystem.locate_folders', 'filesystem.grep',
+      'system.processes', 'system.kill_process', 'system.storage', 'system.battery', 'system.info',
+      'system.service', 'system.dotfile',
+      'application.open', 'application.force_quit', 'application.running',
+      'browser.navigate', 'browser.search', 'browser.open',
+      'git.status', 'git.log', 'git.diff', 'git.pull', 'git.commit', 'git.push', 'git.branch',
+      'docker.ps', 'docker.images', 'docker.logs', 'docker.stop', 'docker.restart',
+      'shell.execute'
+    ];
+    for (const id of standardToolIds) {
+      if (!this.drivers.has(id)) {
+        const d = this.createDriverForId(id);
+        if (d) this.register(id, d);
+      }
+    }
+
+    // 3. Register legacy short ID aliases for network capabilities
     this.register('wifi.scan', new WifiCapability('network.wifi.scan'));
     this.register('wifi.connect', new WifiCapability('network.wifi.connect'));
     this.register('wifi.on', new WifiCapability('network.wifi.on'));
@@ -138,6 +161,55 @@ export class CapabilityRegistrySDK {
     this.register('bluetooth.off', new BluetoothCapability('network.bluetooth.off'));
     this.register('bluetooth.connect', new BluetoothCapability('network.bluetooth.connect'));
     this.register('application.open', new ApplicationCapability('application.open'));
+  }
+
+  /**
+   * Factory that constructs the appropriate concrete SDK driver for any tool ID.
+   */
+  public createDriverForId(toolId: string): ICapabilityDriver<any, any> | undefined {
+    const lower = toolId.toLowerCase();
+
+    if (lower.startsWith('filesystem.') || lower.startsWith('fs.')) {
+      return new FilesystemSDKCapability(toolId);
+    }
+    if (lower.startsWith('network.wifi') || lower.startsWith('wifi.')) {
+      return new WifiCapability(toolId);
+    }
+    if (lower.startsWith('network.bluetooth') || lower.startsWith('bluetooth.')) {
+      return new BluetoothCapability(toolId);
+    }
+    if (lower.startsWith('network.') || lower.startsWith('net.')) {
+      return new NetworkingCapability(toolId);
+    }
+    if (lower.startsWith('application.') || lower.startsWith('app.')) {
+      return new ApplicationCapability(toolId);
+    }
+    if (lower.startsWith('browser.') || lower.startsWith('web.')) {
+      return new BrowserCapability(toolId);
+    }
+    if (lower.startsWith('git.')) {
+      return new GitCapability(toolId);
+    }
+    if (lower.startsWith('docker.')) {
+      return new DockerCapability(toolId);
+    }
+    if (lower.startsWith('node.')) {
+      return new NodeCapability(toolId);
+    }
+    if (lower.startsWith('python.')) {
+      return new PythonCapability(toolId);
+    }
+    if (lower.startsWith('system.') || lower.startsWith('sys.')) {
+      return new SystemSDKCapability(toolId);
+    }
+    if (lower.startsWith('developer.') || lower.startsWith('dev.')) {
+      return new DeveloperCapability(toolId);
+    }
+    if (lower.startsWith('shell.') || lower === 'sh' || lower === 'shell.execute') {
+      return new ShellSDKCapability();
+    }
+
+    return new ShellSDKCapability();
   }
 
   public register(toolId: string, driver: ICapabilityDriver<any, any>): void {
@@ -157,7 +229,23 @@ export class CapabilityRegistrySDK {
   }
 
   public getDriver<I = any, O = any>(toolId: string): ICapabilityDriver<I, O> | undefined {
-    return this.drivers.get(toolId) as ICapabilityDriver<I, O> | undefined;
+    // 1. Direct hit in drivers map
+    let driver = this.drivers.get(toolId);
+    if (driver) return driver as ICapabilityDriver<I, O>;
+
+    // 2. Short alias check
+    const alt = toolId.startsWith('network.') ? toolId.replace('network.', '') : `network.${toolId}`;
+    driver = this.drivers.get(alt);
+    if (driver) return driver as ICapabilityDriver<I, O>;
+
+    // 3. Dynamic on-demand driver creation and caching
+    const created = this.createDriverForId(toolId);
+    if (created) {
+      this.drivers.set(toolId, created);
+      return created as ICapabilityDriver<I, O>;
+    }
+
+    return undefined;
   }
 
   /**

@@ -57,7 +57,12 @@ export function buildSystemPrompt(
     return `- ${t.id}(${params}): ${t.description}`;
   }).join('\n');
 
-  return `You are Sentinel, a ${context.os} terminal AI. CWD: ${context.cwd}
+  const now = new Date();
+  const dateStr = now.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+  const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+  return `You are Sentinel, an autonomous ${context.os} terminal AI copilot. CWD: ${context.cwd}
+Current System Date & Time: ${dateStr}, ${timeStr} (ISO: ${now.toISOString()})
 
 RESPOND WITH ONLY VALID JSON. No other text.
 

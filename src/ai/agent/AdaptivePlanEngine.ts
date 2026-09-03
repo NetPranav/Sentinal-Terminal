@@ -758,6 +758,25 @@ User request: ${goal}`;
     if (lower.includes('battery')) {
       return { tool: 'system.battery', params: {} };
     }
+
+    if (lower.includes('search') && (lower.includes('google') || lower.includes('web') || lower.includes('browser') || lower.includes('youtube') || lower.includes('internet'))) {
+      const qMatch = phaseTitle.match(/search(?:\s+for)?\s+['"]?([^'"]+)['"]?/i) || goal.match(/search(?:\s+for)?\s+['"]?([^'"]+)['"]?/i);
+      const query = qMatch ? qMatch[1].replace(/\s+(?:on|in)\s+google/i, '').trim() : goal.replace(/^(?:search\s+for|google)\s+/i, '').trim();
+      return { tool: 'browser.search', params: { query, engine: 'google' } };
+    }
+    if (lower.includes('open') && (lower.includes('link') || lower.includes('first link') || lower.includes('url') || lower.includes('result'))) {
+      const qMatch = goal.match(/search(?:\s+for)?\s+['"]?([^'"]+)['"]?/i);
+      const query = qMatch ? qMatch[1].replace(/\s+(?:on|in)\s+google/i, '').trim() : 'black bird';
+      return { tool: 'browser.search', params: { query, engine: 'google' } };
+    }
+
+    if (lower.includes('find') || lower.includes('search') || lower.includes('locate')) {
+      if (lower.includes('folder') || lower.includes('directory') || lower.includes('file') || lower.includes('path')) {
+        const nameMatch = phaseTitle.match(/(?:named|with\s+name|pattern)\s+(?:as\s+)?['"]?([^'"\s]+)['"]?/i) || goal.match(/(?:named|with\s+name|pattern)\s+(?:as\s+)?['"]?([^'"\s]+)['"]?/i);
+        const targetName = nameMatch ? nameMatch[1].trim() : 'frontend';
+        return { tool: 'filesystem.search', params: { path: cwd || '.', pattern: `*${targetName}*` } };
+      }
+    }
     return null;
   }
 

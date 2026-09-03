@@ -411,6 +411,15 @@ export class AgentLoop {
       return { success: true, summary: helpMsg, steps: [] };
     }
 
+    if (/^(?:(?:what\s+is\s+(?:the\s+)?(?:current\s+)?(?:time|date|day))|current\s+(?:time|date)|what\s+time\s+is\s+it|what\s+is\s+today'?s?\s+date|date|time)[\s?!.]*$/i.test(rawLower)) {
+      const now = new Date();
+      const dateStr = now.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+      const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      const dateTimeMsg = `The current date and time is ${dateStr}, ${timeStr}.`;
+      this.emit({ type: 'done', message: dateTimeMsg });
+      return { success: true, summary: dateTimeMsg, steps: [] };
+    }
+
     if (/^(?:setup-?ai|download-?model|install-?model|get-?model)[\s]*$/i.test(rawLower)) {
       this.emit({ type: 'tool_start', message: 'Initiating Sentinel Embedded AI download (Qwen 2.5 Coder 3B)...' });
       EmbeddedEngineManager.getInstance().downloadRecommendedModel().then(async (ok) => {
