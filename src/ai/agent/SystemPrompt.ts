@@ -6,6 +6,7 @@
  */
 
 import { ToolRegistryState } from '../../tools/loader/ToolLoader';
+import { DynamicToolPruner } from './DynamicToolPruner';
 
 export interface ToolSpec {
   id: string;
@@ -35,13 +36,21 @@ export function buildToolSpecs(registry: ToolRegistryState): ToolSpec[] {
 
 /**
  * Build the system prompt for the agentic ReAct loop.
+ * If goal is provided, dynamically prunes tools down to the 4-6 most relevant tools.
  */
-export function buildSystemPrompt(toolSpecs: ToolSpec[], context: { os: string; cwd: string }): string {
-  // Core high-frequency tools prioritized for the prompt
-  const corePrefixes = ['filesystem.', 'system.', 'network.', 'application.', 'browser.', 'git.', 'developer.', 'shell.'];
-  const prioritized = toolSpecs.filter(t => corePrefixes.some(p => t.id.startsWith(p)));
+export function buildSystemPrompt(
+  toolSpecs: ToolSpec[],
+  context: { os: string; cwd: string },
+  goal?: string,
+  options?: { maxTools?: number }
+): string {
+  const maxTools = options?.maxTools ?? 6;
+  // Dynamic Small-Model Tool Pruning
+  const activeTools = goal
+    ? DynamicToolPruner.prune(toolSpecs, goal, { maxTools })
+    : toolSpecs.filter(t => ['filesystem.', 'system.', 'network.', 'application.', 'browser.', 'git.', 'developer.', 'shell.'].some(p => t.id.startsWith(p)));
 
-  const toolList = (prioritized.length > 0 ? prioritized : toolSpecs).map(t => {
+  const toolList = activeTools.map(t => {
     const params = t.parameters
       .map(p => `${p.name}${p.required ? '*' : ''}`)
       .join(', ');

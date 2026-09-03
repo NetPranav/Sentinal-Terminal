@@ -22,8 +22,9 @@ This document tracks critical core issues, bugs, and security vulnerabilities id
 - [x] **3.3 Startup Service Automation**: Natural language intent routing (e.g. `>enable bluetooth on startup`, `>disable auto-launch of gazebo`).
 
 ### 🔷 Epic 4: Small-Model Cognitive Supercharger
-- [ ] **4.1 Dynamic Domain Tool Pruning**: Classify user intent domain and dynamically load only 4–6 relevant tools into local LLM context.
-- [ ] **4.2 Two-Tier Reasoning Pipeline**: Split semantic understanding from deterministic DAG task decomposition.
+- [x] **4.1 Dynamic Domain Tool Pruning**: Classify user intent domain and dynamically load only 4–6 relevant tools into local LLM context.
+- [x] **4.2 Two-Tier Reasoning Pipeline**: Split semantic understanding from deterministic DAG task decomposition.
+- [x] **4.3 Zero-Hallucination Schema Enforcement**: Validate LLM parameter JSON against schemas and auto-repair types/aliases before invocation.
 
 ---
 

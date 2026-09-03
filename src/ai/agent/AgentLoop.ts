@@ -43,7 +43,9 @@ export interface AgentResult {
 
 import { AdaptivePlanEngine, AgentPlan, PlanPhase, PhaseStatus } from './AdaptivePlanEngine';
 import { ProjectDiscoveryEngine } from '../../domain/discovery/ProjectDiscoveryEngine';
-export { AdaptivePlanEngine, AgentPlan, PlanPhase, PhaseStatus };
+import { ToolParameterValidator } from './ToolParameterValidator';
+import { DynamicToolPruner } from './DynamicToolPruner';
+export { AdaptivePlanEngine, AgentPlan, PlanPhase, PhaseStatus, ToolParameterValidator, DynamicToolPruner };
 
 interface LLMResponse {
   action: 'tool' | 'done' | 'error';
@@ -463,7 +465,7 @@ export class AgentLoop {
    * feeds results back, and repeats until done.
    */
   private async runLLMLoop(goal: string, context: { os: string; cwd: string }): Promise<AgentResult> {
-    const systemPrompt = buildSystemPrompt(this.toolSpecs, context);
+    const systemPrompt = buildSystemPrompt(this.toolSpecs, context, goal);
     const steps: { tool: string; params: any; result: ToolExecutionResult }[] = [];
     let cdPath: string | undefined;
 
@@ -631,7 +633,17 @@ export class AgentLoop {
 
         if (parsed.action === 'tool' && parsed.tool) {
           const toolId = parsed.tool;
-          const params = parsed.params || {};
+          let params = parsed.params || {};
+
+          // Validate and type-coerce parameters against tool schema
+          const toolSpec = this.toolSpecs.find(t => t.id === toolId);
+          const validation = ToolParameterValidator.validateAndCoerce(toolSpec, params);
+          if (!validation.valid && validation.errors) {
+            messages.push({ role: 'assistant', content: JSON.stringify(parsed) });
+            messages.push({ role: 'user', content: `Parameter error: ${validation.errors.join(', ')}. Please correct parameters.` });
+            continue;
+          }
+          params = validation.coercedParams;
 
           // Check if tool exists
           if (!this.toolExecutor.hasDriver(toolId)) {
