@@ -31,82 +31,100 @@ export interface AgentEventFormatted {
 }
 
 /**
+ * Renders Markdown-like AI text responses cleanly for raw terminal buffers (xterm.js).
+ * Converts headers, bold, inline code, lists, and code blocks into ANSI terminal sequences
+ * with guaranteed CRLF (\r\n) line endings and consistent column-0 indentation.
+ */
+export function formatMarkdownTerminal(text: string): string {
+  if (!text) return '';
+  const lines = text.split(/\r?\n/);
+  let inCodeBlock = false;
+  const formattedLines: string[] = [];
+
+  for (let rawLine of lines) {
+    const line = rawLine;
+
+    if (line.trim().startsWith('```')) {
+      inCodeBlock = !inCodeBlock;
+      if (inCodeBlock) {
+        const lang = line.trim().replace(/^```/, '').trim();
+        formattedLines.push(`  ${C.gray}┌──${lang ? ' ' + lang + ' ' : ''}─────────────────────────────────────────${C.reset}`);
+      } else {
+        formattedLines.push(`  ${C.gray}└────────────────────────────────────────────────${C.reset}`);
+      }
+      continue;
+    }
+
+    if (inCodeBlock) {
+      formattedLines.push(`  ${C.gray}│${C.reset}  ${C.cyan}${line}${C.reset}`);
+      continue;
+    }
+
+    if (!line.trim()) {
+      formattedLines.push('');
+      continue;
+    }
+
+    if (/^#{1,4}\s+/.test(line.trim())) {
+      const headerText = line.trim().replace(/^#{1,4}\s+/, '');
+      formattedLines.push(`  ${C.boldCyan}${headerText}${C.reset}`);
+      continue;
+    }
+
+    let formatted = line
+      .replace(/\*\*([^*]+)\*\*/g, `${C.bold}$1${C.reset}`)
+      .replace(/__([^_]+)__/g, `${C.bold}$1${C.reset}`)
+      .replace(/`([^`]+)`/g, `${C.cyan}$1${C.reset}`)
+      .replace(/^(\s*)(\d+\.)\s+/, `$1${C.boldCyan}$2${C.reset} `)
+      .replace(/^(\s*)[-*•]\s+/, `$1${C.cyan}•${C.reset} `);
+
+    formattedLines.push(`  ${formatted}`);
+  }
+
+  return formattedLines.join('\r\n');
+}
+
+/**
  * Format an agent event into a clean terminal string.
  */
 export function formatAgentEvent(event: AgentEventFormatted): string {
   switch (event.type) {
     case 'thinking':
-      return `\r\n${C.dim}${C.cyan}● ${event.message}${C.reset}\r\n`;
+      return `\r\n${C.dim}${C.cyan}● ${event.message.replace(/\r?\n/g, '\r\n')}${C.reset}\r\n`;
 
-    case 'plan': {
-      const plan = event.data;
-      if (plan && Array.isArray(plan.phases) && plan.phases.length > 0) {
-        let out = `\r\n${C.magenta}● Execution Plan: ${event.message}${C.reset}\r\n`;
-        for (const phase of plan.phases) {
-          const icon = phase.status === 'completed'
-            ? `${C.green}✓${C.reset}`
-            : phase.status === 'running'
-            ? `${C.boldCyan}▸${C.reset}`
-            : phase.status === 'skipped'
-            ? `${C.gray}⊘${C.reset}`
-            : phase.status === 'failed'
-            ? `${C.red}✗${C.reset}`
-            : `${C.dim}○${C.reset}`;
-          const titleColor = phase.status === 'running'
-            ? C.boldCyan
-            : phase.status === 'completed'
-            ? C.green
-            : phase.status === 'skipped'
-            ? C.gray
-            : C.white;
-          const skippedNote = phase.skippedReason ? ` ${C.dim}(${phase.skippedReason})${C.reset}` : '';
-          out += `  ${icon} ${titleColor}Phase ${phase.id}:${C.reset} ${phase.title}${skippedNote}\r\n`;
-
-          if (phase.subPhases && phase.subPhases.length > 0) {
-            for (const sub of phase.subPhases) {
-              const subIcon = sub.status === 'completed'
-                ? `${C.green}✓${C.reset}`
-                : sub.status === 'running'
-                ? `${C.boldCyan}▸${C.reset}`
-                : sub.status === 'skipped'
-                ? `${C.gray}⊘${C.reset}`
-                : sub.status === 'failed'
-                ? `${C.red}✗${C.reset}`
-                : `${C.dim}○${C.reset}`;
-              out += `      ${subIcon} ${C.dim}Phase ${sub.id}:${C.reset} ${sub.title}\r\n`;
-            }
-          }
-        }
-        return out;
-      }
-      return `\r\n${C.magenta}● Plan ready: ${event.message}${C.reset}\r\n`;
-    }
+    case 'plan':
+      // The interactive execution plan is presented via the floating HUD dropdown in the UI.
+      // Do not duplicate or dump multi-line ASCII blocks into the main terminal buffer.
+      return '';
 
     case 'question':
-      return `\r\n${C.boldYellow}  ? ${event.message}${C.reset}\r\n${C.dim}  Type your answer to continue, or /cancel to stop this workflow.${C.reset}\r\n`;
+      return `\r\n${C.boldYellow}  ? ${event.message.replace(/\r?\n/g, '\r\n  ')}${C.reset}\r\n${C.dim}  Type your answer to continue, or /cancel to stop this workflow.${C.reset}\r\n`;
 
     case 'tool_start':
-      return `${C.dim}${C.white}  ▸ ${event.message}${C.reset}\r\n`;
+      return `${C.dim}${C.white}  ▸ ${event.message.replace(/\r?\n/g, '\r\n  ')}${C.reset}\r\n`;
 
     case 'tool_done':
       if (event.message.startsWith('✓')) {
-        return `${C.green}  ${event.message}${C.reset}\r\n`;
+        return `${C.green}  ${event.message.replace(/\r?\n/g, '\r\n  ')}${C.reset}\r\n`;
       } else if (event.message.startsWith('⚠')) {
-        return `${C.yellow}  ${event.message}${C.reset}\r\n`;
+        return `${C.yellow}  ${event.message.replace(/\r?\n/g, '\r\n  ')}${C.reset}\r\n`;
       }
-      return `${C.white}  ${event.message}${C.reset}\r\n`;
+      return `${C.white}  ${event.message.replace(/\r?\n/g, '\r\n  ')}${C.reset}\r\n`;
 
     case 'done':
+      if (event.message.includes('\n') || event.message.includes('**') || event.message.includes('```')) {
+        return `\r\n${formatMarkdownTerminal(event.message)}\r\n`;
+      }
       return `${C.boldGreen}  ${event.message}${C.reset}\r\n`;
 
     case 'error':
-      return `${C.boldRed}  ✗ ${event.message}${C.reset}\r\n`;
+      return `${C.boldRed}  ✗ ${event.message.replace(/\r?\n/g, '\r\n  ')}${C.reset}\r\n`;
 
     case 'step_output':
-      return `${C.white}${event.message}${C.reset}\r\n`;
+      return `${C.white}${event.message.replace(/\r?\n/g, '\r\n')}${C.reset}\r\n`;
 
     default:
-      return `${event.message}\r\n`;
+      return `${event.message.replace(/\r?\n/g, '\r\n')}\r\n`;
   }
 }
 
@@ -148,13 +166,16 @@ export function formatDataOutput(data: any): string {
   }
 
   // Command stdout
-  if (data.stdout && typeof data.stdout === 'string') {
-    return `\r\n${data.stdout.replace(/\n/g, '\r\n')}\r\n`;
+  if (typeof data === 'object' && ('code' in data || 'stdout' in data)) {
+    if (data.stdout && typeof data.stdout === 'string' && data.stdout.trim()) {
+      return `\r\n${data.stdout.trim().replace(/\r?\n/g, '\r\n')}\r\n`;
+    }
+    return '';
   }
 
   // Generic object — show key-value pairs cleanly
   if (typeof data === 'object' && Object.keys(data).length > 0) {
-    const skip = new Set(['commandExecuted', 'dryRun', 'rollbackPayload']);
+    const skip = new Set(['commandExecuted', 'dryRun', 'rollbackPayload', 'stdout', 'stderr', 'code']);
     const lines = Object.entries(data)
       .filter(([k]) => !skip.has(k))
       .map(([k, v]) => {
@@ -218,8 +239,13 @@ function formatSearchResults(results: any[]): string {
   
   const lines = results.slice(0, 30).map(r => {
     const path = typeof r === 'string' ? r : (r.path || r.name || String(r));
+    const isDir = typeof r === 'object'
+      ? (r.isDirectory || r.type === 'directory')
+      : (!path.split('/').pop()?.includes('.') || path.endsWith('/'));
+    const icon = isDir ? '📁' : '📄';
+    const color = isDir ? C.boldCyan : C.white;
     const size = typeof r === 'object' && r.size ? ` ${C.dim}(${formatSize(r.size)})${C.reset}` : '';
-    return `  📄 ${C.white}${path}${C.reset}${size}`;
+    return `  ${icon} ${color}${path}${C.reset}${size}`;
   });
 
   if (results.length > 30) {

@@ -82,10 +82,33 @@ describe('ExecutionEngine Pipeline', () => {
 
   it('should bypass interactive prompt in SafeMode for harmless read-only shell utilities (date, whoami, clear, cal)', async () => {
     permissionManager.setProfile('SafeMode');
-    let asked = false;
     // Test evaluating a harmless read-only command via shell.core / shell.execute
     const risk = executionEngine['securityEngine'].calculateRisk('shell.execute', { command: 'date' });
     expect(risk.level).toBe('SAFE');
+    expect(risk.requiresConsent).toBe(false);
+  });
+
+  it('should require explicit user consent and preserve 1-line plain English explanation for generative commands', async () => {
+    const aiExplanation = 'Extracts the audio track from video.mp4 and saves it as output.mp3';
+    const risk = executionEngine['securityEngine'].calculateRisk('shell.execute', {
+      command: 'ffmpeg -i video.mp4 -vn output.mp3',
+      explanation: aiExplanation
+    });
+
+    expect(risk.level).toBe('SENSITIVE');
+    expect(risk.requiresConsent).toBe(true);
+    expect(risk.requiresPassword).toBe(false);
+    expect(risk.explanation).toBe(aiExplanation);
+  });
+
+  it('should require password authentication and consent for destructive administrative shell commands', async () => {
+    const risk = executionEngine['securityEngine'].calculateRisk('shell.execute', {
+      command: 'sudo rm -rf /tmp/build'
+    });
+
+    expect(risk.level).toBe('CRITICAL');
+    expect(risk.requiresConsent).toBe(true);
+    expect(risk.requiresPassword).toBe(true);
   });
 
   it('should deny if user rejects ask prompt', async () => {
@@ -163,6 +186,24 @@ describe('ExecutionEngine Pipeline', () => {
   it('should deny system directory deletion via PolicyEngine even in Developer profile', async () => {
     permissionManager.setProfile('Developer');
     const res = await executionEngine.execute('filesystem.delete', { path: '/System' });
+    expect(res.success).toBe(false);
+    expect(res.error?.code).toBe('POLICY_DENIED');
+  });
+
+  it('should deny deletion of nested files within protected system paths (/etc/hosts, /System/Library) (Issue 11 / GitHub #3)', async () => {
+    permissionManager.setProfile('Developer');
+    const res1 = await executionEngine.execute('filesystem.delete', { path: '/etc/hosts' });
+    expect(res1.success).toBe(false);
+    expect(res1.error?.code).toBe('POLICY_DENIED');
+
+    const res2 = await executionEngine.execute('filesystem.delete', { path: '/System/Library/CoreServices' });
+    expect(res2.success).toBe(false);
+    expect(res2.error?.code).toBe('POLICY_DENIED');
+  });
+
+  it('should block directory traversal bypasses attempting to delete protected paths', async () => {
+    permissionManager.setProfile('Developer');
+    const res = await executionEngine.execute('filesystem.delete', { path: '/Users/test/../../etc/hosts' });
     expect(res.success).toBe(false);
     expect(res.error?.code).toBe('POLICY_DENIED');
   });

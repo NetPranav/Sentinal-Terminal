@@ -12,6 +12,9 @@ export interface GenerateOptions {
   stopSequences?: string[];
   grammarJsonSchema?: Record<string, any>;
   format?: 'json' | string;
+  messages?: { role: string; content: string }[];
+  logitBias?: Record<string | number, number>;
+  grammar?: string; // Phase 5.3: GBNF (GGML BNF) Grammar constraint
 }
 
 export interface ProviderResponse {

@@ -7,10 +7,16 @@ import { SessionManager } from '../domain/SessionManager';
 import { ToolLoader } from '../tools/loader/ToolLoader';
 import { AppAliasRegistry } from '../domain/capabilities/AppAliasRegistry';
 import { AgentLoop, AgentPlan } from '../ai/agent/AgentLoop';
+import { DemonstrationLearningEngine } from '../domain/learning/DemonstrationLearningEngine';
+import { EpisodicMemoryEngine } from '../domain/learning/EpisodicMemoryEngine';
+import { SentinelSerlCoordinator } from '../domain/learning/SentinelSerlCoordinator';
+import { PtyOutputObserver, type RemediationPrompt } from '../domain/observer/PtyOutputObserver';
 import { formatAgentEvent, formatDataOutput } from './OutputFormatter';
 
 import { AutocompleteEngine } from '../domain/autocomplete/AutocompleteEngine';
 import { HistoryProvider } from '../domain/autocomplete/HistoryProvider';
+import { DemonstrationProvider } from '../domain/autocomplete/DemonstrationProvider';
+import { WorkspaceContextProvider } from '../domain/autocomplete/WorkspaceContextProvider';
 import { GhostTextRenderer } from '../ui/components/GhostText';
 import { ThemeManager } from '../ui/theme/ThemeManager';
 import { ShellAdapter } from '../domain/shell/ShellAdapter';
@@ -38,6 +44,26 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
   const [authError, setAuthError] = useState('');
   const [isVerifying, setIsVerifying] = useState(false);
   const [latestPlan, setLatestPlan] = useState<AgentPlan | null>(null);
+  const [isPlanOpen, setIsPlanOpen] = useState(true);
+  const [activeRemediation, setActiveRemediation] = useState<RemediationPrompt | null>(null);
+  const agentLoopRef = useRef<AgentLoop | null>(null);
+  const lastUnresolvedGoalRef = useRef<{ goal: string; timestamp: number } | null>(null);
+
+  const handleExecuteRemediation = async (rem: RemediationPrompt) => {
+    setActiveRemediation(null);
+    PtyOutputObserver.getInstance().clearRemediation();
+    if (sessionId) {
+      await SessionManager.getInstance().write(sessionId, '\x03');
+    }
+    if (xtermRef.current) {
+      xtermRef.current.write(`\r\n\x1b[1;32m⚡ [Sentinel Auto-Heal] Executing: ${rem.actionTitle}...\x1b[0m\r\n`);
+    }
+    if (rem.tool === 'shell.execute' && rem.params?.command && sessionId) {
+      await SessionManager.getInstance().write(sessionId, `${rem.params.command}\r`);
+    } else if (agentLoopRef.current) {
+      await agentLoopRef.current.run(`fix error: ${rem.actionTitle}`, { os: 'mac', cwd: currentPath || '~' });
+    }
+  };
 
   const handleAuthorize = async () => {
     if (!authPassword.trim()) {
@@ -99,8 +125,13 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
       allowTransparency: true,
       scrollback: 100000,
       allowProposedApi: true,
-      fontFamily: currentTheme.ui.fontFamily || 'Menlo, Monaco, "Courier New", monospace',
-      fontSize: currentTheme.ui.fontSize || 14,
+      convertEol: true,
+      fontFamily: currentTheme.ui.fontFamily || '"SF Mono", Menlo, Monaco, "Cascadia Code", "Courier New", monospace',
+      fontSize: currentTheme.ui.fontSize || 13.5,
+      lineHeight: 1.25,
+      letterSpacing: 0,
+      fontWeight: '400',
+      fontWeightBold: '700',
       theme: {
         background: 'rgba(0, 0, 0, 0)', // Completely transparent to reveal glassmorphism backdrop
         foreground: currentTheme.colors.foreground,
@@ -143,14 +174,16 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
 
     // Helper to write output locally while recording to SessionManager buffer for pane switching persistence
     const writeTerm = (text: string) => {
-      term.write(text);
+      const normalized = text.replace(/\r?\n/g, '\r\n');
+      term.write(normalized);
       if (currentSessionId) {
-        sessionManager.recordOutput(currentSessionId, text);
+        sessionManager.recordOutput(currentSessionId, normalized);
       }
     };
     
     // We must define the callback here so we can remove it later
     let outputCallback: ((data: Uint8Array) => void) | null = null;
+    let unsubRemediation: (() => void) | null = null;
 
     const initSession = async () => {
       try {
@@ -172,7 +205,20 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
 
         outputCallback = (data: Uint8Array) => {
           term.write(data);
+          try {
+            const str = new TextDecoder().decode(data);
+            PtyOutputObserver.getInstance().ingest(str, currentPath);
+          } catch { /* ignore decode error */ }
         };
+
+        unsubRemediation = PtyOutputObserver.getInstance().onRemediation((rem) => {
+          setActiveRemediation(rem);
+          if (rem) {
+            writeTerm(`\r\n\x1b[1;33m⚡ Sentinel Auto-Heal:\x1b[0m ${rem.cause}\r\n`);
+            writeTerm(`  • \x1b[36mSuggested Fix:\x1b[0m ${rem.actionTitle}\r\n`);
+            writeTerm(`  • \x1b[35mType \x1b[1m>fix\x1b[0m\x1b[35m or press \x1b[1m[Tab]\x1b[0m\x1b[35m to auto-resolve with Sentinel.\x1b[0m\r\n\r\n`);
+          }
+        });
 
         sessionManager.onOutput(currentSessionId, outputCallback);
 
@@ -181,20 +227,29 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
         toolLoader.loadAll();
         
         const agentLoop = new AgentLoop(toolLoader.getState());
+        agentLoopRef.current = agentLoop;
         agentLoop.setAuthorizationHandler((plan) => new Promise(resolve => {
           setSecurityModalPlan({ plan, resolve });
         }));
 
-        // Initialize Autocomplete
+        // Initialize Autocomplete with History, Demonstration, and Workspace Context providers
         const autocompleteEngine = new AutocompleteEngine();
         const historyProvider = new HistoryProvider();
+        const demonstrationProvider = new DemonstrationProvider();
+        const workspaceContextProvider = new WorkspaceContextProvider();
         autocompleteEngine.registerProvider(historyProvider);
+        autocompleteEngine.registerProvider(demonstrationProvider);
+        autocompleteEngine.registerProvider(workspaceContextProvider);
         
+        // Start Tier 4 Sentinel-SERL Autonomous Orchestrator
+        SentinelSerlCoordinator.getInstance().startCoordinator();
+
         const ghostText = new GhostTextRenderer(term);
         ghostText.attach(terminalRef.current!);
 
         term.onData(async (data) => {
           if (!currentSessionId) return;
+          SentinelSerlCoordinator.getInstance().markActivity();
 
           // Handle Tab completion or Right Arrow completion
           if (data === '\t' || data === '\x1b[C') {
@@ -203,6 +258,20 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
                await sessionManager.write(currentSessionId, remaining);
                ghostText.clear();
                return; // Intercept key
+             }
+
+             // If Tab is pressed and an auto-heal remediation is active
+             const activeRem = PtyOutputObserver.getInstance().getActiveRemediation();
+             if (activeRem) {
+               await sessionManager.write(currentSessionId, '\x03');
+               writeTerm(`\r\n\x1b[1;32m⚡ [Sentinel Auto-Heal] Executing: ${activeRem.actionTitle}...\x1b[0m\r\n`);
+               PtyOutputObserver.getInstance().clearRemediation();
+               if (activeRem.tool === 'shell.execute' && activeRem.params?.command) {
+                 await sessionManager.write(currentSessionId, `${activeRem.params.command}\r`);
+               } else {
+                 await agentLoop.run(`fix error: ${activeRem.actionTitle}`, { os: 'mac', cwd: currentPath || '~' });
+               }
+               return;
              }
           }
 
@@ -293,6 +362,104 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
                 return;
               }
 
+              // Intercept demonstration learning slash commands: /learn, /learned, /forget
+              if (cleanCmd.startsWith('/learn') || cleanCmd.startsWith('/learned') || cleanCmd.startsWith('/forget')) {
+                await sessionManager.write(currentSessionId!, '\x03');
+                if (cleanCmd.startsWith('/learned')) {
+                  const patterns = DemonstrationLearningEngine.getInstance().getAllPatterns();
+                  if (patterns.length === 0) {
+                    writeTerm(`\r\n\x1b[33m[Learning Engine] No custom patterns learned yet.\x1b[0m\r\n`);
+                    writeTerm(`\x1b[37mTeach Sentinel via:\x1b[0m \x1b[1;32m/learn <goal> -> <command>\x1b[0m\r\n\r\n`);
+                  } else {
+                    writeTerm(`\r\n\x1b[1;35m[Learning Engine] Currently Learned Workflows (${patterns.length}):\x1b[0m\r\n`);
+                    patterns.forEach((p, idx) => {
+                      writeTerm(`  ${idx + 1}. \x1b[36m"${p.originalGoal}"\x1b[0m\r\n     ──► \x1b[33m${p.commandTemplate}\x1b[0m\r\n     \x1b[90mID: ${p.id} | Used: ${p.timesUsed}x\x1b[0m\r\n`);
+                    });
+                    writeTerm(`\r\n\x1b[37mTo remove a pattern:\x1b[0m \x1b[1;31m/forget <id or goal>\x1b[0m\r\n\r\n`);
+                  }
+                } else if (cleanCmd.startsWith('/forget')) {
+                  const target = cleanCmd.replace(/^\/forget\s*/i, '').trim();
+                  if (target) {
+                    const ok = DemonstrationLearningEngine.getInstance().forgetPattern(target);
+                    if (ok) {
+                      writeTerm(`\r\n\x1b[1;32m[Learning Engine] Successfully removed learned pattern:\x1b[0m ${target}\r\n\r\n`);
+                    } else {
+                      writeTerm(`\r\n\x1b[1;31m[Learning Engine] Could not find pattern matching:\x1b[0m ${target}\r\n\r\n`);
+                    }
+                  } else {
+                    writeTerm(`\r\n\x1b[37mUsage:\x1b[0m \x1b[1;31m/forget <pattern_id or goal>\x1b[0m\r\n\r\n`);
+                  }
+                } else {
+                  // /learn <trigger> -> <command>
+                  const match = cleanCmd.match(/^\/learn\s+(.+?)\s*(?:->|=>|──►|to)\s*(.+)$/i);
+                  if (match && match[1] && match[2]) {
+                    const pattern = DemonstrationLearningEngine.getInstance().learnExplicit(match[1], match[2]);
+                    EpisodicMemoryEngine.getInstance().recordMemory(match[1], match[2], {
+                      cwd: currentPath,
+                      source: 'explicit_teach'
+                    });
+                    writeTerm(`\r\n\x1b[1;32m[Learning Engine] Successfully learned new workflow:\x1b[0m\r\n`);
+                    writeTerm(`  • Trigger: \x1b[1;36m"${pattern.originalGoal}"\x1b[0m\r\n`);
+                    writeTerm(`  • Command: \x1b[1;33m${pattern.commandTemplate}\x1b[0m\r\n`);
+                    writeTerm(`\x1b[37m[Learning Engine] Saved to persistent storage (~/.sentinel/learned_patterns.json & episodic memory).\x1b[0m\r\n\r\n`);
+                  } else {
+                    writeTerm(`\r\n\x1b[37mUsage:\x1b[0m \x1b[1;32m/learn <natural language goal> -> <command>\x1b[0m\r\n`);
+                    writeTerm(`Example: \x1b[36m/learn compress backups -> tar -czvf backups.tar.gz ./backups\x1b[0m\r\n\r\n`);
+                  }
+                }
+                return;
+              }
+
+              // Intercept auto-heal remediation commands: >fix, >heal
+              if (cleanCmd === '>fix' || cleanCmd === '>heal') {
+                await sessionManager.write(currentSessionId!, '\x03');
+                const rem = PtyOutputObserver.getInstance().getActiveRemediation();
+                if (rem) {
+                  writeTerm(`\r\n\x1b[1;32m⚡ [Sentinel Auto-Heal] Executing: ${rem.actionTitle}...\x1b[0m\r\n`);
+                  PtyOutputObserver.getInstance().clearRemediation();
+                  await agentLoop.run(`fix error: ${rem.actionTitle}`, { os: 'mac', cwd: currentPath || '~' });
+                } else {
+                  writeTerm(`\r\n\x1b[33m[Sentinel Auto-Heal] No active error diagnosed in recent output.\x1b[0m\r\n\r\n`);
+                }
+                return;
+              }
+
+              // If there was an unresolved AI goal within the last 3 minutes and the user demonstrates a command
+              if (
+                lastUnresolvedGoalRef.current &&
+                Date.now() - lastUnresolvedGoalRef.current.timestamp < 180000 &&
+                !['ls', 'pwd', 'clear', 'exit'].includes(cleanCmd.toLowerCase()) &&
+                !cleanCmd.startsWith('cd ') &&
+                !cleanCmd.startsWith('>') &&
+                !cleanCmd.startsWith('/')
+              ) {
+                const learned = DemonstrationLearningEngine.getInstance().learnFromDemonstration(
+                  lastUnresolvedGoalRef.current.goal,
+                  cleanCmd
+                );
+                EpisodicMemoryEngine.getInstance().recordMemory(
+                  lastUnresolvedGoalRef.current.goal,
+                  cleanCmd,
+                  {
+                    cwd: currentPath,
+                    source: 'demonstration'
+                  }
+                );
+                // Tier 4: Feed human demonstration into Sentinel-SERL closed-loop
+                SentinelSerlCoordinator.getInstance().onHumanDemonstration(
+                  lastUnresolvedGoalRef.current.goal,
+                  cleanCmd,
+                  `Human demonstration in ${currentPath || '~'}`
+                ).catch(e => console.warn('[TerminalView] SERL demonstration recording error:', e));
+                if (learned) {
+                  writeTerm(`\r\n\x1b[1;35m💡 Sentinel learned this workflow from your demonstration!\x1b[0m\r\n`);
+                  writeTerm(`  • \x1b[36mTrigger:\x1b[0m "${lastUnresolvedGoalRef.current.goal}"\r\n`);
+                  writeTerm(`  • \x1b[33mCommand:\x1b[0m ${cleanCmd}\r\n`);
+                  writeTerm(`  • \x1b[37mSaved to ~/.sentinel/learned_patterns.json & LoRA training dataset. Next time you ask, Sentinel will know this!\x1b[0m\r\n\r\n`);
+                  lastUnresolvedGoalRef.current = null;
+                }
+              }
+
               // `>` starts an AI request. Once it asks a clarification question,
               // the next normal terminal entry is treated as the answer so the
               // workflow can resume without making the user retype the request.
@@ -317,19 +484,40 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
 
                 // Set up event listener for live output
                 agentLoop.onEvent((event) => {
-                  writeTerm(formatAgentEvent(event));
-                  if (event.type === 'plan' && event.data) {
-                    setLatestPlan(event.data as AgentPlan);
+                  if (event.type === 'plan') {
+                    if (event.data) {
+                      setLatestPlan(event.data as AgentPlan);
+                      setIsPlanOpen(true);
+                    }
+                    // Keep execution plan strictly in dropdown overlay; avoid terminal buffer spam
+                    return;
                   }
+
+                  if (event.type === 'done') {
+                    // Automatically collapse the dropdown plan when goal completes successfully
+                    setIsPlanOpen(false);
+                  }
+
+                  const text = formatAgentEvent(event);
+                  if (text) writeTerm(text);
+
                   // Show structured data (file lists, devices, etc.) when available
                   if (event.data && (event.type === 'tool_done' || event.type === 'done')) {
                     const dataOutput = formatDataOutput(event.data);
-                    if (dataOutput) writeTerm(dataOutput);
+                    if (dataOutput && (!text || !text.includes(dataOutput.trim()))) {
+                      writeTerm(dataOutput);
+                    }
                   }
                 });
 
                 // Run the agent loop
                 agentLoop.run(aiGoal, { os: 'mac', cwd: currentPath || '~' }).then(result => {
+                  if (!result.success) {
+                    lastUnresolvedGoalRef.current = { goal: aiGoal, timestamp: Date.now() };
+                  } else {
+                    lastUnresolvedGoalRef.current = null;
+                  }
+
                   // Handle clear terminal command
                   if (result.steps.some(s => s.tool === '__clear__')) {
                     term.clear();
@@ -348,6 +536,7 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
                     sessionManager.write(currentSessionId!, '\r');
                   }
                 }).catch(err => {
+                  lastUnresolvedGoalRef.current = { goal: aiGoal, timestamp: Date.now() };
                   writeTerm(`\r\n\x1b[1;31m  ✗ ${err.message || 'Something went wrong'}\x1b[0m\r\n\r\n`);
                   sessionManager.write(currentSessionId!, '\r');
                 });
@@ -432,6 +621,7 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
       if (currentSessionId && outputCallback) {
         sessionManager.offOutput(currentSessionId, outputCallback);
       }
+      unsubRemediation?.();
       unsubscribeTheme();
       term.dispose();
     };
@@ -458,24 +648,48 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
       />
 
       {latestPlan && (
-        <details style={{
-          position: 'absolute',
-          top: '12px',
-          right: '14px',
-          width: 'min(360px, calc(100% - 28px))',
-          padding: '10px 12px',
-          borderRadius: '10px',
-          border: '1px solid rgba(192, 132, 252, 0.28)',
-          background: 'rgba(20, 16, 29, 0.9)',
-          boxShadow: '0 10px 32px rgba(0, 0, 0, 0.35)',
-          backdropFilter: 'blur(12px)',
-          color: '#f5f3ff',
-          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-          fontSize: '12px',
-          zIndex: 30
-        }}>
-          <summary style={{ cursor: 'pointer', fontWeight: 650, color: '#d8b4fe', outline: 'none', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span>Execution Plan {latestPlan.phases ? `· ${latestPlan.phases.length} Phases` : `· ${latestPlan.steps.length} Steps`}</span>
+        <details 
+          open={isPlanOpen}
+          onToggle={(e) => setIsPlanOpen(e.currentTarget.open)}
+          style={{
+            position: 'absolute',
+            top: '12px',
+            right: '14px',
+            width: 'min(380px, calc(100% - 28px))',
+            padding: '10px 14px',
+            borderRadius: '10px',
+            border: latestPlan.phases?.every(p => p.status === 'completed')
+              ? '1px solid rgba(74, 222, 128, 0.35)'
+              : '1px solid rgba(192, 132, 252, 0.28)',
+            background: 'rgba(20, 16, 29, 0.94)',
+            boxShadow: '0 10px 32px rgba(0, 0, 0, 0.45)',
+            backdropFilter: 'blur(12px)',
+            color: '#f5f3ff',
+            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+            fontSize: '12px',
+            zIndex: 30,
+            transition: 'all 0.2s ease'
+          }}
+        >
+          <summary style={{
+            cursor: 'pointer',
+            fontWeight: 650,
+            color: latestPlan.phases?.every(p => p.status === 'completed') ? '#4ade80' : '#d8b4fe',
+            outline: 'none',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            userSelect: 'none'
+          }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span>{latestPlan.phases?.every(p => p.status === 'completed') ? '✓' : '⚡'}</span>
+              <span>Execution Plan {latestPlan.phases ? `· ${latestPlan.phases.length} Phases` : `· ${latestPlan.steps.length} Steps`}</span>
+              {latestPlan.phases?.every(p => p.status === 'completed') && (
+                <span style={{ fontSize: '10px', color: '#4ade80', background: 'rgba(34, 197, 94, 0.15)', padding: '1px 6px', borderRadius: '4px' }}>
+                  Completed
+                </span>
+              )}
+            </span>
             {latestPlan.activePhaseId && (
               <span style={{ fontSize: '10px', background: 'rgba(56, 189, 248, 0.25)', color: '#38bdf8', padding: '1px 6px', borderRadius: '4px' }}>
                 Running Phase {latestPlan.activePhaseId}
@@ -530,24 +744,116 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
         </details>
       )}
 
-      {/* Security & Deletion Authorization Overlay Modal */}
-      {securityModalPlan && (
+      {/* Floating Auto-Heal Action Banner HUD */}
+      {activeRemediation && (
         <div style={{
           position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(0, 0, 0, 0.75)',
+          top: '16px',
+          right: '20px',
+          maxWidth: '420px',
+          backgroundColor: 'rgba(15, 23, 42, 0.92)',
           backdropFilter: 'blur(16px)',
           WebkitBackdropFilter: 'blur(16px)',
+          border: '1px solid rgba(245, 158, 11, 0.4)',
+          borderRadius: '12px',
+          boxShadow: '0 12px 32px rgba(0, 0, 0, 0.65), 0 0 12px rgba(245, 158, 11, 0.15)',
+          padding: '14px 16px',
+          zIndex: 8000,
+          color: '#f8fafc',
           display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 9999,
-          padding: '20px',
-          transition: 'all 0.3s ease'
+          flexDirection: 'column',
+          gap: '10px',
+          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
         }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '15px' }}>⚡</span>
+              <span style={{ fontSize: '12px', fontWeight: 700, color: '#f59e0b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                Sentinel Auto-Heal
+              </span>
+            </div>
+            <button
+              onClick={() => {
+                setActiveRemediation(null);
+                PtyOutputObserver.getInstance().clearRemediation();
+              }}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: 'rgba(255,255,255,0.4)',
+                cursor: 'pointer',
+                fontSize: '14px',
+                padding: '2px 4px',
+                lineHeight: 1
+              }}
+              title="Dismiss"
+            >
+              ✕
+            </button>
+          </div>
+          <div style={{ fontSize: '12px', color: '#e2e8f0', lineHeight: 1.4 }}>
+            {activeRemediation.cause}
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '2px', gap: '8px' }}>
+            <span style={{ fontSize: '11px', color: '#38bdf8', fontFamily: 'monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={activeRemediation.params?.command || activeRemediation.actionTitle}>
+              Fix: {activeRemediation.params?.command || activeRemediation.actionTitle}
+            </span>
+            <button
+              onClick={() => handleExecuteRemediation(activeRemediation)}
+              style={{
+                background: '#f59e0b',
+                color: '#000',
+                border: 'none',
+                borderRadius: '6px',
+                padding: '6px 12px',
+                fontSize: '12px',
+                fontWeight: 600,
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                flexShrink: 0,
+                boxShadow: '0 2px 8px rgba(245, 158, 11, 0.3)'
+              }}
+            >
+              Auto-Fix <span style={{ opacity: 0.8, fontSize: '10px', background: 'rgba(0,0,0,0.18)', padding: '1px 4px', borderRadius: '3px' }}>Tab</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Security & Deletion Authorization Overlay Modal */}
+      {securityModalPlan && (
+        <div 
+          tabIndex={0}
+          ref={(el) => { if (el && !securityModalPlan.plan.requiresPassword) el.focus(); }}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape' || e.key === 'n' || e.key === 'N') {
+              securityModalPlan.resolve(false);
+              setSecurityModalPlan(null);
+              setAuthPassword('');
+            } else if ((e.key === 'Enter' || e.key === 'y' || e.key === 'Y') && !securityModalPlan.plan.requiresPassword) {
+              securityModalPlan.resolve(true);
+              setSecurityModalPlan(null);
+            }
+          }}
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.75)',
+            backdropFilter: 'blur(16px)',
+            WebkitBackdropFilter: 'blur(16px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+            padding: '20px',
+            transition: 'all 0.3s ease',
+            outline: 'none'
+          }}>
           <div style={{
             width: '100%',
             maxWidth: '460px',
@@ -586,7 +892,9 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
             </div>
 
             <p style={{ fontSize: '13px', lineHeight: '1.55', color: 'rgba(255, 255, 255, 0.75)', margin: '0 0 18px 0' }}>
-              To ensure system integrity and prevent unauthorized modifications, please verify your macOS user login password to execute this capability.
+              {securityModalPlan.plan.requiresPassword
+                ? 'To ensure system integrity and prevent unauthorized modifications, please verify your macOS user login password to execute this capability.'
+                : 'This terminal command requires your explicit confirmation before executing. Review the command and intent below.'}
             </p>
 
             <div style={{
@@ -608,47 +916,57 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
                   {String(securityModalPlan.plan.parameters?.path || securityModalPlan.plan.parameters?.source || securityModalPlan.plan.parameters?.command || JSON.stringify(securityModalPlan.plan.parameters))}
                 </span>
               </div>
-            </div>
-
-            <div style={{ marginBottom: '22px' }}>
-              <label style={{ display: 'block', fontSize: '12px', color: 'rgba(255, 255, 255, 0.85)', marginBottom: '8px', fontWeight: 500 }}>
-                macOS User Login Password:
-              </label>
-              <input
-                type="password"
-                value={authPassword}
-                onChange={(e) => { setAuthPassword(e.target.value); setAuthError(''); }}
-                placeholder="Enter system credentials..."
-                autoFocus
-                disabled={isVerifying}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !isVerifying) {
-                    handleAuthorize();
-                  } else if (e.key === 'Escape' && !isVerifying) {
-                    securityModalPlan.resolve(false);
-                    setSecurityModalPlan(null);
-                    setAuthPassword('');
-                  }
-                }}
-                style={{
-                  width: '100%',
-                  padding: '10px 14px',
-                  borderRadius: '8px',
-                  border: authError ? '1px solid rgba(239, 68, 68, 0.6)' : '1px solid rgba(255, 255, 255, 0.15)',
-                  backgroundColor: 'rgba(8, 9, 13, 0.75)',
-                  color: '#fff',
-                  fontSize: '13px',
-                  outline: 'none',
-                  boxSizing: 'border-box',
-                  transition: 'border-color 0.2s ease'
-                }}
-              />
-              {authError && (
-                <div style={{ color: '#ef4444', fontSize: '12px', marginTop: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <span>⚠️</span> {authError}
+              {securityModalPlan.plan.explanation && (
+                <div style={{ marginTop: '8px', paddingTop: '8px', borderTop: '1px solid rgba(255, 255, 255, 0.07)', display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
+                  <span style={{ color: '#a78bfa', flexShrink: 0, fontWeight: 600 }}>ℹ️ Intent:</span>
+                  <span style={{ color: '#f1f5f9', lineHeight: '1.45', wordBreak: 'break-word' }}>
+                    {securityModalPlan.plan.explanation}
+                  </span>
                 </div>
               )}
             </div>
+
+            {securityModalPlan.plan.requiresPassword ? (
+              <div style={{ marginBottom: '22px' }}>
+                <label style={{ display: 'block', fontSize: '12px', color: 'rgba(255, 255, 255, 0.85)', marginBottom: '8px', fontWeight: 500 }}>
+                  macOS User Login Password:
+                </label>
+                <input
+                  type="password"
+                  value={authPassword}
+                  onChange={(e) => { setAuthPassword(e.target.value); setAuthError(''); }}
+                  placeholder="Enter system credentials..."
+                  autoFocus
+                  disabled={isVerifying}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !isVerifying) {
+                      handleAuthorize();
+                    } else if (e.key === 'Escape' && !isVerifying) {
+                      securityModalPlan.resolve(false);
+                      setSecurityModalPlan(null);
+                      setAuthPassword('');
+                    }
+                  }}
+                  style={{
+                    width: '100%',
+                    padding: '10px 14px',
+                    borderRadius: '8px',
+                    border: authError ? '1px solid rgba(239, 68, 68, 0.6)' : '1px solid rgba(255, 255, 255, 0.15)',
+                    backgroundColor: 'rgba(8, 9, 13, 0.75)',
+                    color: '#fff',
+                    fontSize: '13px',
+                    outline: 'none',
+                    boxSizing: 'border-box',
+                    transition: 'border-color 0.2s ease'
+                  }}
+                />
+                {authError && (
+                  <div style={{ color: '#ef4444', fontSize: '12px', marginTop: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span>⚠️</span> {authError}
+                  </div>
+                )}
+              </div>
+            ) : null}
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
               <button
@@ -670,11 +988,18 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
                   transition: 'background-color 0.2s ease'
                 }}
               >
-                Cancel
+                Cancel <span style={{ opacity: 0.6, fontSize: '11px', marginLeft: '4px' }}>[Esc]</span>
               </button>
               <button
                 disabled={isVerifying}
-                onClick={handleAuthorize}
+                onClick={() => {
+                  if (securityModalPlan.plan.requiresPassword) {
+                    handleAuthorize();
+                  } else {
+                    securityModalPlan.resolve(true);
+                    setSecurityModalPlan(null);
+                  }
+                }}
                 style={{
                   padding: '9px 18px',
                   borderRadius: '8px',
@@ -685,10 +1010,14 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
                   cursor: isVerifying ? 'wait' : 'pointer',
                   fontWeight: 600,
                   boxShadow: isVerifying ? 'none' : '0 2px 10px rgba(245, 158, 11, 0.3)',
-                  transition: 'all 0.2s ease'
+                  transition: 'all 0.2s ease',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px'
                 }}
               >
-                {isVerifying ? 'Authenticating...' : 'Authorize'}
+                {isVerifying ? 'Authenticating...' : securityModalPlan.plan.requiresPassword ? 'Authorize' : 'Approve & Execute'}
+                {!isVerifying && <span style={{ opacity: 0.75, fontSize: '11px', background: 'rgba(0,0,0,0.18)', padding: '1px 5px', borderRadius: '4px' }}>↵ Enter</span>}
               </button>
             </div>
           </div>

@@ -9,14 +9,14 @@ export interface RiskAnalysisResult {
 }
 
 export interface ISecurityEngine {
-  analyzeCommand(command: string, args?: string[]): RiskAnalysisResult;
+  analyzeCommand(command: string, args?: string[], explanation?: string): RiskAnalysisResult;
   analyzeWorkflow(actions: any[]): RiskAnalysisResult;
   calculateRisk(capabilityId: string, input: any): RiskAnalysisResult;
 }
 
 export class SecurityEngine implements ISecurityEngine {
-  analyzeCommand(command: string, args: string[] = []): RiskAnalysisResult {
-    const fullCmd = [command, ...args].join(' ');
+  analyzeCommand(command: string, args: string[] = [], explanation?: string): RiskAnalysisResult {
+    const fullCmd = [command, ...args].join(' ').trim();
     const lowerCmd = fullCmd.toLowerCase();
 
     // 1. Super-User / Administrator Commands
@@ -72,14 +72,41 @@ export class SecurityEngine implements ISecurityEngine {
       };
     }
 
-    // 4. Safe Read-Only Commands
-    const safeCommands = ['ls', 'pwd', 'echo', 'cat', 'whoami', 'date', 'time', 'cal', 'env', 'clear', 'uptime', 'uname', 'which', 'head', 'tail', 'grep', 'system_profiler', 'ps', 'osascript', 'df', 'du', 'top', 'htop', 'id', 'hostname', 'groups', 'printenv'];
-    const firstWord = lowerCmd.trim().split(/\s+/)[0];
-    if (safeCommands.includes(firstWord)) {
-      return { score: 5, level: 'SAFE', explanation: 'Safe read-only system command.', requiresPassword: false, requiresConsent: false };
+    // 5. Safe Read-Only Commands
+    const safeCommands = [
+      'ls', 'pwd', 'echo', 'cat', 'whoami', 'date', 'time', 'cal', 'env', 'clear',
+      'uptime', 'uname', 'which', 'head', 'tail', 'grep', 'system_profiler', 'ps',
+      'osascript', 'df', 'du', 'top', 'htop', 'id', 'hostname', 'groups', 'printenv',
+      'mdfind', 'lsof', 'sw_vers', 'file', 'wc', 'sort', 'uniq', 'awk', 'sed', 'cut', 'tr'
+    ];
+    const parts = lowerCmd.split(/\s+/);
+    const firstWord = parts[0];
+    const secondWord = parts[1];
+
+    const isSafeFind = firstWord === 'find' && !lowerCmd.includes('-delete') && !lowerCmd.includes('-exec') && !lowerCmd.includes(' rm ');
+    const isSafePmset = firstWord === 'pmset' && secondWord === '-g';
+    const isSafeNetworksetup = firstWord === 'networksetup' && (secondWord?.startsWith('-list') || secondWord?.startsWith('-get'));
+
+    if (
+      safeCommands.includes(firstWord) ||
+      isSafeFind ||
+      isSafePmset ||
+      isSafeNetworksetup ||
+      (firstWord === 'git' && ['status', 'log', 'diff', 'show', 'branch', 'remote'].includes(secondWord)) ||
+      (['npm', 'pnpm', 'yarn', 'bun', 'cargo', 'go', 'pytest', 'vitest'].includes(firstWord) && ['test', 'run', 'check', 'lint', 'audit', 'version', '--version', '-v'].includes(secondWord || ''))
+    ) {
+      return { score: 5, level: 'SAFE', explanation: 'Safe read-only or developer test command.', requiresPassword: false, requiresConsent: false };
     }
 
-    return { score: 10, level: 'SAFE', explanation: 'Standard terminal utility execution.', requiresPassword: false, requiresConsent: false };
+    // 6. Generative Long-Tail Shell Command Execution
+    // Requires explicit user consent and presents 1-line plain English explanation without requiring system password
+    return {
+      score: 55,
+      level: 'SENSITIVE',
+      explanation: explanation || `Executes terminal command: "${fullCmd}". User confirmation required before execution.`,
+      requiresPassword: false,
+      requiresConsent: true
+    };
   }
 
   analyzeWorkflow(actions: any[]): RiskAnalysisResult {
@@ -108,7 +135,7 @@ export class SecurityEngine implements ISecurityEngine {
 
   calculateRisk(capabilityId: string, input: any): RiskAnalysisResult {
     if (capabilityId === 'shell.core' || capabilityId === 'shell.execute' || capabilityId === 'terminal.run') {
-      return this.analyzeCommand(input?.command || input?.cmd || '', input?.args || []);
+      return this.analyzeCommand(input?.command || input?.cmd || '', input?.args || [], input?.explanation);
     }
     
     // 1. Filesystem Deletions and Modifications
