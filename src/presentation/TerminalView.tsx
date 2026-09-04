@@ -125,6 +125,7 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
       allowTransparency: true,
       scrollback: 100000,
       allowProposedApi: true,
+      convertEol: true,
       fontFamily: currentTheme.ui.fontFamily || '"SF Mono", Menlo, Monaco, "Cascadia Code", "Courier New", monospace',
       fontSize: currentTheme.ui.fontSize || 13.5,
       lineHeight: 1.25,
@@ -173,9 +174,10 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
 
     // Helper to write output locally while recording to SessionManager buffer for pane switching persistence
     const writeTerm = (text: string) => {
-      term.write(text);
+      const normalized = text.replace(/\r?\n/g, '\r\n');
+      term.write(normalized);
       if (currentSessionId) {
-        sessionManager.recordOutput(currentSessionId, text);
+        sessionManager.recordOutput(currentSessionId, normalized);
       }
     };
     

@@ -31,12 +31,66 @@ export interface AgentEventFormatted {
 }
 
 /**
+ * Renders Markdown-like AI text responses cleanly for raw terminal buffers (xterm.js).
+ * Converts headers, bold, inline code, lists, and code blocks into ANSI terminal sequences
+ * with guaranteed CRLF (\r\n) line endings and consistent column-0 indentation.
+ */
+export function formatMarkdownTerminal(text: string): string {
+  if (!text) return '';
+  const lines = text.split(/\r?\n/);
+  let inCodeBlock = false;
+  const formattedLines: string[] = [];
+
+  for (let rawLine of lines) {
+    const line = rawLine;
+
+    if (line.trim().startsWith('```')) {
+      inCodeBlock = !inCodeBlock;
+      if (inCodeBlock) {
+        const lang = line.trim().replace(/^```/, '').trim();
+        formattedLines.push(`  ${C.gray}┌──${lang ? ' ' + lang + ' ' : ''}─────────────────────────────────────────${C.reset}`);
+      } else {
+        formattedLines.push(`  ${C.gray}└────────────────────────────────────────────────${C.reset}`);
+      }
+      continue;
+    }
+
+    if (inCodeBlock) {
+      formattedLines.push(`  ${C.gray}│${C.reset}  ${C.cyan}${line}${C.reset}`);
+      continue;
+    }
+
+    if (!line.trim()) {
+      formattedLines.push('');
+      continue;
+    }
+
+    if (/^#{1,4}\s+/.test(line.trim())) {
+      const headerText = line.trim().replace(/^#{1,4}\s+/, '');
+      formattedLines.push(`  ${C.boldCyan}${headerText}${C.reset}`);
+      continue;
+    }
+
+    let formatted = line
+      .replace(/\*\*([^*]+)\*\*/g, `${C.bold}$1${C.reset}`)
+      .replace(/__([^_]+)__/g, `${C.bold}$1${C.reset}`)
+      .replace(/`([^`]+)`/g, `${C.cyan}$1${C.reset}`)
+      .replace(/^(\s*)(\d+\.)\s+/, `$1${C.boldCyan}$2${C.reset} `)
+      .replace(/^(\s*)[-*•]\s+/, `$1${C.cyan}•${C.reset} `);
+
+    formattedLines.push(`  ${formatted}`);
+  }
+
+  return formattedLines.join('\r\n');
+}
+
+/**
  * Format an agent event into a clean terminal string.
  */
 export function formatAgentEvent(event: AgentEventFormatted): string {
   switch (event.type) {
     case 'thinking':
-      return `\r\n${C.dim}${C.cyan}● ${event.message}${C.reset}\r\n`;
+      return `\r\n${C.dim}${C.cyan}● ${event.message.replace(/\r?\n/g, '\r\n')}${C.reset}\r\n`;
 
     case 'plan':
       // The interactive execution plan is presented via the floating HUD dropdown in the UI.
@@ -44,30 +98,33 @@ export function formatAgentEvent(event: AgentEventFormatted): string {
       return '';
 
     case 'question':
-      return `\r\n${C.boldYellow}  ? ${event.message}${C.reset}\r\n${C.dim}  Type your answer to continue, or /cancel to stop this workflow.${C.reset}\r\n`;
+      return `\r\n${C.boldYellow}  ? ${event.message.replace(/\r?\n/g, '\r\n  ')}${C.reset}\r\n${C.dim}  Type your answer to continue, or /cancel to stop this workflow.${C.reset}\r\n`;
 
     case 'tool_start':
-      return `${C.dim}${C.white}  ▸ ${event.message}${C.reset}\r\n`;
+      return `${C.dim}${C.white}  ▸ ${event.message.replace(/\r?\n/g, '\r\n  ')}${C.reset}\r\n`;
 
     case 'tool_done':
       if (event.message.startsWith('✓')) {
-        return `${C.green}  ${event.message}${C.reset}\r\n`;
+        return `${C.green}  ${event.message.replace(/\r?\n/g, '\r\n  ')}${C.reset}\r\n`;
       } else if (event.message.startsWith('⚠')) {
-        return `${C.yellow}  ${event.message}${C.reset}\r\n`;
+        return `${C.yellow}  ${event.message.replace(/\r?\n/g, '\r\n  ')}${C.reset}\r\n`;
       }
-      return `${C.white}  ${event.message}${C.reset}\r\n`;
+      return `${C.white}  ${event.message.replace(/\r?\n/g, '\r\n  ')}${C.reset}\r\n`;
 
     case 'done':
+      if (event.message.includes('\n') || event.message.includes('**') || event.message.includes('```')) {
+        return `\r\n${formatMarkdownTerminal(event.message)}\r\n`;
+      }
       return `${C.boldGreen}  ${event.message}${C.reset}\r\n`;
 
     case 'error':
-      return `${C.boldRed}  ✗ ${event.message}${C.reset}\r\n`;
+      return `${C.boldRed}  ✗ ${event.message.replace(/\r?\n/g, '\r\n  ')}${C.reset}\r\n`;
 
     case 'step_output':
-      return `${C.white}${event.message}${C.reset}\r\n`;
+      return `${C.white}${event.message.replace(/\r?\n/g, '\r\n')}${C.reset}\r\n`;
 
     default:
-      return `${event.message}\r\n`;
+      return `${event.message.replace(/\r?\n/g, '\r\n')}\r\n`;
   }
 }
 
