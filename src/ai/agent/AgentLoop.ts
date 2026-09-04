@@ -502,16 +502,27 @@ export class AgentLoop {
       };
     }
 
+    // When the AI engine is available, ALWAYS route user requests directly to the LLM model
+    // so the AI understands, reasons, selects tools, and executes dynamically.
+    // Local fast paths are strictly reserved as an offline fallback when no AI engine is active.
+    let isAIAvailable = await this.modelManager.getActiveProvider().isAvailable();
+    if (!isAIAvailable) {
+      const embeddedMgr = EmbeddedEngineManager.getInstance();
+      if (await embeddedMgr.checkModelExists()) {
+        isAIAvailable = true;
+      }
+    }
+
     let result: AgentResult;
-    if (cleaned.length > 0) {
-      const fastResult = await this.tryFastPath(cleaned, context);
+    if (isAIAvailable) {
+      result = await this.runLLMLoop(goal.trim(), context);
+    } else {
+      const fastResult = await this.tryFastPath(cleaned || goal.trim(), context);
       if (fastResult) {
         result = fastResult;
       } else {
-        result = await this.runLLMLoop(cleaned || goal.trim(), context);
+        result = await this.runLLMLoop(goal.trim(), context);
       }
-    } else {
-      result = await this.runLLMLoop(goal.trim(), context);
     }
 
     this.conversationHistory.push({ role: 'user', content: goal.trim() });
