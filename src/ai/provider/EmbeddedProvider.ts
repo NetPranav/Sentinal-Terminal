@@ -138,42 +138,47 @@ export class EmbeddedProvider implements ModelProvider {
   public async generate(prompt: string, _modelId?: string, options?: GenerateOptions): Promise<ProviderResponse> {
     const startTime = performance.now();
 
-    // Split system prompt from user message if present
-    const systemSplit = prompt.indexOf('\n\nUser: ');
     let messages: { role: string; content: string }[];
-    
-    if (systemSplit > 0) {
-      const systemPrompt = prompt.substring(0, systemSplit).trim();
-      const conversationPart = prompt.substring(systemSplit).trim();
-      
-      // Parse User:/Assistant: blocks into proper messages
-      messages = [{ role: 'system', content: systemPrompt }];
-      const lines = conversationPart.split('\n');
-      let currentRole = '';
-      let currentContent = '';
-      
-      for (const line of lines) {
-        if (line.startsWith('User: ')) {
-          if (currentRole && currentContent) {
-            messages.push({ role: currentRole, content: currentContent.trim() });
-          }
-          currentRole = 'user';
-          currentContent = line.substring(6);
-        } else if (line.startsWith('Assistant: ')) {
-          if (currentRole && currentContent) {
-            messages.push({ role: currentRole, content: currentContent.trim() });
-          }
-          currentRole = 'assistant';
-          currentContent = line.substring(11);
-        } else if (currentRole) {
-          currentContent += '\n' + line;
-        }
-      }
-      if (currentRole && currentContent) {
-        messages.push({ role: currentRole, content: currentContent.trim() });
-      }
+
+    if (options?.messages && options.messages.length > 0) {
+      messages = options.messages;
     } else {
-      messages = [{ role: 'user', content: prompt }];
+      // Split system prompt from user message if present
+      const systemSplit = prompt.indexOf('\n\nUser: ');
+      
+      if (systemSplit > 0) {
+        const systemPrompt = prompt.substring(0, systemSplit).trim();
+        const conversationPart = prompt.substring(systemSplit).trim();
+        
+        // Parse User:/Assistant: blocks into proper messages
+        messages = [{ role: 'system', content: systemPrompt }];
+        const lines = conversationPart.split('\n');
+        let currentRole = '';
+        let currentContent = '';
+        
+        for (const line of lines) {
+          if (line.startsWith('User: ')) {
+            if (currentRole && currentContent) {
+              messages.push({ role: currentRole, content: currentContent.trim() });
+            }
+            currentRole = 'user';
+            currentContent = line.substring(6);
+          } else if (line.startsWith('Assistant: ')) {
+            if (currentRole && currentContent) {
+              messages.push({ role: currentRole, content: currentContent.trim() });
+            }
+            currentRole = 'assistant';
+            currentContent = line.substring(11);
+          } else if (currentRole) {
+            currentContent += '\n' + line;
+          }
+        }
+        if (currentRole && currentContent) {
+          messages.push({ role: currentRole, content: currentContent.trim() });
+        }
+      } else {
+        messages = [{ role: 'user', content: prompt }];
+      }
     }
 
     // Primary: OpenAI-compatible chat completions (best for instruct models)
@@ -190,7 +195,9 @@ export class EmbeddedProvider implements ModelProvider {
           // Optimizations for speed
           repeat_penalty: 1.1,
           top_k: 20,
-          cache_prompt: true
+          cache_prompt: true,
+          ...(options?.logitBias ? { logit_bias: options.logitBias } : {}),
+          ...(options?.grammar ? { grammar: options.grammar } : {})
         })
       });
 
@@ -224,7 +231,8 @@ export class EmbeddedProvider implements ModelProvider {
             temperature: options?.temperature ?? 0.05,
             top_p: options?.topP ?? 0.9,
             stop: ['</s>', '<|im_end|>', '\n\n\n'],
-            cache_prompt: true
+            cache_prompt: true,
+            ...(options?.grammar ? { grammar: options.grammar } : {})
           })
         });
 

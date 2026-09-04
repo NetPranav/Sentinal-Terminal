@@ -77,6 +77,39 @@ describe('ErrorDiagnosticsEngine', () => {
     });
   });
 
+  describe('Phase 5.2 — DeterministicRuleOracle (thefuck Architecture) Integration', () => {
+    it('diagnoses missing git upstream and provides exact git push command', () => {
+      const error = `fatal: The current branch feat-payments has no upstream branch.
+To push the current branch and set the remote as upstream, use
+
+    git push --set-upstream origin feat-payments`;
+
+      const diagnosis = ErrorDiagnosticsEngine.diagnose(error, 'shell.execute', { command: 'git push' });
+
+      expect(diagnosis.category).toBe('SOFTWARE_RECOVERABLE');
+      expect(diagnosis.canRetry).toBe(true);
+      expect(diagnosis.remediation).toBeDefined();
+      expect(diagnosis.remediation?.tool).toBe('shell.execute');
+      expect(diagnosis.remediation?.params.command).toBe('git push --set-upstream origin feat-payments');
+    });
+
+    it('diagnoses Docker daemon stopped and suggests launching Docker Desktop', () => {
+      const error = 'Cannot connect to the Docker daemon at unix:///var/run/docker.sock. Is the docker daemon running?';
+      const diagnosis = ErrorDiagnosticsEngine.diagnose(error, 'shell.execute', { command: 'docker ps' });
+
+      expect(diagnosis.category).toBe('SOFTWARE_RECOVERABLE');
+      expect(diagnosis.remediation?.params.command).toContain('open -a Docker');
+    });
+
+    it('diagnoses command typo (gti -> git)', () => {
+      const error = 'zsh: command not found: gti';
+      const diagnosis = ErrorDiagnosticsEngine.diagnose(error, 'shell.execute', { command: 'gti status' });
+
+      expect(diagnosis.category).toBe('SOFTWARE_RECOVERABLE');
+      expect(diagnosis.remediation?.params.command).toBe('git status');
+    });
+  });
+
   describe('Fatal Unknown Error Fallback', () => {
     it('should classify unrecoverable syntax/binary failure as FATAL_UNKNOWN without infinite loop', () => {
       const error = 'Segmentation fault (core dumped)';

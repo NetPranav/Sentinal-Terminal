@@ -45,8 +45,24 @@ export class PolicyEngine implements IPolicyEngine {
 
         if (isDeleteCap) {
           const rawPath = String(input.path || input.target || input.source || '').trim();
-          // Remove quotes, and remove trailing slashes (unless the path is literally "/" or "//")
-          const normalized = rawPath.replace(/^['"]|['"]$/g, '').replace(/(.+)\/+$/, '$1');
+          let clean = rawPath.replace(/^['"]|['"]$/g, '').trim().replace(/(.+)\/+$/, '$1');
+
+          // Normalize dot-segments (../) to prevent directory traversal bypasses
+          if (clean.startsWith('/')) {
+            const parts = clean.split(/\/+/);
+            const resolved: string[] = [];
+            for (const part of parts) {
+              if (part === '' || part === '.') continue;
+              if (part === '..') {
+                resolved.pop();
+              } else {
+                resolved.push(part);
+              }
+            }
+            clean = '/' + resolved.join('/');
+          }
+
+          const normalized = clean;
 
           const protectedRoots = [
             '/', '~', '$HOME', '${HOME}', 
@@ -55,7 +71,17 @@ export class PolicyEngine implements IPolicyEngine {
           
           const destructiveGlobs = ['/*', '~/*', '$HOME/*', '/System/*', '/usr/*', '/bin/*', '/etc/*'];
 
-          if (protectedRoots.includes(normalized) || destructiveGlobs.includes(rawPath)) {
+          for (const root of protectedRoots) {
+            if (root === '/' || root === '~' || root === '$HOME' || root === '${HOME}') {
+              if (normalized === root) return 'Deny';
+            } else {
+              if (normalized === root || normalized.startsWith(root + '/')) {
+                return 'Deny';
+              }
+            }
+          }
+
+          if (destructiveGlobs.includes(rawPath) || destructiveGlobs.includes(normalized)) {
             return 'Deny';
           }
         }

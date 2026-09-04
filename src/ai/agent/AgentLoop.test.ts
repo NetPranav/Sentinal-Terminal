@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest';
-import { isExplicitFilesystemSearch, findFastPath } from './AgentLoop';
+import { describe, expect, it, vi } from 'vitest';
+import { isExplicitFilesystemSearch, findFastPath, AgentLoop, isConversationalRefusal, isActionableGoal, isReferentialFollowup, cleanseConversationalRefusal } from './AgentLoop';
+import { DemonstrationLearningEngine } from '../../domain/learning/DemonstrationLearningEngine';
 
 describe('AgentLoop fast-path routing', () => {
   it('uses the filesystem shortcut only for explicit file-oriented searches', () => {
@@ -72,4 +73,715 @@ describe('AgentLoop fast-path routing', () => {
     expect(webRes?.params.engine).toBe('google');
     expect(webRes?.params.query).toBe('quantum computing advances');
   });
+
+  it('should resolve workspace disambiguation and execute project plan on user selection', async () => {
+    const { AgentLoop } = await import('./AgentLoop');
+    const mockToolExecutor = {
+      hasDriver: () => true,
+      execute: (tool: string, params: any) => Promise.resolve({ success: true, data: { stdout: `Executed ${tool}` } })
+    };
+    const mockRegistry = {
+      toolIndex: { getAll: () => [] }
+    };
+    const loop = new AgentLoop(mockRegistry as any, mockToolExecutor as any);
+
+    // Simulate pending clarification from a multi-project discovery
+    (loop as any).pendingClarification = {
+      goal: 'run gazebo',
+      plan: {
+        summary: 'Disambiguate project for "gazebo"',
+        steps: [],
+        phases: [],
+        question: 'Found 2 projects: [1] drone_ws [2] rover_ws',
+        discoveredProjects: [
+          {
+            id: '1',
+            name: 'drone_ws',
+            path: '/home/user/drone_ws',
+            type: 'ros2',
+            setupScript: 'source install/setup.bash',
+            launchTarget: 'ros2 launch drone_ws quad.launch.py',
+            confidence: 100
+          },
+          {
+            id: '2',
+            name: 'rover_ws',
+            path: '/home/user/rover_ws',
+            type: 'ros1',
+            setupScript: 'source devel/setup.bash',
+            launchTarget: 'roslaunch rover_ws sim.launch',
+            confidence: 90
+          }
+        ]
+      }
+    };
+
+    // User chooses option 1
+    const result = await loop.run('1', { os: 'linux', cwd: '/home/user' });
+    expect(result.success).toBe(true);
+    expect(result.cdPath).toBe('/home/user/drone_ws');
+    expect(result.steps.length).toBe(3);
+    expect(result.steps[0].tool).toBe('filesystem.navigate');
+    expect(result.steps[1].tool).toBe('shell.execute');
+    expect(result.steps[1].params.command).toBe('source install/setup.bash');
+    expect(result.steps[2].tool).toBe('shell.execute');
+    expect(result.steps[2].params.command).toBe('ros2 launch drone_ws quad.launch.py');
+  });
+
+  it('routes system service and dotfile rice commands directly via fast-path', () => {
+    const serviceRes = findFastPath('restart postgresql service');
+    expect(serviceRes).not.toBeNull();
+    expect(serviceRes?.tool).toBe('system.service');
+    expect(serviceRes?.params.service).toBe('postgresql');
+    expect(serviceRes?.params.action).toBe('restart');
+
+    const dotfileRes = findFastPath('turn off gazebo in hyprland');
+    expect(dotfileRes).not.toBeNull();
+    expect(dotfileRes?.tool).toBe('system.dotfile');
+    expect(dotfileRes?.params.app).toBe('gazebo');
+    expect(dotfileRes?.params.enable).toBe(false);
+    expect(dotfileRes?.params.target).toBe('hyprland');
+  });
+
+  it('executes user request via learned demonstration pattern without invoking LLM', async () => {
+    const learningEngine = DemonstrationLearningEngine.getInstance();
+    learningEngine.clear();
+    learningEngine.learnExplicit(
+      'compress backups into archive',
+      'tar -czvf backups.tar.gz ./backups',
+      'Compresses backups directory into tar.gz archive'
+    );
+
+    const mockToolExecutor = {
+      hasDriver: vi.fn().mockReturnValue(true),
+      execute: vi.fn().mockResolvedValue({
+        success: true,
+        data: { stdout: 'backups.tar.gz created' }
+      })
+    };
+
+    const loop = new AgentLoop(
+      { toolIndex: { has: () => false, getAll: () => [] } } as any,
+      undefined
+    );
+    (loop as any).toolExecutor = mockToolExecutor;
+
+    const res = await loop.run('compress backups into archive', { os: 'mac', cwd: '/test' });
+    expect(res.success).toBe(true);
+    expect(mockToolExecutor.execute).toHaveBeenCalledWith(
+      'shell.execute',
+      expect.objectContaining({
+        command: 'tar -czvf backups.tar.gz ./backups'
+      }),
+      '/test',
+      undefined
+    );
+    expect(res.summary).toContain('Executed learned workflow: tar -czvf backups.tar.gz ./backups');
+  });
+
+  it('normalizes shell-native execute JSON contract into shell.execute tool call', () => {
+    const loop = new AgentLoop({ toolIndex: { has: () => false, getAll: () => [] } } as any);
+    const parsed = (loop as any).parseLLMResponse(JSON.stringify({
+      action: 'execute',
+      command: 'mdfind "kMDItemFSName == \'*frontend*\'c && kMDItemContentType == \'public.folder\'"',
+      explanation: 'Search entire Mac for frontend directories'
+    }));
+
+    expect(parsed).not.toBeNull();
+    expect(parsed.action).toBe('tool');
+    expect(parsed.tool).toBe('shell.execute');
+    expect(parsed.params.command).toBe('mdfind "kMDItemFSName == \'*frontend*\'c && kMDItemContentType == \'public.folder\'"');
+    expect(parsed.params.explanation).toBe('Search entire Mac for frontend directories');
+  });
+
+  it('normalizes bare command JSON object into shell.execute tool call', () => {
+    const loop = new AgentLoop({ toolIndex: { has: () => false, getAll: () => [] } } as any);
+    const parsed = (loop as any).parseLLMResponse(JSON.stringify({
+      command: 'lsof -iTCP -sTCP:LISTEN -n -P',
+      explanation: 'List active listening ports'
+    }));
+
+    expect(parsed).not.toBeNull();
+    expect(parsed.action).toBe('tool');
+    expect(parsed.tool).toBe('shell.execute');
+    expect(parsed.params.command).toBe('lsof -iTCP -sTCP:LISTEN -n -P');
+  });
+
+  it('routes search query fallback to shell-native Spotlight mdfind on macOS', () => {
+    const loop = new AgentLoop({ toolIndex: { has: () => false, getAll: () => [] } } as any);
+    const fallback = (loop as any).tryHeuristicFallback('find all frontend folders in my system', { os: 'mac', cwd: '/workspace' });
+
+    expect(fallback).not.toBeNull();
+    expect(fallback.tool).toBe('shell.execute');
+    expect(fallback.params.command).toContain('mdfind');
+    expect(fallback.params.command).toContain('*frontend*');
+    expect(fallback.params.command).toContain('public.folder');
+  });
+
+  describe('Tier 2: Refusal Interception & Autonomous Self-Healing', () => {
+    it('detects canned chatbot refusals accurately', () => {
+      expect(isConversationalRefusal("I don't have access to your file system.")).toBe(true);
+      expect(isConversationalRefusal("As an AI, I am unable to view your local files or execute commands.")).toBe(true);
+      expect(isConversationalRefusal("I cannot access your network or system directories.")).toBe(true);
+      expect(isConversationalRefusal("I do not have access to the operating system.")).toBe(true);
+      expect(isConversationalRefusal("I am unable to search your computer.")).toBe(true);
+      expect(isConversationalRefusal("I'm sorry, but as an AI language model, I don't have the ability to directly manipulate or change your device's IP address without using a VPN or changing your network configuration. However, I can provide you with general information on how to do this if you're interested in learning more about it.")).toBe(true);
+
+      expect(isConversationalRefusal("Found 12 matching folders.")).toBe(false);
+      expect(isConversationalRefusal("The active listening port is 3000.")).toBe(false);
+      expect(isConversationalRefusal("I am Sentinel, an autonomous mac terminal AI copilot.")).toBe(false);
+    });
+
+    it('identifies actionable system goals versus informational queries', () => {
+      expect(isActionableGoal('find all frontend folders in my system')).toBe(true);
+      expect(isActionableGoal('tell me all available network')).toBe(true);
+      expect(isActionableGoal('what is using port 3000')).toBe(true);
+      expect(isActionableGoal('kill node process')).toBe(true);
+      expect(isActionableGoal('check git status and branches')).toBe(true);
+      expect(isActionableGoal('Hey tell me is there a way we can change the ip adress without vpn or without changeing network')).toBe(true);
+      expect(isActionableGoal('still somehow that you can try right now')).toBe(true);
+      expect(isActionableGoal('renew ip address')).toBe(true);
+      expect(isActionableGoal('renew dhcp lease')).toBe(true);
+
+      expect(isActionableGoal('who are you')).toBe(false);
+      expect(isActionableGoal('hello')).toBe(false);
+      expect(isActionableGoal('what is your name')).toBe(false);
+    });
+
+    it('detects referential follow-up requests in multi-turn conversations', () => {
+      expect(isReferentialFollowup('still somehow that you can try right now')).toBe(true);
+      expect(isReferentialFollowup('try it')).toBe(true);
+      expect(isReferentialFollowup('can you try that')).toBe(true);
+      expect(isReferentialFollowup('go ahead')).toBe(true);
+      expect(isReferentialFollowup('do it anyway')).toBe(true);
+      expect(isReferentialFollowup('find all frontend folders in my system')).toBe(false);
+    });
+
+    it('resolves effective goal across multi-turn conversation history', () => {
+      const loop = new AgentLoop({ toolIndex: { has: () => false, getAll: () => [] } } as any);
+      (loop as any).conversationHistory = [
+        { role: 'user', content: 'Hey tell me is there a way we can change the ip adress without vpn or without changeing network' },
+        { role: 'assistant', content: 'Changing IP directly is not possible...' }
+      ];
+
+      const effective = loop.resolveEffectiveGoal('still somehow that you can try right now');
+      expect(effective).toContain('change the ip adress without vpn');
+      expect(effective).toContain('still somehow that you can try right now');
+    });
+
+    it('routes IP address check and DHCP renewal to macOS terminal commands', () => {
+      const loop = new AgentLoop({ toolIndex: { has: () => false, getAll: () => [] } } as any);
+      const renewFallback = (loop as any).tryHeuristicFallback(
+        'change the ip adress without vpn or without changeing network (still somehow that you can try right now)',
+        { os: 'mac', cwd: '/workspace' }
+      );
+      expect(renewFallback).not.toBeNull();
+      expect(renewFallback.tool).toBe('shell.execute');
+      expect(renewFallback.params.command).toContain('sudo ipconfig set en0 DHCP');
+
+      const checkFallback = (loop as any).tryHeuristicFallback('check my ip address', { os: 'mac', cwd: '/workspace' });
+      expect(checkFallback).not.toBeNull();
+      expect(checkFallback.tool).toBe('shell.execute');
+      expect(checkFallback.params.command).toContain('ipconfig getifaddr en0');
+    });
+
+    it('cleanses robotic AI refusals into actionable macOS network advice', () => {
+      const refusal = "I'm sorry, but as an AI language model, I don't have the ability to directly manipulate or change your device's IP address without using a VPN or changing your network configuration.";
+      const cleansed = cleanseConversationalRefusal(refusal, 'change the ip adress without vpn', { os: 'mac', cwd: '/workspace' });
+      expect(cleansed).not.toContain('AI language model');
+      expect(cleansed).toContain('sudo ipconfig set en0 DHCP');
+      expect(cleansed).toContain('networksetup -setmanual');
+    });
+
+    it('intercepts canned refusal and re-prompts model with terminal execution authority', async () => {
+      const mockProvider = {
+        name: 'test-provider',
+        isAvailable: vi.fn().mockResolvedValue(true),
+        generate: vi.fn()
+          // Step 1: Model attempts canned refusal
+          .mockResolvedValueOnce({
+            content: JSON.stringify({
+              action: 'done',
+              summary: "I don't have access to your file system or computer."
+            })
+          })
+          // Step 2: After refusal interception, model generates the proper command
+          .mockResolvedValueOnce({
+            content: JSON.stringify({
+              action: 'execute',
+              command: 'mdfind "kMDItemFSName == \'*frontend*\'c"',
+              explanation: 'Search for frontend folders'
+            })
+          })
+          // Step 3: Done
+          .mockResolvedValueOnce({
+            content: JSON.stringify({
+              action: 'done',
+              summary: 'Found frontend folders.'
+            })
+          })
+      };
+
+      const mockModelManager = {
+        getActiveProvider: () => mockProvider,
+        getActiveModel: () => ({ modelId: 'test-model' }),
+        initialize: vi.fn().mockResolvedValue(undefined)
+      } as any;
+
+      const mockToolExecutor = {
+        hasDriver: vi.fn().mockReturnValue(true),
+        execute: vi.fn().mockResolvedValue({
+          success: true,
+          data: { stdout: '/Users/test/frontend\n/Users/test/projects/frontend', code: 0 }
+        })
+      };
+
+      const loop = new AgentLoop(
+        { toolIndex: { has: () => false, getAll: () => [] } } as any,
+        mockModelManager
+      );
+      (loop as any).toolExecutor = mockToolExecutor;
+
+      const events: any[] = [];
+      loop.onEvent((ev) => events.push(ev));
+
+      const result = await loop.run('find all frontend folders in my system', { os: 'mac', cwd: '/test' });
+
+      expect(result.success).toBe(true);
+      expect(mockProvider.generate).toHaveBeenCalledTimes(3);
+      expect(mockProvider.generate).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.any(String),
+        expect.objectContaining({
+          grammar: expect.stringContaining('action_execute')
+        })
+      );
+
+      // Verify that refusal interception occurred
+      const thinkingEvents = events.filter(e => e.type === 'thinking');
+      expect(thinkingEvents.some(e => e.message.includes('Intercepted model refusal'))).toBe(true);
+
+      // Verify command executed
+      expect(mockToolExecutor.execute).toHaveBeenCalledWith(
+        'shell.execute',
+        expect.objectContaining({ command: 'mdfind "kMDItemFSName == \'*frontend*\'c"' }),
+        '/test',
+        undefined
+      );
+    });
+
+    it('intercepts canned refusal on referential follow-up and executes DHCP renewal', async () => {
+      const mockProvider = {
+        name: 'test-provider',
+        isAvailable: vi.fn().mockResolvedValue(true),
+        generate: vi.fn()
+          // Model returns canned AI refusal
+          .mockResolvedValueOnce({
+            content: JSON.stringify({
+              action: 'done',
+              summary: "I'm sorry, but as an AI language model, I don't have the ability to directly manipulate or change your device's IP address without using a VPN or changing your network configuration. However, I can provide you with general information on how to do this if you're interested in learning more about it."
+            })
+          })
+          // On second attempt, model generates DHCP renewal command
+          .mockResolvedValueOnce({
+            content: JSON.stringify({
+              action: 'execute',
+              command: 'sudo ipconfig set en0 DHCP',
+              explanation: 'Renew local DHCP lease'
+            })
+          })
+          .mockResolvedValueOnce({
+            content: JSON.stringify({
+              action: 'done',
+              summary: 'DHCP lease renewed successfully.'
+            })
+          })
+      };
+
+      const mockModelManager = {
+        getActiveProvider: () => mockProvider,
+        getActiveModel: () => ({ modelId: 'test-model' }),
+        initialize: vi.fn().mockResolvedValue(undefined)
+      } as any;
+
+      const mockToolExecutor = {
+        hasDriver: vi.fn().mockReturnValue(true),
+        execute: vi.fn().mockResolvedValue({
+          success: true,
+          data: { stdout: 'DHCP lease renewed on en0.', code: 0 }
+        })
+      };
+
+      const loop = new AgentLoop(
+        { toolIndex: { has: () => false, getAll: () => [] } } as any,
+        mockModelManager
+      );
+      (loop as any).toolExecutor = mockToolExecutor;
+
+      // Seed turn 1 history
+      (loop as any).conversationHistory = [
+        { role: 'user', content: 'Hey tell me is there a way we can change the ip adress without vpn or without changeing network' },
+        { role: 'assistant', content: 'Changing IP directly is not possible...' }
+      ];
+
+      const events: any[] = [];
+      loop.onEvent((ev) => events.push(ev));
+
+      const result = await loop.run('still somehow that you can try right now', { os: 'mac', cwd: '/workspace' });
+
+      expect(result.success).toBe(true);
+      expect(result.summary).not.toContain('AI language model');
+      expect(mockToolExecutor.execute).toHaveBeenCalledWith(
+        'shell.execute',
+        expect.objectContaining({ command: 'sudo ipconfig set en0 DHCP' }),
+        '/workspace',
+        undefined
+      );
+    });
+
+    it('feeds command stderr and exit code back into AI context for self-healing remediation', async () => {
+      const mockProvider = {
+        name: 'test-provider',
+        isAvailable: vi.fn().mockResolvedValue(true),
+        generate: vi.fn()
+          // Step 1: Model generates command that fails (e.g. invalid flag)
+          .mockResolvedValueOnce({
+            content: JSON.stringify({
+              action: 'execute',
+              command: 'lsof -broken_flag',
+              explanation: 'Inspect listening ports'
+            })
+          })
+          // Step 2: In response to failure feedback, model self-heals and generates valid command
+          .mockResolvedValueOnce({
+            content: JSON.stringify({
+              action: 'execute',
+              command: 'lsof -iTCP -sTCP:LISTEN -n -P',
+              explanation: 'Inspect listening ports with corrected flags'
+            })
+          })
+          // Step 3: Done
+          .mockResolvedValueOnce({
+            content: JSON.stringify({
+              action: 'done',
+              summary: 'Listed all listening ports.'
+            })
+          })
+      };
+
+      const mockModelManager = {
+        getActiveProvider: () => mockProvider,
+        getActiveModel: () => ({ modelId: 'test-model' }),
+        initialize: vi.fn().mockResolvedValue(undefined)
+      } as any;
+
+      const mockToolExecutor = {
+        hasDriver: vi.fn().mockReturnValue(true),
+        execute: vi.fn()
+          // First attempt fails with non-zero exit code and stderr
+          .mockResolvedValueOnce({
+            success: false,
+            error: 'lsof: illegal option -- broken_flag',
+            data: { stderr: 'lsof: illegal option -- broken_flag', code: 1 }
+          })
+          // Second attempt succeeds
+          .mockResolvedValueOnce({
+            success: true,
+            data: { stdout: 'node 3000 LISTEN\n', code: 0 }
+          })
+      };
+
+      const loop = new AgentLoop(
+        { toolIndex: { has: () => false, getAll: () => [] } } as any,
+        mockModelManager
+      );
+      (loop as any).toolExecutor = mockToolExecutor;
+
+      const events: any[] = [];
+      loop.onEvent((ev) => events.push(ev));
+
+      const result = await loop.run('tell me all running ports', { os: 'mac', cwd: '/test' });
+
+      expect(result.success).toBe(true);
+      expect(mockToolExecutor.execute).toHaveBeenCalledTimes(2);
+
+      // Verify self-healing thinking event was emitted
+      const selfHealingEvent = events.find(e => e.type === 'thinking' && e.message.includes('Self-healing'));
+      expect(selfHealingEvent).toBeDefined();
+
+      // Verify the second generate call was given the failure context
+      const secondGenerateCall = mockProvider.generate.mock.calls[1][0];
+      expect(secondGenerateCall).toContain('COMMAND FAILED:');
+      expect(secondGenerateCall).toContain('illegal option');
+      expect(secondGenerateCall).toContain('Self-Healing Mode');
+    });
+
+    it('activates deterministic safety net fallback when 3 command attempts fail (three strikes)', async () => {
+      const mockProvider = {
+        name: 'test-provider',
+        isAvailable: vi.fn().mockResolvedValue(true),
+        generate: vi.fn()
+          // 3 broken attempts
+          .mockResolvedValueOnce({
+            content: JSON.stringify({ action: 'execute', command: 'badcmd1' })
+          })
+          .mockResolvedValueOnce({
+            content: JSON.stringify({ action: 'execute', command: 'badcmd2' })
+          })
+          .mockResolvedValueOnce({
+            content: JSON.stringify({ action: 'execute', command: 'badcmd3' })
+          })
+      };
+
+      const mockModelManager = {
+        getActiveProvider: () => mockProvider,
+        getActiveModel: () => ({ modelId: 'test-model' }),
+        initialize: vi.fn().mockResolvedValue(undefined)
+      } as any;
+
+      const mockToolExecutor = {
+        hasDriver: vi.fn().mockReturnValue(true),
+        execute: vi.fn()
+          .mockResolvedValueOnce({ success: false, error: 'Command badcmd1 not found', data: { code: 127 } })
+          .mockResolvedValueOnce({ success: false, error: 'Command badcmd2 not found', data: { code: 127 } })
+          .mockResolvedValueOnce({ success: false, error: 'Command badcmd3 not found', data: { code: 127 } })
+          // Safety net fallback execution
+          .mockResolvedValueOnce({ success: true, data: { stdout: '/Users/test/frontend', code: 0 } })
+      };
+
+      const loop = new AgentLoop(
+        { toolIndex: { has: () => false, getAll: () => [] } } as any,
+        mockModelManager
+      );
+      (loop as any).toolExecutor = mockToolExecutor;
+
+      const events: any[] = [];
+      loop.onEvent((ev) => events.push(ev));
+
+      const result = await loop.run('find all frontend folders in my system', { os: 'mac', cwd: '/test' });
+
+      // Deterministic fallback was triggered after 3 strikes
+      expect(mockToolExecutor.execute).toHaveBeenCalledTimes(4);
+      expect(result.success).toBe(true);
+
+      const safetyNetEvent = events.find(e => e.type === 'thinking' && e.message.includes('Three command attempts failed'));
+      expect(safetyNetEvent).toBeDefined();
+    });
+  });
+
+  describe('Phase 4.1 — Speculative Shadow-PTY Simulation Integration', () => {
+    it('should speculatively evaluate candidates and swap unviable model syntax for verified winner', async () => {
+      const mockProvider = {
+        isAvailable: vi.fn().mockResolvedValue(true),
+        generate: vi.fn()
+          .mockResolvedValueOnce({
+            content: JSON.stringify({ action: 'execute', command: 'fuser 3000/tcp', explanation: 'Check port with fuser' })
+          })
+          .mockResolvedValueOnce({
+            content: JSON.stringify({ action: 'done', summary: 'Port 3000 inspected successfully' })
+          })
+      };
+
+      const mockModelManager = {
+        getActiveProvider: () => mockProvider,
+        getActiveModel: () => ({ modelId: 'test-model' }),
+        initialize: vi.fn().mockResolvedValue(undefined)
+      } as any;
+
+      const mockToolExecutor = {
+        hasDriver: vi.fn().mockReturnValue(true),
+        execute: vi.fn().mockResolvedValue({
+          success: true,
+          data: { stdout: 'node 4190 user 22u IPv4 0x123 TCP *:3000 (LISTEN)', stderr: '', code: 0 }
+        })
+      };
+
+      // Mock shadow simulator executor where fuser fails but lsof succeeds
+      const mockShadowExecutor = vi.fn().mockImplementation(async (_cmd: string, args: string[]) => {
+        const full = args.join(' ');
+        if (full.includes('fuser')) {
+          return { stdout: '', stderr: 'zsh: command not found: fuser', code: 127 };
+        }
+        if (full.includes('lsof')) {
+          return { stdout: 'node 4190 TCP *:3000 (LISTEN)', stderr: '', code: 0 };
+        }
+        return { stdout: '', stderr: '', code: 0 };
+      });
+
+      const { ShadowPtySimulator } = await import('./ShadowPtySimulator');
+      const customSimulator = new ShadowPtySimulator({ executor: mockShadowExecutor });
+
+      const loop = new AgentLoop(
+        { toolIndex: { has: () => false, getAll: () => [] } } as any,
+        mockModelManager,
+        customSimulator
+      );
+      (loop as any).toolExecutor = mockToolExecutor;
+
+      const events: any[] = [];
+      loop.onEvent((ev) => events.push(ev));
+
+      const result = await loop.run('check port 3000', { os: 'mac', cwd: '/test' });
+
+      expect(result.success).toBe(true);
+      // ToolExecutor should have been called with the verified 'lsof' candidate, NOT 'fuser'!
+      expect(mockToolExecutor.execute).toHaveBeenCalledWith(
+        'shell.execute',
+        expect.objectContaining({
+          command: expect.stringContaining('lsof')
+        }),
+        '/test',
+        undefined
+      );
+
+      // Event stream should show speculative optimization
+      const specEvent = events.find(e => e.type === 'thinking' && e.message.includes('Speculative Shadow-PTY: Optimized candidate'));
+      expect(specEvent).toBeDefined();
+    });
+
+    it('executes verified canonical recipe directly via TLDR knowledge base when AI model is offline', async () => {
+      const mockProvider = {
+        name: 'test-provider',
+        isAvailable: vi.fn().mockResolvedValue(false),
+        generate: vi.fn()
+      };
+
+      const mockModelManager = {
+        getActiveProvider: () => mockProvider,
+        getActiveModel: () => ({ modelId: 'test-model' }),
+        initialize: vi.fn().mockResolvedValue(undefined)
+      } as any;
+
+      const mockToolExecutor = {
+        hasDriver: vi.fn().mockReturnValue(true),
+        execute: vi.fn().mockResolvedValue({
+          success: true,
+          data: { stdout: 'Flushed DNS cache successfully', code: 0 }
+        })
+      };
+
+      const loop = new AgentLoop(
+        { toolIndex: { has: () => false, getAll: () => [] } } as any,
+        mockModelManager
+      );
+      (loop as any).toolExecutor = mockToolExecutor;
+
+      const events: any[] = [];
+      loop.onEvent((ev) => events.push(ev));
+
+      const result = await loop.run('flush dns cache', { os: 'mac', cwd: '/test' });
+
+      expect(result.success).toBe(true);
+      expect(mockToolExecutor.execute).toHaveBeenCalledWith(
+        'shell.execute',
+        expect.objectContaining({
+          command: 'sudo dscacheutil -flushcache; sudo killall -HUP mDNSResponder'
+        }),
+        '/test',
+        undefined
+      );
+
+      const tldrEvent = events.find(e => e.type === 'thinking' && e.message.includes('Using Ground-Truth CLI Recipe'));
+      expect(tldrEvent).toBeDefined();
+    });
+
+    it('emits instant deterministic remediation (thefuck oracle) on git push missing upstream', async () => {
+      const mockProvider = {
+        name: 'test-provider',
+        isAvailable: vi.fn().mockResolvedValue(true),
+        generate: vi.fn()
+          .mockResolvedValueOnce({
+            content: JSON.stringify({ action: 'execute', command: 'git push', explanation: 'Push changes to remote' })
+          })
+          .mockResolvedValueOnce({
+            content: JSON.stringify({ action: 'execute', command: 'git push --set-upstream origin feat-auth', explanation: 'Set upstream and push' })
+          })
+          .mockResolvedValueOnce({
+            content: JSON.stringify({ action: 'done', summary: 'Branch pushed successfully' })
+          })
+      };
+
+      const mockModelManager = {
+        getActiveProvider: () => mockProvider,
+        getActiveModel: () => ({ modelId: 'test-model' }),
+        initialize: vi.fn().mockResolvedValue(undefined)
+      } as any;
+
+      const mockToolExecutor = {
+        hasDriver: vi.fn().mockReturnValue(true),
+        execute: vi.fn()
+          .mockResolvedValueOnce({
+            success: false,
+            data: {
+              code: 128,
+              stderr: `fatal: The current branch feat-auth has no upstream branch.
+To push the current branch and set the remote as upstream, use
+
+    git push --set-upstream origin feat-auth`
+            }
+          })
+          .mockResolvedValueOnce({
+            success: true,
+            data: { stdout: 'Branch feat-auth set up to track remote branch feat-auth from origin.', code: 0 }
+          })
+      };
+
+      const loop = new AgentLoop(
+        { toolIndex: { has: () => false, getAll: () => [] } } as any,
+        mockModelManager
+      );
+      (loop as any).toolExecutor = mockToolExecutor;
+
+      const events: any[] = [];
+      loop.onEvent((ev) => events.push(ev));
+
+      const result = await loop.run('push my commit to github', { os: 'mac', cwd: '/test' });
+
+      expect(result.success).toBe(true);
+      const remediationEvent = events.find(
+        e => e.type === 'thinking' && e.message.includes('Instant Deterministic Remediation') && e.message.includes('git push --set-upstream origin feat-auth')
+      );
+      expect(remediationEvent).toBeDefined();
+    });
+  });
+
+  describe('Application and process management fast paths', () => {
+    it('routes "tell me is there any applciation named as music or somethign like that" to application.list_running with app filter', () => {
+      const res = findFastPath('tell me is there any applciation named as music or somethign like that');
+      expect(res).not.toBeNull();
+      expect(res?.tool).toBe('application.list_running');
+      expect(res?.params.app).toBe('music');
+    });
+
+    it('routes "Yeah go aheaed kill the Music application" to system.kill_process with process Music', () => {
+      const res = findFastPath('Yeah go aheaed kill the Music application');
+      expect(res).not.toBeNull();
+      expect(res?.tool).toBe('system.kill_process');
+      expect(res?.params.process).toBe('Music');
+    });
+
+    it('routes "if any applcaiton named music is running then close it" to system.kill_process with ifRunning: true', () => {
+      const res = findFastPath('if any applcaiton named music is running then close it');
+      expect(res).not.toBeNull();
+      expect(res?.tool).toBe('system.kill_process');
+      expect(res?.params.process).toBe('music');
+      expect(res?.params.ifRunning).toBe(true);
+    });
+
+    it('routes conversational variants of process close and kill', () => {
+      const res1 = findFastPath('kill the Music application');
+      expect(res1?.tool).toBe('system.kill_process');
+      expect(res1?.params.process).toBe('Music');
+
+      const res2 = findFastPath('close Music');
+      expect(res2?.tool).toBe('system.kill_process');
+      expect(res2?.params.process).toBe('Music');
+
+      const res3 = findFastPath('if Music is running then close it');
+      expect(res3?.tool).toBe('system.kill_process');
+      expect(res3?.params.process).toBe('Music');
+      expect(res3?.params.ifRunning).toBe(true);
+    });
+  });
 });
+
