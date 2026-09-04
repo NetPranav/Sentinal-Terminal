@@ -9,8 +9,8 @@ Sentinel Terminal is a high-performance, AI-native terminal emulator designed fo
 | Tier | Focus Area | Status | Key Deliverables |
 |---|---|---|---|
 | **Tier 1** | **Shell-Native Autonomous Execution Engine** | 🟢 **COMPLETED** | Replaces brittle 101-tool JSON schema architecture with direct Shell (`zsh`/`bash`/`powershell`) CLI generation. Sandboxed via `SecurityEngine` & `PolicyEngine`. |
-| **Tier 2** | **Autonomous Self-Healing & Refusal Interception** | 🟡 **NEXT UP** | Intercepts LLM conversational refusals (*"I don't have access"*), feeds command stderr/exit codes back into AI loop for up to 3 self-healing retries. |
-| **Tier 3** | **Continuous On-Device Learning & LoRA Fine-Tuning** | ⚪ **PLANNED** | Dynamic Episodic Memory (0ms in-context conditioning) + automatic ShareGPT dataset export for Qwen 2.5 Coder 3B LoRA fine-tuning. |
+| **Tier 2** | **Autonomous Self-Healing & Refusal Interception** | 🟢 **COMPLETED** | Intercepts LLM conversational refusals (*"I don't have access"*), feeds command stderr/exit codes back into AI loop for up to 3 self-healing retries. |
+| **Tier 3** | **Continuous On-Device Learning & LoRA Fine-Tuning** | 🟡 **NEXT UP** | Dynamic Episodic Memory (0ms in-context conditioning) + automatic ShareGPT dataset export for Qwen 2.5 Coder 3B LoRA fine-tuning. |
 
 ---
 
@@ -38,17 +38,17 @@ Transition Sentinel Terminal from fragile tool calling to native shell execution
 
 Ensure Sentinel never gets stuck on canned model refusals or broken command syntax:
 
-- [ ] **2.1 Conversational Refusal Interceptor**
+- [x] **2.1 Conversational Refusal Interceptor**
   - *Target*: `src/ai/agent/AgentLoop.ts`
   - *Goal*: Detect and intercept LLM canned refusals (*"I don't have access to your file system"*, *"I cannot assist with that"*), reject the response, and re-prompt the model to generate the actionable terminal command.
-- [ ] **2.2 Stderr & Non-Zero Exit Code Feedback Loop**
+- [x] **2.2 Stderr & Non-Zero Exit Code Feedback Loop**
   - *Target*: `src/ai/agent/AgentLoop.ts`
   - *Goal*: When a shell command fails (exit code != 0 or stderr), feed the exact error back into the AI context:
     *"Command '<cmd>' failed with code <code>: <stderr>. Analyze the failure and output a corrected command."*
-- [ ] **2.3 Three-Strike Autonomous Auto-Remediation**
+- [x] **2.3 Three-Strike Autonomous Auto-Remediation**
   - *Target*: `src/ai/agent/AgentLoop.ts`
   - *Goal*: Allow up to 3 automatic correction attempts before halting and prompting the user for manual demonstration.
-- [ ] **2.4 Deterministic Execution Fallback**
+- [x] **2.4 Deterministic Execution Fallback**
   - *Target*: `src/ai/agent/AgentLoop.ts`
   - *Goal*: If LLM fails across 3 attempts, run deterministic OS probe as safety net.
 

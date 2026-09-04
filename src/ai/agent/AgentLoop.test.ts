@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { isExplicitFilesystemSearch, findFastPath, AgentLoop } from './AgentLoop';
+import { isExplicitFilesystemSearch, findFastPath, AgentLoop, isConversationalRefusal, isActionableGoal } from './AgentLoop';
 import { DemonstrationLearningEngine } from '../../domain/learning/DemonstrationLearningEngine';
 
 describe('AgentLoop fast-path routing', () => {
@@ -216,5 +216,230 @@ describe('AgentLoop fast-path routing', () => {
     expect(fallback.params.command).toContain('mdfind');
     expect(fallback.params.command).toContain('*frontend*');
     expect(fallback.params.command).toContain('public.folder');
+  });
+
+  describe('Tier 2: Refusal Interception & Autonomous Self-Healing', () => {
+    it('detects canned chatbot refusals accurately', () => {
+      expect(isConversationalRefusal("I don't have access to your file system.")).toBe(true);
+      expect(isConversationalRefusal("As an AI, I am unable to view your local files or execute commands.")).toBe(true);
+      expect(isConversationalRefusal("I cannot access your network or system directories.")).toBe(true);
+      expect(isConversationalRefusal("I do not have access to the operating system.")).toBe(true);
+      expect(isConversationalRefusal("I am unable to search your computer.")).toBe(true);
+
+      expect(isConversationalRefusal("Found 12 matching folders.")).toBe(false);
+      expect(isConversationalRefusal("The active listening port is 3000.")).toBe(false);
+      expect(isConversationalRefusal("I am Sentinel, an autonomous mac terminal AI copilot.")).toBe(false);
+    });
+
+    it('identifies actionable system goals versus informational queries', () => {
+      expect(isActionableGoal('find all frontend folders in my system')).toBe(true);
+      expect(isActionableGoal('tell me all available network')).toBe(true);
+      expect(isActionableGoal('what is using port 3000')).toBe(true);
+      expect(isActionableGoal('kill node process')).toBe(true);
+      expect(isActionableGoal('check git status and branches')).toBe(true);
+
+      expect(isActionableGoal('who are you')).toBe(false);
+      expect(isActionableGoal('hello')).toBe(false);
+      expect(isActionableGoal('what is your name')).toBe(false);
+    });
+
+    it('intercepts canned refusal and re-prompts model with terminal execution authority', async () => {
+      const mockProvider = {
+        name: 'test-provider',
+        isAvailable: vi.fn().mockResolvedValue(true),
+        generate: vi.fn()
+          // Step 1: Model attempts canned refusal
+          .mockResolvedValueOnce({
+            content: JSON.stringify({
+              action: 'done',
+              summary: "I don't have access to your file system or computer."
+            })
+          })
+          // Step 2: After refusal interception, model generates the proper command
+          .mockResolvedValueOnce({
+            content: JSON.stringify({
+              action: 'execute',
+              command: 'mdfind "kMDItemFSName == \'*frontend*\'c"',
+              explanation: 'Search for frontend folders'
+            })
+          })
+          // Step 3: Done
+          .mockResolvedValueOnce({
+            content: JSON.stringify({
+              action: 'done',
+              summary: 'Found frontend folders.'
+            })
+          })
+      };
+
+      const mockModelManager = {
+        getActiveProvider: () => mockProvider,
+        getActiveModel: () => ({ modelId: 'test-model' }),
+        initialize: vi.fn().mockResolvedValue(undefined)
+      } as any;
+
+      const mockToolExecutor = {
+        hasDriver: vi.fn().mockReturnValue(true),
+        execute: vi.fn().mockResolvedValue({
+          success: true,
+          data: { stdout: '/Users/test/frontend\n/Users/test/projects/frontend', code: 0 }
+        })
+      };
+
+      const loop = new AgentLoop(
+        { toolIndex: { has: () => false, getAll: () => [] } } as any,
+        mockModelManager
+      );
+      (loop as any).toolExecutor = mockToolExecutor;
+
+      const events: any[] = [];
+      loop.onEvent((ev) => events.push(ev));
+
+      const result = await loop.run('find all frontend folders in my system', { os: 'mac', cwd: '/test' });
+
+      expect(result.success).toBe(true);
+      expect(mockProvider.generate).toHaveBeenCalledTimes(3);
+
+      // Verify that refusal interception occurred
+      const thinkingEvents = events.filter(e => e.type === 'thinking');
+      expect(thinkingEvents.some(e => e.message.includes('Intercepted model refusal'))).toBe(true);
+
+      // Verify command executed
+      expect(mockToolExecutor.execute).toHaveBeenCalledWith(
+        'shell.execute',
+        expect.objectContaining({ command: 'mdfind "kMDItemFSName == \'*frontend*\'c"' }),
+        '/test',
+        undefined
+      );
+    });
+
+    it('feeds command stderr and exit code back into AI context for self-healing remediation', async () => {
+      const mockProvider = {
+        name: 'test-provider',
+        isAvailable: vi.fn().mockResolvedValue(true),
+        generate: vi.fn()
+          // Step 1: Model generates command that fails (e.g. invalid flag)
+          .mockResolvedValueOnce({
+            content: JSON.stringify({
+              action: 'execute',
+              command: 'lsof -broken_flag',
+              explanation: 'Inspect listening ports'
+            })
+          })
+          // Step 2: In response to failure feedback, model self-heals and generates valid command
+          .mockResolvedValueOnce({
+            content: JSON.stringify({
+              action: 'execute',
+              command: 'lsof -iTCP -sTCP:LISTEN -n -P',
+              explanation: 'Inspect listening ports with corrected flags'
+            })
+          })
+          // Step 3: Done
+          .mockResolvedValueOnce({
+            content: JSON.stringify({
+              action: 'done',
+              summary: 'Listed all listening ports.'
+            })
+          })
+      };
+
+      const mockModelManager = {
+        getActiveProvider: () => mockProvider,
+        getActiveModel: () => ({ modelId: 'test-model' }),
+        initialize: vi.fn().mockResolvedValue(undefined)
+      } as any;
+
+      const mockToolExecutor = {
+        hasDriver: vi.fn().mockReturnValue(true),
+        execute: vi.fn()
+          // First attempt fails with non-zero exit code and stderr
+          .mockResolvedValueOnce({
+            success: false,
+            error: 'lsof: illegal option -- broken_flag',
+            data: { stderr: 'lsof: illegal option -- broken_flag', code: 1 }
+          })
+          // Second attempt succeeds
+          .mockResolvedValueOnce({
+            success: true,
+            data: { stdout: 'node 3000 LISTEN\n', code: 0 }
+          })
+      };
+
+      const loop = new AgentLoop(
+        { toolIndex: { has: () => false, getAll: () => [] } } as any,
+        mockModelManager
+      );
+      (loop as any).toolExecutor = mockToolExecutor;
+
+      const events: any[] = [];
+      loop.onEvent((ev) => events.push(ev));
+
+      const result = await loop.run('tell me all running ports', { os: 'mac', cwd: '/test' });
+
+      expect(result.success).toBe(true);
+      expect(mockToolExecutor.execute).toHaveBeenCalledTimes(2);
+
+      // Verify self-healing thinking event was emitted
+      const selfHealingEvent = events.find(e => e.type === 'thinking' && e.message.includes('Self-healing'));
+      expect(selfHealingEvent).toBeDefined();
+
+      // Verify the second generate call was given the failure context
+      const secondGenerateCall = mockProvider.generate.mock.calls[1][0];
+      expect(secondGenerateCall).toContain('COMMAND FAILED:');
+      expect(secondGenerateCall).toContain('illegal option');
+      expect(secondGenerateCall).toContain('Self-Healing Mode');
+    });
+
+    it('activates deterministic safety net fallback when 3 command attempts fail (three strikes)', async () => {
+      const mockProvider = {
+        name: 'test-provider',
+        isAvailable: vi.fn().mockResolvedValue(true),
+        generate: vi.fn()
+          // 3 broken attempts
+          .mockResolvedValueOnce({
+            content: JSON.stringify({ action: 'execute', command: 'badcmd1' })
+          })
+          .mockResolvedValueOnce({
+            content: JSON.stringify({ action: 'execute', command: 'badcmd2' })
+          })
+          .mockResolvedValueOnce({
+            content: JSON.stringify({ action: 'execute', command: 'badcmd3' })
+          })
+      };
+
+      const mockModelManager = {
+        getActiveProvider: () => mockProvider,
+        getActiveModel: () => ({ modelId: 'test-model' }),
+        initialize: vi.fn().mockResolvedValue(undefined)
+      } as any;
+
+      const mockToolExecutor = {
+        hasDriver: vi.fn().mockReturnValue(true),
+        execute: vi.fn()
+          .mockResolvedValueOnce({ success: false, error: 'Command badcmd1 not found', data: { code: 127 } })
+          .mockResolvedValueOnce({ success: false, error: 'Command badcmd2 not found', data: { code: 127 } })
+          .mockResolvedValueOnce({ success: false, error: 'Command badcmd3 not found', data: { code: 127 } })
+          // Safety net fallback execution
+          .mockResolvedValueOnce({ success: true, data: { stdout: '/Users/test/frontend', code: 0 } })
+      };
+
+      const loop = new AgentLoop(
+        { toolIndex: { has: () => false, getAll: () => [] } } as any,
+        mockModelManager
+      );
+      (loop as any).toolExecutor = mockToolExecutor;
+
+      const events: any[] = [];
+      loop.onEvent((ev) => events.push(ev));
+
+      const result = await loop.run('find all frontend folders in my system', { os: 'mac', cwd: '/test' });
+
+      // Deterministic fallback was triggered after 3 strikes
+      expect(mockToolExecutor.execute).toHaveBeenCalledTimes(4);
+      expect(result.success).toBe(true);
+
+      const safetyNetEvent = events.find(e => e.type === 'thinking' && e.message.includes('Three command attempts failed'));
+      expect(safetyNetEvent).toBeDefined();
+    });
   });
 });
