@@ -301,6 +301,33 @@ Sentinel can continuously self-improve using your real terminal interactions:
 
 ---
 
+## 🔮 Upcoming in Version 2.1: Macro Recording & 1-Click Multi-App Workflow Automation
+
+We are actively developing the **Sentinel Macro & Workflow Automation System** for **Version 2.1**, expanding beyond single-command AI execution to full **desktop orchestration and user action recording**:
+
+### 🎬 1. "Record & Replay" Workflow Recording
+- Users will be able to start an interactive recording session (`>record workflow: <name>`).
+- Sentinel observes your actions—applications opened, web URLs navigated, commands executed, and split layouts created.
+- Outputs a clean, declarative, human-readable workflow definition saved to `~/.sentinel/workflows/`.
+
+### ⚡ 2. 1-Click Multi-App & Multi-Browser Orchestration
+Instead of manually opening multiple tools every morning, Sentinel will orchestrate your entire workspace in **1 single click or natural language trigger**:
+- **Real-World Automation Example**:
+  ```bash
+  pranav@macbook ~ % >start my daily ai dev session
+  ```
+  In **1 click**, Sentinel automatically:
+  1. Opens **Claude**, **Gemini**, and **ChatGPT** concurrently in dedicated tabs in **Safari**.
+  2. Opens **YouTube** (or your reference video/music) in **Google Chrome**.
+  3. Launches **Antigravity IDE** (or Visual Studio Code) focused on your active project directory.
+  4. Automatically positions and tiles the windows across your displays for instant productivity.
+
+### ⌨️ 3. Hotkey Binding & Quick-Trigger Dashboard
+- Bind any recorded workflow to a custom global key combination (e.g. `Cmd+Shift+1`) or trigger it via the interactive UI bar.
+- Export and share workflow templates across teams via simple JSON/YAML specifications.
+
+---
+
 ## 📜 License
 
 Sentinel Terminal is open-source software licensed under the **[MIT License](LICENSE)**.

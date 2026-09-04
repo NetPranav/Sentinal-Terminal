@@ -150,9 +150,35 @@ Elevate Sentinel from raw LLM reasoning to hybrid ground-truth intelligence by m
 
 ---
 
+## 🔮 Milestone v2.1: Macro Recording & 1-Click Multi-App Workflow Automation (Upcoming)
+
+Promised for **Version 2.1**, this major evolution upgrades the Sentinel Workflow System from task-level execution to full **desktop and browser macro automation**:
+
+- [ ] **2.1.1 Interactive Workflow & Macro Recorder ("Record & Replay")**
+  - *Target*: `src/workflows/MacroRecorder.ts`, `src/domain/observer/DesktopActionObserver.ts`
+  - *Goal*: Enable users to record sequential desktop and terminal actions. When recording is started (`>record workflow: <name>`), Sentinel observes launched applications, browser navigations, and CLI steps, producing clean declarative workflow definitions.
+- [ ] **2.1.2 1-Click Multi-App & Multi-Browser Orchestration**
+  - *Target*: `src/workflows/MultiAppOrchestrator.ts`, `src/sdk/capabilities/drivers/BrowserCapability.ts`, `src/sdk/capabilities/drivers/ApplicationCapability.ts`
+  - *Goal*: Execute complex multi-application desktop setups in a single command or click.
+  - *Real-world Workflow Example*:
+    - Open **Claude**, **Gemini**, and **ChatGPT** concurrently in **Safari**.
+    - Open **YouTube** (or reference video/music) in **Google Chrome**.
+    - Open **Antigravity IDE** (or Visual Studio Code) targeted at the current repository.
+    - Result: With a single prompt (`>start ai dev session`) or 1-click UI button, the entire multi-browser, multi-app workspace is launched and arranged.
+- [ ] **2.1.3 Declarative Workflow Storage & Quick-Trigger Binding**
+  - *Target*: `src/workflows/WorkflowStorage.ts`, `src/ui/components/WorkflowBar.tsx`
+  - *Goal*: Save recorded macros as human-readable JSON/YAML in `~/.sentinel/workflows/`. Bind any macro to customizable hotkeys (e.g. `Cmd+Shift+1`) or the terminal quick-action bar.
+- [ ] **2.1.4 Window Tiling & Workspace Geometry Management**
+  - *Target*: `src/platform/macos/WindowGeometryManager.ts`
+  - *Goal*: Automatically position and tile orchestrated application windows across multiple displays or split desktop spaces for zero-friction context switching.
+
+---
+
 ## 🏛️ Completed Foundation (Archived Milestone)
 - ✅ Core Reliability, Security & Sandbox Fortification (749/749 tests green).
 - ✅ Visual Auto-Remediation Toast HUD, Workspace Quick-Switcher (`Cmd+O`), Port & Process Manager (`Cmd+Shift+P`), Frecency History (`Ctrl+R`) (754/754 tests green).
 - ✅ Plugin Marketplace runtime, cryptographic tamper-evident audit logs, remote SSH session multiplexer (765/765 tests green).
 - ✅ Full Tier 4: Sentinel-SERL (Self-Evolving Reflexion Loop & Frontier On-Device Intelligence) (887/887 tests green).
+- ✅ Production Release v2.0.0: Decoupled refusal interception, autonomous self-healing, multi-turn referential context resolution, macOS IP/DHCP renewal, and full offline Metal acceleration (983/983 tests green).
+
 

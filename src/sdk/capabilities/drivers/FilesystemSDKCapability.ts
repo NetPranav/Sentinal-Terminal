@@ -297,14 +297,7 @@ export class FilesystemSDKCapability extends BaseCapabilityDriver<FsDriverInput,
           } else if (startDir === 'unknown' || startDir === 'system' || startDir === 'my system') {
             startDir = '~';
           }
-          let resolvedDir = startDir;
-          if (resolvedDir.startsWith('~/') || resolvedDir === '~') {
-            try {
-              const hRes = await invoke<{ stdout: string }>('execute_command', { command: 'sh', args: ['-c', 'echo $HOME'] });
-              const hd = (hRes?.stdout || '').trim();
-              if (hd) resolvedDir = resolvedDir === '~' ? hd : resolvedDir.replace(/^~/, hd);
-            } catch { /* ignore */ }
-          }
+          let resolvedDir = await FilesystemSDKCapability.expandTilde(startDir);
           const cleanPattern = pattern.toString().trim().replace(/^[*\s]+|[*\s]+$/g, '') || '*';
           const isFolderSearch = op === 'locate_folders' || input.type === 'directory' || input.type === 'folder' || pattern.toLowerCase().includes('folder');
           let matches: string[] = [];
