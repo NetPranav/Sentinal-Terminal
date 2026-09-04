@@ -7,6 +7,7 @@
 
 import { ToolRegistryState } from '../../tools/loader/ToolLoader';
 import { DynamicToolPruner } from './DynamicToolPruner';
+import { EpisodicMemoryEngine } from '../../domain/learning/EpisodicMemoryEngine';
 
 export interface ToolSpec {
   id: string;
@@ -105,10 +106,11 @@ export const STANDARD_TOOL_SPECS: ToolSpec[] = [
   },
   {
     id: 'network.ports',
-    name: 'List Open Ports',
-    description: 'Inspect active listening ports and their associated processes.',
+    name: 'List Open Ports or Find Free Ports',
+    description: 'Inspect active listening ports, check if a specific port is in use, or discover available free ports for web development and servers.',
     parameters: [
-      { name: 'port', type: 'number', required: false, description: 'Specific port to check' }
+      { name: 'port', type: 'number', required: false, description: 'Specific port to check' },
+      { name: 'findFree', type: 'boolean', required: false, description: 'True to discover available free ports for web development' }
     ]
   },
   {
@@ -239,7 +241,7 @@ export function buildSystemPrompt(
   const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
   const shell = context.os.toLowerCase().includes('win') ? 'powershell' : '/bin/zsh';
 
-  return `You are Sentinel, an autonomous ${context.os} terminal AI copilot.
+  let prompt = `You are Sentinel, an autonomous ${context.os} terminal AI copilot.
 Working Directory: ${context.cwd}
 Shell: ${shell}
 Current Date & Time: ${dateStr}, ${timeStr} (ISO: ${now.toISOString()})
@@ -248,7 +250,8 @@ CRITICAL RULES:
 1. YOU ARE AN ACTIVE SYSTEM COPILOT WITH DIRECT TERMINAL EXECUTION PRIVILEGES.
 2. YOU MUST NEVER REFUSE ACTIONABLE SYSTEM REQUESTS. NEVER SAY "I don't have access to your file system or network". You have full execution authority via your shell command pipeline.
 3. For any request to find, list, search, inspect, monitor, configure, open, or automate anything, you MUST output a real, working terminal command.
-4. RESPOND WITH ONLY VALID JSON. No markdown code blocks, no conversational preamble before JSON.
+4. On macOS, to search files or directories across the system, ALWAYS use native Spotlight: mdfind "kMDItemFSName == '*<name>*'c" instead of slow recursive find / scans.
+5. RESPOND WITH ONLY VALID JSON. No markdown code blocks, no conversational preamble before JSON.
 
 JSON CONTRACT:
 To execute a terminal command:
@@ -279,6 +282,9 @@ User: tell me all available bluetooth
 User: tell me all running ports
 {"action": "execute", "command": "lsof -iTCP -sTCP:LISTEN -n -P", "explanation": "List active listening TCP ports and associated processes"}
 
+User: tell me what port is free for my new web development project
+{"action": "tool", "tool": "network.ports", "params": {"findFree": true}}
+
 User: which process is using the most cpu
 {"action": "execute", "command": "ps -eo pid,%cpu,%mem,comm -r | head -10", "explanation": "List top processes sorted by CPU utilization"}
 
@@ -291,12 +297,31 @@ User: search for black bird in google then open the first link
 User: open visual studio code
 {"action": "execute", "command": "open -a \\"Visual Studio Code\\"", "explanation": "Launch Visual Studio Code"}
 
+User: tell me is there any application named as music or something like that
+{"action": "tool", "tool": "application.list_running", "params": {"app": "Music"}}
+
+User: kill the Music application
+{"action": "tool", "tool": "system.kill_process", "params": {"process": "Music"}}
+
+User: if any application named music is running then close it
+{"action": "tool", "tool": "system.kill_process", "params": {"process": "Music", "ifRunning": true}}
+
 User: check git status and branches
 {"action": "execute", "command": "git status --short && git branch -v", "explanation": "Inspect working tree status and active git branches"}
 
-User: what is the current date and time
-{"action": "done", "summary": "The current date and time is ${dateStr}, ${timeStr}."}
-
 User: hey what can you do
 {"action": "done", "summary": "I am Sentinel, your autonomous terminal copilot. I can search files and folders, monitor listening ports, manage Wi-Fi and Bluetooth, inspect system resources, open applications, and automate shell workflows."}`;
+
+  if (goal) {
+    try {
+      const memories = EpisodicMemoryEngine.getInstance().retrieveSimilar(goal, 2);
+      if (memories.length > 0) {
+        prompt += '\n\n' + EpisodicMemoryEngine.getInstance().formatPromptFewShots(memories);
+      }
+    } catch {
+      // Non-blocking
+    }
+  }
+
+  return prompt;
 }

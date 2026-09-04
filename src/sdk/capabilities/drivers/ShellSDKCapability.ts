@@ -73,7 +73,10 @@ export class ShellSDKCapability extends BaseCapabilityDriver<ShellDriverInput, a
         commandExecuted: commandLine
       };
     } catch (e: any) {
-      return { success: false, error: { code: 'SHELL_INVOKER_ERROR', message: e.message || 'Error occurred while executing command in shell' } };
+      const errMsg = typeof e === 'string'
+        ? e
+        : (e?.message || (e ? JSON.stringify(e) : 'Error occurred while executing command in shell'));
+      return { success: false, error: { code: 'SHELL_INVOKER_ERROR', message: errMsg } };
     }
   }
 
@@ -94,9 +97,14 @@ export class ShellSDKCapability extends BaseCapabilityDriver<ShellDriverInput, a
   }
 
   private toCommandLine(input: ShellDriverInput): string {
-    if (!input.args?.length) return input.command;
-    // Backward-compatible support for callers that still pass a binary and
-    // separate arguments. JSON-string quoting is shell-safe for zsh values.
-    return [input.command, ...input.args.map(arg => JSON.stringify(arg))].join(' ');
+    let raw = input.command || '';
+    if (input.args?.length) {
+      // Backward-compatible support for callers that still pass a binary and
+      // separate arguments. JSON-string quoting is shell-safe for zsh values.
+      raw = [input.command, ...input.args.map(arg => JSON.stringify(arg))].join(' ');
+    }
+    // Automatically sanitize read-only diagnostic commands by removing 'sudo'
+    // Non-interactive subshells cannot supply sudo passwords, causing silent empty failures
+    return raw.replace(/^sudo\s+(lsof|netstat|ps|ifconfig|vm_stat|sw_vers|pmset|cat|grep|find|cut|awk|head|tail|sed)\b/, '$1');
   }
 }

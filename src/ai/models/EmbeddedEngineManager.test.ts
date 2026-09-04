@@ -30,4 +30,32 @@ describe('EmbeddedEngineManager (In-App Local AI Integration)', () => {
     const stopped = await manager.stopEngine();
     expect(typeof stopped).toBe('boolean');
   });
+
+  it('supports attaching LoRA adapters and tracking activeLora status', async () => {
+    const loraPath = '/Users/test/.sentinel/models/sentinel_mlx_lora.gguf';
+    const started = await manager.startEngine(undefined, loraPath);
+    expect(started).toBe(true);
+    expect(manager.getActiveLora()).toBe(loraPath);
+
+    const status = await manager.getStatus();
+    expect(status.activeLora).toBe(loraPath);
+
+    const stopped = await manager.stopEngine();
+    expect(stopped).toBe(true);
+    expect(manager.getActiveLora()).toBeUndefined();
+  });
+
+  it('hot-reloads a new LoRA adapter into the running engine', async () => {
+    const initialLora = '/Users/test/.sentinel/models/v1_adapter.gguf';
+    await manager.startEngine(undefined, initialLora);
+    expect(manager.getActiveLora()).toBe(initialLora);
+
+    const newLora = '/Users/test/.sentinel/models/sentinel_mlx_lora.gguf';
+    const reloaded = await manager.hotReloadLora(newLora);
+    expect(reloaded).toBe(true);
+    expect(manager.getActiveLora()).toBe(newLora);
+
+    const status = await manager.getStatus();
+    expect(status.activeLora).toBe(newLora);
+  });
 });

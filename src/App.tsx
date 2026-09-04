@@ -560,31 +560,37 @@ function App() {
   };
 
   return (
-    <div className="app-container">
-      {tabs.length > 1 && (
-        <div className="tabs-bar">
-          <div className="tabs-track">
-            {tabs.map((tab) => {
-              const isActive = activeTabId === tab.id;
-              return (
-                <div 
-                  key={tab.id} 
-                  className={`tab-pill ${isActive ? 'active' : ''}`}
-                  onClick={() => setActiveTabId(tab.id)}
-                >
-                  <span className="tab-pill-text">
-                    {getTabDisplayTitle(tab)}
-                  </span>
-                  {tabs.length > 1 && (
-                    <button className="pill-close-btn" onClick={(e) => closeTab(tab.id, e)} title="Close Tab">✕</button>
-                  )}
-                </div>
-              );
-            })}
-            <button className="pill-add-btn" onClick={addTab} title="New Terminal Tab">+</button>
-          </div>
+    <div 
+      className="app-container"
+      onContextMenu={(e) => {
+        // Suppress default webview context menu to ensure precision native terminal feel
+        if (!(e.target as HTMLElement).closest('.allow-context-menu')) {
+          e.preventDefault();
+        }
+      }}
+    >
+      <div className="tabs-bar window-drag-region">
+        <div className="tabs-track">
+          {tabs.map((tab) => {
+            const isActive = activeTabId === tab.id;
+            return (
+              <div 
+                key={tab.id} 
+                className={`tab-pill ${isActive ? 'active' : ''}`}
+                onClick={() => setActiveTabId(tab.id)}
+              >
+                <span className="tab-pill-text">
+                  {getTabDisplayTitle(tab)}
+                </span>
+                {tabs.length > 1 && (
+                  <button className="pill-close-btn" onClick={(e) => closeTab(tab.id, e)} title="Close Tab">✕</button>
+                )}
+              </div>
+            );
+          })}
+          <button className="pill-add-btn" onClick={addTab} title="New Terminal Tab">+</button>
         </div>
-      )}
+      </div>
 
       {/* Classic Minimalist Workspace Appearance Modal */}
       {showThemeModal && (

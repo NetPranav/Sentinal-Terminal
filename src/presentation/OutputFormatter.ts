@@ -109,17 +109,16 @@ export function formatDataOutput(data: any): string {
   }
 
   // Command stdout
-  if (data.stdout && typeof data.stdout === 'string') {
-    const trimmed = data.stdout.trim();
-    if (trimmed) {
-      return `\r\n${trimmed.replace(/\r?\n/g, '\r\n')}\r\n`;
+  if (typeof data === 'object' && ('code' in data || 'stdout' in data)) {
+    if (data.stdout && typeof data.stdout === 'string' && data.stdout.trim()) {
+      return `\r\n${data.stdout.trim().replace(/\r?\n/g, '\r\n')}\r\n`;
     }
     return '';
   }
 
   // Generic object — show key-value pairs cleanly
   if (typeof data === 'object' && Object.keys(data).length > 0) {
-    const skip = new Set(['commandExecuted', 'dryRun', 'rollbackPayload']);
+    const skip = new Set(['commandExecuted', 'dryRun', 'rollbackPayload', 'stdout', 'stderr', 'code']);
     const lines = Object.entries(data)
       .filter(([k]) => !skip.has(k))
       .map(([k, v]) => {

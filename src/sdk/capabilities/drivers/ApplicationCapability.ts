@@ -67,8 +67,8 @@ export class ApplicationCapability extends BaseCapabilityDriver<AppDriverInput, 
       op = this.capabilityId.replace('application.', '') as AppOperation;
     }
 
-    const rawTarget = input.app || input.package || '';
-    const target = (op === 'open' || op === 'close' || op === 'force_quit' || op === 'focus' || op === 'minimize' || op === 'maximize' || op === 'update' || op === 'install' || op === 'uninstall')
+    const rawTarget = input.app || input.process || input.name || input.package || input.target || '';
+    const target = (op === 'open' || op === 'close' || op === 'force_quit' || op === 'focus' || op === 'minimize' || op === 'maximize' || op === 'update' || op === 'install' || op === 'uninstall' || op === 'list_running')
       ? AppAliasRegistry.getInstance().resolve(rawTarget)
       : rawTarget;
 
@@ -90,7 +90,18 @@ export class ApplicationCapability extends BaseCapabilityDriver<AppDriverInput, 
         case 'maximize':
           return { success: true, data: { maximized: true }, commandExecuted };
         case 'list_running': {
-          const mockApps = ['Sentinel Terminal', 'Antigravity IDE', 'Google Chrome', 'Safari', 'Preview'];
+          const mockApps = ['Sentinel Terminal', 'Antigravity IDE', 'Google Chrome', 'Safari', 'Preview', 'Music'];
+          if (rawTarget) {
+            const filterLower = rawTarget.toLowerCase();
+            const matchedApp = mockApps.find(a => a.toLowerCase() === filterLower || a.toLowerCase().includes(filterLower));
+            const isRunning = !!matchedApp;
+            const appName = matchedApp || target || rawTarget;
+            return {
+              success: true,
+              data: { isRunning, app: appName, apps: mockApps, stdout: `The application "${appName}" is ${isRunning ? 'running' : 'not running'}.` },
+              commandExecuted
+            };
+          }
           return { success: true, data: { apps: mockApps, stdout: `Currently Running Desktop Applications (${mockApps.length}):\r\n  • ` + mockApps.join('\r\n  • ') }, commandExecuted };
         }
         case 'install': {
@@ -261,11 +272,28 @@ export class ApplicationCapability extends BaseCapabilityDriver<AppDriverInput, 
 
       if (op === 'close' || op === 'force_quit') {
         const flag = op === 'force_quit' ? '-9' : '-15';
-        await invoke('execute_command', { command: 'pkill', args: [flag, '-i', '-f', target] });
-        return { success: true, data: { closed: true, allProcessesStopped: true }, commandExecuted: `pkill ${flag} -i -f ${target}` };
+        let killed = false;
+        if (platform === 'macos' && op === 'close') {
+          try {
+            const osascriptRes = await invoke<{ code?: number }>('execute_command', {
+              command: 'osascript',
+              args: ['-e', `tell application "${target}" to quit`]
+            });
+            if (osascriptRes && (osascriptRes.code === 0 || osascriptRes.code === undefined)) {
+              killed = true;
+            }
+          } catch {
+            // fall back to pkill
+          }
+        }
+        if (!killed) {
+          await invoke('execute_command', { command: 'pkill', args: [flag, '-i', '-f', target] });
+        }
+        return { success: true, data: { closed: true, allProcessesStopped: true, stdout: `Closed application "${target}"` }, commandExecuted: `pkill ${flag} -i -f ${target}` };
       }
 
       if (op === 'list_running') {
+        const filter = (rawTarget || '').trim().toLowerCase();
         if (platform === 'macos') {
           const output = await invoke<{ stdout: string; code: number }>('execute_command', { 
             command: 'osascript', 
@@ -282,11 +310,35 @@ export class ApplicationCapability extends BaseCapabilityDriver<AppDriverInput, 
               return name;
             });
           apps = Array.from(new Set(apps));
+          if (filter) {
+            const matchedApp = apps.find(a => a.toLowerCase() === filter || a.toLowerCase().includes(filter));
+            const isRunning = !!matchedApp;
+            const appDisplayName = matchedApp || target || filter;
+            const stdoutText = isRunning
+              ? `The application "${appDisplayName}" is running.`
+              : `The application "${appDisplayName}" is not running.`;
+            return {
+              success: true,
+              data: { isRunning, app: appDisplayName, apps, stdout: stdoutText },
+              commandExecuted: `osascript -e 'tell application "System Events" to get GUI processes'`
+            };
+          }
           const stdoutText = `Currently Running Desktop Applications (${apps.length}):\r\n  • ` + apps.join('\r\n  • ');
           return { success: true, data: { apps, stdout: stdoutText }, commandExecuted: `osascript -e 'tell application "System Events" to get GUI processes'` };
         } else {
           const output = await invoke<{ stdout: string }>('execute_command', { command: 'ps', args: ['-eo', 'comm'] });
           const apps = (output?.stdout || '').split('\n').filter(Boolean);
+          if (filter) {
+            const isRunning = apps.some(a => a.toLowerCase().includes(filter));
+            const stdoutText = isRunning
+              ? `The application "${target || filter}" is running.`
+              : `The application "${target || filter}" is not running.`;
+            return {
+              success: true,
+              data: { isRunning, app: target || filter, apps, stdout: stdoutText },
+              commandExecuted: `ps -eo comm`
+            };
+          }
           const stdoutText = `Running Processes (${apps.length}):\r\n  • ` + apps.slice(0, 20).join('\r\n  • ');
           return { success: true, data: { apps, stdout: stdoutText }, commandExecuted: `ps -eo comm` };
         }

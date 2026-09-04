@@ -169,6 +169,27 @@ export const StatusBar: React.FC<StatusBarProps> = ({
 
         <span style={{ opacity: 0.75, fontSize: '11px' }}>Mem: <strong>{memoryUsage} MB</strong></span>
         <span style={{ opacity: 0.75, fontSize: '11px' }}>CPU: <strong>{cpuUsage}%</strong></span>
+        
+        {/* Unified Intelligence Status HUD */}
+        <span 
+          title="Sentinel Hybrid Intelligence: 70+ TLDR Ground-Truth Recipes | 59 Deterministic Remediation Rules | Hardware GBNF Grammar Constraints | Concrete Shell AST Syntactic Guard | Shadow-PTY Minority Report Simulation"
+          style={{ 
+            backgroundColor: 'rgba(139, 92, 246, 0.18)',
+            border: '1px solid rgba(139, 92, 246, 0.35)',
+            padding: '2px 8px',
+            borderRadius: '4px',
+            color: '#c4b5fd',
+            fontSize: '11px',
+            fontWeight: 600,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '4px',
+            cursor: 'default'
+          }}
+        >
+          <span>⚡</span> SERL & Oracles
+        </span>
+
         <span style={{ 
           backgroundColor: 'rgba(56, 189, 248, 0.15)',
           border: '1px solid rgba(56, 189, 248, 0.3)',

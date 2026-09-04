@@ -8,6 +8,7 @@
  */
 
 import { DiagnosticResult, ErrorDiagnosticsEngine } from '../../ai/agent/ErrorDiagnosticsEngine';
+import { SentinelSerlCoordinator } from '../learning/SentinelSerlCoordinator';
 
 export interface RemediationPrompt {
   id: string;
@@ -17,6 +18,7 @@ export interface RemediationPrompt {
   params: Record<string, any>;
   rawError: string;
   timestamp: number;
+  fixedCommand?: string;
 }
 
 export class PtyOutputObserver {
@@ -35,7 +37,7 @@ export class PtyOutputObserver {
   /**
    * Ingest streaming terminal output chunks
    */
-  public ingest(chunk: string, cwd?: string): RemediationPrompt | null {
+  public ingest(chunk: string, cwd?: string, command?: string): RemediationPrompt | null {
     if (!chunk) return null;
 
     // Filter out common raw ANSI escape codes to inspect clean text
@@ -48,10 +50,24 @@ export class PtyOutputObserver {
       this.recentOutputBuffer = this.recentOutputBuffer.slice(this.recentOutputBuffer.length - 40);
     }
 
+    // Attempt to extract latest shell command from scrollback if not passed
+    let detectedCommand = command;
+    if (!detectedCommand) {
+      for (let i = this.recentOutputBuffer.length - 1; i >= 0; i--) {
+        const line = this.recentOutputBuffer[i].trim();
+        const promptMatch = line.match(/(?:[$%#>]\s+|\$\s*)([a-zA-Z0-9_\.\-\/]+.*)/);
+        if (promptMatch) {
+          detectedCommand = promptMatch[1].trim();
+          break;
+        }
+      }
+    }
+
     const fullRecent = this.recentOutputBuffer.join('\n');
-    const diag = ErrorDiagnosticsEngine.diagnose(fullRecent, undefined, undefined, cwd);
+    const diag = ErrorDiagnosticsEngine.diagnose(fullRecent, undefined, undefined, cwd, detectedCommand);
 
     if (diag.category === 'SOFTWARE_RECOVERABLE' && diag.remediation) {
+      const fixedCmd = diag.remediation.params?.command;
       const remediation: RemediationPrompt = {
         id: 'rem_' + Date.now(),
         cause: diag.cause,
@@ -59,11 +75,24 @@ export class PtyOutputObserver {
         tool: diag.remediation.tool,
         params: diag.remediation.params,
         rawError: diag.cause,
-        timestamp: Date.now()
+        timestamp: Date.now(),
+        fixedCommand: fixedCmd
       };
       this.activeRemediation = remediation;
       this.notify(remediation);
       return remediation;
+    } else if (detectedCommand && (cleanChunk.includes('error:') || cleanChunk.includes('command not found') || cleanChunk.includes('fatal:') || cleanChunk.includes('failed'))) {
+      try {
+        SentinelSerlCoordinator.getInstance().onCommandExecutionFailure(
+          `Shell command: ${detectedCommand}`,
+          detectedCommand,
+          1,
+          cleanChunk,
+          { cwd, os: 'macos' }
+        );
+      } catch {
+        // Non-blocking background deficit logging
+      }
     }
 
     return null;

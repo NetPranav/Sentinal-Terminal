@@ -6,6 +6,8 @@
  * sub-phases, or requires physical user hardware intervention.
  */
 
+import { DeterministicRuleOracle } from '../../domain/remediation/DeterministicRuleOracle';
+
 export type ErrorCategory = 'SOFTWARE_RECOVERABLE' | 'PHYSICAL_ACTION_REQUIRED' | 'FATAL_UNKNOWN';
 
 export interface RemediationAction {
@@ -31,7 +33,8 @@ export class ErrorDiagnosticsEngine {
     errorMsg: string | undefined | null,
     toolId?: string,
     params?: Record<string, any>,
-    cwd?: string
+    cwd?: string,
+    command?: string
   ): DiagnosticResult {
     const raw = (errorMsg || '').trim();
     const lower = raw.toLowerCase();
@@ -42,13 +45,36 @@ export class ErrorDiagnosticsEngine {
       return physicalDiagnosis;
     }
 
-    // 2. Check for Software Recoverable Errors
+    // 2. Check for Domain Capability Software Recoverable Errors
     const softwareDiagnosis = this.checkSoftwareRecoverable(lower, raw, toolId, params, cwd);
     if (softwareDiagnosis) {
       return softwareDiagnosis;
     }
 
-    // 3. Fallback: Unknown Fatal Error
+    // 3. Phase 5.2: Check DeterministicRuleOracle (thefuck architecture for Shell & Terminal)
+    const execCmd = command || (params?.command as string) || '';
+    const oracleResult = DeterministicRuleOracle.getInstance().diagnose({
+      command: execCmd,
+      output: raw,
+      cwd,
+      os: 'mac'
+    });
+
+    if (oracleResult) {
+      return {
+        category: 'SOFTWARE_RECOVERABLE',
+        cause: oracleResult.explanation,
+        remediation: {
+          title: oracleResult.title,
+          tool: 'shell.execute',
+          params: { command: oracleResult.fixedCommand },
+          description: `${oracleResult.explanation}: ${oracleResult.fixedCommand}`
+        },
+        canRetry: true
+      };
+    }
+
+    // 4. Fallback: Unknown Fatal Error
     return {
       category: 'FATAL_UNKNOWN',
       cause: raw || 'Unknown execution failure',

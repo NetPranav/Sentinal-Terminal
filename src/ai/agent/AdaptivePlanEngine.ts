@@ -183,7 +183,11 @@ export class AdaptivePlanEngine {
       const phaseOutcome = await this.executeSinglePhase(goal, phase, plan, options, executedSteps);
       if (phaseOutcome.cdPath) {
         cdPath = phaseOutcome.cdPath;
+        options.cwd = cdPath; // Propagate updated working directory to subsequent phases
       }
+
+      // Dynamic Plan Adaptation: reduce or adjust subsequent phases based on step outcome
+      this.adaptPlanAfterPhase(phase, plan, options.cwd, goal);
 
       options.onPhaseDone?.(phase);
       options.onPlanUpdate?.(plan);
@@ -228,6 +232,9 @@ export class AdaptivePlanEngine {
     let summary: string;
     if (stepOutputs.length > 0) {
       summary = stepOutputs.join('\n\n');
+    } else if (completedPhases === 0) {
+      const failures = plan.phases.map(p => p.resultSummary || p.title).filter(Boolean).join('; ');
+      summary = failures ? `Workflow plan failed: ${failures}` : 'Could not complete workflow plan.';
     } else {
       summary = skippedPhases > 0
         ? `Completed goal in ${completedPhases} phase(s); ${skippedPhases} subsequent phase(s) skipped.`
@@ -263,6 +270,26 @@ export class AdaptivePlanEngine {
       }
     }
 
+    // Universal Shell Resolution: If tool is not mapped or shell.execute has no command, resolve command
+    if (!phase.tool || (phase.tool === 'shell.execute' && !phase.params?.command)) {
+      const resolvedCmd = this.resolveShellCommandForPhase(phase.title, goal, options.cwd, options.os);
+      if (resolvedCmd) {
+        phase.tool = 'shell.execute';
+        phase.params = { command: resolvedCmd, explanation: phase.title };
+      }
+    }
+
+    // Auto-populate missing required parameters for system.kill_process / application.close
+    if ((phase.tool === 'system.kill_process' || phase.tool === 'application.close' || phase.tool === 'application.force_quit') && (!phase.params || (!phase.params.process && !phase.params.app))) {
+      const match = phase.title.match(/(?:close|kill|terminate|stop|force\s+quit)\s+(?:the\s+|an?\s+)?(?:application\s+|app\s+|process\s+)?['"]?([a-z0-9_.-]+)['"]?/i)
+        || goal.match(/(?:close|kill|terminate|stop|force\s+quit)\s+(?:the\s+|an?\s+)?(?:application\s+|app\s+|process\s+)?['"]?([a-z0-9_.-]+)['"]?/i)
+        || goal.match(/(?:named|called)\s+['"]?([a-z0-9_.-]+)['"]?/i);
+      if (match && match[1] && match[1].toLowerCase() !== 'it' && match[1].toLowerCase() !== 'that') {
+        const clean = match[1].replace(/^(?:the|my|a|an)\s+/i, '').replace(/\s+(?:application|app|process)$/i, '').trim();
+        phase.params = { ...(phase.params || {}), process: clean, app: clean };
+      }
+    }
+
     // If tool is assigned, execute it
     if (phase.tool && options.toolExecutor.hasDriver(phase.tool)) {
       try {
@@ -284,6 +311,12 @@ export class AdaptivePlanEngine {
         // Capture navigation
         if (phase.tool === 'filesystem.navigate' && result.success && phase.params?.path) {
           phaseCdPath = phase.params.path;
+        } else if (phase.tool === 'shell.execute' && result.success && phase.params?.command) {
+          const cdMatch = phase.params.command.match(/^(?:cd\s+['"]?([^'";\n&]+)['"]?)/);
+          if (cdMatch && cdMatch[1]) {
+            const home = process.env.HOME || process.env.USERPROFILE || '~';
+            phaseCdPath = path.resolve(options.cwd, cdMatch[1].trim().replace('~', home));
+          }
         }
 
         // Handle Physical Action Requirements (Human-in-the-Loop)
@@ -517,6 +550,23 @@ export class AdaptivePlanEngine {
       ];
     }
 
+    // Case 3: Target directory does not exist when navigating or scaffolding
+    if (errMsg.includes('no such file or directory') || errMsg.includes('directory not found') || errMsg.includes('cannot find the path')) {
+      const targetPath = phase.params?.path || (phase.params?.command?.match(/(?:cd|mkdir)\s+['"]?([^'";\n]+)['"]?/)?.[1]);
+      if (targetPath) {
+        return [
+          { title: `Create target directory: ${targetPath}`, tool: 'shell.execute', params: { command: `mkdir -p "${targetPath}"`, explanation: `Create directory ${targetPath}` } }
+        ];
+      }
+    }
+
+    // Case 4: Not a git repository
+    if (errMsg.includes('not a git repository')) {
+      return [
+        { title: 'Initialize git repository', tool: 'shell.execute', params: { command: 'git init', explanation: 'Initialize git repository' } }
+      ];
+    }
+
     return null;
   }
 
@@ -669,6 +719,179 @@ export class AdaptivePlanEngine {
       };
     }
 
+    // 7. Compound Project Scaffolding & Git Init Workflow (Multi-Phase)
+    if (
+      (lower.includes('initialize') || lower.includes('scaffold') || lower.includes('create') || lower.includes('setup')) &&
+      (lower.includes('next') || lower.includes('react') || lower.includes('vite') || lower.includes('project') || lower.includes('app')) &&
+      (lower.includes('inside') || lower.includes('in folder') || lower.includes('in directory') || lower.includes('desktop') || lower.includes('git'))
+    ) {
+      const isNext = lower.includes('next');
+      const isReact = lower.includes('react') || lower.includes('vite');
+      const frameworkName = isNext ? 'Next.js' : isReact ? 'React' : 'Project';
+      const scaffoldCmd = isNext
+        ? 'npx -y create-next-app@latest . --ts --eslint --tailwind --app --yes'
+        : isReact
+        ? 'npx -y create-vite@latest . --template react-ts'
+        : 'npm init -y';
+
+      const home = process.env.HOME || process.env.USERPROFILE || '~';
+      let targetPath = context.cwd;
+
+      if (lower.includes('desktop')) {
+        const folderMatch = lower.match(/(?:inside|in)\s+(?:the\s+)?([a-z0-9_.-]+)\s+(?:folder|directory|dir)\s+(?:inside|in|on)\s+desktop/i)
+          || lower.match(/(?:inside|in|on)\s+desktop\s+(?:inside|in)\s+(?:the\s+)?([a-z0-9_.-]+)/i)
+          || lower.match(/([a-z0-9_.-]+)\s+folder\s+(?:inside|in|on)\s+desktop/i);
+        const folderName = folderMatch ? folderMatch[1].trim() : 'frontend';
+        targetPath = path.join(home, 'Desktop', folderName);
+      } else {
+        const inMatch = lower.match(/(?:inside|in)\s+(?:the\s+)?([~/a-z0-9_.-]+)(?:\s+folder|\s+directory|\s+dir)?/i);
+        if (inMatch && inMatch[1] && !['the', 'a', 'this', 'next'].includes(inMatch[1])) {
+          const raw = inMatch[1].trim();
+          targetPath = raw.startsWith('~') ? raw.replace('~', home) : path.resolve(context.cwd, raw);
+        }
+      }
+
+      const wantsGit = lower.includes('git');
+      const phases: PlanPhase[] = [
+        {
+          id: '1',
+          title: `Ensure directory exists and navigate: ${targetPath}`,
+          tool: 'filesystem.navigate',
+          params: { path: targetPath },
+          status: 'pending'
+        },
+        {
+          id: '2',
+          title: `Initialize ${frameworkName} project in ${targetPath}`,
+          tool: 'shell.execute',
+          params: { command: scaffoldCmd, explanation: `Scaffold ${frameworkName} project` },
+          status: 'pending'
+        }
+      ];
+
+      if (wantsGit) {
+        phases.push({
+          id: '3',
+          title: `Initialize git repository and stage files`,
+          tool: 'shell.execute',
+          params: { command: 'git init && git add . && git commit -m "Initial commit" 2>/dev/null || git init', explanation: 'Initialize git repository' },
+          status: 'pending'
+        });
+      }
+
+      return {
+        summary: `Scaffold ${frameworkName} project in ${targetPath}${wantsGit ? ' and initialize git repository' : ''}`,
+        steps: phases.map(p => p.title),
+        phases
+      };
+    }
+
+    return null;
+  }
+
+  /**
+   * Evaluates dynamic plan adaptation after a phase finishes:
+   * - Reduce: If later phases are now redundant (e.g. git already initialized, files already exist), skip them.
+   * - Increase: If unexpected prerequisites are found, inject sub-phases.
+   */
+  public adaptPlanAfterPhase(
+    completedPhase: PlanPhase,
+    plan: AgentPlan,
+    currentCwd: string,
+    goal: string
+  ): void {
+    if (completedPhase.status !== 'completed') return;
+
+    for (const p of plan.phases) {
+      if (p.status !== 'pending') continue;
+
+      const titleLower = p.title.toLowerCase();
+
+      // 1. Dynamic Phase Reduction: If git repository already initialized by scaffolding or earlier step
+      if (titleLower.includes('git') && (titleLower.includes('init') || titleLower.includes('repository'))) {
+        const gitDir = path.join(currentCwd, '.git');
+        try {
+          if (fs.existsSync(gitDir)) {
+            p.status = 'skipped';
+            p.skippedReason = 'Git repository was already initialized by scaffolding';
+          }
+        } catch { /* ignore */ }
+      }
+
+      // 2. Dynamic Phase Reduction: If dependencies already installed
+      if (titleLower.includes('dependency') || titleLower.includes('dependencies') || titleLower.includes('npm install')) {
+        const nodeModules = path.join(currentCwd, 'node_modules');
+        try {
+          if (fs.existsSync(nodeModules) && fs.readdirSync(nodeModules).length > 0) {
+            p.status = 'skipped';
+            p.skippedReason = 'Dependencies already installed';
+          }
+        } catch { /* ignore */ }
+      }
+
+      // 3. Dynamic Phase Reduction: If target directory already exists
+      if (titleLower.includes('create folder') || titleLower.includes('create directory') || titleLower.includes('ensure directory')) {
+        const match = p.title.match(/(?:directory|folder|at|to)\s+['"]?([~/a-z0-9_.-]+)['"]?/i);
+        if (match && match[1]) {
+          const resolved = path.resolve(currentCwd, match[1].replace('~', process.env.HOME || '~'));
+          try {
+            if (fs.existsSync(resolved)) {
+              p.status = 'skipped';
+              p.skippedReason = 'Directory already exists';
+            }
+          } catch { /* ignore */ }
+        }
+      }
+    }
+  }
+
+  public resolveShellCommandForPhase(phaseTitle: string, goal: string, cwd: string, os: string): string | null {
+    const lower = phaseTitle.toLowerCase();
+
+    // Next.js init
+    if (lower.includes('next') && (lower.includes('init') || lower.includes('create') || lower.includes('scaffold') || lower.includes('project'))) {
+      return 'npx -y create-next-app@latest . --ts --eslint --tailwind --app --yes';
+    }
+
+    // React init
+    if (lower.includes('react') && (lower.includes('init') || lower.includes('create') || lower.includes('scaffold') || lower.includes('project'))) {
+      return 'npx -y create-vite@latest . --template react-ts';
+    }
+
+    // Git init
+    if (lower.includes('git') && (lower.includes('init') || lower.includes('initialize') || lower.includes('repository') || lower.includes('repo'))) {
+      return 'git init && git add . && git commit -m "Initial commit" 2>/dev/null || git init';
+    }
+
+    // Install dependencies
+    if (lower.includes('install') && (lower.includes('dependenc') || lower.includes('package') || lower.includes('npm'))) {
+      return 'npm install';
+    }
+
+    // Build project
+    if (lower.includes('build') || lower.includes('compile')) {
+      return 'npm run build 2>/dev/null || make 2>/dev/null';
+    }
+
+    // Directory creation
+    if (lower.includes('create directory') || lower.includes('create folder') || lower.includes('ensure directory') || lower.includes('mkdir')) {
+      const match = phaseTitle.match(/(?:directory|folder|mkdir|at|to)\s+['"]?([~/a-z0-9_.-]+)['"]?/i);
+      if (match && match[1]) {
+        return `mkdir -p "${match[1]}"`;
+      }
+    }
+
+    // Process / application termination
+    if (lower.includes('close') || lower.includes('kill') || lower.includes('terminate') || lower.includes('stop')) {
+      const match = phaseTitle.match(/(?:close|kill|terminate|stop)\s+(?:the\s+|an?\s+)?(?:application\s+|app\s+|process\s+)?['"]?([a-z0-9_.-]+)['"]?/i)
+        || goal.match(/(?:close|kill|terminate|stop)\s+(?:the\s+|an?\s+)?(?:application\s+|app\s+|process\s+)?['"]?([a-z0-9_.-]+)['"]?/i)
+        || goal.match(/(?:named|called)\s+['"]?([a-z0-9_.-]+)['"]?/i);
+      if (match && match[1] && match[1].toLowerCase() !== 'it' && match[1].toLowerCase() !== 'that') {
+        const clean = match[1].replace(/^(?:the|my|a|an)\s+/i, '').replace(/\s+(?:application|app|process)$/i, '').trim();
+        return os === 'mac' ? `osascript -e 'tell application "${clean}" to quit' 2>/dev/null || pkill -9 -i -f "${clean}"` : `pkill -9 -i -f "${clean}"`;
+      }
+    }
+
     return null;
   }
 
@@ -697,7 +920,8 @@ User request: ${goal}`;
       const phases: PlanPhase[] = parsed.phases.map((p: any, idx: number) => ({
         id: String(p.id || idx + 1),
         title: String(p.title || `Phase ${idx + 1}`),
-        tool: p.tool ? String(p.tool) : undefined,
+        tool: p.tool ? String(p.tool) : (p.command ? 'shell.execute' : undefined),
+        params: p.params || (p.command ? { command: String(p.command), explanation: String(p.title) } : undefined),
         status: 'pending'
       }));
 
@@ -749,6 +973,21 @@ User request: ${goal}`;
     if (lower.includes('port') || lower.includes('listening')) {
       return { tool: 'network.ports', params: {} };
     }
+    if (lower.includes('close') || lower.includes('kill') || lower.includes('terminate') || lower.includes('stop') || lower.includes('force quit')) {
+      const match = phaseTitle.match(/(?:close|kill|terminate|stop|force\s+quit)\s+(?:the\s+|an?\s+)?(?:application\s+|app\s+|process\s+)?['"]?([a-z0-9_.-]+)['"]?/i)
+        || goal.match(/(?:close|kill|terminate|stop|force\s+quit)\s+(?:the\s+|an?\s+)?(?:application\s+|app\s+|process\s+)?['"]?([a-z0-9_.-]+)['"]?/i)
+        || goal.match(/(?:named|called)\s+['"]?([a-z0-9_.-]+)['"]?/i);
+      let target = match ? match[1].trim() : '';
+      target = target.replace(/^(?:the|my|a|an)\s+/i, '').replace(/\s+(?:application|app|process)$/i, '').trim();
+      if (target && target.toLowerCase() !== 'it' && target.toLowerCase() !== 'that') {
+        return { tool: 'system.kill_process', params: { process: target } };
+      }
+    }
+
+    if (lower.includes('check') && (lower.includes('running') || lower.includes('application') || lower.includes('app') || lower.includes('process'))) {
+      return { tool: 'application.list_running', params: {} };
+    }
+
     if (lower.includes('process') || lower.includes('cpu') || lower.includes('ram')) {
       return { tool: 'system.processes', params: { sort: lower.includes('ram') ? 'ram' : 'cpu' } };
     }
@@ -766,14 +1005,16 @@ User request: ${goal}`;
     }
     if (lower.includes('open') && (lower.includes('link') || lower.includes('first link') || lower.includes('url') || lower.includes('result'))) {
       const qMatch = goal.match(/search(?:\s+for)?\s+['"]?([^'"]+)['"]?/i);
-      const query = qMatch ? qMatch[1].replace(/\s+(?:on|in)\s+google/i, '').trim() : 'black bird';
+      const query = qMatch ? qMatch[1].replace(/\s+(?:on|in)\s+google/i, '').trim() : goal.replace(/^(?:open|search)\s+/i, '').trim();
       return { tool: 'browser.search', params: { query, engine: 'google' } };
     }
 
     if (lower.includes('find') || lower.includes('search') || lower.includes('locate')) {
       if (lower.includes('folder') || lower.includes('directory') || lower.includes('file') || lower.includes('path')) {
-        const nameMatch = phaseTitle.match(/(?:named|with\s+name|pattern)\s+(?:as\s+)?['"]?([^'"\s]+)['"]?/i) || goal.match(/(?:named|with\s+name|pattern)\s+(?:as\s+)?['"]?([^'"\s]+)['"]?/i);
-        const targetName = nameMatch ? nameMatch[1].trim() : 'frontend';
+        const nameMatch = phaseTitle.match(/(?:named|with\s+name|pattern)\s+(?:as\s+)?['"]?([^'"\s]+)['"]?/i)
+          || goal.match(/(?:named|with\s+name|pattern)\s+(?:as\s+)?['"]?([^'"\s]+)['"]?/i)
+          || goal.match(/(?:find|search|locate)\s+(?:me\s+)?(?:the\s+|all\s+)?['"]?([a-z0-9_.*-]+)['"]?\s+(?:folders?|directories|dirs|files?)/i);
+        const targetName = nameMatch ? nameMatch[1].trim() : (phaseTitle.replace(/^(?:find|search|locate)\s+(?:all\s+)?(?:the\s+)?/i, '').replace(/\s+(?:folders?|directories|files?).*$/i, '').trim() || '*');
         return { tool: 'filesystem.search', params: { path: cwd || '.', pattern: `*${targetName}*` } };
       }
     }

@@ -1,10 +1,13 @@
 :root {
-  font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Helvetica Neue", Inter, system-ui, sans-serif;
   line-height: 1.5;
   font-weight: 400;
   color-scheme: dark;
   color: var(--sentinel-fg, rgba(255, 255, 255, 0.9));
   background-color: transparent !important;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }
 
 body {
@@ -14,6 +17,10 @@ body {
   min-width: 100vw;
   overflow: hidden;
   background-color: transparent !important;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 #root {
@@ -22,8 +29,8 @@ body {
   display: flex;
   flex-direction: column;
   background-color: var(--sentinel-bg, rgba(11, 13, 23, 0.85));
-  backdrop-filter: var(--sentinel-backdrop, blur(25px));
-  -webkit-backdrop-filter: var(--sentinel-backdrop, blur(25px));
+  backdrop-filter: var(--sentinel-backdrop, blur(28px));
+  -webkit-backdrop-filter: var(--sentinel-backdrop, blur(28px));
   box-shadow: var(--sentinel-border-glow, none);
 }
 
@@ -33,24 +40,30 @@ body {
   width: 100%;
   height: 100%;
   background: var(--sentinel-bg, rgba(11, 13, 23, 0.85));
+  backdrop-filter: var(--sentinel-backdrop, blur(28px));
+  -webkit-backdrop-filter: var(--sentinel-backdrop, blur(28px));
   position: relative;
   overflow: hidden;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
-/* Apple macOS style capsule/pill header bar */
+/* Apple macOS style capsule/pill header bar with traffic-light inset and drag region */
 .tabs-bar {
   display: flex;
-  background-color: var(--sentinel-bg, rgba(11, 13, 23, 0.85));
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  background-color: var(--sentinel-bg, rgba(11, 13, 23, 0.75));
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
   border-bottom: 1px solid var(--sentinel-border, rgba(255, 255, 255, 0.08));
   height: 38px;
   align-items: center;
   flex-shrink: 0;
   user-select: none;
+  -webkit-user-select: none;
   z-index: 200;
-  padding: 0 10px;
+  padding: 0 10px 0 78px; /* Inset clears native macOS traffic lights (close, minimize, zoom) */
   color: var(--sentinel-fg, #ffffff);
+  -webkit-app-region: drag; /* Allows moving the window by dragging the tabs bar */
 }
 
 .tabs-track {
@@ -278,9 +291,55 @@ body {
   50% { opacity: 0.6; transform: scale(0.92); }
 }
 
-/* xterm transparent overrides for crisp glassmorphism */
-.xterm, .xterm-viewport, .xterm-screen {
+/* Native macOS window dragging and interactive region management */
+.window-drag-region {
+  -webkit-app-region: drag;
+}
+
+.window-no-drag,
+.tab-pill,
+.pill-close-btn,
+.pill-add-btn,
+.pane-action-buttons,
+.split-divider,
+.personalize-btn,
+button,
+input,
+select,
+textarea {
+  -webkit-app-region: no-drag;
+}
+
+/* Fluid, precise text selection exclusively in terminal grids */
+.xterm, .xterm-viewport, .xterm-screen, .xterm-rows, .xterm-selection {
   background: transparent !important;
   background-color: transparent !important;
+  user-select: text !important;
+  -webkit-user-select: text !important;
+}
+
+/* Allow text selection in code snippets, diagnostic text, and inputs */
+input, textarea, select, pre, code, .terminal-selectable {
+  user-select: text !important;
+  -webkit-user-select: text !important;
+}
+
+/* Sleek minimalist scrollbars matching macOS system style */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
 }
 

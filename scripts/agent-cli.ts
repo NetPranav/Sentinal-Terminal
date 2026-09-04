@@ -254,6 +254,11 @@ async function runPrompt(
 }
 
 async function startInteractiveRepl(agentLoop: AgentLoop, options: CliOptions): Promise<void> {
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout
+  });
+
   console.log(`
 ${colors.bold}${colors.cyan}══════════════════════════════════════════════════════════════════════${colors.reset}
 ${colors.bold}${colors.cyan}  Sentinel AI Terminal — Interactive Inspection REPL${colors.reset}
@@ -324,6 +329,12 @@ async function main(): Promise<void> {
 
   const modelManager = new ModelManager();
   const agentLoop = new AgentLoop(loader.getState(), modelManager);
+  agentLoop.setAuthorizationHandler(async (plan) => {
+    if (!options.json) {
+      console.log(`  ${colors.yellow}⚡ [Authorized action]${colors.reset} ${plan.capabilityId} (${plan.riskLevel})`);
+    }
+    return true;
+  });
 
   if (options.prompt) {
     const result = await runPrompt(agentLoop, options.prompt, options);

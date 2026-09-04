@@ -8,6 +8,8 @@ import { ToolLoader } from '../tools/loader/ToolLoader';
 import { AppAliasRegistry } from '../domain/capabilities/AppAliasRegistry';
 import { AgentLoop, AgentPlan } from '../ai/agent/AgentLoop';
 import { DemonstrationLearningEngine } from '../domain/learning/DemonstrationLearningEngine';
+import { EpisodicMemoryEngine } from '../domain/learning/EpisodicMemoryEngine';
+import { SentinelSerlCoordinator } from '../domain/learning/SentinelSerlCoordinator';
 import { PtyOutputObserver, type RemediationPrompt } from '../domain/observer/PtyOutputObserver';
 import { formatAgentEvent, formatDataOutput } from './OutputFormatter';
 
@@ -56,7 +58,9 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
     if (xtermRef.current) {
       xtermRef.current.write(`\r\n\x1b[1;32m⚡ [Sentinel Auto-Heal] Executing: ${rem.actionTitle}...\x1b[0m\r\n`);
     }
-    if (agentLoopRef.current) {
+    if (rem.tool === 'shell.execute' && rem.params?.command && sessionId) {
+      await SessionManager.getInstance().write(sessionId, `${rem.params.command}\r`);
+    } else if (agentLoopRef.current) {
       await agentLoopRef.current.run(`fix error: ${rem.actionTitle}`, { os: 'mac', cwd: currentPath || '~' });
     }
   };
@@ -121,8 +125,12 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
       allowTransparency: true,
       scrollback: 100000,
       allowProposedApi: true,
-      fontFamily: currentTheme.ui.fontFamily || 'Menlo, Monaco, "Courier New", monospace',
-      fontSize: currentTheme.ui.fontSize || 14,
+      fontFamily: currentTheme.ui.fontFamily || '"SF Mono", Menlo, Monaco, "Cascadia Code", "Courier New", monospace',
+      fontSize: currentTheme.ui.fontSize || 13.5,
+      lineHeight: 1.25,
+      letterSpacing: 0,
+      fontWeight: '400',
+      fontWeightBold: '700',
       theme: {
         background: 'rgba(0, 0, 0, 0)', // Completely transparent to reveal glassmorphism backdrop
         foreground: currentTheme.colors.foreground,
@@ -231,11 +239,15 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
         autocompleteEngine.registerProvider(demonstrationProvider);
         autocompleteEngine.registerProvider(workspaceContextProvider);
         
+        // Start Tier 4 Sentinel-SERL Autonomous Orchestrator
+        SentinelSerlCoordinator.getInstance().startCoordinator();
+
         const ghostText = new GhostTextRenderer(term);
         ghostText.attach(terminalRef.current!);
 
         term.onData(async (data) => {
           if (!currentSessionId) return;
+          SentinelSerlCoordinator.getInstance().markActivity();
 
           // Handle Tab completion or Right Arrow completion
           if (data === '\t' || data === '\x1b[C') {
@@ -252,7 +264,11 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
                await sessionManager.write(currentSessionId, '\x03');
                writeTerm(`\r\n\x1b[1;32m⚡ [Sentinel Auto-Heal] Executing: ${activeRem.actionTitle}...\x1b[0m\r\n`);
                PtyOutputObserver.getInstance().clearRemediation();
-               await agentLoop.run(`fix error: ${activeRem.actionTitle}`, { os: 'mac', cwd: currentPath || '~' });
+               if (activeRem.tool === 'shell.execute' && activeRem.params?.command) {
+                 await sessionManager.write(currentSessionId, `${activeRem.params.command}\r`);
+               } else {
+                 await agentLoop.run(`fix error: ${activeRem.actionTitle}`, { os: 'mac', cwd: currentPath || '~' });
+               }
                return;
              }
           }
@@ -376,10 +392,14 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
                   const match = cleanCmd.match(/^\/learn\s+(.+?)\s*(?:->|=>|──►|to)\s*(.+)$/i);
                   if (match && match[1] && match[2]) {
                     const pattern = DemonstrationLearningEngine.getInstance().learnExplicit(match[1], match[2]);
+                    EpisodicMemoryEngine.getInstance().recordMemory(match[1], match[2], {
+                      cwd: currentPath,
+                      source: 'explicit_teach'
+                    });
                     writeTerm(`\r\n\x1b[1;32m[Learning Engine] Successfully learned new workflow:\x1b[0m\r\n`);
                     writeTerm(`  • Trigger: \x1b[1;36m"${pattern.originalGoal}"\x1b[0m\r\n`);
                     writeTerm(`  • Command: \x1b[1;33m${pattern.commandTemplate}\x1b[0m\r\n`);
-                    writeTerm(`\x1b[37m[Learning Engine] Saved to persistent storage (~/.sentinel/learned_patterns.json).\x1b[0m\r\n\r\n`);
+                    writeTerm(`\x1b[37m[Learning Engine] Saved to persistent storage (~/.sentinel/learned_patterns.json & episodic memory).\x1b[0m\r\n\r\n`);
                   } else {
                     writeTerm(`\r\n\x1b[37mUsage:\x1b[0m \x1b[1;32m/learn <natural language goal> -> <command>\x1b[0m\r\n`);
                     writeTerm(`Example: \x1b[36m/learn compress backups -> tar -czvf backups.tar.gz ./backups\x1b[0m\r\n\r\n`);
@@ -415,11 +435,25 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
                   lastUnresolvedGoalRef.current.goal,
                   cleanCmd
                 );
+                EpisodicMemoryEngine.getInstance().recordMemory(
+                  lastUnresolvedGoalRef.current.goal,
+                  cleanCmd,
+                  {
+                    cwd: currentPath,
+                    source: 'demonstration'
+                  }
+                );
+                // Tier 4: Feed human demonstration into Sentinel-SERL closed-loop
+                SentinelSerlCoordinator.getInstance().onHumanDemonstration(
+                  lastUnresolvedGoalRef.current.goal,
+                  cleanCmd,
+                  `Human demonstration in ${currentPath || '~'}`
+                ).catch(e => console.warn('[TerminalView] SERL demonstration recording error:', e));
                 if (learned) {
                   writeTerm(`\r\n\x1b[1;35m💡 Sentinel learned this workflow from your demonstration!\x1b[0m\r\n`);
                   writeTerm(`  • \x1b[36mTrigger:\x1b[0m "${lastUnresolvedGoalRef.current.goal}"\r\n`);
                   writeTerm(`  • \x1b[33mCommand:\x1b[0m ${cleanCmd}\r\n`);
-                  writeTerm(`  • \x1b[37mSaved to ~/.sentinel/learned_patterns.json. Next time you ask, Sentinel will know this!\x1b[0m\r\n\r\n`);
+                  writeTerm(`  • \x1b[37mSaved to ~/.sentinel/learned_patterns.json & LoRA training dataset. Next time you ask, Sentinel will know this!\x1b[0m\r\n\r\n`);
                   lastUnresolvedGoalRef.current = null;
                 }
               }
@@ -468,7 +502,9 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
                   // Show structured data (file lists, devices, etc.) when available
                   if (event.data && (event.type === 'tool_done' || event.type === 'done')) {
                     const dataOutput = formatDataOutput(event.data);
-                    if (dataOutput) writeTerm(dataOutput);
+                    if (dataOutput && (!text || !text.includes(dataOutput.trim()))) {
+                      writeTerm(dataOutput);
+                    }
                   }
                 });
 
@@ -757,8 +793,8 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
             {activeRemediation.cause}
           </div>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '2px', gap: '8px' }}>
-            <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.55)', fontStyle: 'italic', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              Fix: {activeRemediation.actionTitle}
+            <span style={{ fontSize: '11px', color: '#38bdf8', fontFamily: 'monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={activeRemediation.params?.command || activeRemediation.actionTitle}>
+              Fix: {activeRemediation.params?.command || activeRemediation.actionTitle}
             </span>
             <button
               onClick={() => handleExecuteRemediation(activeRemediation)}

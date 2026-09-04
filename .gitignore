@@ -27,8 +27,15 @@ dist-ssr
 # Embedded AI Models & Binaries
 src-tauri/binaries/
 src-tauri/resources/models/
+*.safetensors
+*.bin
+*.gguf
+*.zip
+*.tar.gz
+sentinel_lora_colab/
 
 # Build artifacts & scratch
 *.dmg
 build/
 scratch/
+

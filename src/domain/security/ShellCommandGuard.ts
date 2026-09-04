@@ -1,5 +1,6 @@
 import { ExecutionPreviewPlan } from './ExecutionEngine';
 import { ISecurityEngine, RiskAnalysisResult, SecurityEngine } from './SecurityEngine';
+import { ShellAstParser } from './ShellAstParser';
 
 export type ShellGuardAction = 'allow' | 'require_approval' | 'deny';
 
@@ -37,11 +38,26 @@ export class ShellCommandGuard {
       };
     }
 
+    // 1. Syntactic AST Validation
+    const syntax = ShellAstParser.validateSyntax(command);
+    if (!syntax.valid) {
+      return {
+        action: 'deny',
+        command,
+        risk: {
+          score: 95,
+          level: 'CRITICAL',
+          explanation: `Shell AST syntax error: ${syntax.error}`,
+          requiresPassword: false,
+          requiresConsent: false
+        },
+        blockReason: `Syntax validation failed: ${syntax.error}`
+      };
+    }
+
     // Check piped execution risk on the whole command line first (e.g. curl ... | bash)
     const wholePipeRisk = this.analyzePipedExecution(command);
 
-    // Split compound commands (&&, ||, ;, |, &) while respecting quotes
-    const subCommands = this.splitCompoundCommands(command);
     let highestRisk: RiskAnalysisResult = wholePipeRisk || {
       score: 0,
       level: 'SAFE',
@@ -50,48 +66,95 @@ export class ShellCommandGuard {
       requiresConsent: false
     };
 
-    for (const subCmd of subCommands) {
-      const subProtectedPath = this.detectProtectedPathDeletion(subCmd);
-      if (subProtectedPath) {
-        return {
-          action: 'deny',
-          command,
-          risk: {
-            score: 100,
-            level: 'CRITICAL',
-            explanation: `Hard block: destructive operation targeting protected path '${subProtectedPath}'.`,
-            requiresPassword: true,
-            requiresConsent: true
-          },
-          blockReason: `Cannot delete or modify protected system path: ${subProtectedPath}`
-        };
+    try {
+      const ast = ShellAstParser.parse(command);
+
+      // Check catastrophic destructive operations across AST (rm -rf /, dd overwrite, mkfs, etc.)
+      const destructive = ShellAstParser.isDestructiveOperation(ast);
+
+      const simpleCommands = ShellAstParser.getAllSimpleCommands(ast);
+
+      for (const cmdNode of simpleCommands) {
+        const fullCmdStr = cmdNode.rawText || `${cmdNode.name} ${cmdNode.args.join(' ')}`;
+        const subProtectedPath = this.detectProtectedPathDeletion(fullCmdStr);
+        if (subProtectedPath) {
+          return {
+            action: 'deny',
+            command,
+            risk: {
+              score: 100,
+              level: 'CRITICAL',
+              explanation: `Hard block: destructive operation targeting protected path '${subProtectedPath}'.`,
+              requiresPassword: true,
+              requiresConsent: true
+            },
+            blockReason: `Cannot delete or modify protected system path: ${subProtectedPath}`
+          };
+        }
+
+        const binary = cmdNode.name;
+        const args = cmdNode.args;
+        let subRisk = this.securityEngine.analyzeCommand(binary, args);
+
+        // Catch single-token destructive binaries missed by spaced patterns
+        subRisk = this.enhanceRiskForEdgeCases(fullCmdStr, binary, subRisk);
+
+        const pipeRisk = this.analyzePipedExecution(fullCmdStr);
+        if (pipeRisk && pipeRisk.score > subRisk.score) {
+          subRisk = pipeRisk;
+        }
+
+        if (subRisk.score > highestRisk.score) {
+          highestRisk = {
+            ...subRisk,
+            requiresPassword: highestRisk.requiresPassword || subRisk.requiresPassword,
+            requiresConsent: highestRisk.requiresConsent || subRisk.requiresConsent
+          };
+        } else {
+          highestRisk = {
+            ...highestRisk,
+            requiresPassword: highestRisk.requiresPassword || subRisk.requiresPassword,
+            requiresConsent: highestRisk.requiresConsent || subRisk.requiresConsent
+          };
+        }
       }
 
-      const parts = subCmd.split(/\s+/);
-      const binary = parts[0];
-      const args = parts.slice(1);
-      let subRisk = this.securityEngine.analyzeCommand(binary, args);
-
-      // Catch single-token destructive binaries missed by spaced patterns
-      subRisk = this.enhanceRiskForEdgeCases(subCmd, binary, subRisk);
-
-      const pipeRisk = this.analyzePipedExecution(subCmd);
-      if (pipeRisk && pipeRisk.score > subRisk.score) {
-        subRisk = pipeRisk;
+      if (destructive.isDestructive) {
+        highestRisk = {
+          score: Math.max(highestRisk.score, 98),
+          level: 'CRITICAL',
+          explanation: destructive.reasons.join('; '),
+          requiresPassword: true,
+          requiresConsent: true
+        };
       }
-
-      if (subRisk.score > highestRisk.score) {
-        highestRisk = {
-          ...subRisk,
-          requiresPassword: highestRisk.requiresPassword || subRisk.requiresPassword,
-          requiresConsent: highestRisk.requiresConsent || subRisk.requiresConsent
-        };
-      } else {
-        highestRisk = {
-          ...highestRisk,
-          requiresPassword: highestRisk.requiresPassword || subRisk.requiresPassword,
-          requiresConsent: highestRisk.requiresConsent || subRisk.requiresConsent
-        };
+    } catch {
+      // Fallback to splitting if AST parse encountered edge case
+      const subCommands = this.splitCompoundCommands(command);
+      for (const subCmd of subCommands) {
+        const subProtectedPath = this.detectProtectedPathDeletion(subCmd);
+        if (subProtectedPath) {
+          return {
+            action: 'deny',
+            command,
+            risk: {
+              score: 100,
+              level: 'CRITICAL',
+              explanation: `Hard block: destructive operation targeting protected path '${subProtectedPath}'.`,
+              requiresPassword: true,
+              requiresConsent: true
+            },
+            blockReason: `Cannot delete or modify protected system path: ${subProtectedPath}`
+          };
+        }
+        const parts = subCmd.split(/\s+/);
+        const binary = parts[0];
+        const args = parts.slice(1);
+        let subRisk = this.securityEngine.analyzeCommand(binary, args);
+        subRisk = this.enhanceRiskForEdgeCases(subCmd, binary, subRisk);
+        if (subRisk.score > highestRisk.score) {
+          highestRisk = subRisk;
+        }
       }
     }
 

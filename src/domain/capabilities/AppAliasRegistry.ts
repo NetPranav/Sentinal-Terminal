@@ -47,7 +47,9 @@ export class AppAliasRegistry {
     'antigravity ide': 'Antigravity IDE',
     'cursor': 'Cursor',
     'cursor ai': 'Cursor',
-    'finder': 'Finder'
+    'finder': 'Finder',
+    'music': 'Music',
+    'apple music': 'Music'
   };
 
   private defaultCasks: Record<string, string> = {
@@ -169,7 +171,11 @@ export class AppAliasRegistry {
    */
   public resolve(appNameOrAlias: string): string {
     if (!appNameOrAlias) return '';
-    const clean = appNameOrAlias.trim().replace(/^(?:the|my|a|an)\s+/i, '');
+    const clean = appNameOrAlias.trim()
+      .replace(/^["']|["']$/g, '')
+      .replace(/^(?:the|my|a|an)\s+/i, '')
+      .replace(/\s+(?:application|app|process)$/i, '')
+      .trim();
     const lower = clean.toLowerCase();
 
     // Check direct alias lookup

@@ -8,6 +8,7 @@
  */
 
 import { invoke } from '@tauri-apps/api/core';
+import { safeBase64Encode } from '../../utils/encodingUtils';
 
 export interface LearnedPattern {
   id: string;
@@ -312,7 +313,7 @@ export class DemonstrationLearningEngine {
     try {
       const all = Array.from(this.patterns.values());
       const jsonStr = JSON.stringify(all, null, 2);
-      const b64 = Buffer.from(jsonStr).toString('base64');
+      const b64 = safeBase64Encode(jsonStr);
       const cmd = `mkdir -p "$HOME/.sentinel" && echo '${b64}' | base64 --decode > "$HOME/.sentinel/learned_patterns.json"`;
 
       await invoke('execute_command', {

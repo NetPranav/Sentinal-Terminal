@@ -385,5 +385,76 @@ describe('AdaptivePlanEngine — Dynamic Multi-Phase Planning & Execution', () =
     expect(plan.phases[0].params?.enable).toBe(false);
     expect(plan.phases[0].params?.target).toBe('hyprland');
   });
+
+  it('should generate a compound 3-phase plan for project scaffolding and git initialization', async () => {
+    const engine = new AdaptivePlanEngine();
+    const plan = await engine.createPlan(
+      'inside the frontend folder inside desktop initialize the next project into it and also git initialize it after',
+      { os: 'mac', cwd: '/Users/test' }
+    );
+
+    expect(plan).toBeDefined();
+    expect(plan.phases.length).toBe(3);
+    expect(plan.phases[0].id).toBe('1');
+    expect(plan.phases[0].title).toContain('Desktop');
+    expect(plan.phases[0].title).toContain('frontend');
+    expect(plan.phases[0].tool).toBe('filesystem.navigate');
+
+    expect(plan.phases[1].id).toBe('2');
+    expect(plan.phases[1].title).toContain('Next.js');
+    expect(plan.phases[1].tool).toBe('shell.execute');
+    expect(plan.phases[1].params?.command).toContain('create-next-app');
+
+    expect(plan.phases[2].id).toBe('3');
+    expect(plan.phases[2].title).toContain('git repository');
+    expect(plan.phases[2].tool).toBe('shell.execute');
+  });
+
+  it('should dynamically adapt plan by skipping git init phase if scaffolding already initialized git', async () => {
+    const engine = new AdaptivePlanEngine();
+    const plan: AgentPlan = {
+      summary: 'Scaffold Next.js and Git',
+      steps: ['Navigate', 'Scaffold', 'Git init'],
+      phases: [
+        { id: '1', title: 'Navigate to target', tool: 'filesystem.navigate', params: { path: '/tmp/test_scaffold' }, status: 'pending' },
+        { id: '2', title: 'Initialize Next.js project', tool: 'shell.execute', params: { command: 'create-next-app' }, status: 'pending' },
+        { id: '3', title: 'Initialize git repository', tool: 'shell.execute', params: { command: 'git init' }, status: 'pending' }
+      ]
+    };
+
+    const mockToolExecutor = {
+      hasDriver: vi.fn().mockReturnValue(true),
+      execute: vi.fn().mockImplementation(async (toolId: string) => {
+        if (toolId === 'filesystem.navigate') {
+          return { success: true, data: {} };
+        }
+        if (toolId === 'shell.execute') {
+          return { success: true, data: { stdout: 'Success' } };
+        }
+        return { success: true, data: {} };
+      })
+    };
+
+    const adaptSpy = vi.spyOn(engine, 'adaptPlanAfterPhase').mockImplementation((completed, p) => {
+      if (completed.id === '2') {
+        p.phases[2].status = 'skipped';
+        p.phases[2].skippedReason = 'Git repository was already initialized by scaffolding';
+      }
+    });
+
+    const result = await engine.executePlan('scaffold and git init', plan, {
+      cwd: '/tmp/test_scaffold',
+      os: 'mac',
+      toolExecutor: mockToolExecutor
+    });
+
+    expect(result.success).toBe(true);
+    expect(plan.phases[0].status).toBe('completed');
+    expect(plan.phases[1].status).toBe('completed');
+    expect(plan.phases[2].status).toBe('skipped');
+    expect(plan.phases[2].skippedReason).toContain('already initialized');
+    expect(mockToolExecutor.execute).toHaveBeenCalledTimes(2);
+    adaptSpy.mockRestore();
+  });
 });
 

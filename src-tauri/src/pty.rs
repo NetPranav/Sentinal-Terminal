@@ -68,7 +68,19 @@ pub fn spawn_pty(
         }
     }
 
-    if let Some(dir) = cwd.filter(|d| !d.trim().is_empty()) {
+    let target_dir = cwd
+        .filter(|d| !d.trim().is_empty())
+        .map(|d| crate::process_cmds::expand_tilde(&d))
+        .and_then(|p| if p.is_dir() { Some(p) } else { None })
+        .or_else(|| {
+            std::env::var("HOME")
+                .or_else(|_| std::env::var("USERPROFILE"))
+                .ok()
+                .map(std::path::PathBuf::from)
+                .filter(|p| p.is_dir())
+        });
+
+    if let Some(dir) = target_dir {
         cmd.cwd(dir);
     }
 

@@ -258,6 +258,9 @@ describe('Capability SDK — End-to-End Concrete Execution Drivers', () => {
       expect(shellRes.success).toBe(true);
       expect(shellRes.data?.code).toBe(0);
 
+      const shellWithTildeCwd = await shellDriver.execute({ command: 'echo hello', cwd: '~' });
+      expect(shellWithTildeCwd.success).toBe(true);
+
       const verifyShell = await shellDriver.verify({ command: 'echo hello' }, shellRes);
       expect(verifyShell).toBe(true);
     });

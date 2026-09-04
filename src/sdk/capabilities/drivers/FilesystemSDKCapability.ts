@@ -434,7 +434,8 @@ export class FilesystemSDKCapability extends BaseCapabilityDriver<FsDriverInput,
         }
       }
     } catch (e: any) {
-      return { success: false, error: { code: 'FS_ERROR', message: e.message || `Failed to execute ${op}` } };
+      const errMsg = typeof e === 'string' ? e : (e?.message || (e ? JSON.stringify(e) : `Failed to execute ${op}`));
+      return { success: false, error: { code: 'FS_ERROR', message: errMsg } };
     }
   }
 

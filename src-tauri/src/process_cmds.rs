@@ -72,12 +72,37 @@ pub struct CommandOutput {
     pub code: i32,
 }
 
+pub fn expand_tilde(path: &str) -> std::path::PathBuf {
+    if path == "~" {
+        if let Ok(home) = std::env::var("HOME").or_else(|_| std::env::var("USERPROFILE")) {
+            return std::path::PathBuf::from(home);
+        }
+    } else if let Some(rest) = path.strip_prefix("~/").or_else(|| path.strip_prefix("~\\")) {
+        if let Ok(home) = std::env::var("HOME").or_else(|_| std::env::var("USERPROFILE")) {
+            return std::path::PathBuf::from(home).join(rest);
+        }
+    }
+    std::path::PathBuf::from(path)
+}
+
 #[tauri::command]
 pub async fn execute_command(command: String, args: Vec<String>, cwd: Option<String>) -> Result<CommandOutput, String> {
     let mut process = std::process::Command::new(&command);
     process.args(&args);
 
-    if let Some(directory) = cwd.filter(|path| !path.trim().is_empty()) {
+    let target_dir = cwd
+        .filter(|path| !path.trim().is_empty())
+        .map(|path| expand_tilde(&path))
+        .and_then(|p| if p.is_dir() { Some(p) } else { None })
+        .or_else(|| {
+            std::env::var("HOME")
+                .or_else(|_| std::env::var("USERPROFILE"))
+                .ok()
+                .map(std::path::PathBuf::from)
+                .filter(|p| p.is_dir())
+        });
+
+    if let Some(directory) = target_dir {
         process.current_dir(directory);
     }
 
@@ -95,4 +120,22 @@ pub async fn execute_command(command: String, args: Vec<String>, cwd: Option<Str
 #[tauri::command]
 pub fn get_launch_args() -> Vec<String> {
     std::env::args().collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_expand_tilde() {
+        let home = std::env::var("HOME").or_else(|_| std::env::var("USERPROFILE")).unwrap();
+        let expanded = expand_tilde("~");
+        assert_eq!(expanded.to_str().unwrap(), home);
+
+        let expanded_sub = expand_tilde("~/test_dir");
+        assert_eq!(expanded_sub.to_str().unwrap(), format!("{}/test_dir", home));
+
+        let regular = expand_tilde("/tmp");
+        assert_eq!(regular.to_str().unwrap(), "/tmp");
+    }
 }

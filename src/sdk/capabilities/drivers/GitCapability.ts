@@ -164,7 +164,8 @@ export class GitCapability extends BaseCapabilityDriver<GitDriverInput, any> {
       if (typeof process !== 'undefined' && process.env.NODE_ENV === 'test') {
         return { success: true, data: { operation: op }, commandExecuted: `git ${op}` };
       }
-      return { success: false, error: { code: 'GIT_DRIVER_FAILED', message: e.message || 'Git execution failed' } };
+      const errMsg = typeof e === 'string' ? e : (e?.message || (e ? JSON.stringify(e) : 'Git execution failed'));
+      return { success: false, error: { code: 'GIT_DRIVER_FAILED', message: errMsg } };
     }
   }
 

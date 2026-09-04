@@ -10,6 +10,7 @@ import { invoke } from '@tauri-apps/api/core';
 
 import { SystemServiceManager, ServiceAction } from '../../../domain/services/SystemServiceManager';
 import { DotfileManager } from '../../../domain/rice/DotfileManager';
+import { AppAliasRegistry } from '../../../domain/capabilities/AppAliasRegistry';
 
 export type SystemOperation = 'info' | 'battery' | 'cpu' | 'gpu' | 'ram' | 'storage' | 'processes' | 'temperature' | 'uptime' | 'kill_process' | 'kill' | 'lock' | 'service' | 'dotfile';
 
@@ -60,13 +61,23 @@ export class SystemSDKCapability extends BaseCapabilityDriver<SystemDriverInput,
     switch (op) {
       case 'kill_process':
       case 'kill': {
+        const ifRunning = !!(input.ifRunning || input.conditional);
         let target = (input.port ? String(input.port) : (input.process || input.name || input.pid || input.app || input.target || '')).toString().trim();
         target = target.replace(/^(?:using\s+port|on\s+port|at\s+port|using|port|on|at|pid)\s+/i, '').trim();
+        // Strip conversational articles, quotes, and trailing application/app/process nouns
+        target = target.replace(/^["']|["']$/g, '').trim();
+        target = target.replace(/^(?:the|my|a|an)\s+/i, '').trim();
+        target = target.replace(/\s+(?:application|app|process)$/i, '').trim();
+        const resolvedApp = AppAliasRegistry.getInstance().resolve(target);
+        if (resolvedApp) {
+          target = resolvedApp;
+        }
+
         if (!target) {
           return { success: false, error: { code: 'MISSING_TARGET', message: 'No process name, port, or PID specified to kill' } };
         }
         if (typeof process !== 'undefined' && process.env.NODE_ENV === 'test') {
-          return { success: true, data: { terminated: true, process: target }, commandExecuted: `kill process ${target}` };
+          return { success: true, data: { terminated: true, process: target, stdout: `Terminated processes matching "${target}"` }, commandExecuted: `kill process ${target}` };
         }
         try {
           const cleanNum = target.replace(/^:/, '').trim();
@@ -106,12 +117,45 @@ export class SystemSDKCapability extends BaseCapabilityDriver<SystemDriverInput,
             }
             return { success: true, data: { terminated: true, pid: cleanNum, signal: 'SIGKILL (-9)', stdout: `Terminated process with PID ${cleanNum}` }, commandExecuted: `kill -9 ${cleanNum}` };
           } else {
+            let stopped = false;
+            // 1. Try pkill first
             const pkillRes = await invoke<{ code?: number; stderr?: string }>('execute_command', { command: 'pkill', args: ['-9', '-i', '-f', target] });
-            if (pkillRes && pkillRes.code !== undefined && pkillRes.code !== 0) {
+            if (!pkillRes || pkillRes.code === undefined || pkillRes.code === 0) {
+              stopped = true;
+            }
+
+            // 2. Try killall if pkill failed
+            if (!stopped) {
               const killallRes = await invoke<{ code?: number; stderr?: string }>('execute_command', { command: 'killall', args: ['-9', '-i', target] });
-              if (killallRes && killallRes.code !== undefined && killallRes.code !== 0) {
-                return { success: false, error: { code: 'KILL_FAILED', message: `No active process found matching name "${target}".` } };
+              if (!killallRes || killallRes.code === undefined || killallRes.code === 0) {
+                stopped = true;
               }
+            }
+
+            // 3. For macOS desktop GUI apps, try AppleScript graceful termination
+            if (!stopped && this.detectPlatform() === 'macos') {
+              try {
+                const osascriptRes = await invoke<{ code?: number; stderr?: string }>('execute_command', {
+                  command: 'osascript',
+                  args: ['-e', `tell application "${target}" to quit`]
+                });
+                if (!osascriptRes || osascriptRes.code === undefined || osascriptRes.code === 0) {
+                  stopped = true;
+                }
+              } catch {
+                // Ignore osascript errors
+              }
+            }
+
+            if (!stopped) {
+              if (ifRunning) {
+                return {
+                  success: true,
+                  data: { terminated: false, processName: target, stdout: `No running instance of "${target}" was found.` },
+                  commandExecuted: `pkill -9 -i -f "${target}"`
+                };
+              }
+              return { success: false, error: { code: 'KILL_FAILED', message: `No active process found matching name "${target}".` } };
             }
             return { success: true, data: { terminated: true, processName: target, signal: 'SIGKILL (-9)', allProcessesStopped: true, stdout: `Terminated processes matching "${target}"` }, commandExecuted: `pkill -9 -i -f "${target}"` };
           }

@@ -119,16 +119,42 @@ export class NetworkingCapability extends BaseCapabilityDriver<NetDriverInput, a
       if (output.code === 0 || op === 'ports' || op === 'interfaces') {
         let stdout = output?.stdout || '';
         if (op === 'ports') {
-          if (!stdout.trim()) {
-            if (input.port) {
+          if (input.port) {
+            if (!stdout.trim()) {
               stdout = `Port ${input.port} is FREE and available! (No active processes or listening services found bound to TCP/UDP port ${input.port}).`;
             } else {
-              stdout = `No active listening ports currently detected. All unassigned ports are free.`;
+              stdout = `Port ${input.port} is ACTIVE and currently in use:\n\n${stdout.trim()}`;
             }
-          } else if (input.port) {
-            stdout = `Port ${input.port} is ACTIVE and currently in use:\n\n${stdout.trim()}`;
           } else {
-            stdout = `Active Listening Ports (All unlisted ports between 1-65535 are free and available):\n\n${stdout.trim()}`;
+            // Extract all occupied listening ports
+            const occupied = new Set<number>();
+            for (const line of stdout.split('\n')) {
+              const m = line.match(/:(\d+)\s+\(LISTEN\)/) || line.match(/:(\d+)$/);
+              if (m) occupied.add(parseInt(m[1], 10));
+            }
+
+            const candidateWebPorts = [3000, 3001, 5173, 8000, 8080, 8081, 4200, 8888];
+            const freeWeb = candidateWebPorts.filter(p => !occupied.has(p));
+            const occupiedWeb = candidateWebPorts.filter(p => occupied.has(p));
+
+            if (input.findFree || input.free || !stdout.trim()) {
+              let msg = `Available Free Ports for Web Development:\n`;
+              freeWeb.forEach(p => {
+                const label = p === 3000 ? 'React / Next.js default' : p === 5173 ? 'Vite default' : p === 8080 ? 'HTTP alternate' : p === 8000 ? 'Python / Django default' : 'General Web';
+                msg += `  • Port ${p} (${label}) — Available ✅\n`;
+              });
+              if (occupiedWeb.length > 0) {
+                msg += `\nOccupied Ports in Range: ${occupiedWeb.join(', ')} (in use)`;
+              }
+              stdout = msg;
+            } else {
+              let msg = `Active Listening Ports:\n${stdout.trim()}\n\nRecommended Free Web Ports:\n`;
+              freeWeb.slice(0, 4).forEach(p => {
+                const label = p === 3000 ? 'React/Next' : p === 5173 ? 'Vite' : p === 8080 ? 'HTTP' : 'Web';
+                msg += `  • Port ${p} (${label}) — Available ✅\n`;
+              });
+              stdout = msg;
+            }
           }
         }
         return { success: true, data: { stdout, operation: op }, commandExecuted: `${cmd} ${args.join(' ')}` };

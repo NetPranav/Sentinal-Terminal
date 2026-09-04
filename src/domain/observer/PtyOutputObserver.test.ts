@@ -49,4 +49,18 @@ vite v5.0.0 ready in 150 ms
     expect(rem).toBeNull();
     expect(observer.getActiveRemediation()).toBeNull();
   });
+
+  it('detects missing git upstream and provides exact fixedCommand remediation', () => {
+    const chunk = `
+$ git push
+fatal: The current branch my-feature has no upstream branch.
+To push the current branch and set the remote as upstream, use
+
+    git push --set-upstream origin my-feature
+`;
+    const rem = observer.ingest(chunk, '/test/repo');
+    expect(rem).not.toBeNull();
+    expect(rem?.fixedCommand).toBe('git push --set-upstream origin my-feature');
+    expect(rem?.tool).toBe('shell.execute');
+  });
 });

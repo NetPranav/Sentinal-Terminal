@@ -11,6 +11,7 @@ export interface EmbeddedStatus {
   isRunning: boolean;
   pid?: number;
   activeModel?: string;
+  activeLora?: string;
   port: number;
   engineInstalled: boolean;
   modelDownloaded: boolean;
@@ -50,6 +51,8 @@ export class EmbeddedEngineManager {
     return EmbeddedEngineManager.instance;
   }
 
+  private activeLora?: string;
+
   /**
    * Get detailed runtime status of the embedded LLM engine.
    */
@@ -58,7 +61,8 @@ export class EmbeddedEngineManager {
       isRunning: false,
       port: 8847,
       engineInstalled: false,
-      modelDownloaded: false
+      modelDownloaded: false,
+      activeLora: this.activeLora
     };
 
     if (typeof process !== 'undefined' && process.env.NODE_ENV === 'test') {
@@ -68,7 +72,8 @@ export class EmbeddedEngineManager {
         modelDownloaded: true,
         isRunning: true,
         port: 8847,
-        activeModel: 'qwen2.5-coder-3b-instruct-q4_k_m.gguf'
+        activeModel: 'qwen2.5-coder-3b-instruct-q4_k_m.gguf',
+        activeLora: this.activeLora
       };
     }
 
@@ -77,6 +82,7 @@ export class EmbeddedEngineManager {
         is_running: boolean;
         pid?: number;
         active_model?: string;
+        active_lora?: string;
         port: number;
       }>('get_embedded_llm_status');
 
@@ -87,6 +93,7 @@ export class EmbeddedEngineManager {
         isRunning: res.is_running,
         pid: res.pid,
         activeModel: res.active_model,
+        activeLora: res.active_lora || this.activeLora,
         port: res.port || 8847,
         engineInstalled: engineExists,
         modelDownloaded: modelExists,
@@ -94,6 +101,31 @@ export class EmbeddedEngineManager {
       };
     } catch {
       return defaultStatus;
+    }
+  }
+
+  /**
+   * Get the currently active LoRA adapter path, if any.
+   */
+  public getActiveLora(): string | undefined {
+    return this.activeLora;
+  }
+
+  /**
+   * Check if a given LoRA adapter exists in ~/.sentinel/models/
+   */
+  public async checkLoraExists(loraPath?: string): Promise<boolean> {
+    if (typeof process !== 'undefined' && process.env.NODE_ENV === 'test') return true;
+    const pathToCheck = loraPath || '$HOME/.sentinel/models/sentinel_mlx_lora.gguf';
+    try {
+      const checkCmd = `test -f "${pathToCheck}" && echo "exists"`;
+      const res = await invoke<{ stdout: string }>('execute_command', {
+        command: 'sh',
+        args: ['-c', checkCmd]
+      });
+      return (res.stdout || '').trim() === 'exists';
+    } catch {
+      return false;
     }
   }
 
@@ -132,12 +164,14 @@ export class EmbeddedEngineManager {
   }
 
   /**
-   * Start the native in-app LLM engine using the recommended 3B model.
+   * Start the native in-app LLM engine using the recommended 3B model,
+   * optionally attaching a local LoRA adapter.
    */
-  public async startEngine(modelPath?: string): Promise<boolean> {
+  public async startEngine(modelPath?: string, loraPath?: string): Promise<boolean> {
+    this.activeLora = loraPath;
     if (typeof process !== 'undefined' && process.env.NODE_ENV === 'test') return true;
     try {
-      return await invoke<boolean>('start_embedded_llm', { modelPath });
+      return await invoke<boolean>('start_embedded_llm', { modelPath, loraPath });
     } catch (err) {
       console.warn('[EmbeddedEngineManager] Failed to start embedded LLM:', err);
       return false;
@@ -145,12 +179,38 @@ export class EmbeddedEngineManager {
   }
 
   /**
+   * Hot-reloads a new LoRA adapter into the running engine with minimal downtime.
+   */
+  public async hotReloadLora(loraPath: string): Promise<boolean> {
+    const exists = await this.checkLoraExists(loraPath);
+    if (!exists) {
+      console.warn(`[EmbeddedEngineManager] LoRA adapter not found at: ${loraPath}`);
+      return false;
+    }
+
+    // Gracefully restart engine with new adapter
+    await this.stopEngine();
+    const started = await this.startEngine(undefined, loraPath);
+    if (started) {
+      this.activeLora = loraPath;
+    }
+    return started;
+  }
+
+  /**
    * Stop the native in-app LLM engine.
    */
   public async stopEngine(): Promise<boolean> {
-    if (typeof process !== 'undefined' && process.env.NODE_ENV === 'test') return true;
+    if (typeof process !== 'undefined' && process.env.NODE_ENV === 'test') {
+      this.activeLora = undefined;
+      return true;
+    }
     try {
-      return await invoke<boolean>('stop_embedded_llm');
+      const stopped = await invoke<boolean>('stop_embedded_llm');
+      if (stopped) {
+        this.activeLora = undefined;
+      }
+      return stopped;
     } catch (err) {
       console.warn('[EmbeddedEngineManager] Failed to stop embedded LLM:', err);
       return false;

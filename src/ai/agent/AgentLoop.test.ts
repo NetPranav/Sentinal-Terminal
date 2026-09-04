@@ -299,6 +299,13 @@ describe('AgentLoop fast-path routing', () => {
 
       expect(result.success).toBe(true);
       expect(mockProvider.generate).toHaveBeenCalledTimes(3);
+      expect(mockProvider.generate).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.any(String),
+        expect.objectContaining({
+          grammar: expect.stringContaining('action_execute')
+        })
+      );
 
       // Verify that refusal interception occurred
       const thinkingEvents = events.filter(e => e.type === 'thinking');
@@ -442,4 +449,220 @@ describe('AgentLoop fast-path routing', () => {
       expect(safetyNetEvent).toBeDefined();
     });
   });
+
+  describe('Phase 4.1 — Speculative Shadow-PTY Simulation Integration', () => {
+    it('should speculatively evaluate candidates and swap unviable model syntax for verified winner', async () => {
+      const mockProvider = {
+        isAvailable: vi.fn().mockResolvedValue(true),
+        generate: vi.fn()
+          .mockResolvedValueOnce({
+            content: JSON.stringify({ action: 'execute', command: 'fuser 3000/tcp', explanation: 'Check port with fuser' })
+          })
+          .mockResolvedValueOnce({
+            content: JSON.stringify({ action: 'done', summary: 'Port 3000 inspected successfully' })
+          })
+      };
+
+      const mockModelManager = {
+        getActiveProvider: () => mockProvider,
+        getActiveModel: () => ({ modelId: 'test-model' }),
+        initialize: vi.fn().mockResolvedValue(undefined)
+      } as any;
+
+      const mockToolExecutor = {
+        hasDriver: vi.fn().mockReturnValue(true),
+        execute: vi.fn().mockResolvedValue({
+          success: true,
+          data: { stdout: 'node 4190 user 22u IPv4 0x123 TCP *:3000 (LISTEN)', stderr: '', code: 0 }
+        })
+      };
+
+      // Mock shadow simulator executor where fuser fails but lsof succeeds
+      const mockShadowExecutor = vi.fn().mockImplementation(async (_cmd: string, args: string[]) => {
+        const full = args.join(' ');
+        if (full.includes('fuser')) {
+          return { stdout: '', stderr: 'zsh: command not found: fuser', code: 127 };
+        }
+        if (full.includes('lsof')) {
+          return { stdout: 'node 4190 TCP *:3000 (LISTEN)', stderr: '', code: 0 };
+        }
+        return { stdout: '', stderr: '', code: 0 };
+      });
+
+      const { ShadowPtySimulator } = await import('./ShadowPtySimulator');
+      const customSimulator = new ShadowPtySimulator({ executor: mockShadowExecutor });
+
+      const loop = new AgentLoop(
+        { toolIndex: { has: () => false, getAll: () => [] } } as any,
+        mockModelManager,
+        customSimulator
+      );
+      (loop as any).toolExecutor = mockToolExecutor;
+
+      const events: any[] = [];
+      loop.onEvent((ev) => events.push(ev));
+
+      const result = await loop.run('check port 3000', { os: 'mac', cwd: '/test' });
+
+      expect(result.success).toBe(true);
+      // ToolExecutor should have been called with the verified 'lsof' candidate, NOT 'fuser'!
+      expect(mockToolExecutor.execute).toHaveBeenCalledWith(
+        'shell.execute',
+        expect.objectContaining({
+          command: expect.stringContaining('lsof')
+        }),
+        '/test',
+        undefined
+      );
+
+      // Event stream should show speculative optimization
+      const specEvent = events.find(e => e.type === 'thinking' && e.message.includes('Speculative Shadow-PTY: Optimized candidate'));
+      expect(specEvent).toBeDefined();
+    });
+
+    it('executes verified canonical recipe directly via TLDR knowledge base when AI model is offline', async () => {
+      const mockProvider = {
+        name: 'test-provider',
+        isAvailable: vi.fn().mockResolvedValue(false),
+        generate: vi.fn()
+      };
+
+      const mockModelManager = {
+        getActiveProvider: () => mockProvider,
+        getActiveModel: () => ({ modelId: 'test-model' }),
+        initialize: vi.fn().mockResolvedValue(undefined)
+      } as any;
+
+      const mockToolExecutor = {
+        hasDriver: vi.fn().mockReturnValue(true),
+        execute: vi.fn().mockResolvedValue({
+          success: true,
+          data: { stdout: 'Flushed DNS cache successfully', code: 0 }
+        })
+      };
+
+      const loop = new AgentLoop(
+        { toolIndex: { has: () => false, getAll: () => [] } } as any,
+        mockModelManager
+      );
+      (loop as any).toolExecutor = mockToolExecutor;
+
+      const events: any[] = [];
+      loop.onEvent((ev) => events.push(ev));
+
+      const result = await loop.run('flush dns cache', { os: 'mac', cwd: '/test' });
+
+      expect(result.success).toBe(true);
+      expect(mockToolExecutor.execute).toHaveBeenCalledWith(
+        'shell.execute',
+        expect.objectContaining({
+          command: 'sudo dscacheutil -flushcache; sudo killall -HUP mDNSResponder'
+        }),
+        '/test',
+        undefined
+      );
+
+      const tldrEvent = events.find(e => e.type === 'thinking' && e.message.includes('Using Ground-Truth CLI Recipe'));
+      expect(tldrEvent).toBeDefined();
+    });
+
+    it('emits instant deterministic remediation (thefuck oracle) on git push missing upstream', async () => {
+      const mockProvider = {
+        name: 'test-provider',
+        isAvailable: vi.fn().mockResolvedValue(true),
+        generate: vi.fn()
+          .mockResolvedValueOnce({
+            content: JSON.stringify({ action: 'execute', command: 'git push', explanation: 'Push changes to remote' })
+          })
+          .mockResolvedValueOnce({
+            content: JSON.stringify({ action: 'execute', command: 'git push --set-upstream origin feat-auth', explanation: 'Set upstream and push' })
+          })
+          .mockResolvedValueOnce({
+            content: JSON.stringify({ action: 'done', summary: 'Branch pushed successfully' })
+          })
+      };
+
+      const mockModelManager = {
+        getActiveProvider: () => mockProvider,
+        getActiveModel: () => ({ modelId: 'test-model' }),
+        initialize: vi.fn().mockResolvedValue(undefined)
+      } as any;
+
+      const mockToolExecutor = {
+        hasDriver: vi.fn().mockReturnValue(true),
+        execute: vi.fn()
+          .mockResolvedValueOnce({
+            success: false,
+            data: {
+              code: 128,
+              stderr: `fatal: The current branch feat-auth has no upstream branch.
+To push the current branch and set the remote as upstream, use
+
+    git push --set-upstream origin feat-auth`
+            }
+          })
+          .mockResolvedValueOnce({
+            success: true,
+            data: { stdout: 'Branch feat-auth set up to track remote branch feat-auth from origin.', code: 0 }
+          })
+      };
+
+      const loop = new AgentLoop(
+        { toolIndex: { has: () => false, getAll: () => [] } } as any,
+        mockModelManager
+      );
+      (loop as any).toolExecutor = mockToolExecutor;
+
+      const events: any[] = [];
+      loop.onEvent((ev) => events.push(ev));
+
+      const result = await loop.run('push my commit to github', { os: 'mac', cwd: '/test' });
+
+      expect(result.success).toBe(true);
+      const remediationEvent = events.find(
+        e => e.type === 'thinking' && e.message.includes('Instant Deterministic Remediation') && e.message.includes('git push --set-upstream origin feat-auth')
+      );
+      expect(remediationEvent).toBeDefined();
+    });
+  });
+
+  describe('Application and process management fast paths', () => {
+    it('routes "tell me is there any applciation named as music or somethign like that" to application.list_running with app filter', () => {
+      const res = findFastPath('tell me is there any applciation named as music or somethign like that');
+      expect(res).not.toBeNull();
+      expect(res?.tool).toBe('application.list_running');
+      expect(res?.params.app).toBe('music');
+    });
+
+    it('routes "Yeah go aheaed kill the Music application" to system.kill_process with process Music', () => {
+      const res = findFastPath('Yeah go aheaed kill the Music application');
+      expect(res).not.toBeNull();
+      expect(res?.tool).toBe('system.kill_process');
+      expect(res?.params.process).toBe('Music');
+    });
+
+    it('routes "if any applcaiton named music is running then close it" to system.kill_process with ifRunning: true', () => {
+      const res = findFastPath('if any applcaiton named music is running then close it');
+      expect(res).not.toBeNull();
+      expect(res?.tool).toBe('system.kill_process');
+      expect(res?.params.process).toBe('music');
+      expect(res?.params.ifRunning).toBe(true);
+    });
+
+    it('routes conversational variants of process close and kill', () => {
+      const res1 = findFastPath('kill the Music application');
+      expect(res1?.tool).toBe('system.kill_process');
+      expect(res1?.params.process).toBe('Music');
+
+      const res2 = findFastPath('close Music');
+      expect(res2?.tool).toBe('system.kill_process');
+      expect(res2?.params.process).toBe('Music');
+
+      const res3 = findFastPath('if Music is running then close it');
+      expect(res3?.tool).toBe('system.kill_process');
+      expect(res3?.params.process).toBe('Music');
+      expect(res3?.params.ifRunning).toBe(true);
+    });
+  });
 });
+
