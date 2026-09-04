@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { isExplicitFilesystemSearch, findFastPath, AgentLoop, isConversationalRefusal, isActionableGoal } from './AgentLoop';
+import { isExplicitFilesystemSearch, findFastPath, AgentLoop, isConversationalRefusal, isActionableGoal, isReferentialFollowup, cleanseConversationalRefusal } from './AgentLoop';
 import { DemonstrationLearningEngine } from '../../domain/learning/DemonstrationLearningEngine';
 
 describe('AgentLoop fast-path routing', () => {
@@ -225,6 +225,7 @@ describe('AgentLoop fast-path routing', () => {
       expect(isConversationalRefusal("I cannot access your network or system directories.")).toBe(true);
       expect(isConversationalRefusal("I do not have access to the operating system.")).toBe(true);
       expect(isConversationalRefusal("I am unable to search your computer.")).toBe(true);
+      expect(isConversationalRefusal("I'm sorry, but as an AI language model, I don't have the ability to directly manipulate or change your device's IP address without using a VPN or changing your network configuration. However, I can provide you with general information on how to do this if you're interested in learning more about it.")).toBe(true);
 
       expect(isConversationalRefusal("Found 12 matching folders.")).toBe(false);
       expect(isConversationalRefusal("The active listening port is 3000.")).toBe(false);
@@ -237,10 +238,59 @@ describe('AgentLoop fast-path routing', () => {
       expect(isActionableGoal('what is using port 3000')).toBe(true);
       expect(isActionableGoal('kill node process')).toBe(true);
       expect(isActionableGoal('check git status and branches')).toBe(true);
+      expect(isActionableGoal('Hey tell me is there a way we can change the ip adress without vpn or without changeing network')).toBe(true);
+      expect(isActionableGoal('still somehow that you can try right now')).toBe(true);
+      expect(isActionableGoal('renew ip address')).toBe(true);
+      expect(isActionableGoal('renew dhcp lease')).toBe(true);
 
       expect(isActionableGoal('who are you')).toBe(false);
       expect(isActionableGoal('hello')).toBe(false);
       expect(isActionableGoal('what is your name')).toBe(false);
+    });
+
+    it('detects referential follow-up requests in multi-turn conversations', () => {
+      expect(isReferentialFollowup('still somehow that you can try right now')).toBe(true);
+      expect(isReferentialFollowup('try it')).toBe(true);
+      expect(isReferentialFollowup('can you try that')).toBe(true);
+      expect(isReferentialFollowup('go ahead')).toBe(true);
+      expect(isReferentialFollowup('do it anyway')).toBe(true);
+      expect(isReferentialFollowup('find all frontend folders in my system')).toBe(false);
+    });
+
+    it('resolves effective goal across multi-turn conversation history', () => {
+      const loop = new AgentLoop({ toolIndex: { has: () => false, getAll: () => [] } } as any);
+      (loop as any).conversationHistory = [
+        { role: 'user', content: 'Hey tell me is there a way we can change the ip adress without vpn or without changeing network' },
+        { role: 'assistant', content: 'Changing IP directly is not possible...' }
+      ];
+
+      const effective = loop.resolveEffectiveGoal('still somehow that you can try right now');
+      expect(effective).toContain('change the ip adress without vpn');
+      expect(effective).toContain('still somehow that you can try right now');
+    });
+
+    it('routes IP address check and DHCP renewal to macOS terminal commands', () => {
+      const loop = new AgentLoop({ toolIndex: { has: () => false, getAll: () => [] } } as any);
+      const renewFallback = (loop as any).tryHeuristicFallback(
+        'change the ip adress without vpn or without changeing network (still somehow that you can try right now)',
+        { os: 'mac', cwd: '/workspace' }
+      );
+      expect(renewFallback).not.toBeNull();
+      expect(renewFallback.tool).toBe('shell.execute');
+      expect(renewFallback.params.command).toContain('sudo ipconfig set en0 DHCP');
+
+      const checkFallback = (loop as any).tryHeuristicFallback('check my ip address', { os: 'mac', cwd: '/workspace' });
+      expect(checkFallback).not.toBeNull();
+      expect(checkFallback.tool).toBe('shell.execute');
+      expect(checkFallback.params.command).toContain('ipconfig getifaddr en0');
+    });
+
+    it('cleanses robotic AI refusals into actionable macOS network advice', () => {
+      const refusal = "I'm sorry, but as an AI language model, I don't have the ability to directly manipulate or change your device's IP address without using a VPN or changing your network configuration.";
+      const cleansed = cleanseConversationalRefusal(refusal, 'change the ip adress without vpn', { os: 'mac', cwd: '/workspace' });
+      expect(cleansed).not.toContain('AI language model');
+      expect(cleansed).toContain('sudo ipconfig set en0 DHCP');
+      expect(cleansed).toContain('networksetup -setmanual');
     });
 
     it('intercepts canned refusal and re-prompts model with terminal execution authority', async () => {
@@ -316,6 +366,75 @@ describe('AgentLoop fast-path routing', () => {
         'shell.execute',
         expect.objectContaining({ command: 'mdfind "kMDItemFSName == \'*frontend*\'c"' }),
         '/test',
+        undefined
+      );
+    });
+
+    it('intercepts canned refusal on referential follow-up and executes DHCP renewal', async () => {
+      const mockProvider = {
+        name: 'test-provider',
+        isAvailable: vi.fn().mockResolvedValue(true),
+        generate: vi.fn()
+          // Model returns canned AI refusal
+          .mockResolvedValueOnce({
+            content: JSON.stringify({
+              action: 'done',
+              summary: "I'm sorry, but as an AI language model, I don't have the ability to directly manipulate or change your device's IP address without using a VPN or changing your network configuration. However, I can provide you with general information on how to do this if you're interested in learning more about it."
+            })
+          })
+          // On second attempt, model generates DHCP renewal command
+          .mockResolvedValueOnce({
+            content: JSON.stringify({
+              action: 'execute',
+              command: 'sudo ipconfig set en0 DHCP',
+              explanation: 'Renew local DHCP lease'
+            })
+          })
+          .mockResolvedValueOnce({
+            content: JSON.stringify({
+              action: 'done',
+              summary: 'DHCP lease renewed successfully.'
+            })
+          })
+      };
+
+      const mockModelManager = {
+        getActiveProvider: () => mockProvider,
+        getActiveModel: () => ({ modelId: 'test-model' }),
+        initialize: vi.fn().mockResolvedValue(undefined)
+      } as any;
+
+      const mockToolExecutor = {
+        hasDriver: vi.fn().mockReturnValue(true),
+        execute: vi.fn().mockResolvedValue({
+          success: true,
+          data: { stdout: 'DHCP lease renewed on en0.', code: 0 }
+        })
+      };
+
+      const loop = new AgentLoop(
+        { toolIndex: { has: () => false, getAll: () => [] } } as any,
+        mockModelManager
+      );
+      (loop as any).toolExecutor = mockToolExecutor;
+
+      // Seed turn 1 history
+      (loop as any).conversationHistory = [
+        { role: 'user', content: 'Hey tell me is there a way we can change the ip adress without vpn or without changeing network' },
+        { role: 'assistant', content: 'Changing IP directly is not possible...' }
+      ];
+
+      const events: any[] = [];
+      loop.onEvent((ev) => events.push(ev));
+
+      const result = await loop.run('still somehow that you can try right now', { os: 'mac', cwd: '/workspace' });
+
+      expect(result.success).toBe(true);
+      expect(result.summary).not.toContain('AI language model');
+      expect(mockToolExecutor.execute).toHaveBeenCalledWith(
+        'shell.execute',
+        expect.objectContaining({ command: 'sudo ipconfig set en0 DHCP' }),
+        '/workspace',
         undefined
       );
     });
