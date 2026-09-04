@@ -73,13 +73,25 @@ export class SecurityEngine implements ISecurityEngine {
     }
 
     // 5. Safe Read-Only Commands
-    const safeCommands = ['ls', 'pwd', 'echo', 'cat', 'whoami', 'date', 'time', 'cal', 'env', 'clear', 'uptime', 'uname', 'which', 'head', 'tail', 'grep', 'system_profiler', 'ps', 'osascript', 'df', 'du', 'top', 'htop', 'id', 'hostname', 'groups', 'printenv'];
+    const safeCommands = [
+      'ls', 'pwd', 'echo', 'cat', 'whoami', 'date', 'time', 'cal', 'env', 'clear',
+      'uptime', 'uname', 'which', 'head', 'tail', 'grep', 'system_profiler', 'ps',
+      'osascript', 'df', 'du', 'top', 'htop', 'id', 'hostname', 'groups', 'printenv',
+      'mdfind', 'lsof', 'sw_vers', 'file', 'wc', 'sort', 'uniq', 'awk', 'sed', 'cut', 'tr'
+    ];
     const parts = lowerCmd.split(/\s+/);
     const firstWord = parts[0];
     const secondWord = parts[1];
 
+    const isSafeFind = firstWord === 'find' && !lowerCmd.includes('-delete') && !lowerCmd.includes('-exec') && !lowerCmd.includes(' rm ');
+    const isSafePmset = firstWord === 'pmset' && secondWord === '-g';
+    const isSafeNetworksetup = firstWord === 'networksetup' && (secondWord?.startsWith('-list') || secondWord?.startsWith('-get'));
+
     if (
       safeCommands.includes(firstWord) ||
+      isSafeFind ||
+      isSafePmset ||
+      isSafeNetworksetup ||
       (firstWord === 'git' && ['status', 'log', 'diff', 'show', 'branch', 'remote'].includes(secondWord)) ||
       (['npm', 'pnpm', 'yarn', 'bun', 'cargo', 'go', 'pytest', 'vitest'].includes(firstWord) && ['test', 'run', 'check', 'lint', 'audit', 'version', '--version', '-v'].includes(secondWord || ''))
     ) {

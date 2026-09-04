@@ -4,117 +4,77 @@ Sentinel Terminal is a high-performance, AI-native terminal emulator designed fo
 
 ---
 
-## 🏆 Master Roadmap Status by Tier
+## 🏆 Master Roadmap Status by Tier (Active Focus)
 
 | Tier | Focus Area | Status | Key Deliverables |
 |---|---|---|---|
-| **Tier 1** | **Core Reliability, Security & Sandbox Fortification** | ✅ **100% COMPLETE** | Compound shell tokenizer, child-path protection, `cwd` propagation, cached path expansion, peripheral sanitization (749/749 tests green). |
-| **Tier 2** | **Addictive Next-Gen Product Pillars & Power-User Tools** | ✅ **100% COMPLETE** | Visual Auto-Remediation Toast HUD, Workspace Quick-Switcher (`Cmd+O`), Port & Process Manager (`Cmd+Shift+P`), Frecency History (`Ctrl+R`) (754/754 tests green). |
-| **Tier 3** | **Enterprise Security, Collaboration & Extensibility** | ✅ **100% COMPLETE** | Plugin Marketplace runtime, cryptographic tamper-evident audit logs, remote SSH session multiplexer, Rice sync (765/765 tests green). |
+| **Tier 1** | **Shell-Native Autonomous Execution Engine** | 🟢 **COMPLETED** | Replaces brittle 101-tool JSON schema architecture with direct Shell (`zsh`/`bash`/`powershell`) CLI generation. Sandboxed via `SecurityEngine` & `PolicyEngine`. |
+| **Tier 2** | **Autonomous Self-Healing & Refusal Interception** | 🟡 **NEXT UP** | Intercepts LLM conversational refusals (*"I don't have access"*), feeds command stderr/exit codes back into AI loop for up to 3 self-healing retries. |
+| **Tier 3** | **Continuous On-Device Learning & LoRA Fine-Tuning** | ⚪ **PLANNED** | Dynamic Episodic Memory (0ms in-context conditioning) + automatic ShareGPT dataset export for Qwen 2.5 Coder 3B LoRA fine-tuning. |
 
 ---
 
-## 🛡️ Tier 1: Core Reliability, Security & Sandbox Fortification (COMPLETED)
+## 🐚 Tier 1: Shell-Native Autonomous Execution Engine
 
-All critical P0–P3 core vulnerabilities and sandboxing issues have been resolved, covered with automated regression tests, and verified:
+Transition Sentinel Terminal from fragile tool calling to native shell execution aligned with Qwen 2.5 Coder's pre-trained weights:
 
-- [x] **1.1 Compound Shell Command Chaining Risk Guard (Issue 9 / GitHub #2 - P0)**
-  - *Target*: `src/domain/security/ShellCommandGuard.ts`
-  - *Fix*: Implemented quote-aware lexical tokenizer splitting compound operators (`&&`, `;`, `||`, `|`, `&`) while respecting single/double quotes and escapes. Aggregates maximum risk score across all sub-commands, preventing hidden destructive execution.
-- [x] **1.2 Protected Path & Child Deletion Prevention (Issue 11 / GitHub #3 - P0)**
-  - *Target*: `src/domain/security/PolicyEngine.ts`
-  - *Fix*: Added dot-segment path traversal normalization (`../`) and child-path matching (`normalized.startsWith(root + '/')`), blocking deletion of `/etc/hosts`, `/System/Library`, or directory traversal escapes.
-- [x] **1.3 Working Directory (`cwd`) Context Propagation (Issue 10 / GitHub #4 - P1)**
-  - *Target*: `src/sdk/capabilities/drivers/GitCapability.ts`, `src/sdk/capabilities/drivers/ShellSDKCapability.ts`
-  - *Fix*: Propagated `cwd: input.directory || _context?.cwd` to Tauri native process backend across execution and rollback actions.
-- [x] **1.4 Filesystem Tilde Expansion Optimization (Issue 12 / GitHub #5 - P2)**
-  - *Target*: `src/sdk/capabilities/drivers/FilesystemSDKCapability.ts`
-  - *Fix*: Replaced repeated `sh -c 'echo $HOME'` process spawning with static cached `getHomeDir()` and `expandTilde()` helpers (<0.01ms resolution).
-- [x] **1.5 Bluetooth Peripheral Noun Sanitization (Issue 8 / GitHub #6 - P3)**
-  - *Target*: `src/sdk/capabilities/drivers/BluetoothCapability.ts`
-  - *Fix*: Stripped accessory nouns (`headphone`, `earbuds`, `speaker`, `mouse`) from device queries and enabled bidirectional substring matching against paired devices.
-- [x] **1.6 Generative Shell Fallback with 1-Line Explanation & Consent Guardrails**
-  - *Target*: `tools/shell/execute/tool.json`, `ShellSDKCapability.ts`, `SecurityEngine.ts`
-  - *Fix*: AI provides plain English explanation of unmapped commands; flagged as `SENSITIVE` requiring explicit 1-click user approval.
-- [x] **1.7 Autonomous Demonstration & Pattern Learning Engine**
-  - *Target*: `src/domain/learning/DemonstrationLearningEngine.ts`, `AgentLoop.ts`
-  - *Fix*: Learns from manual terminal fixes after unresolved AI goals, extracts dynamic token templates, and persists patterns to `~/.sentinel/learned_patterns.json`.
+- [x] **1.1 Native Shell System Prompt Contract**
+  - *Target*: `src/ai/agent/SystemPrompt.ts`
+  - *Goal*: Remove 101 custom JSON tool schemas. Instruct the model as an active terminal copilot with full command generation authority.
+  - *Format*: `{"action": "execute", "command": "<cli_command>", "explanation": "<1-line summary>"}` or `{"action": "done", "summary": "<response>"}`.
+- [x] **1.2 Direct PTY Shell Execution Pipeline**
+  - *Target*: `src/ai/agent/AgentLoop.ts`, `src/sdk/capabilities/drivers/ShellSDKCapability.ts`
+  - *Goal*: Run commands directly via `/bin/zsh -lc` (macOS), `/bin/bash` (Linux), and `powershell` (Windows) with real environment variable and alias awareness.
+- [x] **1.3 Security & Permission Guardrails**
+  - *Target*: `src/domain/security/SecurityEngine.ts`, `src/domain/security/PolicyEngine.ts`
+  - *Goal*: Zero-friction execution for read-only / diagnostic commands (`ls`, `mdfind`, `lsof`, `git status`, `networksetup`), while requiring 1-click user confirmation with 1-line explanation for sensitive/destructive commands (`rm`, `kill`, `sudo`).
+- [x] **1.4 Direct Output Streaming to Terminal**
+  - *Target*: `src/presentation/TerminalView.tsx`, `src/presentation/OutputFormatter.ts`
+  - *Goal*: Real command stdout/stderr rendered cleanly without fake tool wrapper badges.
 
 ---
 
-## ⚡ Tier 2: Addictive Next-Gen Product Pillars & Power-User Tools (COMPLETED)
+## 🔄 Tier 2: Autonomous Self-Healing & Refusal Interception
 
-High-impact features that transform Sentinel from a terminal into an indispensable daily driver:
+Ensure Sentinel never gets stuck on canned model refusals or broken command syntax:
 
-### 🔷 Pillar 2.1: Visual Auto-Remediation Toast & Action Banner (HUD)
-- [x] **2.1.1 Floating Error Remediation Banner Component**: Render a sleek glassmorphism HUD chip above the active terminal pane when `PtyOutputObserver` detects an error (e.g., `EADDRINUSE`, `.git/index.lock`, missing modules).
-- [x] **2.1.2 One-Click & Hotkey Execution**: Click the banner or press `[Tab]` to trigger autonomous self-healing without retyping.
-- [x] **2.1.3 Banner Dismissal & Auto-Expiry**: Smooth fade-out animations on dismiss (`[Esc]`) or 2-minute inactivity.
-
-### 🔷 Pillar 2.2: Workspace Quick-Switcher & Fuzzy Navigator (`Cmd+O` / `Ctrl+O`)
-- [x] **2.2.1 Workspace Scanner & Indexer**: Leverage `ProjectDiscoveryEngine` and `WorkspaceRegistry` to discover ROS 1/2 workspaces, Node.js packages, Python venvs, Rust crates, and Docker stacks in `~` and custom search roots.
-- [x] **2.2.2 Fast Fuzzy Search Modal**: Sub-5ms modal popup with tech-stack badges (`📦 ROS2`, `⚛️ Next.js`, `🐍 Python`, `🦀 Rust`).
-- [x] **2.2.3 One-Touch Context Switch**: Press `[Enter]` to navigate current pane or `[Cmd+Enter]` to open in a new tab/split with automatic environment sourcing (`source setup.bash`, `source venv/bin/activate`).
-
-### 🔷 Pillar 2.3: Visual Process Monitor & Active Port Manager Drawer (`Cmd+Shift+P`)
-- [x] **2.3.1 Active Port & Zombie Process Inspector**: Native background query listing listening TCP/UDP ports (3000, 5173, 8080, 8000, etc.), PID, process name, and memory footprint via `ProcessPortManager`.
-- [x] **2.3.2 One-Click "Free Port" Action**: Instant process termination button connected directly to `system.kill_process` driver.
-- [x] **2.3.3 Live Refresh Drawer**: Slide-over drawer with real-time process monitoring and filterable search.
-
-### 🔷 Pillar 2.4: Frecency-Ranked History Search Popup (`Ctrl+R`)
-- [x] **2.4.1 Frecency History Database**: Weight command history by both execution frequency and recency.
-- [x] **2.4.2 Interactive Fuzzy Popup**: Overlay showing matched historical commands, working directory context, and timestamp.
-- [x] **2.4.3 Seamless Shell Insertion**: Instant insertion into current prompt with arrow-key navigation.
+- [ ] **2.1 Conversational Refusal Interceptor**
+  - *Target*: `src/ai/agent/AgentLoop.ts`
+  - *Goal*: Detect and intercept LLM canned refusals (*"I don't have access to your file system"*, *"I cannot assist with that"*), reject the response, and re-prompt the model to generate the actionable terminal command.
+- [ ] **2.2 Stderr & Non-Zero Exit Code Feedback Loop**
+  - *Target*: `src/ai/agent/AgentLoop.ts`
+  - *Goal*: When a shell command fails (exit code != 0 or stderr), feed the exact error back into the AI context:
+    *"Command '<cmd>' failed with code <code>: <stderr>. Analyze the failure and output a corrected command."*
+- [ ] **2.3 Three-Strike Autonomous Auto-Remediation**
+  - *Target*: `src/ai/agent/AgentLoop.ts`
+  - *Goal*: Allow up to 3 automatic correction attempts before halting and prompting the user for manual demonstration.
+- [ ] **2.4 Deterministic Execution Fallback**
+  - *Target*: `src/ai/agent/AgentLoop.ts`
+  - *Goal*: If LLM fails across 3 attempts, run deterministic OS probe as safety net.
 
 ---
 
-## 🏢 Tier 3: Enterprise Security, Collaboration & Extensibility (COMPLETED)
+## 🧠 Tier 3: Continuous On-Device Learning & LoRA Fine-Tuning
 
-- [x] **3.1 Plugin Marketplace & Hot-Reloading SDK**: Dynamic marketplace modal (`Cmd+Shift+X`), curated ecosystem (`Kubernetes`, `ROS 2 Telemetry`, `Docker Compose`, `Git Lens`, `AWS Cloud`, `Hyprland Rice`), 1-click install, permission audit, and hot-reloading.
-- [x] **3.2 Cryptographic Tamper-Evident Audit Logger**: SHA-256 hash-chained immutable execution trails with zero-drift integrity verification (`verifyChain()`) and SOC 2 / ISO 27001 signed report export.
-- [x] **3.3 Remote SSH Multiplexer & Dotfile Rice Sync**: Automated `~/.ssh/config` parsing for remote clusters/robots, and 1-click portable sync bundle exporting themes, aliases, and learned AI demonstration patterns.
+Make Sentinel adapt to the user's specific system, workflows, and style over time:
 
----
-
-## 📋 Comprehensive Issue & Epic Archive
-
-### Core Architectural Epics (All Complete)
-- [x] **Epic 1: Autonomous Error Recovery & "Awaiting Physical Confirmation"**
-  - [x] `ErrorDiagnosticsEngine.ts`: Classify errors into `SOFTWARE_RECOVERABLE` vs `PHYSICAL_ACTION_REQUIRED`.
-  - [x] In-loop remediation sub-phases in `AdaptivePlanEngine`.
-  - [x] `AWAITING_PHYSICAL_ACTION` pause state with physical prompts.
-- [x] **Epic 2: Probe & Disambiguate Discovery Engine**
-  - [x] `ProjectDiscoveryEngine.ts`: Scan ROS 1/2, Node, Python, Rust, Docker.
-  - [x] Interactive disambiguation selection menu for ambiguous project targets.
-  - [x] Automatic contextual workspace sourcing (`source setup.bash`, `cd <project>`).
-- [x] **Epic 3: System Services & Dotfile "Rice" Orchestration**
-  - [x] Unified `system.service` driver (`systemctl`, `launchctl`, Windows Service Manager).
-  - [x] `DotfileManager.ts`: AST/regex-safe dotfile editor for `.zshrc`, `.bashrc`, `hyprland.conf`, `i3.conf`.
-  - [x] Startup service natural language automation.
-- [x] **Epic 4: Small-Model Cognitive Supercharger**
-  - [x] `DynamicToolPruner.ts`: Classify user intent domain and dynamically load only 4–6 relevant tools into LLM context.
-  - [x] Two-tier reasoning pipeline separating semantic understanding from DAG decomposition.
-  - [x] `ToolParameterValidator.ts`: Zero-hallucination schema enforcement with type auto-coercion.
-- [x] **Epic 5: Production-Grade Addictive Terminal Enhancements**
-  - [x] `PtyOutputObserver.ts`: Real-time stderr & exit code monitor with 1-click `[Tab]` auto-remediation.
-  - [x] `DemonstrationProvider.ts` & `WorkspaceContextProvider.ts`: Sub-5ms ghost-text completions.
-  - [x] `SessionPersistenceEngine.ts`: Crash-proof multi-tab and split-pane layout auto-save and restore.
-  - [x] Keyboard-first ergonomics: Zero-mouse security modal navigation (`[Enter]`/`[y]`, `[Esc]`/`[n]`).
-
-### Resolved Bug Tracker Archive
-- [x] **Issue 1**: `browser.navigate` ignores target application and drops `-a <browser>` in macOS `open` command.
-- [x] **Issue 2**: `application.update` fails on macOS Homebrew casks due to unnormalized app names.
-- [x] **Issue 3**: `ExecutionEngine` permission category fallback grants `ReadFiles` to package installation, git, docker, ssh.
-- [x] **Issue 4**: `BluetoothCapability` fails on stock macOS systems when Homebrew `blueutil` binary is missing.
-- [x] **Issue 5**: Fast-Path Engine lacks URL and Web navigation patterns, forcing 2–5s LLM inference latency.
-- [x] **Issue 6**: Incomplete tool artifacts: `application.update`, `developer.scaffold`, and `system.lock` missing `knowledge.json`, `examples.json`, `tests.json`.
-- [x] **Issue 7**: `system.lock` classified as `SAFE` with `confirmationRequired: false`.
-- [x] **Issue 8 (GitHub #6)**: Bluetooth device connection fails when queries include peripheral category nouns.
-- [x] **Issue 9 (GitHub #2)**: Compound shell command chaining (`&&`, `;`, `||`) bypasses `ShellCommandGuard` risk analysis.
-- [x] **Issue 10 (GitHub #4)**: `GitCapability` and `ShellSDKCapability` drop process working directory context (`cwd`).
-- [x] **Issue 11 (GitHub #3)**: `PolicyEngine.protect-system-dirs` fails to block deletion of subdirectories and files within protected system paths.
-- [x] **Issue 12 (GitHub #5)**: `FilesystemSDKCapability` invokes redundant shell child processes (`sh -c 'echo $HOME'`) on every tilde path expansion.
-- [x] **Issue 13**: `ToolExecutor` lacks execution timeout enforcement, risking indefinite UI freeze on interactive or hanging CLI commands.
+- [ ] **3.1 Dynamic Episodic Memory Engine (Instant 0ms Recall)**
+  - *Target*: `src/domain/learning/EpisodicMemoryEngine.ts`
+  - *Goal*: Persist user demonstrations to `~/.sentinel/memory/learned_demonstrations.json`.
+  - *Features*: Semantic & token-similarity retriever that fetches top matching demonstrations and injects them directly into the system prompt's dynamic context window.
+- [ ] **3.2 Persistent Demonstration Capture in Terminal**
+  - *Target*: `src/presentation/TerminalView.tsx`
+  - *Goal*: Fix `lastUnresolvedGoalRef` tracking so it stays active whenever a command is unresolved. When the user types the working command in their terminal, Sentinel captures `(goal, command, cwd, os)` instantly.
+- [ ] **3.3 Continuous ShareGPT / Alpaca Dataset Generation**
+  - *Target*: `src/domain/learning/EpisodicMemoryEngine.ts`
+  - *Goal*: Automatically append every successful self-healing and demonstrated workflow to `~/.sentinel/training/sentinel_shell_dataset.jsonl`.
+- [ ] **3.4 One-Click LoRA Fine-Tuning Pipeline**
+  - *Target*: `scripts/finetune_sentinel_lora.py`
+  - *Goal*: Standalone fine-tuning script supporting Unsloth / PEFT to train lightweight LoRA adapter (`~/.sentinel/models/sentinel_custom_lora.bin`) and auto-load via `llama-server --lora`.
 
 ---
-*Last Updated: September 4, 2026 — 765 Tests Passing (100% Green across 138 Test Files)*
+
+## 🏛️ Completed Foundation (Archived Milestone)
+- ✅ Core Reliability, Security & Sandbox Fortification (749/749 tests green).
+- ✅ Visual Auto-Remediation Toast HUD, Workspace Quick-Switcher (`Cmd+O`), Port & Process Manager (`Cmd+Shift+P`), Frecency History (`Ctrl+R`) (754/754 tests green).
+- ✅ Plugin Marketplace runtime, cryptographic tamper-evident audit logs, remote SSH session multiplexer (765/765 tests green).

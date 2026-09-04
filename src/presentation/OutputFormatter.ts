@@ -110,7 +110,11 @@ export function formatDataOutput(data: any): string {
 
   // Command stdout
   if (data.stdout && typeof data.stdout === 'string') {
-    return `\r\n${data.stdout.replace(/\n/g, '\r\n')}\r\n`;
+    const trimmed = data.stdout.trim();
+    if (trimmed) {
+      return `\r\n${trimmed.replace(/\r?\n/g, '\r\n')}\r\n`;
+    }
+    return '';
   }
 
   // Generic object — show key-value pairs cleanly

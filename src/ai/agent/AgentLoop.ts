@@ -51,8 +51,10 @@ export { AdaptivePlanEngine, ToolParameterValidator, DynamicToolPruner, Demonstr
 export type { AgentPlan, PlanPhase, PhaseStatus };
 
 interface LLMResponse {
-  action: 'tool' | 'done' | 'error';
+  action: 'tool' | 'done' | 'error' | 'execute';
   tool?: string;
+  command?: string;
+  explanation?: string;
   params?: Record<string, any>;
   summary?: string;
   message?: string;
@@ -801,7 +803,7 @@ export class AgentLoop {
             continue;
           }
 
-          this.emit({ type: 'tool_start', message: this.getToolDisplayName(toolId) });
+          this.emit({ type: 'tool_start', message: this.getToolDisplayName(toolId, params) });
 
           // Execute the tool
           const result = await this.toolExecutor.execute(toolId, params, context.cwd, this.authorizationHandler);
@@ -1074,10 +1076,40 @@ User request: ${goal}`;
 
     const normalizeParsed = (obj: any): LLMResponse | null => {
       if (!obj || typeof obj !== 'object') return null;
+
+      // 1. Shell-native execution contract: {"action": "execute", "command": "...", "explanation": "..."}
+      if (obj.action === 'execute' || (!obj.action && obj.command)) {
+        return {
+          action: 'tool',
+          tool: 'shell.execute',
+          params: {
+            command: obj.command,
+            explanation: obj.explanation || (obj.params && obj.params.explanation) || `Executing: ${obj.command}`
+          }
+        };
+      }
+
+      // 2. Tool calls for shell.execute or with direct command property
+      if (obj.action === 'tool') {
+        if ((obj.tool === 'shell.execute' || !obj.tool) && (obj.command || (obj.params && obj.params.command))) {
+          const cmd = obj.command || obj.params.command;
+          const exp = obj.explanation || (obj.params && obj.params.explanation) || `Executing: ${cmd}`;
+          return {
+            action: 'tool',
+            tool: 'shell.execute',
+            params: { command: cmd, explanation: exp }
+          };
+        }
+        if (obj.tool && !obj.params && obj.command) {
+          obj.params = { command: obj.command, explanation: obj.explanation };
+        }
+      }
+
       if (!obj.action) {
         if (obj.tool) obj.action = 'tool';
         else if (obj.summary || obj.response || obj.message || obj.result) obj.action = 'done';
       }
+
       if (obj.action === 'tool' || obj.action === 'done' || obj.action === 'error') {
         return obj as LLMResponse;
       }
@@ -1275,8 +1307,8 @@ User request: ${goal}`;
       }
     }
 
-    // Filesystem search (e.g. find all json files in tools directory, search for *.ts in src)
-    if (lower.startsWith('find ') || lower.startsWith('search ') || lower.startsWith('locate ') || lower.includes('find all') || lower.includes('search for') || lower.includes('locate files')) {
+    // Filesystem search (e.g. find all frontend folders, search for *.ts in src)
+    if (lower.startsWith('find ') || lower.startsWith('search ') || lower.startsWith('locate ') || lower.includes('find all') || lower.includes('search for') || lower.includes('locate files') || lower.includes('frontend')) {
       let pattern = '*';
       let dir = '.';
 
@@ -1289,13 +1321,26 @@ User request: ${goal}`;
       if (extMatch && extMatch[1] && !['all', 'the', 'some', 'any', 'my', 'locate', 'search', 'find'].includes(extMatch[1])) {
         pattern = `*.${extMatch[1]}`;
       } else {
-        const namedMatch = lower.match(/(?:named|with\s+name|matching|for)\s+['"]?([a-z0-9_.*-]+)['"]?/i);
+        const namedMatch = lower.match(/(?:named|with\s+name|matching|for)\s+(?:as\s+)?['"]?([a-z0-9_.*-]+)['"]?/i);
         if (namedMatch && namedMatch[1]) {
           pattern = namedMatch[1].trim();
+        } else {
+          const targetFolderMatch = lower.match(/([a-z0-9_.*-]+)\s+(?:folders?|directories|dirs|files?)\b/i);
+          if (targetFolderMatch && targetFolderMatch[1] && !['all', 'the', 'some', 'any', 'my', 'locate', 'search', 'find'].includes(targetFolderMatch[1])) {
+            pattern = targetFolderMatch[1].trim();
+          }
         }
       }
 
-      return { tool: 'filesystem.search', params: { dir, pattern } };
+      const isFolder = /\b(?:folders?|directories|dirs)\b/i.test(lower);
+      const isMac = context.os.toLowerCase().includes('mac') || context.os.toLowerCase().includes('darwin');
+      if (isMac) {
+        const cmd = isFolder
+          ? `mdfind "kMDItemFSName == '*${pattern}*'c && kMDItemContentType == 'public.folder'" | grep -v 'node_modules\\|\\.git\\|Library/Caches' | head -30`
+          : `mdfind "kMDItemFSName == '*${pattern}*'c" | grep -v 'node_modules\\|\\.git\\|Library/Caches' | head -30`;
+        return { tool: 'shell.execute', params: { command: cmd, explanation: `Search for ${pattern} using Spotlight index` } };
+      }
+      return { tool: 'shell.execute', params: { command: `find ${dir === '.' ? '.' : dir} -iname "*${pattern}*" 2>/dev/null | head -30`, explanation: `Search for ${pattern}` } };
     }
 
     // Basic Queries (Time, User, Git)
@@ -1316,7 +1361,7 @@ User request: ${goal}`;
   }
 
   private async executeFallback(fallback: { tool: string; params: Record<string, any> }, context: { os: string; cwd: string }): Promise<AgentResult> {
-    this.emit({ type: 'tool_start', message: this.getToolDisplayName(fallback.tool) });
+    this.emit({ type: 'tool_start', message: this.getToolDisplayName(fallback.tool, fallback.params) });
     const result = await this.toolExecutor.execute(fallback.tool, fallback.params, context.cwd, this.authorizationHandler);
     const cdPath = this.extractCdPath(fallback.tool, fallback.params, result);
     const summary = result.success
@@ -1330,6 +1375,13 @@ User request: ${goal}`;
    * Extract a directory path if a step performed navigation.
    */
   private extractCdPath(toolId: string, params: Record<string, any>, result: ToolExecutionResult): string | undefined {
+    if (toolId === 'shell.execute') {
+      const cmd = (params.command || '').trim();
+      const cdMatch = cmd.match(/^cd\s+([^\s;&|]+)/);
+      if (cdMatch) {
+        return cdMatch[1].replace(/["']/g, '');
+      }
+    }
     if (toolId === 'filesystem.navigate' || toolId === 'filesystem.cd' || toolId === 'shell.cd') {
       return result.data?.path || params.path || params.directory;
     }
@@ -1347,6 +1399,7 @@ User request: ${goal}`;
     const action = toolId.split('.').slice(1).join('.');
 
     switch (toolId) {
+      case 'shell.execute': return `✓ ${params.explanation || `Executed: ${params.command || 'command'}`}`;
       case 'network.bluetooth.on': return '✓ Bluetooth turned on';
       case 'network.bluetooth.off': return '✓ Bluetooth turned off';
       case 'network.bluetooth.connect': return `✓ Connected to ${params.device || 'device'}`;
@@ -1377,7 +1430,10 @@ User request: ${goal}`;
   /**
    * Get a human-friendly display name for a tool.
    */
-  private getToolDisplayName(toolId: string): string {
+  private getToolDisplayName(toolId: string, params?: Record<string, any>): string {
+    if (toolId === 'shell.execute') {
+      return params?.explanation || (params?.command ? `Running: ${params.command}...` : 'Executing shell command...');
+    }
     const names: Record<string, string> = {
       'system.service': 'Managing system service...',
       'system.dotfile': 'Updating dotfile configuration...',

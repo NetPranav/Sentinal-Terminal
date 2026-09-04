@@ -1,40 +1,33 @@
 import { describe, it, expect } from 'vitest';
 import { buildSystemPrompt, ToolSpec } from './SystemPrompt';
 
-describe('SystemPrompt — Lean System Prompt Construction', () => {
+describe('SystemPrompt — Shell-Native Autonomous Copilot Prompt', () => {
   const mockTools: ToolSpec[] = [
-    { id: 'network.bluetooth.on', name: 'Turn On Bluetooth', description: 'Enable adapter', parameters: [] },
-    { id: 'network.bluetooth.connect', name: 'Connect Bluetooth', description: 'Connect peripheral', parameters: [{ name: 'device', type: 'string', required: true, description: '' }] },
-    { id: 'network.wifi.connect', name: 'Connect WiFi', description: 'Connect SSID', parameters: [{ name: 'ssid', type: 'string', required: true, description: '' }] },
-    { id: 'filesystem.search', name: 'Search Files', description: 'Search directory', parameters: [{ name: 'pattern', type: 'string', required: true, description: '' }] },
-    { id: 'git.status', name: 'Git Status', description: 'Check repo status', parameters: [] },
-    { id: 'system.service', name: 'Manage Service', description: 'Control systemctl', parameters: [{ name: 'service', type: 'string', required: true, description: '' }] },
-    { id: 'system.dotfile', name: 'Manage Dotfile', description: 'Configure rice', parameters: [{ name: 'app', type: 'string', required: true, description: '' }] },
-    { id: 'shell.execute', name: 'Execute Shell Command', description: 'Run bash command', parameters: [{ name: 'command', type: 'string', required: true, description: '' }] }
+    { id: 'shell.execute', name: 'Execute Shell Command', description: 'Run shell command', parameters: [{ name: 'command', type: 'string', required: true, description: '' }] }
   ];
 
-  it('builds system prompt with full core toolset when no goal is specified', () => {
-    const prompt = buildSystemPrompt(mockTools, { os: 'mac', cwd: '/workspace' });
-    expect(prompt).toContain('You are Sentinel, a mac terminal AI');
-    expect(prompt).toContain('Tools:');
-    expect(prompt).toContain('network.bluetooth.on');
-    expect(prompt).toContain('filesystem.search');
-    expect(prompt).toContain('shell.execute');
+  it('builds shell-native system prompt for macOS with zero-refusal rules and JSON contract', () => {
+    const prompt = buildSystemPrompt(mockTools, { os: 'mac', cwd: '/Users/test/projects' });
+    expect(prompt).toContain('You are Sentinel, an autonomous mac terminal AI copilot.');
+    expect(prompt).toContain('Working Directory: /Users/test/projects');
+    expect(prompt).toContain('Shell: /bin/zsh');
+    expect(prompt).toContain('CRITICAL RULES:');
+    expect(prompt).toContain('YOU MUST NEVER REFUSE ACTIONABLE SYSTEM REQUESTS');
+    expect(prompt).toContain('JSON CONTRACT:');
+    expect(prompt).toContain('{"action": "execute", "command": "<terminal_command>", "explanation": "<1-line plain English explanation of what this command will do>"}');
   });
 
-  it('dynamically prunes tools to 4-6 relevant candidates when goal is provided', () => {
-    const prompt = buildSystemPrompt(
-      mockTools,
-      { os: 'mac', cwd: '/workspace' },
-      'connect bluetooth headphones Space One',
-      { maxTools: 3 }
-    );
+  it('builds shell-native system prompt for Windows with PowerShell', () => {
+    const prompt = buildSystemPrompt(mockTools, { os: 'windows', cwd: 'C:\\Users\\test' });
+    expect(prompt).toContain('Shell: powershell');
+    expect(prompt).toContain('Working Directory: C:\\Users\\test');
+  });
 
-    expect(prompt).toContain('network.bluetooth.connect');
-    expect(prompt).toContain('network.bluetooth.on');
-    expect(prompt).toContain('shell.execute');
-
-    // Unrelated tools should be pruned out
-    expect(prompt).not.toContain('network.wifi.connect');
+  it('includes key terminal command examples for fast Spotlight, network, and port queries', () => {
+    const prompt = buildSystemPrompt(mockTools, { os: 'mac', cwd: '/workspace' });
+    expect(prompt).toContain('mdfind');
+    expect(prompt).toContain('networksetup');
+    expect(prompt).toContain('lsof');
+    expect(prompt).toContain('pmset');
   });
 });

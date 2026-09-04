@@ -178,4 +178,43 @@ describe('AgentLoop fast-path routing', () => {
     );
     expect(res.summary).toContain('Executed learned workflow: tar -czvf backups.tar.gz ./backups');
   });
+
+  it('normalizes shell-native execute JSON contract into shell.execute tool call', () => {
+    const loop = new AgentLoop({ toolIndex: { has: () => false, getAll: () => [] } } as any);
+    const parsed = (loop as any).parseLLMResponse(JSON.stringify({
+      action: 'execute',
+      command: 'mdfind "kMDItemFSName == \'*frontend*\'c && kMDItemContentType == \'public.folder\'"',
+      explanation: 'Search entire Mac for frontend directories'
+    }));
+
+    expect(parsed).not.toBeNull();
+    expect(parsed.action).toBe('tool');
+    expect(parsed.tool).toBe('shell.execute');
+    expect(parsed.params.command).toBe('mdfind "kMDItemFSName == \'*frontend*\'c && kMDItemContentType == \'public.folder\'"');
+    expect(parsed.params.explanation).toBe('Search entire Mac for frontend directories');
+  });
+
+  it('normalizes bare command JSON object into shell.execute tool call', () => {
+    const loop = new AgentLoop({ toolIndex: { has: () => false, getAll: () => [] } } as any);
+    const parsed = (loop as any).parseLLMResponse(JSON.stringify({
+      command: 'lsof -iTCP -sTCP:LISTEN -n -P',
+      explanation: 'List active listening ports'
+    }));
+
+    expect(parsed).not.toBeNull();
+    expect(parsed.action).toBe('tool');
+    expect(parsed.tool).toBe('shell.execute');
+    expect(parsed.params.command).toBe('lsof -iTCP -sTCP:LISTEN -n -P');
+  });
+
+  it('routes search query fallback to shell-native Spotlight mdfind on macOS', () => {
+    const loop = new AgentLoop({ toolIndex: { has: () => false, getAll: () => [] } } as any);
+    const fallback = (loop as any).tryHeuristicFallback('find all frontend folders in my system', { os: 'mac', cwd: '/workspace' });
+
+    expect(fallback).not.toBeNull();
+    expect(fallback.tool).toBe('shell.execute');
+    expect(fallback.params.command).toContain('mdfind');
+    expect(fallback.params.command).toContain('*frontend*');
+    expect(fallback.params.command).toContain('public.folder');
+  });
 });
