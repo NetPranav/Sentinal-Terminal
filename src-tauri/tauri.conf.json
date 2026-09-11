@@ -14,10 +14,7 @@
       {
         "title": "Sentinel Terminal",
         "width": 1024,
-        "height": 768,
-        "titleBarStyle": "Overlay",
-        "hiddenTitle": true,
-        "transparent": true
+        "height": 768
       }
     ],
     "security": {
@@ -31,15 +28,10 @@
       "icons/32x32.png",
       "icons/128x128.png",
       "icons/128x128@2x.png",
-      "icons/icon.icns",
+      "icons/icon.png",
       "icons/icon.ico"
     ],
-    "category": "DeveloperTool",
-    "macOS": {
-      "minimumSystemVersion": "12.0",
-      "infoPlist": "Info.plist"
-    },
-    "externalBin": ["binaries/llama-server"],
-    "resources": ["resources/models/*"]
+    "category": "DeveloperTool"
   }
 }
+

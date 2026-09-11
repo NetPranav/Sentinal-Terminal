@@ -48,6 +48,28 @@ export class ModelManager {
 
   // Curated registry of high-performance local candidates (Coder 7B models & lightweight targets)
   readonly candidateCatalog: Record<string, CandidateModelSpec> = {
+    'qwen3:4b': {
+      id: 'qwen3:4b',
+      name: 'Qwen 3 4B',
+      recommendedTag: 'qwen3:4b',
+      maxRamBytes: 3000 * 1024 * 1024,
+      expectedLatencyMs: 350,
+      jsonReliabilityScore: 98,
+      toolSelectionAccuracy: 98,
+      overallScore: 104,
+      appleSiliconOptimized: true
+    },
+    'qwen2.5-coder:3b': {
+      id: 'qwen2.5-coder:3b',
+      name: 'Qwen2.5-Coder 3B Instruct',
+      recommendedTag: 'qwen2.5-coder:3b',
+      maxRamBytes: 2500 * 1024 * 1024,
+      expectedLatencyMs: 300,
+      jsonReliabilityScore: 99,
+      toolSelectionAccuracy: 99,
+      overallScore: 103,
+      appleSiliconOptimized: true
+    },
     'qwen2.5-coder:7b': {
       id: 'qwen2.5-coder:7b',
       name: 'Qwen2.5-Coder 7B Instruct',

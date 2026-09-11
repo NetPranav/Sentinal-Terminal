@@ -66,25 +66,64 @@ export class WifiCapability extends BaseCapabilityDriver<WifiInput, any> {
         }
       }
 
+      const platform = this.detectPlatform();
+
       if (op === 'on' || op === 'off') {
-        const output = await invoke<{ stdout: string; stderr: string; code: number }>('execute_command', {
-          command: 'networksetup',
-          args: ['-setairportpower', iface, op]
-        });
-        if (output.code === 0 && !output.stderr) {
-          const stdout = `Wi-Fi Interface (${iface}) radio power turned ${op.toUpperCase()}`;
+        if (platform === 'macos') {
+          const output = await invoke<{ stdout: string; stderr: string; code: number }>('execute_command', {
+            command: 'networksetup',
+            args: ['-setairportpower', iface, op]
+          });
+          if (output.code === 0 && !output.stderr) {
+            const stdout = `Wi-Fi Interface (${iface}) radio power turned ${op.toUpperCase()}`;
+            return {
+              success: true,
+              data: { power: op, wifi: op, interface: iface, stdout },
+              commandExecuted: `networksetup -setairportpower ${iface} ${op}`,
+              rollbackPayload: { power: op === 'on' ? 'off' : 'on', iface }
+            };
+          } else {
+            return { success: false, error: { code: 'WIFI_POWER_FAILED', message: output.stderr || output.stdout || `Failed to turn Wi-Fi ${op}` } };
+          }
+        } else {
+          // Linux nmcli / rfkill
+          const output = await invoke<{ stdout: string; stderr: string; code: number }>('execute_command', {
+            command: 'nmcli',
+            args: ['radio', 'wifi', op]
+          });
+          const stdout = `Wi-Fi radio turned ${op.toUpperCase()}`;
           return {
             success: true,
-            data: { power: op, wifi: op, interface: iface, stdout },
-            commandExecuted: `networksetup -setairportpower ${iface} ${op}`,
+            data: { power: op, wifi: op, stdout },
+            commandExecuted: `nmcli radio wifi ${op}`,
             rollbackPayload: { power: op === 'on' ? 'off' : 'on', iface }
           };
-        } else {
-          return { success: false, error: { code: 'WIFI_POWER_FAILED', message: output.stderr || output.stdout || `Failed to turn Wi-Fi ${op}` } };
         }
       }
 
       if (op === 'scan') {
+        if (platform === 'linux') {
+          try {
+            const output = await invoke<{ stdout: string; stderr: string; code: number }>('execute_command', {
+              command: 'sh',
+              args: ['-c', 'nmcli -t -f SSID,SIGNAL,SECURITY device wifi list 2>/dev/null || iw dev 2>/dev/null']
+            });
+            const lines = (output?.stdout || '').split('\n').map(l => l.trim()).filter(Boolean);
+            const networks: string[] = [];
+            for (const line of lines) {
+              const parts = line.split(':');
+              if (parts[0] && !networks.includes(parts[0])) {
+                networks.push(parts[0]);
+              }
+            }
+            const stdout = networks.length > 0
+              ? `Available Wi-Fi Networks (${networks.length}):\r\n` + networks.map(n => `  • ${n}`).join('\r\n')
+              : 'No Wi-Fi networks found in vicinity.';
+            return { success: true, data: { networks, stdout }, commandExecuted: 'nmcli device wifi list' };
+          } catch (e: any) {
+            return { success: false, error: { code: 'WIFI_SCAN_FAILED', message: e.message || 'Failed to scan wifi on Linux' } };
+          }
+        }
         try {
           const output = await invoke<{ stdout: string; stderr: string; code: number }>('execute_command', {
             command: '/System/Library/PrivateFrameworks/Apple80211.framework/Versions/Current/Resources/airport',
@@ -256,6 +295,32 @@ export class WifiCapability extends BaseCapabilityDriver<WifiInput, any> {
               retrievedPassword = keyRes.stdout.trim();
             }
           } catch { /* ignore if password not found in keychain or access declined */ }
+        }
+
+        if (platform === 'linux') {
+          const passwordToUse = input.password || '';
+          const cmd = passwordToUse ? `nmcli device wifi connect "${targetSsid}" password "${passwordToUse}"` : `nmcli device wifi connect "${targetSsid}"`;
+          const output = await invoke<{ stdout: string; stderr: string; code: number }>('execute_command', {
+            command: 'sh',
+            args: ['-c', cmd]
+          });
+          if (output.code === 0 || output.stdout.toLowerCase().includes('successfully') || output.stdout.toLowerCase().includes('activated')) {
+            const stdout = `Wi-Fi: Connected successfully to "${targetSsid}"\r\n${output.stdout}`;
+            return {
+              success: true,
+              data: { connected: true, ssid: targetSsid, originalRequest: input.ssid, stdout },
+              commandExecuted: passwordToUse ? `nmcli device wifi connect "${targetSsid}" password [CREDENTIAL_APPLIED]` : `nmcli device wifi connect "${targetSsid}"`,
+              rollbackPayload: { previousSsid: this.previousSsid, iface }
+            };
+          } else {
+            return {
+              success: false,
+              error: {
+                code: 'WIFI_CONNECT_FAILED',
+                message: `Could not connect to Wi-Fi SSID "${targetSsid}": ${output.stderr || output.stdout}`
+              }
+            };
+          }
         }
 
         const passwordToUse = input.password || retrievedPassword;

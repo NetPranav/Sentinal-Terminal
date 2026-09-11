@@ -216,7 +216,9 @@ export class SystemSDKCapability extends BaseCapabilityDriver<SystemDriverInput,
       case 'processes': {
         if (typeof process === 'undefined' || process.env.NODE_ENV !== 'test') {
           try {
-            const out = await invoke<{ stdout: string }>('execute_command', { command: 'ps', args: ['-eo', 'pid,pcpu,pmem,comm', '-r'] });
+            const isLinux = this.detectPlatform() === 'linux';
+            const args = isLinux ? ['-eo', 'pid,pcpu,pmem,comm', '--sort=-pcpu'] : ['-eo', 'pid,pcpu,pmem,comm', '-r'];
+            const out = await invoke<{ stdout: string }>('execute_command', { command: 'ps', args });
             if (out && out.stdout) {
               const lines = out.stdout.trim().split('\n').slice(1, (input.count || 15) + 1);
               const procList = lines.map(line => {
@@ -227,7 +229,7 @@ export class SystemSDKCapability extends BaseCapabilityDriver<SystemDriverInput,
                 const name = parts.slice(3).join(' ') || 'unknown';
                 return { pid, name, cpuPercent, ramPercent: pmem };
               });
-              return { success: true, data: { sortedBy: input.sort || 'cpu', activeProcesses: procList }, commandExecuted: 'ps -eo pid,pcpu,pmem,comm -r' };
+              return { success: true, data: { sortedBy: input.sort || 'cpu', activeProcesses: procList }, commandExecuted: isLinux ? 'ps -eo pid,pcpu,pmem,comm --sort=-pcpu' : 'ps -eo pid,pcpu,pmem,comm -r' };
             }
           } catch {
             // fall through to default diagnostics
@@ -314,12 +316,19 @@ export class SystemSDKCapability extends BaseCapabilityDriver<SystemDriverInput,
 
       case 'lock':
         if (typeof process !== 'undefined' && process.env.NODE_ENV !== 'test') {
-          await invoke('execute_command', { command: 'pmset', args: ['displaysleepnow'] });
+          if (this.detectPlatform() === 'macos') {
+            await invoke('execute_command', { command: 'pmset', args: ['displaysleepnow'] });
+          } else {
+            await invoke('execute_command', { 
+              command: 'sh', 
+              args: ['-c', 'loginctl lock-session 2>/dev/null || xdg-screensaver lock 2>/dev/null || gnome-screensaver-command -l 2>/dev/null || xflock4 2>/dev/null || swaylock 2>/dev/null'] 
+            });
+          }
         }
         return {
           success: true,
           data: { locked: true, stdout: 'System locked successfully' },
-          commandExecuted: 'pmset displaysleepnow'
+          commandExecuted: this.detectPlatform() === 'macos' ? 'pmset displaysleepnow' : 'loginctl lock-session'
         };
 
       default:

@@ -206,11 +206,12 @@ pub fn run() {
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
-        .run(|app_handle, event| {
-            if let tauri::RunEvent::Opened { urls } = event {
+        .run(|_app_handle, _event| {
+            #[cfg(any(target_os = "macos", target_os = "ios"))]
+            if let tauri::RunEvent::Opened { urls } = _event {
                 use tauri::Emitter;
                 let url_strings: Vec<String> = urls.into_iter().map(|u| u.to_string()).collect();
-                let _ = app_handle.emit("sentinel-url", url_strings);
+                let _ = _app_handle.emit("sentinel-url", url_strings);
             }
         });
 }

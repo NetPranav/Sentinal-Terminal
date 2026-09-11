@@ -87,21 +87,21 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
         }
       } else {
         const escaped = authPassword.replace(/'/g, "'\\''");
-        // Securely verify system password against macOS Directory Service login credentials
+        // Securely verify system password against Linux/macOS login credentials
         const res = await invoke<{ code?: number; stderr?: string; stdout?: string }>('execute_command', {
           command: 'sh',
-          args: ['-c', `dscl . -authonly "$(whoami)" '${escaped}' 2>&1 || (echo '${escaped}' | sudo -S -k -v 2>&1)`]
+          args: ['-c', `(which dscl >/dev/null 2>&1 && dscl . -authonly "$(whoami)" '${escaped}' 2>&1) || (echo '${escaped}' | sudo -S -k -v 2>&1)`]
         });
         if (res && res.code === 0) {
           isValid = true;
         } else {
           isValid = false;
-          errorMessage = 'Authentication failed: Incorrect system password. Please enter your valid macOS login password.';
+          errorMessage = 'Authentication failed: Incorrect system password. Please enter your valid login password.';
         }
       }
     } catch (err: any) {
       isValid = false;
-      errorMessage = 'Authentication failed: Incorrect system password. Please enter your valid macOS login password.';
+      errorMessage = 'Authentication failed: Incorrect system password. Please enter your valid login password.';
     }
 
     setIsVerifying(false);

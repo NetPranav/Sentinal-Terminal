@@ -423,7 +423,7 @@ export class ShadowPtySimulator {
     // Pure syntax validation using '/bin/zsh -n -c "<cmd>"'
     // -n parses and verifies syntax/grammar without running any command!
     const escaped = trimmed.replace(/'/g, `'\\''`);
-    return { predicate: `/bin/zsh -n -c '${escaped}'`, isTransformed: true };
+    return { predicate: `${this.getSandboxShell()} -n -c '${escaped}'`, isTransformed: true };
   }
 
   /**
@@ -498,6 +498,16 @@ export class ShadowPtySimulator {
     };
   }
 
+  private getSandboxShell(): string {
+    if (typeof process !== 'undefined') {
+      if (process.env?.SHELL && (process.env.SHELL.endsWith('/bash') || process.env.SHELL.endsWith('/zsh') || process.env.SHELL.endsWith('/sh'))) {
+        return process.env.SHELL;
+      }
+      return '/bin/sh';
+    }
+    return '/bin/sh';
+  }
+
   /**
    * Executes a command string inside the shadow sandbox with a strict timeout.
    */
@@ -505,9 +515,11 @@ export class ShadowPtySimulator {
     commandLine: string,
     cwd?: string
   ): Promise<{ stdout: string; stderr: string; code: number }> {
+    const shell = this.getSandboxShell();
+
     // 1. If custom executor provided, use it
     if (this.customExecutor) {
-      return this.customExecutor('/bin/zsh', ['-lc', commandLine], cwd);
+      return this.customExecutor(shell, ['-c', commandLine], cwd);
     }
 
     // 2. Node/test environment check
@@ -518,7 +530,7 @@ export class ShadowPtySimulator {
           ...process.env,
           PATH: `${process.env.PATH || ''}:/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin`
         };
-        const res = spawnSync('/bin/zsh', ['-lc', commandLine], {
+        const res = spawnSync(shell, ['-c', commandLine], {
           cwd: cwd || process.cwd(),
           env,
           encoding: 'utf-8',
@@ -540,8 +552,8 @@ export class ShadowPtySimulator {
     });
 
     const executionPromise = invoke<{ stdout: string; stderr: string; code: number }>('execute_command', {
-      command: '/bin/zsh',
-      args: ['-lc', commandLine],
+      command: shell,
+      args: ['-c', commandLine],
       cwd
     });
 

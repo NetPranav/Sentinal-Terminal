@@ -120,13 +120,26 @@ export class BrowserCapability extends BaseCapabilityDriver<BrowserInput, any> {
 
     try {
       if (op === 'navigate' || op === 'search' || op === 'new_tab') {
-        const cmdArgs = resolvedBrowser ? ['-a', resolvedBrowser, targetUrl] : [targetUrl];
-        const commandExecuted = resolvedBrowser
-          ? `open -a "${resolvedBrowser}" "${targetUrl}"`
-          : `open "${targetUrl}"`;
+        const platform = this.detectPlatform();
+        let command = 'open';
+        let cmdArgs = resolvedBrowser ? ['-a', resolvedBrowser, targetUrl] : [targetUrl];
+
+        if (platform === 'linux') {
+          if (resolvedBrowser) {
+            command = 'sh';
+            cmdArgs = ['-c', `which "${resolvedBrowser.toLowerCase()}" >/dev/null 2>&1 && "${resolvedBrowser.toLowerCase()}" "${targetUrl}" & || xdg-open "${targetUrl}"`];
+          } else {
+            command = 'xdg-open';
+            cmdArgs = [targetUrl];
+          }
+        }
+
+        const commandExecuted = platform === 'linux'
+          ? (resolvedBrowser ? `${resolvedBrowser} "${targetUrl}"` : `xdg-open "${targetUrl}"`)
+          : (resolvedBrowser ? `open -a "${resolvedBrowser}" "${targetUrl}"` : `open "${targetUrl}"`);
 
         const output = await invoke<{ code: number; stderr?: string; stdout?: string }>('execute_command', {
-          command: 'open',
+          command,
           args: cmdArgs
         });
 

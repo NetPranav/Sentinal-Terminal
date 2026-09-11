@@ -97,9 +97,9 @@ describe('ShadowPtySimulator — Speculative Shadow-PTY Simulation Engine', () =
       expect(isTransformed).toBe(true);
     });
 
-    it('should transform unmapped mutating command into safe zsh -n syntax verification', () => {
+    it('should transform unmapped mutating command into safe shell -n syntax verification', () => {
       const { predicate, isTransformed } = simulator.toSafePredicate('chmod +x script.sh && ./script.sh', 'safe_mutation');
-      expect(predicate).toContain('/bin/zsh -n -c');
+      expect(predicate).toMatch(/\/(?:zsh|bash|sh)\s+-n\s+-c/);
       expect(isTransformed).toBe(true);
     });
   });
@@ -235,10 +235,12 @@ describe('ShadowPtySimulator — Speculative Shadow-PTY Simulation Engine', () =
     const simulator = new ShadowPtySimulator();
 
     it('should execute read-only probe in ephemeral subshell in <50ms', async () => {
+      const isMac = process.platform === 'darwin';
+      const cmd = isMac ? 'sw_vers' : 'echo macOS version 14.5';
       const startTime = performance.now();
       const report = await simulator.speculate(
         'check macOS version',
-        'sw_vers',
+        cmd,
         { os: 'mac', cwd: process.cwd() }
       );
       const elapsed = performance.now() - startTime;

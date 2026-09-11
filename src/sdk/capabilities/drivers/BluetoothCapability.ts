@@ -181,8 +181,31 @@ export class BluetoothCapability extends BaseCapabilityDriver<BluetoothInput, an
       }
     }
 
+    const platform = this.detectPlatform();
+
     try {
       if (op === 'list') {
+        if (platform === 'linux') {
+          const output = await invoke<{ stdout: string; stderr: string; code: number }>('execute_command', {
+            command: 'sh',
+            args: ['-c', 'bluetoothctl devices 2>/dev/null || bluetoothctl paired-devices 2>/dev/null']
+          });
+          const devices: Array<{ name: string; address?: string; connected: boolean }> = [];
+          if (output && output.stdout) {
+            const lines = output.stdout.split('\n');
+            for (const line of lines) {
+              const match = line.match(/^Device\s+([0-9A-Fa-f:]+)\s+(.+)$/);
+              if (match) {
+                devices.push({ address: match[1], name: match[2].trim(), connected: true });
+              }
+            }
+          }
+          const stdout = devices.length > 0
+            ? `Discovered / Paired Bluetooth Devices (${devices.length}):\r\n` + devices.map(d => `  • ${d.name} (${d.address})`).join('\r\n')
+            : 'No Bluetooth devices detected or Bluetooth daemon is inactive.';
+          return { success: true, data: { devices, stdout }, commandExecuted: 'bluetoothctl devices' };
+        }
+
         const output = await invoke<{ stdout: string; stderr: string; code: number }>('execute_command', {
           command: 'system_profiler',
           args: ['SPBluetoothDataType']
@@ -205,6 +228,14 @@ export class BluetoothCapability extends BaseCapabilityDriver<BluetoothInput, an
       }
 
       if (op === 'on' || op === 'off') {
+        if (platform === 'linux') {
+          const output = await invoke<{ stdout: string; stderr: string; code: number }>('execute_command', {
+            command: 'bluetoothctl',
+            args: ['power', op]
+          });
+          return { success: true, data: { power: op, stdout: output.stdout }, commandExecuted: `bluetoothctl power ${op}`, rollbackPayload: { op, prev: op === 'on' ? 'off' : 'on' } };
+        }
+
         const blueutilBin = await this.resolveBlueutilBinary();
         if (blueutilBin) {
           const targetPower = op === 'on' ? '1' : '0';
@@ -261,13 +292,24 @@ export class BluetoothCapability extends BaseCapabilityDriver<BluetoothInput, an
           return { success: false, error: { code: 'MISSING_BT_DEVICE', message: 'Device name or MAC address required for Bluetooth connect' } };
         }
 
+        let actualTarget = target;
+        // Sanitize peripheral category nouns (Issue 8 / GitHub #6)
+        const peripheralNouns = /\b(headphones?|earbuds?|earphones?|buds|headset|speaker|mouse|keyboard|trackpad|airpods)\b/gi;
+        const targetClean = target.replace(peripheralNouns, '').replace(/\s+/g, ' ').trim() || target;
+
+        if (platform === 'linux') {
+          const output = await invoke<{ stdout: string; stderr: string; code: number }>('execute_command', {
+            command: 'bluetoothctl',
+            args: ['connect', actualTarget]
+          });
+          if (output.code === 0 || output.stdout.toLowerCase().includes('successful')) {
+            return { success: true, data: { connected: true, device: actualTarget, stdout: output.stdout }, commandExecuted: `bluetoothctl connect "${actualTarget}"`, rollbackPayload: { op: 'connect', device: actualTarget } };
+          }
+          return { success: false, error: { code: 'BT_CONNECT_FAILED', message: `Failed to connect to Bluetooth device "${actualTarget}": ${output.stderr || output.stdout}` } };
+        }
+
         const blueutilBin = await this.resolveBlueutilBinary();
         if (blueutilBin) {
-          let actualTarget = target;
-
-          // Sanitize peripheral category nouns (Issue 8 / GitHub #6)
-          const peripheralNouns = /\b(headphones?|earbuds?|earphones?|buds|headset|speaker|mouse|keyboard|trackpad|airpods)\b/gi;
-          const targetClean = target.replace(peripheralNouns, '').replace(/\s+/g, ' ').trim() || target;
 
           // Try to fuzzy-match the device name against paired devices
           try {
