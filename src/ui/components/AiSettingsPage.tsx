@@ -77,7 +77,7 @@ export const AiSettingsPage: React.FC = () => {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-              <span style={{ fontSize: '20px' }}>⚡</span>
+              <span style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#38bdf8' }} />
               <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 600, color: '#38bdf8' }}>
                 Sentinel Embedded In-App AI (Recommended)
               </h2>
@@ -93,7 +93,7 @@ export const AiSettingsPage: React.FC = () => {
               </span>
             </div>
             <p style={{ margin: '6px 0 14px', fontSize: '13px', color: 'rgba(255, 255, 255, 0.75)', lineHeight: 1.5, maxWidth: '640px' }}>
-              Runs the industry-leading <strong>Qwen 2.5 Coder 3B Instruct</strong> model directly in-process with Apple Silicon Metal GPU acceleration. No external software, terminal daemons, or background services required.
+              Runs the industry-leading <strong>Qwen 2.5 Coder 3B Instruct</strong> model directly in-process with native hardware acceleration. No external software, terminal daemons, or background services required.
             </p>
 
             <div style={{ display: 'flex', gap: '16px', fontSize: '12px', color: 'rgba(255, 255, 255, 0.6)' }}>

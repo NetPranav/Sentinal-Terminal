@@ -50,11 +50,15 @@ pub fn run() {
                     exe_dir.join("resources/models/model.gguf")
                 };
                 
-                // Try multiple possible locations for the llama-server binary
-                let possible_paths = vec![
+                let mut possible_paths = vec![
                     exe_dir.join("llama-server"),                    // dev mode: target/debug/llama-server
                     exe_dir.join("../MacOS/llama-server"),           // bundled .app: Contents/MacOS/llama-server
                 ];
+                if let Ok(home) = std::env::var("HOME") {
+                    possible_paths.push(std::path::PathBuf::from(home).join(".sentinel/bin/llama-server"));
+                }
+                possible_paths.push(std::path::PathBuf::from("/usr/bin/llama-server"));
+                possible_paths.push(std::path::PathBuf::from("/usr/local/bin/llama-server"));
                 
                 let binary_path = possible_paths.iter().find(|p| p.exists());
                 
@@ -73,7 +77,7 @@ pub fn run() {
                             .args([
                                 "--port", "8847",
                                 "-m", &model_str,
-                                "-ngl", "99",           // Offload ALL layers to Metal GPU
+                                "-ngl", "99",           // Offload ALL layers to GPU
                                 "-t", &n_threads,       // Use all CPU threads for prompt processing
                                 "--flash-attn",         // Flash attention for faster inference
                                 "-b", "2048",           // Larger batch size for throughput
@@ -89,8 +93,7 @@ pub fn run() {
                         }
                     },
                     None => {
-                        eprintln!("Could not find llama-server binary. Searched: {:?}", 
-                            possible_paths.iter().map(|p| p.display().to_string()).collect::<Vec<_>>());
+                        // Embedded llama-server not present; Sentinel falls back to Ollama or remote providers
                     }
                 }
             }
@@ -195,6 +198,7 @@ pub fn run() {
             pty::write_pty,
             pty::resize_pty,
             pty::kill_pty,
+            pty::get_default_shell,
             process_cmds::list_processes,
             process_cmds::kill_process,
             process_cmds::get_system_stats,

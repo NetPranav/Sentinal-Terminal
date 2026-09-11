@@ -88,17 +88,17 @@ export const WorkspaceSwitcherModal: React.FC<WorkspaceSwitcherModalProps> = ({
     switch (type) {
       case 'ros2':
       case 'ros1':
-        return { label: '📦 ROS', bg: 'rgba(249, 115, 22, 0.18)', color: '#fb923c', border: 'rgba(249, 115, 22, 0.35)' };
+        return { label: 'ROS', bg: 'rgba(249, 115, 22, 0.18)', color: '#fb923c', border: 'rgba(249, 115, 22, 0.35)' };
       case 'node':
-        return { label: '⚡ Node.js', bg: 'rgba(34, 197, 94, 0.18)', color: '#4ade80', border: 'rgba(34, 197, 94, 0.35)' };
+        return { label: 'Node.js', bg: 'rgba(34, 197, 94, 0.18)', color: '#4ade80', border: 'rgba(34, 197, 94, 0.35)' };
       case 'rust':
-        return { label: '🦀 Rust', bg: 'rgba(239, 68, 68, 0.18)', color: '#f87171', border: 'rgba(239, 68, 68, 0.35)' };
+        return { label: 'Rust', bg: 'rgba(239, 68, 68, 0.18)', color: '#f87171', border: 'rgba(239, 68, 68, 0.35)' };
       case 'python':
-        return { label: '🐍 Python', bg: 'rgba(59, 130, 246, 0.18)', color: '#60a5fa', border: 'rgba(59, 130, 246, 0.35)' };
+        return { label: 'Python', bg: 'rgba(59, 130, 246, 0.18)', color: '#60a5fa', border: 'rgba(59, 130, 246, 0.35)' };
       case 'docker':
-        return { label: '🐳 Docker', bg: 'rgba(14, 165, 233, 0.18)', color: '#38bdf8', border: 'rgba(14, 165, 233, 0.35)' };
+        return { label: 'Docker', bg: 'rgba(14, 165, 233, 0.18)', color: '#38bdf8', border: 'rgba(14, 165, 233, 0.35)' };
       default:
-        return { label: '📁 Workspace', bg: 'rgba(148, 163, 184, 0.14)', color: '#cbd5e1', border: 'rgba(148, 163, 184, 0.25)' };
+        return { label: 'Workspace', bg: 'rgba(148, 163, 184, 0.14)', color: '#cbd5e1', border: 'rgba(148, 163, 184, 0.25)' };
     }
   };
 
@@ -140,7 +140,10 @@ export const WorkspaceSwitcherModal: React.FC<WorkspaceSwitcherModalProps> = ({
           padding: '16px 20px',
           borderBottom: '1px solid rgba(255, 255, 255, 0.08)'
         }}>
-          <span style={{ fontSize: '18px', opacity: 0.6 }}>🔍</span>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.6)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
           <input 
             ref={inputRef}
             value={query}
@@ -224,7 +227,7 @@ export const WorkspaceSwitcherModal: React.FC<WorkspaceSwitcherModalProps> = ({
                         color: '#c084fc',
                         border: '1px solid rgba(168, 85, 247, 0.3)'
                       }}>
-                        ⚡ env
+                        env
                       </span>
                     )}
                     <span style={{

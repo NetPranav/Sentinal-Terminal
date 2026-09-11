@@ -55,17 +55,34 @@ pub fn spawn_pty(
     #[cfg(target_os = "macos")]
     let default_shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".to_string());
     #[cfg(target_os = "linux")]
-    let default_shell = std::env::var("SHELL").unwrap_or_else(|_| {
-        if std::path::Path::new("/bin/bash").exists() {
-            "/bin/bash".to_string()
-        } else if std::path::Path::new("/bin/zsh").exists() {
-            "/bin/zsh".to_string()
-        } else {
-            "/bin/sh".to_string()
-        }
-    });
+    let default_shell = std::env::var("SHELL")
+        .ok()
+        .filter(|s| !s.trim().is_empty() && std::path::Path::new(s).exists())
+        .unwrap_or_else(|| {
+            if std::path::Path::new("/bin/bash").exists() {
+                "/bin/bash".to_string()
+            } else if std::path::Path::new("/usr/bin/fish").exists() {
+                "/usr/bin/fish".to_string()
+            } else if std::path::Path::new("/usr/bin/bash").exists() {
+                "/usr/bin/bash".to_string()
+            } else {
+                "/bin/sh".to_string()
+            }
+        });
 
-    let target_shell = shell.filter(|s| !s.trim().is_empty()).unwrap_or(default_shell);
+    let target_shell = shell
+        .filter(|s| {
+            let trimmed = s.trim();
+            if trimmed.is_empty() {
+                return false;
+            }
+            if trimmed.contains('/') || trimmed.contains('\\') {
+                std::path::Path::new(trimmed).exists()
+            } else {
+                true
+            }
+        })
+        .unwrap_or(default_shell);
     let mut cmd = CommandBuilder::new(&target_shell);
 
     if login_shell == Some(true) && !target_shell.contains("pwsh") && !target_shell.contains("powershell") {
@@ -90,7 +107,7 @@ pub fn spawn_pty(
                 .filter(|p| p.is_dir())
         });
 
-    if let Some(dir) = target_dir {
+    if let Some(ref dir) = target_dir {
         cmd.cwd(dir);
     }
 
@@ -146,7 +163,39 @@ pub fn spawn_pty(
         cmd.env("PATH", "/usr/local/bin:/usr/bin:/bin:/usr/local/sbin:/usr/sbin:/sbin");
     }
 
-    let _child = pair.slave.spawn_command(cmd).map_err(|e| e.to_string())?;
+    let _child = match pair.slave.spawn_command(cmd) {
+        Ok(child) => child,
+        Err(e) => {
+            #[cfg(target_os = "linux")]
+            {
+                eprintln!("[pty] Failed to spawn '{}': {}. Falling back to default shell...", target_shell, e);
+                let fallback = if std::path::Path::new("/bin/bash").exists() {
+                    "/bin/bash"
+                } else if std::path::Path::new("/usr/bin/bash").exists() {
+                    "/usr/bin/bash"
+                } else {
+                    "/bin/sh"
+                };
+                let mut fallback_cmd = CommandBuilder::new(fallback);
+                if login_shell == Some(true) {
+                    fallback_cmd.arg("-l");
+                }
+                if let Some(dir) = target_dir {
+                    fallback_cmd.cwd(dir);
+                }
+                fallback_cmd.env("TERM", "xterm-256color");
+                fallback_cmd.env("COLORTERM", "truecolor");
+                fallback_cmd.env("TERM_PROGRAM", "Sentinel Terminal");
+                fallback_cmd.env("TERM_PROGRAM_VERSION", "0.1.0");
+                fallback_cmd.env("SENTINEL_TERMINAL", "1");
+                pair.slave.spawn_command(fallback_cmd).map_err(|fb_err| {
+                    format!("Failed to spawn shell '{}' ({}) and fallback '{}' ({})", target_shell, e, fallback, fb_err)
+                })?
+            }
+            #[cfg(not(target_os = "linux"))]
+            return Err(e.to_string());
+        }
+    };
     
     drop(pair.slave);
     
@@ -230,3 +279,29 @@ pub fn kill_pty(
         Err("Session not found".to_string())
     }
 }
+
+#[tauri::command]
+pub fn get_default_shell() -> String {
+    #[cfg(target_os = "windows")]
+    return "powershell.exe".to_string();
+
+    #[cfg(target_os = "macos")]
+    return std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".to_string());
+
+    #[cfg(target_os = "linux")]
+    return std::env::var("SHELL")
+        .ok()
+        .filter(|s| !s.trim().is_empty() && std::path::Path::new(s).exists())
+        .unwrap_or_else(|| {
+            if std::path::Path::new("/bin/bash").exists() {
+                "/bin/bash".to_string()
+            } else if std::path::Path::new("/usr/bin/fish").exists() {
+                "/usr/bin/fish".to_string()
+            } else if std::path::Path::new("/usr/bin/bash").exists() {
+                "/usr/bin/bash".to_string()
+            } else {
+                "/bin/sh".to_string()
+            }
+        });
+}
+

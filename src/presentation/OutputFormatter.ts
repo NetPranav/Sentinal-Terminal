@@ -196,9 +196,9 @@ function formatFileList(files: any[]): string {
   const lines = files.slice(0, 50).map(f => {
     const name = typeof f === 'string' ? f : (f.name || f.path || String(f));
     const isDir = typeof f === 'object' && (f.isDirectory || f.type === 'directory');
-    const icon = isDir ? '📁' : '📄';
+    const marker = isDir ? `${C.dim}d${C.reset}` : `${C.dim}-${C.reset}`;
     const size = typeof f === 'object' && f.size ? ` ${C.dim}(${formatSize(f.size)})${C.reset}` : '';
-    return `  ${icon} ${isDir ? C.boldCyan : C.white}${name}${C.reset}${size}`;
+    return `  ${marker} ${isDir ? C.boldCyan : C.white}${name}${isDir ? '/' : ''}${C.reset}${size}`;
   });
 
   if (files.length > 50) {
@@ -215,7 +215,7 @@ function formatDeviceList(devices: any[]): string {
     const name = d.name || d.address || String(d);
     const connected = d.connected ? `${C.green} (connected)${C.reset}` : '';
     const addr = d.address ? ` ${C.dim}${d.address}${C.reset}` : '';
-    return `  🔵 ${C.white}${name}${C.reset}${addr}${connected}`;
+    return `  • ${C.white}${name}${C.reset}${addr}${connected}`;
   });
 
   return `\r\n${lines.join('\r\n')}\r\n`;
@@ -227,8 +227,8 @@ function formatNetworkList(networks: any[]): string {
   const lines = networks.map(n => {
     const name = n.ssid || n.name || String(n);
     const signal = n.signal ? ` ${C.dim}(${n.signal})${C.reset}` : '';
-    const secured = n.security ? ` 🔒` : '';
-    return `  📶 ${C.white}${name}${C.reset}${signal}${secured}`;
+    const secured = n.security ? ` ${C.dim}[secured]${C.reset}` : '';
+    return `  • ${C.white}${name}${C.reset}${signal}${secured}`;
   });
 
   return `\r\n${lines.join('\r\n')}\r\n`;
@@ -242,10 +242,10 @@ function formatSearchResults(results: any[]): string {
     const isDir = typeof r === 'object'
       ? (r.isDirectory || r.type === 'directory')
       : (!path.split('/').pop()?.includes('.') || path.endsWith('/'));
-    const icon = isDir ? '📁' : '📄';
+    const marker = isDir ? `${C.dim}d${C.reset}` : `${C.dim}-${C.reset}`;
     const color = isDir ? C.boldCyan : C.white;
     const size = typeof r === 'object' && r.size ? ` ${C.dim}(${formatSize(r.size)})${C.reset}` : '';
-    return `  ${icon} ${color}${path}${C.reset}${size}`;
+    return `  ${marker} ${color}${path}${isDir ? '/' : ''}${C.reset}${size}`;
   });
 
   if (results.length > 30) {
@@ -262,7 +262,7 @@ function formatProcessList(processes: any[]): string {
     const name = p.name || p.command || String(p);
     const pid = p.pid ? ` ${C.dim}PID:${p.pid}${C.reset}` : '';
     const cpu = p.cpu ? ` ${C.dim}CPU:${p.cpu}%${C.reset}` : '';
-    return `  ⚙ ${C.white}${name}${C.reset}${pid}${cpu}`;
+    return `  • ${C.white}${name}${C.reset}${pid}${cpu}`;
   });
 
   return `\r\n${lines.join('\r\n')}\r\n`;

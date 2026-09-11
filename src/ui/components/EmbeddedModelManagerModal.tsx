@@ -112,7 +112,7 @@ export const EmbeddedModelManagerModal: React.FC<EmbeddedModelManagerModalProps>
           borderBottom: '1px solid rgba(255, 255, 255, 0.08)'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <span style={{ fontSize: '24px' }}>⚡</span>
+            <span style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#38bdf8' }} />
             <div>
               <h2 style={{ margin: 0, fontSize: '17px', fontWeight: 600 }}>Sentinel Embedded AI</h2>
               <span style={{ fontSize: '12px', color: 'rgba(255, 255, 255, 0.5)' }}>
@@ -143,47 +143,68 @@ export const EmbeddedModelManagerModal: React.FC<EmbeddedModelManagerModalProps>
             justifyContent: 'space-between',
             padding: '14px 18px',
             backgroundColor: status?.isRunning ? 'rgba(34, 197, 94, 0.12)' : 'rgba(255, 255, 255, 0.04)',
-            border: status?.isRunning ? '1px solid rgba(34, 197, 94, 0.3)' : '1px solid rgba(255, 255, 255, 0.08)',
+            border: status?.isRunning ? '1px solid rgba(34, 197, 94, 0.3)' : '1px solid rgba(255, 255, 255, 0.1)',
             borderRadius: '10px'
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <span style={{
+              <div style={{
                 width: '10px',
                 height: '10px',
                 borderRadius: '50%',
-                backgroundColor: status?.isRunning ? '#22c55e' : '#eab308'
+                backgroundColor: status?.isRunning ? '#4ade80' : '#eab308',
+                boxShadow: status?.isRunning ? '0 0 10px #4ade80' : 'none'
               }} />
               <div>
-                <div style={{ fontSize: '13px', fontWeight: 600 }}>
-                  {status?.isRunning ? 'Embedded Engine Active' : 'Embedded Engine Idle'}
-                </div>
-                <div style={{ fontSize: '11px', color: 'rgba(255, 255, 255, 0.5)' }}>
-                  Hardware: Apple Silicon Metal GPU | Port: {status?.port || 8847}
-                </div>
+                <span style={{ fontSize: '13px', fontWeight: 600, color: '#f8fafc' }}>
+                  {status?.isRunning ? 'Inference Engine Active (Metal / GPU)' : 'Inference Engine Inactive'}
+                </span>
+                <span style={{ fontSize: '11px', color: 'rgba(255, 255, 255, 0.5)', display: 'block', marginTop: '2px' }}>
+                  Endpoint: http://127.0.0.1:8847/v1 • llama-server sidecar
+                </span>
               </div>
             </div>
 
-            {status?.modelDownloaded && (
-              <button
-                disabled={isActionBusy}
-                onClick={handleToggleEngine}
-                style={{
-                  padding: '6px 14px',
-                  borderRadius: '6px',
-                  border: 'none',
-                  backgroundColor: status?.isRunning ? 'rgba(239, 68, 68, 0.2)' : 'rgba(34, 197, 94, 0.2)',
-                  color: status?.isRunning ? '#f87171' : '#4ade80',
-                  fontSize: '12px',
-                  fontWeight: 600,
-                  cursor: 'pointer'
-                }}
-              >
-                {status?.isRunning ? 'Stop Engine' : 'Start Engine'}
-              </button>
-            )}
+            <div style={{ display: 'flex', gap: '8px' }}>
+              {status?.isRunning ? (
+                <button
+                  disabled={isActionBusy}
+                  onClick={handleToggleEngine}
+                  style={{
+                    padding: '6px 14px',
+                    borderRadius: '6px',
+                    border: '1px solid rgba(239, 68, 68, 0.35)',
+                    backgroundColor: 'rgba(239, 68, 68, 0.15)',
+                    color: '#f87171',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    cursor: 'pointer'
+                  }}
+                >
+                  Stop Engine
+                </button>
+              ) : (
+                <button
+                  onClick={handleToggleEngine}
+                  disabled={!status?.modelDownloaded || isDownloading || isActionBusy}
+                  style={{
+                    padding: '6px 14px',
+                    borderRadius: '6px',
+                    border: '1px solid rgba(56, 189, 248, 0.4)',
+                    backgroundColor: 'rgba(56, 189, 248, 0.15)',
+                    color: '#38bdf8',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    cursor: (!status?.modelDownloaded || isDownloading) ? 'not-allowed' : 'pointer',
+                    opacity: (!status?.modelDownloaded || isDownloading) ? 0.4 : 1
+                  }}
+                >
+                  Start Engine
+                </button>
+              )}
+            </div>
           </div>
 
-          {/* Download progress alert */}
+          {/* Download progress */}
           {downloadMsg && (
             <div style={{
               padding: '10px 14px',
@@ -193,7 +214,7 @@ export const EmbeddedModelManagerModal: React.FC<EmbeddedModelManagerModalProps>
               fontSize: '12px',
               color: '#38bdf8'
             }}>
-              ⏳ {downloadMsg}
+              {downloadMsg}
             </div>
           )}
 
@@ -209,33 +230,33 @@ export const EmbeddedModelManagerModal: React.FC<EmbeddedModelManagerModalProps>
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <div>
-                <h3 style={{ margin: '0 0 4px', fontSize: '15px', fontWeight: 600 }}>
+                <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 600, color: '#f8fafc' }}>
                   Qwen 2.5 Coder 3B Instruct
                 </h3>
-                <span style={{ fontSize: '12px', color: 'rgba(255, 255, 255, 0.5)' }}>
-                  Primary Sweet-Spot Architecture | 4-bit Quantized (Q4_K_M)
+                <span style={{ fontSize: '11px', color: '#94a3b8', display: 'block', marginTop: '2px' }}>
+                  qwen2.5-coder-3b-instruct-q4_k_m.gguf • 4-bit Quantized
                 </span>
               </div>
               <span style={{
-                fontSize: '11px',
+                fontSize: '10px',
                 padding: '3px 8px',
                 borderRadius: '4px',
                 backgroundColor: status?.modelDownloaded ? 'rgba(34, 197, 94, 0.15)' : 'rgba(255, 255, 255, 0.06)',
-                color: status?.modelDownloaded ? '#4ade80' : 'rgba(255, 255, 255, 0.6)',
+                color: status?.modelDownloaded ? '#4ade80' : 'rgba(255, 255, 255, 0.5)',
                 fontWeight: 600
               }}>
-                {status?.modelDownloaded ? 'Installed ✓' : 'Not Downloaded'}
+                {status?.modelDownloaded ? 'Installed' : 'Not Downloaded'}
               </span>
             </div>
 
             <p style={{ margin: 0, fontSize: '12px', color: 'rgba(255, 255, 255, 0.7)', lineHeight: 1.5 }}>
-              Engineered specifically for terminal automation and developer workflows. High-accuracy zero-shot bash translation, strict JSON schema compliance, and autonomous multi-phase error recovery running at 70–90 tokens/sec on Apple Silicon.
+              Engineered specifically for terminal automation and developer workflows. High-accuracy zero-shot bash translation, strict JSON schema compliance, and autonomous multi-phase error recovery.
             </p>
 
             <div style={{ display: 'flex', gap: '12px', fontSize: '11px', color: 'rgba(255, 255, 255, 0.5)' }}>
-              <span>📦 Download Size: ~1.93 GB</span>
-              <span>🧠 RAM Footprint: ~2.4 GB</span>
-              <span>⚡ Metal GPU Acceleration: Yes</span>
+              <span>Download Size: ~1.93 GB</span>
+              <span>RAM Footprint: ~2.4 GB</span>
+              <span>Hardware Acceleration: Supported</span>
             </div>
 
             {!status?.modelDownloaded && (
@@ -246,9 +267,9 @@ export const EmbeddedModelManagerModal: React.FC<EmbeddedModelManagerModalProps>
                   marginTop: '8px',
                   padding: '10px 18px',
                   borderRadius: '8px',
-                  border: 'none',
-                  backgroundColor: '#38bdf8',
-                  color: '#000',
+                  border: '1px solid rgba(56, 189, 248, 0.4)',
+                  backgroundColor: 'rgba(56, 189, 248, 0.15)',
+                  color: '#38bdf8',
                   fontSize: '13px',
                   fontWeight: 600,
                   cursor: isDownloading ? 'not-allowed' : 'pointer',
@@ -259,7 +280,7 @@ export const EmbeddedModelManagerModal: React.FC<EmbeddedModelManagerModalProps>
                   gap: '8px'
                 }}
               >
-                {isDownloading ? 'Downloading Model (~1.9 GB)...' : '⚡ 1-Click Download & Activate Qwen 2.5 Coder 3B (1.9 GB)'}
+                {isDownloading ? 'Downloading Model (~1.9 GB)...' : 'Download & Activate Qwen 2.5 Coder 3B (1.9 GB)'}
               </button>
             )}
           </div>
@@ -273,7 +294,7 @@ export const EmbeddedModelManagerModal: React.FC<EmbeddedModelManagerModalProps>
             backgroundColor: 'rgba(0, 0, 0, 0.25)',
             borderRadius: '8px'
           }}>
-            💡 <strong>Why Embedded?</strong> Sentinel runs its own Metal-accelerated inference engine without background daemons, port 11434 collisions, or complex installation steps. If you prefer using an existing external Ollama instance or remote server, you can switch providers anytime in AI Settings.
+            <strong>Why Embedded?</strong> Sentinel runs its own native inference engine without background daemons, port 11434 collisions, or complex installation steps. If you prefer using an existing external Ollama instance or remote server, you can switch providers anytime in AI Settings.
           </div>
         </div>
 

@@ -16,6 +16,8 @@ import { PluginMarketplaceModal } from "./ui/components/PluginMarketplaceModal";
 import { EmbeddedModelManagerModal } from "./ui/components/EmbeddedModelManagerModal";
 import { AuditLogger } from "./domain/security/AuditLogger";
 import { DotfileSyncEngine } from "./domain/rice/DotfileSyncEngine";
+import { invoke } from "@tauri-apps/api/core";
+import { isLinux, getShortcutModifier, formatShortcut } from "./shared/platform";
 import "./App.css";
 
 type SplitDirection = 'vertical' | 'horizontal';
@@ -88,6 +90,22 @@ function App() {
   const [blurLevel, setBlurLevel] = useState<number>(20);
   const [activeShellMenuPaneId, setActiveShellMenuPaneId] = useState<string | null>(null);
   const [showWizard, setShowWizard] = useState<boolean>(() => !localStorage.getItem('sentinel_onboarded'));
+  const [detectedShell, setDetectedShell] = useState<string>(() => isLinux() ? 'bash' : 'zsh');
+
+  useEffect(() => {
+    const detect = async () => {
+      try {
+        const shell = await invoke<string>('get_default_shell');
+        if (shell) {
+          const name = shell.split('/').pop()?.replace(/^-/, '') || 'bash';
+          setDetectedShell(name);
+        }
+      } catch {
+        setDetectedShell(isLinux() ? 'bash' : 'zsh');
+      }
+    };
+    detect();
+  }, []);
 
   const handleWorkspaceSelect = (targetPath: string, action: 'navigate' | 'new-tab', setupScript?: string) => {
     if (action === 'new-tab') {
@@ -319,13 +337,13 @@ function App() {
     const term = getActiveTerminalPane(tab.rootPane);
     const rawPath = term ? (panePaths[term.id] || '~') : '~';
     const cleaned = formatDisplayPath(rawPath);
-    return `${cleaned} — -zsh`;
+    return `${cleaned} — -${detectedShell}`;
   };
 
   useEffect(() => {
     try {
       const basename = getFolderBasename(currentDisplayPath);
-      const windowTitle = `📁 ${basename} — -zsh`;
+      const windowTitle = `${basename} — -${detectedShell}`;
       document.title = windowTitle;
       import('@tauri-apps/api/window').then(({ getCurrentWindow }) => {
         getCurrentWindow().setTitle(windowTitle).catch(() => {});
@@ -333,7 +351,7 @@ function App() {
     } catch (e) {
       // Ignore in non-Tauri environments
     }
-  }, [currentDisplayPath, panePaths]);
+  }, [currentDisplayPath, panePaths, detectedShell]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -434,7 +452,7 @@ function App() {
         >
           <div className="pane-header-controls">
             <span style={{ display: 'flex', alignItems: 'center', gap: '6px', opacity: 0.85, fontSize: '11px', fontWeight: 500 }}>
-              <span>📁 {formatDisplayPath(panePaths[node.data.id] || '~')} — -zsh</span>
+              <span>{formatDisplayPath(panePaths[node.data.id] || '~')} — -${detectedShell}</span>
             </span>
             <div className="pane-action-buttons">
               <div style={{ position: 'relative', display: 'inline-block' }}>
@@ -473,18 +491,18 @@ function App() {
                     }}
                   >
                     {[
-                      { label: 'New Terminal Tab', shortcut: '⌘T', action: () => addTab() },
-                      { label: 'Split Vertically (Side by side)', shortcut: '⌘D', action: () => splitPane(node.data.id, 'vertical') },
-                      { label: 'Split Horizontally (Stacked)', shortcut: '⇧⌘D', action: () => splitPane(node.data.id, 'horizontal') },
+                      { label: 'New Terminal Tab', shortcut: formatShortcut('t'), action: () => addTab() },
+                      { label: 'Split Vertically (Side by side)', shortcut: formatShortcut('d'), action: () => splitPane(node.data.id, 'vertical') },
+                      { label: 'Split Horizontally (Stacked)', shortcut: formatShortcut('d', true), action: () => splitPane(node.data.id, 'horizontal') },
                       { type: 'divider' },
-                      { label: 'Clear Scrollback & Screen', shortcut: '⌘K', action: () => { if (node.data.sessionId) SessionManager.getInstance().write(node.data.sessionId, 'clear\r'); } },
-                      { label: 'Reset Shell Session', shortcut: '⌘R', action: () => { if (node.data.sessionId) SessionManager.getInstance().write(node.data.sessionId, 'clear && printf "\\033c"\r'); } },
+                      { label: 'Clear Scrollback & Screen', shortcut: formatShortcut('k'), action: () => { if (node.data.sessionId) SessionManager.getInstance().write(node.data.sessionId, 'clear\r'); } },
+                      { label: 'Reset Shell Session', shortcut: formatShortcut('r'), action: () => { if (node.data.sessionId) SessionManager.getInstance().write(node.data.sessionId, 'clear && printf "\\033c"\r'); } },
                       { type: 'divider' },
-                      { label: 'AI Command Palette & Prompt', shortcut: '⇧⌘P', action: () => setCommandPaletteOpen(true) },
-                      { label: 'Zero-Trust AI Security & Profile', shortcut: '⌘,', action: () => setShowAiSettings(true) },
-                      { label: 'macOS Integration & Setup Wizard...', shortcut: '⌘I', action: () => setShowWizard(true) },
+                      { label: 'AI Command Palette & Prompt', shortcut: formatShortcut('p', true), action: () => setCommandPaletteOpen(true) },
+                      { label: 'Zero-Trust AI Security & Profile', shortcut: formatShortcut(','), action: () => setShowAiSettings(true) },
+                      { label: isLinux() ? 'Linux Integration & Setup Wizard...' : 'macOS Integration & Setup Wizard...', shortcut: formatShortcut('i'), action: () => setShowWizard(true) },
                       { type: 'divider' },
-                      { label: 'Close Pane / Tab', shortcut: '⌘W', action: () => {
+                      { label: 'Close Pane / Tab', shortcut: formatShortcut('w'), action: () => {
                         if (!isRoot) closePane(node.data.id);
                         else if (tabs.length > 1) closeTab(activeTabId, { stopPropagation: () => {} } as any);
                       }, disabled: isRoot && tabs.length === 1 }
@@ -742,6 +760,7 @@ function App() {
         ))}
       </div>
       <StatusBar 
+        currentShell={detectedShell}
         currentPath={currentDisplayPath}
         onNavigate={handleStatusBarNavigate}
         onOpenWorkspaces={() => setShowWorkspaceSwitcher(true)}

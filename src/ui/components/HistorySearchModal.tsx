@@ -134,7 +134,10 @@ export const HistorySearchModal: React.FC<HistorySearchModalProps> = ({
           padding: '16px 20px',
           borderBottom: '1px solid rgba(255, 255, 255, 0.08)'
         }}>
-          <span style={{ fontSize: '16px', opacity: 0.6 }}>🕒</span>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.6)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="10"></circle>
+            <polyline points="12 6 12 12 16 14"></polyline>
+          </svg>
           <input 
             ref={inputRef}
             value={query}
@@ -197,7 +200,7 @@ export const HistorySearchModal: React.FC<HistorySearchModalProps> = ({
                       color: isAi ? '#f59e0b' : '#38bdf8',
                       flexShrink: 0
                     }}>
-                      {isAi ? '✨' : '$'}
+                      {isAi ? '>' : '$'}
                     </span>
                     <span style={{
                       fontFamily: 'monospace',

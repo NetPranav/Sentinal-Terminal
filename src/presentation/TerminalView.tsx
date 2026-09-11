@@ -20,6 +20,7 @@ import { WorkspaceContextProvider } from '../domain/autocomplete/WorkspaceContex
 import { GhostTextRenderer } from '../ui/components/GhostText';
 import { ThemeManager } from '../ui/theme/ThemeManager';
 import { ShellAdapter } from '../domain/shell/ShellAdapter';
+import { isLinux, getPlatform } from '../shared/platform';
 import '@xterm/xterm/css/xterm.css';
 
 interface TerminalViewProps {
@@ -56,12 +57,12 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
       await SessionManager.getInstance().write(sessionId, '\x03');
     }
     if (xtermRef.current) {
-      xtermRef.current.write(`\r\n\x1b[1;32m⚡ [Sentinel Auto-Heal] Executing: ${rem.actionTitle}...\x1b[0m\r\n`);
+      xtermRef.current.write(`\r\n\x1b[1;32m[Sentinel Auto-Heal] Executing: ${rem.actionTitle}...\x1b[0m\r\n`);
     }
     if (rem.tool === 'shell.execute' && rem.params?.command && sessionId) {
       await SessionManager.getInstance().write(sessionId, `${rem.params.command}\r`);
     } else if (agentLoopRef.current) {
-      await agentLoopRef.current.run(`fix error: ${rem.actionTitle}`, { os: 'mac', cwd: currentPath || '~' });
+      await agentLoopRef.current.run(`fix error: ${rem.actionTitle}`, { os: getPlatform() === 'linux' ? 'linux' : 'mac', cwd: currentPath || '~' });
     }
   };
 
@@ -189,11 +190,17 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
       try {
         if (!currentSessionId) {
           const shellAdapter = ShellAdapter.getInstance();
-          const defaultProfile = shellAdapter.detectLoginShell();
+          let detectedShell = '';
+          try {
+            detectedShell = await invoke<string>('get_default_shell');
+          } catch {
+            // fallback
+          }
+          const defaultProfile = shellAdapter.detectLoginShell(detectedShell || undefined);
           currentSessionId = await sessionManager.createSession(
             term.rows, 
             term.cols, 
-            defaultProfile.defaultPath, 
+            detectedShell || defaultProfile.defaultPath, 
             currentPath || undefined, 
             true
           );
@@ -214,7 +221,7 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
         unsubRemediation = PtyOutputObserver.getInstance().onRemediation((rem) => {
           setActiveRemediation(rem);
           if (rem) {
-            writeTerm(`\r\n\x1b[1;33m⚡ Sentinel Auto-Heal:\x1b[0m ${rem.cause}\r\n`);
+            writeTerm(`\r\n\x1b[1;33m[Sentinel Auto-Heal]:\x1b[0m ${rem.cause}\r\n`);
             writeTerm(`  • \x1b[36mSuggested Fix:\x1b[0m ${rem.actionTitle}\r\n`);
             writeTerm(`  • \x1b[35mType \x1b[1m>fix\x1b[0m\x1b[35m or press \x1b[1m[Tab]\x1b[0m\x1b[35m to auto-resolve with Sentinel.\x1b[0m\r\n\r\n`);
           }
@@ -264,12 +271,12 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
              const activeRem = PtyOutputObserver.getInstance().getActiveRemediation();
              if (activeRem) {
                await sessionManager.write(currentSessionId, '\x03');
-               writeTerm(`\r\n\x1b[1;32m⚡ [Sentinel Auto-Heal] Executing: ${activeRem.actionTitle}...\x1b[0m\r\n`);
+               writeTerm(`\r\n\x1b[1;32m[Sentinel Auto-Heal] Executing: ${activeRem.actionTitle}...\x1b[0m\r\n`);
                PtyOutputObserver.getInstance().clearRemediation();
                if (activeRem.tool === 'shell.execute' && activeRem.params?.command) {
                  await sessionManager.write(currentSessionId, `${activeRem.params.command}\r`);
                } else {
-                 await agentLoop.run(`fix error: ${activeRem.actionTitle}`, { os: 'mac', cwd: currentPath || '~' });
+                 await agentLoop.run(`fix error: ${activeRem.actionTitle}`, { os: getPlatform() === 'linux' ? 'linux' : 'mac', cwd: currentPath || '~' });
                }
                return;
              }
@@ -415,9 +422,9 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
                 await sessionManager.write(currentSessionId!, '\x03');
                 const rem = PtyOutputObserver.getInstance().getActiveRemediation();
                 if (rem) {
-                  writeTerm(`\r\n\x1b[1;32m⚡ [Sentinel Auto-Heal] Executing: ${rem.actionTitle}...\x1b[0m\r\n`);
+                  writeTerm(`\r\n\x1b[1;32m[Sentinel Auto-Heal] Executing: ${rem.actionTitle}...\x1b[0m\r\n`);
                   PtyOutputObserver.getInstance().clearRemediation();
-                  await agentLoop.run(`fix error: ${rem.actionTitle}`, { os: 'mac', cwd: currentPath || '~' });
+                  await agentLoop.run(`fix error: ${rem.actionTitle}`, { os: getPlatform() === 'linux' ? 'linux' : 'mac', cwd: currentPath || '~' });
                 } else {
                   writeTerm(`\r\n\x1b[33m[Sentinel Auto-Heal] No active error diagnosed in recent output.\x1b[0m\r\n\r\n`);
                 }
@@ -452,7 +459,7 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
                   `Human demonstration in ${currentPath || '~'}`
                 ).catch(e => console.warn('[TerminalView] SERL demonstration recording error:', e));
                 if (learned) {
-                  writeTerm(`\r\n\x1b[1;35m💡 Sentinel learned this workflow from your demonstration!\x1b[0m\r\n`);
+                  writeTerm(`\r\n\x1b[1;35m[Sentinel Learning Engine] Learned this workflow from your demonstration!\x1b[0m\r\n`);
                   writeTerm(`  • \x1b[36mTrigger:\x1b[0m "${lastUnresolvedGoalRef.current.goal}"\r\n`);
                   writeTerm(`  • \x1b[33mCommand:\x1b[0m ${cleanCmd}\r\n`);
                   writeTerm(`  • \x1b[37mSaved to ~/.sentinel/learned_patterns.json & LoRA training dataset. Next time you ask, Sentinel will know this!\x1b[0m\r\n\r\n`);
@@ -511,7 +518,7 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
                 });
 
                 // Run the agent loop
-                agentLoop.run(aiGoal, { os: 'mac', cwd: currentPath || '~' }).then(result => {
+                agentLoop.run(aiGoal, { os: getPlatform() === 'linux' ? 'linux' : 'mac', cwd: currentPath || '~' }).then(result => {
                   if (!result.success) {
                     lastUnresolvedGoalRef.current = { goal: aiGoal, timestamp: Date.now() };
                   } else {
@@ -564,7 +571,7 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
                     currentInput: commandText, 
                     cwd: currentPath || '~',
                     cursorPosition: commandText.length,
-                    os: 'macos'
+                    os: getPlatform() === 'linux' ? 'linux' : 'macos'
                   });
                   if (suggestions.length > 0) {
                      ghostText.render(suggestions[0].value, commandText);
@@ -682,7 +689,7 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
             userSelect: 'none'
           }}>
             <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <span>{latestPlan.phases?.every(p => p.status === 'completed') ? '✓' : '⚡'}</span>
+              <span>{latestPlan.phases?.every(p => p.status === 'completed') ? '✓' : '•'}</span>
               <span>Execution Plan {latestPlan.phases ? `· ${latestPlan.phases.length} Phases` : `· ${latestPlan.steps.length} Steps`}</span>
               {latestPlan.phases?.every(p => p.status === 'completed') && (
                 <span style={{ fontSize: '10px', color: '#4ade80', background: 'rgba(34, 197, 94, 0.15)', padding: '1px 6px', borderRadius: '4px' }}>
@@ -767,7 +774,6 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
         }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ fontSize: '15px' }}>⚡</span>
               <span style={{ fontSize: '12px', fontWeight: 700, color: '#f59e0b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                 Sentinel Auto-Heal
               </span>
@@ -877,9 +883,12 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                fontSize: '20px'
+                fontSize: '11px',
+                fontWeight: 700,
+                color: '#f59e0b',
+                letterSpacing: '0.5px'
               }}>
-                🔒
+                AUTH
               </div>
               <div>
                 <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 600, color: '#f8fafc', letterSpacing: '-0.2px' }}>
@@ -893,7 +902,7 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
 
             <p style={{ fontSize: '13px', lineHeight: '1.55', color: 'rgba(255, 255, 255, 0.75)', margin: '0 0 18px 0' }}>
               {securityModalPlan.plan.requiresPassword
-                ? 'To ensure system integrity and prevent unauthorized modifications, please verify your macOS user login password to execute this capability.'
+                ? 'To ensure system integrity and prevent unauthorized modifications, please verify your system administrator / sudo credentials to execute this capability.'
                 : 'This terminal command requires your explicit confirmation before executing. Review the command and intent below.'}
             </p>
 
@@ -918,7 +927,7 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
               </div>
               {securityModalPlan.plan.explanation && (
                 <div style={{ marginTop: '8px', paddingTop: '8px', borderTop: '1px solid rgba(255, 255, 255, 0.07)', display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
-                  <span style={{ color: '#a78bfa', flexShrink: 0, fontWeight: 600 }}>ℹ️ Intent:</span>
+                  <span style={{ color: '#a78bfa', flexShrink: 0, fontWeight: 600 }}>Intent:</span>
                   <span style={{ color: '#f1f5f9', lineHeight: '1.45', wordBreak: 'break-word' }}>
                     {securityModalPlan.plan.explanation}
                   </span>
@@ -929,7 +938,7 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
             {securityModalPlan.plan.requiresPassword ? (
               <div style={{ marginBottom: '22px' }}>
                 <label style={{ display: 'block', fontSize: '12px', color: 'rgba(255, 255, 255, 0.85)', marginBottom: '8px', fontWeight: 500 }}>
-                  macOS User Login Password:
+                  System Administrator / Sudo Password:
                 </label>
                 <input
                   type="password"
@@ -962,7 +971,7 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
                 />
                 {authError && (
                   <div style={{ color: '#ef4444', fontSize: '12px', marginTop: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <span>⚠️</span> {authError}
+                    <span>[!]</span> {authError}
                   </div>
                 )}
               </div>

@@ -100,7 +100,7 @@ export const ProcessPortManagerDrawer: React.FC<ProcessPortManagerDrawerProps> =
           borderBottom: '1px solid rgba(255, 255, 255, 0.08)'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <span style={{ fontSize: '18px' }}>🔌</span>
+            <span style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#38bdf8' }} />
             <div>
               <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 600 }}>Active Ports & Activities</h3>
               <span style={{ fontSize: '11px', color: 'rgba(255, 255, 255, 0.5)' }}>
@@ -168,7 +168,7 @@ export const ProcessPortManagerDrawer: React.FC<ProcessPortManagerDrawerProps> =
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', fontWeight: 600, color: '#38bdf8' }}>
-                <span>⚡</span>
+                <span style={{ display: 'inline-block', width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#38bdf8' }} />
                 <span>Sentinel Embedded AI</span>
               </div>
               <span style={{

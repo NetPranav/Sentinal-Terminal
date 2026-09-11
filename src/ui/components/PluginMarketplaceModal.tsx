@@ -100,7 +100,7 @@ export const PluginMarketplaceModal: React.FC<PluginMarketplaceModalProps> = ({
           borderBottom: '1px solid rgba(255, 255, 255, 0.08)'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <span style={{ fontSize: '22px' }}>🧩</span>
+            <span style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#a855f7' }} />
             <div>
               <h2 style={{ margin: 0, fontSize: '17px', fontWeight: 600 }}>Sentinel Plugin Marketplace</h2>
               <span style={{ fontSize: '12px', color: 'rgba(255, 255, 255, 0.5)' }}>
@@ -133,7 +133,7 @@ export const PluginMarketplaceModal: React.FC<PluginMarketplaceModalProps> = ({
             fontSize: '12px',
             color: '#38bdf8'
           }}>
-            ⚡ {actionFeedback}
+            {actionFeedback}
           </div>
         )}
 
@@ -243,7 +243,7 @@ export const PluginMarketplaceModal: React.FC<PluginMarketplaceModalProps> = ({
                           fontFamily: 'monospace'
                         }}
                       >
-                        🔒 {perm}
+                        {perm}
                       </span>
                     ))}
                   </div>

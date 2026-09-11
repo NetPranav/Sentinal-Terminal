@@ -1,20 +1,21 @@
 import React, { useEffect, useState } from 'react';
 
 import { invoke } from '@tauri-apps/api/core';
+import { isLinux, getShortcutModifier } from '../../shared/platform';
 
 export interface StatusBarProps {
   currentShell?: string;
   currentPath?: string;
-  onNavigate?: (targetPath: string, commandToExecute: string) => void;
+  onNavigate?: (path: string, cmdToRun: string) => void;
   onOpenPorts?: () => void;
   onOpenWorkspaces?: () => void;
-  memoryUsage?: number; // MB
-  cpuUsage?: number; // %
+  memoryUsage?: number;
+  cpuUsage?: number;
   currentProfile?: string;
 }
 
 export const StatusBar: React.FC<StatusBarProps> = ({ 
-  currentShell = 'zsh', 
+  currentShell, 
   currentPath = '~',
   onNavigate,
   onOpenPorts,
@@ -23,6 +24,7 @@ export const StatusBar: React.FC<StatusBarProps> = ({
   cpuUsage: initialCpu = 2.4,
   currentProfile = 'Developer'
 }) => {
+  const displayShell = currentShell || (isLinux() ? 'bash' : 'zsh');
   const [memoryUsage, setMemoryUsage] = useState(initialMemory);
   const [cpuUsage, setCpuUsage] = useState(initialCpu);
   const [currentTime, setCurrentTime] = useState(() => 
@@ -63,7 +65,7 @@ export const StatusBar: React.FC<StatusBarProps> = ({
       else if (currentPath.startsWith('/') && !fullPath.startsWith('/')) fullPath = '/' + fullPath;
       
       const cmd = fullPath === '~' ? 'cd ~' : `cd "${fullPath}"`;
-      return { name: part === '~' ? '🏠 home' : `📁 ${part}`, fullPath, cmd, isLast: idx === parts.length - 1 };
+      return { name: part === '~' ? 'home' : part, fullPath, cmd, isLast: idx === parts.length - 1 };
     });
   };
 
@@ -86,9 +88,9 @@ export const StatusBar: React.FC<StatusBarProps> = ({
       zIndex: 100
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '14px', overflowX: 'auto' }}>
-        <span style={{ display: 'flex', alignItems: 'center', gap: '4px', opacity: 0.85, fontWeight: 500 }}>
-          <span style={{ color: 'var(--sentinel-blue, #3B82F6)' }}>⚡</span>
-          {currentShell}
+        <span style={{ display: 'flex', alignItems: 'center', gap: '6px', opacity: 0.85, fontWeight: 500 }}>
+          <span style={{ display: 'inline-block', width: '6px', height: '6px', borderRadius: '50%', backgroundColor: 'var(--sentinel-blue, #3B82F6)' }} />
+          {displayShell}
         </span>
         <span style={{ color: 'rgba(255,255,255,0.2)' }}>|</span>
         <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
@@ -138,11 +140,11 @@ export const StatusBar: React.FC<StatusBarProps> = ({
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
-              gap: '4px'
+              gap: '6px'
             }}
-            title="Switch Workspace (Cmd+O)"
+            title={`Switch Workspace (${getShortcutModifier()}+O)`}
           >
-            <span>📁</span> Projects <kbd style={{ opacity: 0.5, fontSize: '9px' }}>⌘O</kbd>
+            <span>Projects</span> <kbd style={{ opacity: 0.5, fontSize: '9px' }}>{getShortcutModifier()}O</kbd>
           </button>
         )}
 
@@ -163,7 +165,7 @@ export const StatusBar: React.FC<StatusBarProps> = ({
             }}
             title="Inspect & Free Listening Ports"
           >
-            <span>🔌</span> Ports
+            Ports
           </button>
         )}
 
@@ -183,11 +185,12 @@ export const StatusBar: React.FC<StatusBarProps> = ({
             fontWeight: 600,
             display: 'flex',
             alignItems: 'center',
-            gap: '4px',
+            gap: '6px',
             cursor: 'default'
           }}
         >
-          <span>⚡</span> SERL & Oracles
+          <span style={{ display: 'inline-block', width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#a78bfa' }} />
+          SERL & Oracles
         </span>
 
         <span style={{ 
@@ -199,7 +202,7 @@ export const StatusBar: React.FC<StatusBarProps> = ({
           fontSize: '11px',
           fontWeight: 600
         }}>
-          🛡️ {currentProfile}
+          {currentProfile}
         </span>
         
         {/* Rightmost real-time clock */}
@@ -209,12 +212,11 @@ export const StatusBar: React.FC<StatusBarProps> = ({
           gap: '6px',
           paddingLeft: '10px',
           borderLeft: '1px solid rgba(255, 255, 255, 0.15)',
-          fontSize: '12px',
+          fontSize: '11px',
           fontWeight: 600,
           color: 'var(--sentinel-fg, #ffffff)'
         }}>
-          <span style={{ color: 'var(--sentinel-green, #10B981)', animation: 'pulse 2s infinite' }}>🕒</span>
-          <span style={{ letterSpacing: '0.5px' }}>{currentTime}</span>
+          <span style={{ letterSpacing: '0.5px', opacity: 0.85 }}>{currentTime}</span>
         </span>
       </div>
     </div>
