@@ -1,4 +1,12 @@
 import React, { useState, useEffect } from 'react';
+import { 
+  Cpu, 
+  X, 
+  Download, 
+  Play, 
+  Square, 
+  Info 
+} from 'lucide-react';
 import { EmbeddedEngineManager, EmbeddedStatus } from '../../ai/models/EmbeddedEngineManager';
 
 export interface EmbeddedModelManagerModalProps {
@@ -112,7 +120,7 @@ export const EmbeddedModelManagerModal: React.FC<EmbeddedModelManagerModalProps>
           borderBottom: '1px solid rgba(255, 255, 255, 0.08)'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <span style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#38bdf8' }} />
+            <Cpu size={20} color="#38bdf8" />
             <div>
               <h2 style={{ margin: 0, fontSize: '17px', fontWeight: 600 }}>Sentinel Embedded AI</h2>
               <span style={{ fontSize: '12px', color: 'rgba(255, 255, 255, 0.5)' }}>
@@ -126,11 +134,13 @@ export const EmbeddedModelManagerModal: React.FC<EmbeddedModelManagerModalProps>
               background: 'none',
               border: 'none',
               color: 'rgba(255, 255, 255, 0.5)',
-              fontSize: '18px',
-              cursor: 'pointer'
+              cursor: 'pointer',
+              padding: '4px',
+              display: 'flex',
+              alignItems: 'center'
             }}
           >
-            ✕
+            <X size={18} />
           </button>
         </div>
 
@@ -177,10 +187,14 @@ export const EmbeddedModelManagerModal: React.FC<EmbeddedModelManagerModalProps>
                     color: '#f87171',
                     fontSize: '12px',
                     fontWeight: 600,
-                    cursor: 'pointer'
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '5px'
                   }}
                 >
-                  Stop Engine
+                  <Square size={12} />
+                  <span>Stop Engine</span>
                 </button>
               ) : (
                 <button
@@ -195,10 +209,14 @@ export const EmbeddedModelManagerModal: React.FC<EmbeddedModelManagerModalProps>
                     fontSize: '12px',
                     fontWeight: 600,
                     cursor: (!status?.modelDownloaded || isDownloading) ? 'not-allowed' : 'pointer',
-                    opacity: (!status?.modelDownloaded || isDownloading) ? 0.4 : 1
+                    opacity: (!status?.modelDownloaded || isDownloading) ? 0.4 : 1,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '5px'
                   }}
                 >
-                  Start Engine
+                  <Play size={12} />
+                  <span>Start Engine</span>
                 </button>
               )}
             </div>
@@ -280,7 +298,8 @@ export const EmbeddedModelManagerModal: React.FC<EmbeddedModelManagerModalProps>
                   gap: '8px'
                 }}
               >
-                {isDownloading ? 'Downloading Model (~1.9 GB)...' : 'Download & Activate Qwen 2.5 Coder 3B (1.9 GB)'}
+                <Download size={14} />
+                <span>{isDownloading ? 'Downloading Model (~1.9 GB)...' : 'Download & Activate Qwen 2.5 Coder 3B (1.9 GB)'}</span>
               </button>
             )}
           </div>
@@ -288,13 +307,19 @@ export const EmbeddedModelManagerModal: React.FC<EmbeddedModelManagerModalProps>
           {/* Information box */}
           <div style={{
             fontSize: '11px',
-            color: 'rgba(255, 255, 255, 0.45)',
+            color: 'rgba(255, 255, 255, 0.55)',
             lineHeight: 1.5,
             padding: '12px 14px',
             backgroundColor: 'rgba(0, 0, 0, 0.25)',
-            borderRadius: '8px'
+            borderRadius: '8px',
+            display: 'flex',
+            alignItems: 'flex-start',
+            gap: '8px'
           }}>
-            <strong>Why Embedded?</strong> Sentinel runs its own native inference engine without background daemons, port 11434 collisions, or complex installation steps. If you prefer using an existing external Ollama instance or remote server, you can switch providers anytime in AI Settings.
+            <Info size={14} style={{ color: '#38bdf8', flexShrink: 0, marginTop: '2px' }} />
+            <div>
+              <strong>Why Embedded?</strong> Sentinel runs its own native inference engine without background daemons, port 11434 collisions, or complex installation steps. If you prefer using an existing external Ollama instance or remote server, you can switch providers anytime in AI Settings.
+            </div>
           </div>
         </div>
 

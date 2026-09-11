@@ -1,4 +1,12 @@
 import React, { useState, useEffect } from 'react';
+import { 
+  Network, 
+  Radio, 
+  RefreshCw, 
+  X, 
+  Brain, 
+  Trash2 
+} from 'lucide-react';
 import { ListeningPortInfo, ProcessPortManager } from '../../domain/process/ProcessPortManager';
 import { EmbeddedEngineManager, EmbeddedStatus } from '../../ai/models/EmbeddedEngineManager';
 
@@ -100,7 +108,7 @@ export const ProcessPortManagerDrawer: React.FC<ProcessPortManagerDrawerProps> =
           borderBottom: '1px solid rgba(255, 255, 255, 0.08)'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <span style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#38bdf8' }} />
+            <Network size={18} color="#38bdf8" />
             <div>
               <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 600 }}>Active Ports & Activities</h3>
               <span style={{ fontSize: '11px', color: 'rgba(255, 255, 255, 0.5)' }}>
@@ -119,10 +127,14 @@ export const ProcessPortManagerDrawer: React.FC<ProcessPortManagerDrawerProps> =
                 color: 'rgba(255, 255, 255, 0.7)',
                 padding: '4px 8px',
                 fontSize: '11px',
-                cursor: 'pointer'
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '5px'
               }}
             >
-              ↻ Refresh
+              <RefreshCw size={11} />
+              <span>Refresh</span>
             </button>
             <button
               onClick={onClose}
@@ -130,12 +142,13 @@ export const ProcessPortManagerDrawer: React.FC<ProcessPortManagerDrawerProps> =
                 background: 'none',
                 border: 'none',
                 color: 'rgba(255, 255, 255, 0.5)',
-                fontSize: '16px',
                 cursor: 'pointer',
-                padding: '4px'
+                padding: '4px',
+                display: 'flex',
+                alignItems: 'center'
               }}
             >
-              ✕
+              <X size={16} />
             </button>
           </div>
         </div>
@@ -167,8 +180,8 @@ export const ProcessPortManagerDrawer: React.FC<ProcessPortManagerDrawerProps> =
             gap: '6px'
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', fontWeight: 600, color: '#38bdf8' }}>
-                <span style={{ display: 'inline-block', width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#38bdf8' }} />
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', fontWeight: 600, color: '#38bdf8' }}>
+                <Brain size={14} color="#38bdf8" />
                 <span>Sentinel Embedded AI</span>
               </div>
               <span style={{
@@ -233,6 +246,7 @@ export const ProcessPortManagerDrawer: React.FC<ProcessPortManagerDrawerProps> =
               >
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                    <Radio size={13} style={{ color: '#38bdf8', flexShrink: 0 }} />
                     <span style={{
                       fontFamily: 'monospace',
                       fontSize: '14px',
@@ -285,10 +299,14 @@ export const ProcessPortManagerDrawer: React.FC<ProcessPortManagerDrawerProps> =
                     cursor: freeingPort === p.port ? 'not-allowed' : 'pointer',
                     opacity: freeingPort === p.port ? 0.6 : 1,
                     transition: 'all 0.15s ease',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
                     flexShrink: 0
                   }}
                 >
-                  {freeingPort === p.port ? 'Freeing...' : 'Free Port'}
+                  <Trash2 size={11} />
+                  <span>{freeingPort === p.port ? 'Freeing...' : 'Free Port'}</span>
                 </button>
               </div>
             ))

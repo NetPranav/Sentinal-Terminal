@@ -1,4 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { 
+  History, 
+  Terminal, 
+  Sparkles, 
+  Clock, 
+  Repeat 
+} from 'lucide-react';
 import { HistoryProvider, HistoryEntry } from '../../domain/autocomplete/HistoryProvider';
 
 export interface HistorySearchModalProps {
@@ -134,10 +141,7 @@ export const HistorySearchModal: React.FC<HistorySearchModalProps> = ({
           padding: '16px 20px',
           borderBottom: '1px solid rgba(255, 255, 255, 0.08)'
         }}>
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.6)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="12" cy="12" r="10"></circle>
-            <polyline points="12 6 12 12 16 14"></polyline>
-          </svg>
+          <History size={16} color="rgba(255,255,255,0.6)" style={{ flexShrink: 0 }} />
           <input 
             ref={inputRef}
             value={query}
@@ -195,13 +199,11 @@ export const HistorySearchModal: React.FC<HistorySearchModalProps> = ({
                   }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1 }}>
-                    <span style={{
-                      fontSize: '11px',
-                      color: isAi ? '#f59e0b' : '#38bdf8',
-                      flexShrink: 0
-                    }}>
-                      {isAi ? '>' : '$'}
-                    </span>
+                    {isAi ? (
+                      <Sparkles size={13} color="#f59e0b" style={{ flexShrink: 0 }} />
+                    ) : (
+                      <Terminal size={13} color="#38bdf8" style={{ flexShrink: 0, opacity: 0.8 }} />
+                    )}
                     <span style={{
                       fontFamily: 'monospace',
                       fontSize: '13px',
@@ -220,12 +222,23 @@ export const HistorySearchModal: React.FC<HistorySearchModalProps> = ({
                       padding: '1px 5px',
                       borderRadius: '4px',
                       backgroundColor: 'rgba(255, 255, 255, 0.06)',
-                      color: 'rgba(255, 255, 255, 0.5)'
+                      color: 'rgba(255, 255, 255, 0.5)',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '2px'
                     }}>
-                      {item.count}×
+                      <Repeat size={9} style={{ opacity: 0.7 }} />
+                      <span>{item.count}×</span>
                     </span>
-                    <span style={{ fontSize: '11px', color: 'rgba(255, 255, 255, 0.4)' }}>
-                      {formatTimeAgo(item.lastUsed)}
+                    <span style={{ 
+                      fontSize: '11px', 
+                      color: 'rgba(255, 255, 255, 0.4)',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '3px'
+                    }}>
+                      <Clock size={10} style={{ opacity: 0.6 }} />
+                      <span>{formatTimeAgo(item.lastUsed)}</span>
                     </span>
                   </div>
                 </div>

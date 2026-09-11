@@ -1,4 +1,18 @@
 import React, { useState, useEffect } from 'react';
+import { 
+  Puzzle, 
+  Search, 
+  X, 
+  Download, 
+  Trash2, 
+  Check, 
+  Boxes, 
+  Bot, 
+  Container, 
+  GitBranch, 
+  Cloud, 
+  Palette 
+} from 'lucide-react';
 import { MarketplacePlugin, PluginMarketplaceCatalog } from '../../plugins/marketplace/PluginMarketplaceCatalog';
 
 export interface PluginMarketplaceModalProps {
@@ -20,6 +34,18 @@ export const PluginMarketplaceModal: React.FC<PluginMarketplaceModalProps> = ({
   const reloadPlugins = () => {
     const list = PluginMarketplaceCatalog.getInstance().search(query, selectedCategory);
     setPlugins(list);
+  };
+
+  const getPluginIcon = (icon: string) => {
+    switch (icon) {
+      case 'k8s': return <Boxes size={24} color="#38bdf8" />;
+      case 'ros': return <Bot size={24} color="#fb923c" />;
+      case 'docker': return <Container size={24} color="#38bdf8" />;
+      case 'git': return <GitBranch size={24} color="#4ade80" />;
+      case 'cloud': return <Cloud size={24} color="#facc15" />;
+      case 'palette': return <Palette size={24} color="#c084fc" />;
+      default: return <Puzzle size={24} color="#a855f7" />;
+    }
   };
 
   useEffect(() => {
@@ -100,7 +126,7 @@ export const PluginMarketplaceModal: React.FC<PluginMarketplaceModalProps> = ({
           borderBottom: '1px solid rgba(255, 255, 255, 0.08)'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <span style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#a855f7' }} />
+            <Puzzle size={20} color="#a855f7" />
             <div>
               <h2 style={{ margin: 0, fontSize: '17px', fontWeight: 600 }}>Sentinel Plugin Marketplace</h2>
               <span style={{ fontSize: '12px', color: 'rgba(255, 255, 255, 0.5)' }}>
@@ -114,11 +140,13 @@ export const PluginMarketplaceModal: React.FC<PluginMarketplaceModalProps> = ({
               background: 'none',
               border: 'none',
               color: 'rgba(255, 255, 255, 0.5)',
-              fontSize: '18px',
-              cursor: 'pointer'
+              cursor: 'pointer',
+              padding: '4px',
+              display: 'flex',
+              alignItems: 'center'
             }}
           >
-            ✕
+            <X size={18} />
           </button>
         </div>
 
@@ -139,20 +167,31 @@ export const PluginMarketplaceModal: React.FC<PluginMarketplaceModalProps> = ({
 
         {/* Controls: Search & Category Pills */}
         <div style={{ padding: '16px 24px 10px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          <input
-            value={query}
-            onChange={e => setQuery(e.target.value)}
-            placeholder="Search extensions, authors, or capabilities..."
-            style={{
-              padding: '10px 14px',
-              backgroundColor: 'rgba(0, 0, 0, 0.25)',
-              border: '1px solid rgba(255, 255, 255, 0.12)',
-              borderRadius: '8px',
-              color: '#fff',
-              fontSize: '13px',
-              outline: 'none'
-            }}
-          />
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+            backgroundColor: 'rgba(0, 0, 0, 0.25)',
+            border: '1px solid rgba(255, 255, 255, 0.12)',
+            borderRadius: '8px',
+            padding: '0 12px'
+          }}>
+            <Search size={14} color="rgba(255,255,255,0.4)" />
+            <input
+              value={query}
+              onChange={e => setQuery(e.target.value)}
+              placeholder="Search extensions, authors, or capabilities..."
+              style={{
+                flex: 1,
+                padding: '10px 0',
+                backgroundColor: 'transparent',
+                border: 'none',
+                color: '#fff',
+                fontSize: '13px',
+                outline: 'none'
+              }}
+            />
+          </div>
 
           <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '4px' }}>
             {categories.map(cat => (
@@ -198,13 +237,15 @@ export const PluginMarketplaceModal: React.FC<PluginMarketplaceModalProps> = ({
                 }}
               >
                 <div style={{
-                  fontSize: '28px',
-                  backgroundColor: 'rgba(255, 255, 255, 0.04)',
-                  padding: '10px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                  padding: '12px',
                   borderRadius: '12px',
                   lineHeight: 1
                 }}>
-                  {p.icon}
+                  {getPluginIcon(p.icon)}
                 </div>
 
                 <div style={{ flex: 1, minWidth: 0 }}>
@@ -218,11 +259,15 @@ export const PluginMarketplaceModal: React.FC<PluginMarketplaceModalProps> = ({
                     <span style={{
                       fontSize: '10px',
                       backgroundColor: 'rgba(255, 255, 255, 0.06)',
-                      padding: '1px 6px',
+                      padding: '2px 6px',
                       borderRadius: '4px',
-                      color: 'rgba(255, 255, 255, 0.6)'
+                      color: 'rgba(255, 255, 255, 0.6)',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '3px'
                     }}>
-                      ↓ {p.downloads}
+                      <Download size={10} />
+                      <span>{p.downloads}</span>
                     </span>
                   </div>
 
@@ -263,10 +308,14 @@ export const PluginMarketplaceModal: React.FC<PluginMarketplaceModalProps> = ({
                             color: p.enabled ? '#4ade80' : 'rgba(255, 255, 255, 0.5)',
                             fontSize: '12px',
                             fontWeight: 600,
-                            cursor: 'pointer'
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px'
                           }}
                         >
-                          {p.enabled ? 'Enabled ✓' : 'Disabled'}
+                          {p.enabled && <Check size={12} />}
+                          <span>{p.enabled ? 'Enabled' : 'Disabled'}</span>
                         </button>
                         <button
                           onClick={() => handleUninstall(p.id, p.name)}
@@ -277,10 +326,14 @@ export const PluginMarketplaceModal: React.FC<PluginMarketplaceModalProps> = ({
                             backgroundColor: 'rgba(239, 68, 68, 0.08)',
                             color: '#f87171',
                             fontSize: '11px',
-                            cursor: 'pointer'
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px'
                           }}
                         >
-                          Uninstall
+                          <Trash2 size={11} />
+                          <span>Uninstall</span>
                         </button>
                       </div>
                     </>
@@ -296,10 +349,14 @@ export const PluginMarketplaceModal: React.FC<PluginMarketplaceModalProps> = ({
                         fontSize: '12px',
                         fontWeight: 600,
                         cursor: 'pointer',
-                        boxShadow: '0 2px 8px rgba(56, 189, 248, 0.25)'
+                        boxShadow: '0 2px 8px rgba(56, 189, 248, 0.25)',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '5px'
                       }}
                     >
-                      Install
+                      <Download size={12} />
+                      <span>Install</span>
                     </button>
                   )}
                 </div>

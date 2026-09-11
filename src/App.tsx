@@ -17,6 +17,22 @@ import { EmbeddedModelManagerModal } from "./ui/components/EmbeddedModelManagerM
 import { AuditLogger } from "./domain/security/AuditLogger";
 import { DotfileSyncEngine } from "./domain/rice/DotfileSyncEngine";
 import { invoke } from "@tauri-apps/api/core";
+import { 
+  Terminal, 
+  Folder, 
+  Columns2, 
+  Rows2, 
+  Palette, 
+  X, 
+  Plus, 
+  ChevronDown, 
+  Sparkles, 
+  ShieldCheck, 
+  Compass, 
+  RotateCcw, 
+  Eraser, 
+  Trash2 
+} from "lucide-react";
 import { isLinux, getShortcutModifier, formatShortcut } from "./shared/platform";
 import "./App.css";
 
@@ -452,6 +468,7 @@ function App() {
         >
           <div className="pane-header-controls">
             <span style={{ display: 'flex', alignItems: 'center', gap: '6px', opacity: 0.85, fontSize: '11px', fontWeight: 500 }}>
+              <Folder size={12} style={{ opacity: 0.75, flexShrink: 0 }} />
               <span>{formatDisplayPath(panePaths[node.data.id] || '~')} — -${detectedShell}</span>
             </span>
             <div className="pane-action-buttons">
@@ -468,8 +485,9 @@ function App() {
                     gap: '4px'
                   }}
                 >
+                  <Terminal size={11} />
                   <span>Shell</span>
-                  <span style={{ fontSize: '9px', opacity: 0.6 }}>▼</span>
+                  <ChevronDown size={10} style={{ opacity: 0.6 }} />
                 </button>
                 {activeShellMenuPaneId === node.data.id && (
                   <div 
@@ -491,18 +509,18 @@ function App() {
                     }}
                   >
                     {[
-                      { label: 'New Terminal Tab', shortcut: formatShortcut('t'), action: () => addTab() },
-                      { label: 'Split Vertically (Side by side)', shortcut: formatShortcut('d'), action: () => splitPane(node.data.id, 'vertical') },
-                      { label: 'Split Horizontally (Stacked)', shortcut: formatShortcut('d', true), action: () => splitPane(node.data.id, 'horizontal') },
+                      { label: 'New Terminal Tab', icon: <Plus size={12} />, shortcut: formatShortcut('t'), action: () => addTab() },
+                      { label: 'Split Vertically (Side by side)', icon: <Columns2 size={12} />, shortcut: formatShortcut('d'), action: () => splitPane(node.data.id, 'vertical') },
+                      { label: 'Split Horizontally (Stacked)', icon: <Rows2 size={12} />, shortcut: formatShortcut('d', true), action: () => splitPane(node.data.id, 'horizontal') },
                       { type: 'divider' },
-                      { label: 'Clear Scrollback & Screen', shortcut: formatShortcut('k'), action: () => { if (node.data.sessionId) SessionManager.getInstance().write(node.data.sessionId, 'clear\r'); } },
-                      { label: 'Reset Shell Session', shortcut: formatShortcut('r'), action: () => { if (node.data.sessionId) SessionManager.getInstance().write(node.data.sessionId, 'clear && printf "\\033c"\r'); } },
+                      { label: 'Clear Scrollback & Screen', icon: <Eraser size={12} />, shortcut: formatShortcut('k'), action: () => { if (node.data.sessionId) SessionManager.getInstance().write(node.data.sessionId, 'clear\r'); } },
+                      { label: 'Reset Shell Session', icon: <RotateCcw size={12} />, shortcut: formatShortcut('r'), action: () => { if (node.data.sessionId) SessionManager.getInstance().write(node.data.sessionId, 'clear && printf "\\033c"\r'); } },
                       { type: 'divider' },
-                      { label: 'AI Command Palette & Prompt', shortcut: formatShortcut('p', true), action: () => setCommandPaletteOpen(true) },
-                      { label: 'Zero-Trust AI Security & Profile', shortcut: formatShortcut(','), action: () => setShowAiSettings(true) },
-                      { label: isLinux() ? 'Linux Integration & Setup Wizard...' : 'macOS Integration & Setup Wizard...', shortcut: formatShortcut('i'), action: () => setShowWizard(true) },
+                      { label: 'AI Command Palette & Prompt', icon: <Sparkles size={12} />, shortcut: formatShortcut('p', true), action: () => setCommandPaletteOpen(true) },
+                      { label: 'Zero-Trust AI Security & Profile', icon: <ShieldCheck size={12} />, shortcut: formatShortcut(','), action: () => setShowAiSettings(true) },
+                      { label: isLinux() ? 'Linux Integration & Setup Wizard...' : 'macOS Integration & Setup Wizard...', icon: <Compass size={12} />, shortcut: formatShortcut('i'), action: () => setShowWizard(true) },
                       { type: 'divider' },
-                      { label: 'Close Pane / Tab', shortcut: formatShortcut('w'), action: () => {
+                      { label: 'Close Pane / Tab', icon: <Trash2 size={12} />, shortcut: formatShortcut('w'), action: () => {
                         if (!isRoot) closePane(node.data.id);
                         else if (tabs.length > 1) closeTab(activeTabId, { stopPropagation: () => {} } as any);
                       }, disabled: isRoot && tabs.length === 1 }
@@ -510,7 +528,7 @@ function App() {
                       if ('type' in item && item.type === 'divider') {
                         return <div key={idx} style={{ height: '1px', background: 'var(--sentinel-border, rgba(255, 255, 255, 0.08))', margin: '4px 0' }} />;
                       }
-                      const menuItem = item as { label: string; shortcut: string; action: () => void; disabled?: boolean };
+                      const menuItem = item as { label: string; icon?: React.ReactNode; shortcut: string; action: () => void; disabled?: boolean };
                       return (
                         <div
                           key={idx}
@@ -527,7 +545,10 @@ function App() {
                           onMouseEnter={(e) => { if (!menuItem.disabled) (e.currentTarget as HTMLElement).style.backgroundColor = 'var(--sentinel-hover, rgba(255, 255, 255, 0.08))'; }}
                           onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.backgroundColor = 'transparent'; }}
                         >
-                          <span>{menuItem.label}</span>
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                            {menuItem.icon && <span style={{ opacity: 0.7, display: 'flex', alignItems: 'center' }}>{menuItem.icon}</span>}
+                            <span>{menuItem.label}</span>
+                          </span>
                           <span style={{ fontSize: '11px', opacity: 0.5, fontFamily: 'monospace' }}>{menuItem.shortcut}</span>
                         </div>
                       );
@@ -541,15 +562,35 @@ function App() {
                 title="Personalize Workspace Appearance & Theme"
                 style={{
                   background: showThemeModal ? 'var(--sentinel-hover, rgba(255, 255, 255, 0.15))' : 'transparent',
-                  borderColor: showThemeModal ? 'var(--sentinel-border-active, rgba(255, 255, 255, 0.35))' : 'var(--sentinel-border, rgba(255, 255, 255, 0.1))'
+                  borderColor: showThemeModal ? 'var(--sentinel-border-active, rgba(255, 255, 255, 0.35))' : 'var(--sentinel-border, rgba(255, 255, 255, 0.1))',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '5px'
                 }}
               >
-                Personalize
+                <Palette size={11} />
+                <span>Personalize</span>
               </button>
-              <button onClick={(e) => { e.stopPropagation(); splitPane(node.data.id, 'vertical'); }} title="Split Vertically (Side by side)">Split V</button>
-              <button onClick={(e) => { e.stopPropagation(); splitPane(node.data.id, 'horizontal'); }} title="Split Horizontally (Stacked)">Split H</button>
+              <button 
+                onClick={(e) => { e.stopPropagation(); splitPane(node.data.id, 'vertical'); }} 
+                title="Split Vertically (Side by side)"
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+              >
+                <Columns2 size={11} />
+                <span>Split V</span>
+              </button>
+              <button 
+                onClick={(e) => { e.stopPropagation(); splitPane(node.data.id, 'horizontal'); }} 
+                title="Split Horizontally (Stacked)"
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+              >
+                <Rows2 size={11} />
+                <span>Split H</span>
+              </button>
               {!isRoot && (
-                <button className="pane-close-btn" onClick={(e) => { e.stopPropagation(); closePane(node.data.id); }} title="Close Pane">✕</button>
+                <button className="pane-close-btn" onClick={(e) => { e.stopPropagation(); closePane(node.data.id); }} title="Close Pane">
+                  <X size={11} />
+                </button>
               )}
             </div>
           </div>
@@ -597,16 +638,21 @@ function App() {
                 className={`tab-pill ${isActive ? 'active' : ''}`}
                 onClick={() => setActiveTabId(tab.id)}
               >
+                <Terminal size={11} style={{ marginRight: 6, opacity: 0.75, flexShrink: 0 }} />
                 <span className="tab-pill-text">
                   {getTabDisplayTitle(tab)}
                 </span>
                 {tabs.length > 1 && (
-                  <button className="pill-close-btn" onClick={(e) => closeTab(tab.id, e)} title="Close Tab">✕</button>
+                  <button className="pill-close-btn" onClick={(e) => closeTab(tab.id, e)} title="Close Tab">
+                    <X size={10} />
+                  </button>
                 )}
               </div>
             );
           })}
-          <button className="pill-add-btn" onClick={addTab} title="New Terminal Tab">+</button>
+          <button className="pill-add-btn" onClick={addTab} title="New Terminal Tab">
+            <Plus size={13} />
+          </button>
         </div>
       </div>
 
@@ -626,13 +672,16 @@ function App() {
           color: 'var(--sentinel-fg, #F8FAFC)',
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', borderBottom: '1px solid var(--sentinel-border, rgba(255,255,255,0.08))', paddingBottom: '8px' }}>
-            <h3 style={{ margin: 0, fontSize: '13px', fontWeight: 600, opacity: 0.9 }}>
-              Workspace Appearance
+            <h3 style={{ margin: 0, fontSize: '13px', fontWeight: 600, opacity: 0.9, display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+              <Palette size={13} />
+              <span>Workspace Appearance</span>
             </h3>
             <button 
               onClick={() => setShowThemeModal(false)}
-              style={{ background: 'transparent', border: 'none', color: 'inherit', opacity: 0.5, cursor: 'pointer', fontSize: '14px', padding: '0 4px' }}
-            >✕</button>
+              style={{ background: 'transparent', border: 'none', color: 'inherit', opacity: 0.5, cursor: 'pointer', fontSize: '14px', padding: '0 4px', display: 'flex', alignItems: 'center' }}
+            >
+              <X size={13} />
+            </button>
           </div>
 
           <div style={{ marginBottom: '16px' }}>

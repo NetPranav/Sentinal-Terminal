@@ -21,6 +21,14 @@ import { GhostTextRenderer } from '../ui/components/GhostText';
 import { ThemeManager } from '../ui/theme/ThemeManager';
 import { ShellAdapter } from '../domain/shell/ShellAdapter';
 import { isLinux, getPlatform } from '../shared/platform';
+import { 
+  Wrench, 
+  Play, 
+  X, 
+  ShieldAlert, 
+  AlertCircle, 
+  Check 
+} from 'lucide-react';
 import '@xterm/xterm/css/xterm.css';
 
 interface TerminalViewProps {
@@ -774,6 +782,7 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
         }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Wrench size={14} color="#f59e0b" />
               <span style={{ fontSize: '12px', fontWeight: 700, color: '#f59e0b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                 Sentinel Auto-Heal
               </span>
@@ -788,13 +797,13 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
                 border: 'none',
                 color: 'rgba(255,255,255,0.4)',
                 cursor: 'pointer',
-                fontSize: '14px',
                 padding: '2px 4px',
-                lineHeight: 1
+                display: 'flex',
+                alignItems: 'center'
               }}
               title="Dismiss"
             >
-              ✕
+              <X size={14} />
             </button>
           </div>
           <div style={{ fontSize: '12px', color: '#e2e8f0', lineHeight: 1.4 }}>
@@ -822,7 +831,8 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
                 boxShadow: '0 2px 8px rgba(245, 158, 11, 0.3)'
               }}
             >
-              Auto-Fix <span style={{ opacity: 0.8, fontSize: '10px', background: 'rgba(0,0,0,0.18)', padding: '1px 4px', borderRadius: '3px' }}>Tab</span>
+              <Play size={11} fill="currentColor" />
+              <span>Auto-Fix</span> <span style={{ opacity: 0.8, fontSize: '10px', background: 'rgba(0,0,0,0.18)', padding: '1px 4px', borderRadius: '3px' }}>Tab</span>
             </button>
           </div>
         </div>
@@ -883,12 +893,9 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                fontSize: '11px',
-                fontWeight: 700,
-                color: '#f59e0b',
-                letterSpacing: '0.5px'
+                color: '#f59e0b'
               }}>
-                AUTH
+                <ShieldAlert size={22} />
               </div>
               <div>
                 <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 600, color: '#f8fafc', letterSpacing: '-0.2px' }}>
@@ -971,7 +978,8 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
                 />
                 {authError && (
                   <div style={{ color: '#ef4444', fontSize: '12px', marginTop: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <span>[!]</span> {authError}
+                    <AlertCircle size={14} style={{ color: '#ef4444', flexShrink: 0 }} />
+                    <span>{authError}</span>
                   </div>
                 )}
               </div>
@@ -994,10 +1002,14 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
                   fontSize: '13px',
                   cursor: 'pointer',
                   fontWeight: 500,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '5px',
                   transition: 'background-color 0.2s ease'
                 }}
               >
-                Cancel <span style={{ opacity: 0.6, fontSize: '11px', marginLeft: '4px' }}>[Esc]</span>
+                <X size={13} />
+                <span>Cancel</span> <span style={{ opacity: 0.6, fontSize: '11px', marginLeft: '4px' }}>[Esc]</span>
               </button>
               <button
                 disabled={isVerifying}
@@ -1025,7 +1037,8 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
                   gap: '6px'
                 }}
               >
-                {isVerifying ? 'Authenticating...' : securityModalPlan.plan.requiresPassword ? 'Authorize' : 'Approve & Execute'}
+                <Check size={14} />
+                <span>{isVerifying ? 'Authenticating...' : securityModalPlan.plan.requiresPassword ? 'Authorize' : 'Approve & Execute'}</span>
                 {!isVerifying && <span style={{ opacity: 0.75, fontSize: '11px', background: 'rgba(0,0,0,0.18)', padding: '1px 5px', borderRadius: '4px' }}>↵ Enter</span>}
               </button>
             </div>

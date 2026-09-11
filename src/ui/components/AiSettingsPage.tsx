@@ -1,4 +1,12 @@
 import React, { useEffect, useState } from 'react';
+import { 
+  Cpu, 
+  Sparkles, 
+  Server, 
+  ArrowRight, 
+  CheckCircle2, 
+  AlertCircle 
+} from 'lucide-react';
 import { OllamaProvider as OllamaModelManager, OllamaModel } from '../../ai/models/OllamaProvider';
 import { EmbeddedModelManagerModal } from './EmbeddedModelManagerModal';
 import { EmbeddedEngineManager, EmbeddedStatus } from '../../ai/models/EmbeddedEngineManager';
@@ -62,7 +70,10 @@ export const AiSettingsPage: React.FC = () => {
       backdropFilter: 'blur(20px)',
     }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-        <h1 style={{ fontSize: '24px', margin: 0, fontWeight: 600 }}>AI Architecture & Providers</h1>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <Cpu size={24} color="#38bdf8" />
+          <h1 style={{ fontSize: '24px', margin: 0, fontWeight: 600 }}>AI Architecture & Providers</h1>
+        </div>
       </div>
 
       {/* Embedded Native AI Card */}
@@ -77,7 +88,7 @@ export const AiSettingsPage: React.FC = () => {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-              <span style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#38bdf8' }} />
+              <Sparkles size={18} color="#38bdf8" />
               <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 600, color: '#38bdf8' }}>
                 Sentinel Embedded In-App AI (Recommended)
               </h2>
@@ -116,10 +127,14 @@ export const AiSettingsPage: React.FC = () => {
               fontWeight: 600,
               cursor: 'pointer',
               boxShadow: '0 2px 10px rgba(56, 189, 248, 0.3)',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
               flexShrink: 0
             }}
           >
-            Configure Embedded Model →
+            <span>Configure Embedded Model</span>
+            <ArrowRight size={14} />
           </button>
         </div>
       </div>
@@ -134,7 +149,10 @@ export const AiSettingsPage: React.FC = () => {
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
           <div>
-            <h2 style={{ fontSize: '17px', margin: 0, fontWeight: 600 }}>External Ollama Service (Alternative)</h2>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '2px' }}>
+              <Server size={18} color="#94a3b8" />
+              <h2 style={{ fontSize: '17px', margin: 0, fontWeight: 600 }}>External Ollama Service (Alternative)</h2>
+            </div>
             <span style={{ fontSize: '12px', color: 'rgba(255, 255, 255, 0.5)' }}>
               Connect to a local or remote Ollama server (default: http://localhost:11434)
             </span>
@@ -144,9 +162,13 @@ export const AiSettingsPage: React.FC = () => {
             padding: '3px 8px',
             borderRadius: '4px',
             backgroundColor: ollamaHealthy ? 'rgba(34, 197, 94, 0.15)' : 'rgba(255, 255, 255, 0.05)',
-            color: ollamaHealthy ? '#4ade80' : 'rgba(255, 255, 255, 0.4)'
+            color: ollamaHealthy ? '#4ade80' : 'rgba(255, 255, 255, 0.4)',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '4px'
           }}>
-            {ollamaHealthy ? 'Connected ✓' : 'Not Running'}
+            {ollamaHealthy ? <CheckCircle2 size={12} /> : <AlertCircle size={12} />}
+            <span>{ollamaHealthy ? 'Connected' : 'Not Running'}</span>
           </span>
         </div>
 

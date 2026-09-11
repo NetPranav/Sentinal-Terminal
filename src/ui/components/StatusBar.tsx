@@ -1,5 +1,17 @@
 import React, { useEffect, useState } from 'react';
-
+import { 
+  Terminal, 
+  Home, 
+  Folder, 
+  ChevronRight, 
+  FolderGit2, 
+  Radio, 
+  HardDrive, 
+  Cpu, 
+  Zap, 
+  Shield, 
+  Clock 
+} from 'lucide-react';
 import { invoke } from '@tauri-apps/api/core';
 import { isLinux, getShortcutModifier } from '../../shared/platform';
 
@@ -65,7 +77,13 @@ export const StatusBar: React.FC<StatusBarProps> = ({
       else if (currentPath.startsWith('/') && !fullPath.startsWith('/')) fullPath = '/' + fullPath;
       
       const cmd = fullPath === '~' ? 'cd ~' : `cd "${fullPath}"`;
-      return { name: part === '~' ? 'home' : part, fullPath, cmd, isLast: idx === parts.length - 1 };
+      return { 
+        name: part === '~' ? 'home' : part, 
+        isHome: part === '~',
+        fullPath, 
+        cmd, 
+        isLast: idx === parts.length - 1 
+      };
     });
   };
 
@@ -88,15 +106,17 @@ export const StatusBar: React.FC<StatusBarProps> = ({
       zIndex: 100
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '14px', overflowX: 'auto' }}>
-        <span style={{ display: 'flex', alignItems: 'center', gap: '6px', opacity: 0.85, fontWeight: 500 }}>
-          <span style={{ display: 'inline-block', width: '6px', height: '6px', borderRadius: '50%', backgroundColor: 'var(--sentinel-blue, #3B82F6)' }} />
-          {displayShell}
+        <span style={{ display: 'flex', alignItems: 'center', gap: '6px', opacity: 0.9, fontWeight: 500 }}>
+          <Terminal size={12} style={{ color: 'var(--sentinel-blue, #3B82F6)' }} />
+          <span>{displayShell}</span>
         </span>
         <span style={{ color: 'rgba(255,255,255,0.2)' }}>|</span>
         <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
           {getBreadcrumbs().map((bc, idx) => (
             <React.Fragment key={idx}>
-              {idx > 0 && <span style={{ color: 'var(--sentinel-cyan, #06B6D4)', opacity: 0.5, margin: '0 2px' }}>❯</span>}
+              {idx > 0 && (
+                <ChevronRight size={11} style={{ color: 'var(--sentinel-cyan, #06B6D4)', opacity: 0.5, margin: '0 1px' }} />
+              )}
               <button
                 onClick={() => onNavigate && onNavigate(bc.fullPath, bc.cmd)}
                 title={`Click to navigate to ${bc.fullPath}`}
@@ -110,6 +130,9 @@ export const StatusBar: React.FC<StatusBarProps> = ({
                   fontSize: '11px',
                   fontFamily: 'inherit',
                   fontWeight: bc.isLast ? 600 : 400,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
                   transition: 'all 0.2s ease',
                 }}
                 onMouseOver={(e) => {
@@ -119,7 +142,8 @@ export const StatusBar: React.FC<StatusBarProps> = ({
                   if (!bc.isLast) e.currentTarget.style.background = 'transparent';
                 }}
               >
-                {bc.name}
+                {bc.isHome ? <Home size={11} style={{ opacity: 0.85 }} /> : <Folder size={11} style={{ opacity: 0.7 }} />}
+                <span>{bc.name}</span>
               </button>
             </React.Fragment>
           ))}
@@ -138,12 +162,13 @@ export const StatusBar: React.FC<StatusBarProps> = ({
               color: '#e2e8f0',
               fontSize: '11px',
               cursor: 'pointer',
-              display: 'flex',
+              display: 'inline-flex',
               alignItems: 'center',
               gap: '6px'
             }}
             title={`Switch Workspace (${getShortcutModifier()}+O)`}
           >
+            <FolderGit2 size={12} style={{ opacity: 0.85 }} />
             <span>Projects</span> <kbd style={{ opacity: 0.5, fontSize: '9px' }}>{getShortcutModifier()}O</kbd>
           </button>
         )}
@@ -159,18 +184,25 @@ export const StatusBar: React.FC<StatusBarProps> = ({
               color: '#e2e8f0',
               fontSize: '11px',
               cursor: 'pointer',
-              display: 'flex',
+              display: 'inline-flex',
               alignItems: 'center',
-              gap: '4px'
+              gap: '5px'
             }}
             title="Inspect & Free Listening Ports"
           >
-            Ports
+            <Radio size={12} style={{ opacity: 0.85 }} />
+            <span>Ports</span>
           </button>
         )}
 
-        <span style={{ opacity: 0.75, fontSize: '11px' }}>Mem: <strong>{memoryUsage} MB</strong></span>
-        <span style={{ opacity: 0.75, fontSize: '11px' }}>CPU: <strong>{cpuUsage}%</strong></span>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', opacity: 0.75, fontSize: '11px' }}>
+          <HardDrive size={11} style={{ opacity: 0.7 }} />
+          <span>Mem: <strong>{memoryUsage} MB</strong></span>
+        </span>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', opacity: 0.75, fontSize: '11px' }}>
+          <Cpu size={11} style={{ opacity: 0.7 }} />
+          <span>CPU: <strong>{cpuUsage}%</strong></span>
+        </span>
         
         {/* Unified Intelligence Status HUD */}
         <span 
@@ -183,14 +215,14 @@ export const StatusBar: React.FC<StatusBarProps> = ({
             color: '#c4b5fd',
             fontSize: '11px',
             fontWeight: 600,
-            display: 'flex',
+            display: 'inline-flex',
             alignItems: 'center',
-            gap: '6px',
+            gap: '5px',
             cursor: 'default'
           }}
         >
-          <span style={{ display: 'inline-block', width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#a78bfa' }} />
-          SERL & Oracles
+          <Zap size={11} style={{ color: '#a78bfa' }} />
+          <span>SERL & Oracles</span>
         </span>
 
         <span style={{ 
@@ -200,22 +232,27 @@ export const StatusBar: React.FC<StatusBarProps> = ({
           borderRadius: '4px',
           color: 'var(--sentinel-cyan, #38BDF8)',
           fontSize: '11px',
-          fontWeight: 600
+          fontWeight: 600,
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: '4px'
         }}>
-          {currentProfile}
+          <Shield size={11} />
+          <span>{currentProfile}</span>
         </span>
         
         {/* Rightmost real-time clock */}
         <span style={{ 
-          display: 'flex', 
+          display: 'inline-flex', 
           alignItems: 'center', 
-          gap: '6px',
+          gap: '5px',
           paddingLeft: '10px',
           borderLeft: '1px solid rgba(255, 255, 255, 0.15)',
           fontSize: '11px',
           fontWeight: 600,
           color: 'var(--sentinel-fg, #ffffff)'
         }}>
+          <Clock size={11} style={{ opacity: 0.7 }} />
           <span style={{ letterSpacing: '0.5px', opacity: 0.85 }}>{currentTime}</span>
         </span>
       </div>
