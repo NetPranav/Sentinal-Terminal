@@ -137,6 +137,7 @@ export class CapabilityRegistrySDK {
       'filesystem.delete', 'filesystem.trash', 'filesystem.mkdir', 'filesystem.create', 'filesystem.navigate',
       'filesystem.locate_files', 'filesystem.locate_folders', 'filesystem.grep',
       'system.processes', 'system.kill_process', 'system.storage', 'system.battery', 'system.info',
+      'system.uptime', 'system.cpu', 'system.ram', 'system.temperature',
       'system.service', 'system.dotfile',
       'application.open', 'application.force_quit', 'application.running',
       'browser.navigate', 'browser.search', 'browser.open',

@@ -23,6 +23,7 @@ export interface CommandExecutionRecord {
   code: number;
   durationMs: number;
   timestamp: number;
+  isAuditLog?: boolean;
 }
 
 export type CommandExecutionListener = (record: CommandExecutionRecord) => void;
@@ -68,8 +69,22 @@ export class NodeTauriBridge {
   /**
    * Get all recorded command executions in this session.
    */
-  public static getHistory(): CommandExecutionRecord[] {
-    return [...this.commandHistory];
+  public static getHistory(includeAudit = true): CommandExecutionRecord[] {
+    if (includeAudit) {
+      return [...this.commandHistory];
+    }
+    return this.commandHistory.filter(c => !c.isAuditLog);
+  }
+
+  /**
+   * Get capability commands executed by the user / agent (excludes internal audit logging and probe checks).
+   */
+  public static getCapabilityCommands(): CommandExecutionRecord[] {
+    return this.commandHistory.filter(c => 
+      !c.isAuditLog && 
+      !c.fullCommand.includes('learned_patterns.json') &&
+      !c.fullCommand.includes('test -f "$HOME/.sentinel/models')
+    );
   }
 
   /**
@@ -123,6 +138,7 @@ export class NodeTauriBridge {
 
         const durationMs = performance.now() - startTime;
         const fullCommand = args.length > 0 ? `${command} ${args.join(' ')}` : command;
+        const isAuditLog = fullCommand.includes('.sentinel/audit.') || fullCommand.includes('audit.jsonl') || fullCommand.includes('audit.benchmark.jsonl');
 
         const record: CommandExecutionRecord = {
           command,
@@ -133,7 +149,8 @@ export class NodeTauriBridge {
           stderr,
           code,
           durationMs,
-          timestamp: Date.now()
+          timestamp: Date.now(),
+          isAuditLog
         };
 
         this.commandHistory.push(record);
@@ -150,7 +167,11 @@ export class NodeTauriBridge {
 
       case 'list_processes': {
         try {
-          const res = spawnSync('ps', ['-eo', 'pid,pcpu,pmem,comm', '-r'], { encoding: 'utf-8' });
+          const isLinux = process.platform === 'linux';
+          const args = isLinux
+            ? ['-eo', 'pid,pcpu,pmem,comm', '--sort=-pcpu']
+            : ['-eo', 'pid,pcpu,pmem,comm', '-r'];
+          const res = spawnSync('ps', args, { encoding: 'utf-8' });
           const lines = (res.stdout || '').split('\n').filter(Boolean);
           const processes: Array<{ pid: number; name: string; memory: number; cpu: number; cmd: string[] }> = [];
 

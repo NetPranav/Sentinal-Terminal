@@ -188,6 +188,20 @@ export function formatDataOutput(data: any, options?: { goal?: string }): string
     return formatRamStatus(data);
   }
 
+  // System Uptime
+  if (typeof data === 'object' && (data.uptimeString || ('uptime' in data && !data.os))) {
+    const up = data.uptimeString || data.uptime;
+    return `\r\n  ${C.boldCyan}▶ System Uptime:${C.reset} ${C.boldGreen}${up}${C.reset}\r\n`;
+  }
+
+  // CPU Info & Load Average
+  if (typeof data === 'object' && (data.loadAverage || (data.model && !data.os))) {
+    const model = data.model ? `\r\n  ${C.boldCyan}Model:${C.reset} ${data.model}` : '';
+    const cores = data.cores ? `\r\n  ${C.boldCyan}Cores:${C.reset} ${data.cores}` : '';
+    const load = data.loadAverage ? `\r\n  ${C.boldCyan}Load Average:${C.reset} ${Array.isArray(data.loadAverage) ? data.loadAverage.join(', ') : data.loadAverage}` : '';
+    return `\r\n  ${C.boldCyan}CPU Information:${C.reset}${model}${cores}${load}\r\n`;
+  }
+
   // System info
   if (typeof data === 'object' && data.os && (data.kernel || data.arch || data.cpus)) {
     return formatSystemInfo(data);

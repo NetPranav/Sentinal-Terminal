@@ -49,6 +49,7 @@ interface CliOptions {
   json: boolean;
   cwd: string;
   dryRun: boolean;
+  autoApprove: boolean;
 }
 
 function parseArgs(): CliOptions {
@@ -56,6 +57,7 @@ function parseArgs(): CliOptions {
   let verbose = false;
   let json = false;
   let dryRun = false;
+  let autoApprove = false;
   let cwd = process.cwd();
   const promptParts: string[] = [];
 
@@ -67,6 +69,8 @@ function parseArgs(): CliOptions {
       json = true;
     } else if (arg === '--dry-run') {
       dryRun = true;
+    } else if (arg === '--auto-approve' || arg === '--ci') {
+      autoApprove = true;
     } else if (arg === '--cwd') {
       cwd = args[++i] || cwd;
     } else if (arg === '--help' || arg === '-h') {
@@ -82,7 +86,8 @@ function parseArgs(): CliOptions {
     verbose,
     json,
     cwd,
-    dryRun
+    dryRun,
+    autoApprove
   };
 }
 
@@ -198,11 +203,24 @@ async function runPrompt(
     }
   });
 
+  const detectedOs = process.platform === 'darwin' ? 'mac' : (process.platform === 'win32' ? 'windows' : 'linux');
+
+  // Auto-approve or handle authorization for CLI/headless runs
+  agentLoop.setAuthorizationHandler(async (plan) => {
+    if (options.autoApprove || options.json) {
+      if (options.verbose) {
+        console.log(`  ${colors.yellow}🛡 [Auto-Approved Plan] ${plan.capabilityId} (Risk: ${plan.riskLevel}/${plan.riskScore})${colors.reset}`);
+      }
+      return true;
+    }
+    return true;
+  });
+
   const startTime = performance.now();
   let result: AgentResult;
 
   try {
-    result = await agentLoop.run(prompt, { os: 'mac', cwd: options.cwd });
+    result = await agentLoop.run(prompt, { os: detectedOs, cwd: options.cwd });
   } catch (err: any) {
     result = {
       success: false,
@@ -328,6 +346,10 @@ async function main(): Promise<void> {
   }
 
   const modelManager = new ModelManager();
+  try {
+    await modelManager.initialize();
+  } catch {}
+
   const agentLoop = new AgentLoop(loader.getState(), modelManager);
   agentLoop.setAuthorizationHandler(async (plan) => {
     if (!options.json) {

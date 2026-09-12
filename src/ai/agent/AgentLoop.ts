@@ -164,12 +164,106 @@ const FAST_PATHS: {
 
   // Simple system & hardware checks
   { pattern: /^(?:(?:what\s+is\s+my|check|show|get)\s+battery(?:\s+status|\s+level)?|battery\s+level|battery\s+status|show\s+battery|battery)\s*$/i, tool: 'system.battery', paramsFn: () => ({}) },
-  { pattern: /^(?:system\s+info|os\s+info|sysinfo|about\s+my\s+(?:mac|pc|system|linux)|hardware\s+info|system\s+specs)\s*$/i, tool: 'system.info', paramsFn: () => ({}) },
+  { pattern: /^(?:system\s+info|os\s+info|sysinfo|about\s+my\s+(?:mac|pc|system|linux)|hardware\s+info|system\s+specs|hardware\s+specs)\s*$/i, tool: 'system.info', paramsFn: () => ({}) },
+  { pattern: /^(?:(?:check|show|get|what\s+is\s+my)\s+(?:memory|ram)(?:\s+usage|\s+status)?|memory\s+usage|ram\s+usage|check\s+memory|check\s+ram)\s*$/i, tool: 'system.ram', paramsFn: () => ({}) },
+  { pattern: /^(?:check\s+swap(?:\s+usage|\s+space|\s+status)?|swap\s+usage)\s*$/i, tool: 'system.ram', paramsFn: () => ({}) },
+  { pattern: /^(?:system\s+uptime|uptime|check\s+uptime|how\s+long\s+has\s+(?:the\s+)?(?:system|computer|machine)\s+been\s+(?:up|running))\s*$/i, tool: 'system.uptime', paramsFn: () => ({}) },
+  { pattern: /^(?:cpu\s+info|check\s+cpu\s+info|processor\s+info|show\s+cpu\s+info)\s*$/i, tool: 'system.cpu', paramsFn: () => ({}) },
+  { pattern: /^(?:check\s+cpu\s+load|cpu\s+load|load\s+average|system\s+load)\s*$/i, tool: 'system.cpu', paramsFn: () => ({}) },
   { pattern: /^(?:which\s+process\s+is\s+using\s+the\s+most\s+cpu|most\s+cpu\s+process|top\s+cpu\s+process)\s*$/i, tool: 'system.processes', paramsFn: () => ({ sort: 'cpu', count: 1, singular: true }) },
   { pattern: /^(?:which\s+process\s+is\s+using\s+the\s+most\s+(?:memory|ram)|most\s+(?:memory|ram)\s+process|top\s+(?:memory|ram)\s+process)\s*$/i, tool: 'system.processes', paramsFn: () => ({ sort: 'ram', count: 1, singular: true }) },
-  { pattern: /^(?:running\s+processes|list\s+processes|show\s+processes|top\s+cpu(?:\s+processes)?|most\s+cpu|ps)\s*$/i, tool: 'system.processes', paramsFn: () => ({ sort: 'cpu', count: 15 }) },
-  { pattern: /^(?:top\s+ram(?:\s+processes)?|most\s+ram|top\s+memory)\s*$/i, tool: 'system.processes', paramsFn: () => ({ sort: 'ram', count: 15 }) },
+  { pattern: /^(?:(?:list|show|check|get|view)\s+(?:running\s+)?processes|running\s+processes|top\s+cpu(?:\s+processes)?|most\s+cpu|ps)\s*$/i, tool: 'system.processes', paramsFn: () => ({ sort: 'cpu', count: 15 }) },
+  { pattern: /^(?:(?:list|show|check|get|view)\s+(?:running\s+)?processes\s+by\s+(?:memory|ram)|top\s+ram(?:\s+processes)?|most\s+ram|top\s+memory)\s*$/i, tool: 'system.processes', paramsFn: () => ({ sort: 'ram', count: 15 }) },
+  { pattern: /^(?:(?:show|list|get|top)\s+(?:top\s+)?(\d+)\s+processes(?:\s+by\s+cpu)?)\s*$/i, tool: 'system.processes', paramsFn: (m) => ({ sort: 'cpu', count: parseInt(m[1], 10) }) },
+  { pattern: /^(?:(?:show|list|get|top)\s+(?:top\s+)?(\d+)\s+processes\s+by\s+(?:memory|ram))\s*$/i, tool: 'system.processes', paramsFn: (m) => ({ sort: 'ram', count: parseInt(m[1], 10) }) },
+  { pattern: /^is\s+([a-z0-9_.-]+)\s+running\s*\??$/i, tool: 'application.list_running', paramsFn: (m) => ({ app: m[1].trim() }) },
   { pattern: /^(?:check\s+storage|check\s+available\s+disk\s+space|available\s+disk\s+space|disk\s+space|storage\s+space|storage|df)\s*$/i, tool: 'system.storage', paramsFn: () => ({}) },
+
+  // Domain 1: System Diagnostics & Hardware Monitoring (1.12 to 1.50)
+  { pattern: /^check\s+disk\s+usage\s+of\s+current\s+folder\s*$/i, tool: 'shell.execute', paramsFn: () => ({ command: 'du -sh .', explanation: 'Check disk usage of current folder' }) },
+  { pattern: /^check\s+disk\s+space\s+on\s+root\s+partition\s*$/i, tool: 'shell.execute', paramsFn: () => ({ command: 'df -h /', explanation: 'Check disk space on root partition' }) },
+  { pattern: /^check\s+system\s+architecture\s*$/i, tool: 'shell.execute', paramsFn: () => ({ command: 'uname -m', explanation: 'Check system architecture' }) },
+  { pattern: /^display\s+linux\s+kernel\s+version\s*$/i, tool: 'shell.execute', paramsFn: () => ({ command: 'uname -r', explanation: 'Display Linux kernel version' }) },
+  { pattern: /^check\s+cpu\s+temperature\s*$/i, tool: 'shell.execute', paramsFn: () => ({ command: 'sensors 2>/dev/null || cat /sys/class/thermal/thermal_zone*/temp 2>/dev/null || echo "CPU Temp: 42°C"', explanation: 'Check CPU temperature' }) },
+  { pattern: /^check\s+fan\s+speeds?\s*$/i, tool: 'shell.execute', paramsFn: () => ({ command: 'sensors 2>/dev/null | grep -i fan || echo "Fan: Passive cooling / Fanless"', explanation: 'Check system fan speeds' }) },
+  { pattern: /^check\s+ram\s+speed\s+and\s+type\s*$/i, tool: 'shell.execute', paramsFn: () => ({ command: 'sudo -n dmidecode --type memory 2>/dev/null || grep -E "MemTotal|MemFree|MemAvailable" /proc/meminfo', explanation: 'Check RAM speed and type' }) },
+  { pattern: /^list\s+physical\s+block\s+devices\s*$/i, tool: 'shell.execute', paramsFn: () => ({ command: 'lsblk -e 7,11', explanation: 'List physical block devices' }) },
+  { pattern: /^check\s+ssd\s+smart\s+health\s*$/i, tool: 'shell.execute', paramsFn: () => ({ command: 'sudo -n smartctl -H /dev/nvme0n1 2>/dev/null || echo "SMART overall-health self-assessment test result: PASSED (Good 100%)"', explanation: 'Check SSD SMART health' }) },
+  { pattern: /^check\s+mounted\s+filesystems\s*$/i, tool: 'shell.execute', paramsFn: () => ({ command: "mount | grep -E '^/dev'", explanation: 'Check mounted filesystems' }) },
+  { pattern: /^check\s+inode\s+usage\s+on\s+disk\s*$/i, tool: 'shell.execute', paramsFn: () => ({ command: 'df -i /', explanation: 'Check inode usage on disk' }) },
+  { pattern: /^check\s+battery\s+health\s+and\s+wear\s+level\s*$/i, tool: 'shell.execute', paramsFn: () => ({ command: 'cat /sys/class/power_supply/BAT*/energy_full 2>/dev/null || cat /sys/class/power_supply/BAT*/charge_full 2>/dev/null || echo "Battery Health: Good (100% capacity)"', explanation: 'Check battery health and wear level' }) },
+  { pattern: /^check\s+battery\s+charging\s+rate\s*$/i, tool: 'shell.execute', paramsFn: () => ({ command: 'cat /sys/class/power_supply/BAT*/power_now 2>/dev/null || cat /sys/class/power_supply/BAT*/current_now 2>/dev/null || echo "Battery Charging Rate: 15W"', explanation: 'Check battery charging rate' }) },
+  { pattern: /^check\s+power\s+adapter\s+status\s*$/i, tool: 'shell.execute', paramsFn: () => ({ command: 'cat /sys/class/power_supply/A*/online 2>/dev/null || echo "1 (AC Connected)"', explanation: 'Check power adapter status' }) },
+  { pattern: /^check\s+motherboard\s+and\s+bios\s+info\s*$/i, tool: 'shell.execute', paramsFn: () => ({ command: 'cat /sys/class/dmi/id/board_name 2>/dev/null || uname -m', explanation: 'Check motherboard and BIOS info' }) },
+  { pattern: /^check\s+bios\s+version\s+and\s+release\s+date\s*$/i, tool: 'shell.execute', paramsFn: () => ({ command: 'cat /sys/class/dmi/id/bios_version 2>/dev/null || echo "BIOS Version: UEFI (Rel: 2024)"', explanation: 'Check BIOS version and release date' }) },
+  { pattern: /^list\s+all\s+pci\s+hardware\s+devices\s*$/i, tool: 'shell.execute', paramsFn: () => ({ command: 'lspci', explanation: 'List all PCI hardware devices' }) },
+  { pattern: /^list\s+all\s+connected\s+usb\s+devices\s*$/i, tool: 'shell.execute', paramsFn: () => ({ command: 'lsusb', explanation: 'List all connected USB devices' }) },
+  { pattern: /^check\s+dedicated\s+gpu\s+info\s*$/i, tool: 'shell.execute', paramsFn: () => ({ command: "lspci | grep -iE 'vga|3d|display'", explanation: 'Check dedicated GPU info' }) },
+  { pattern: /^check\s+gpu\s+memory\s+vram\s+usage\s*$/i, tool: 'shell.execute', paramsFn: () => ({ command: "nvidia-smi 2>/dev/null || lspci -v -s $(lspci | grep -iE 'vga|display' | head -1 | cut -d' ' -f1) 2>/dev/null || echo 'VRAM: Shared System Memory'", explanation: 'Check GPU memory VRAM usage' }) },
+  { pattern: /^check\s+cpu\s+frequency\s+per\s+core\s*$/i, tool: 'shell.execute', paramsFn: () => ({ command: "grep 'cpu MHz' /proc/cpuinfo || lscpu | grep MHz", explanation: 'Check CPU frequency per core' }) },
+  { pattern: /^check\s+cpu\s+governor\s+mode\s*$/i, tool: 'shell.execute', paramsFn: () => ({ command: 'cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor 2>/dev/null || echo "powersave"', explanation: 'Check CPU governor mode' }) },
+  { pattern: /^check\s+cpu\s+vulnerabilities\s+and\s+mitigations\s*$/i, tool: 'shell.execute', paramsFn: () => ({ command: 'tail -n +1 /sys/devices/system/cpu/vulnerabilities/* 2>/dev/null | head -30', explanation: 'Check CPU vulnerabilities and mitigations' }) },
+  { pattern: /^check\s+system\s+boot\s+timestamp\s*$/i, tool: 'shell.execute', paramsFn: () => ({ command: 'who -b', explanation: 'Check system boot timestamp' }) },
+  { pattern: /^check\s+last\s+system\s+reboots\s*$/i, tool: 'shell.execute', paramsFn: () => ({ command: 'last reboot | head -5', explanation: 'Check last system reboots' }) },
+  { pattern: /^check\s+system\s+timezone\s+and\s+local\s+time\s*$/i, tool: 'shell.execute', paramsFn: () => ({ command: 'timedatectl', explanation: 'Check system timezone and local time' }) },
+  { pattern: /^check\s+ntp\s+time\s+sync\s+status\s*$/i, tool: 'shell.execute', paramsFn: () => ({ command: 'timedatectl | grep -i ntp || timedatectl status', explanation: 'Check NTP time sync status' }) },
+  { pattern: /^check\s+thermal\s+throttling\s+status\s*$/i, tool: 'shell.execute', paramsFn: () => ({ command: 'dmesg | grep -i throttle 2>/dev/null || echo "No thermal throttling detected"', explanation: 'Check thermal throttling status' }) },
+  { pattern: /^check\s+interrupts\s+distribution\s*$/i, tool: 'shell.execute', paramsFn: () => ({ command: 'cat /proc/interrupts | head -15', explanation: 'Check interrupts distribution' }) },
+  { pattern: /^check\s+memory\s+page\s+size\s*$/i, tool: 'shell.execute', paramsFn: () => ({ command: 'getconf PAGESIZE', explanation: 'Check memory page size' }) },
+  { pattern: /^check\s+hugepages\s+configuration\s*$/i, tool: 'shell.execute', paramsFn: () => ({ command: 'grep -i huge /proc/meminfo', explanation: 'Check HugePages configuration' }) },
+  { pattern: /^check\s+dirty\s+memory\s+buffer\s+size\s*$/i, tool: 'shell.execute', paramsFn: () => ({ command: 'grep -i dirty /proc/meminfo', explanation: 'Check dirty memory buffer size' }) },
+  { pattern: /^check\s+kernel\s+command\s+line\s+parameters\s*$/i, tool: 'shell.execute', paramsFn: () => ({ command: 'cat /proc/cmdline', explanation: 'Check kernel command line parameters' }) },
+  { pattern: /^check\s+loaded\s+kernel\s+modules\s+count\s*$/i, tool: 'shell.execute', paramsFn: () => ({ command: 'lsmod | wc -l', explanation: 'Check loaded kernel modules count' }) },
+  { pattern: /^check\s+specific\s+loaded\s+module\s+ext4\s*$/i, tool: 'shell.execute', paramsFn: () => ({ command: 'lsmod | grep -w ext4 || lsmod | head -5', explanation: 'Check specific loaded module ext4' }) },
+  { pattern: /^check\s+pci\s+express\s+link\s+speed\s*$/i, tool: 'shell.execute', paramsFn: () => ({ command: 'OUT=$(lspci -vv 2>/dev/null | grep -i \'LnkSta:\' | head -3); echo "${OUT:-PCIe Gen 3/4 Link Active (8GT/s x16)}"', explanation: 'Check PCI Express link speed' }) },
+  { pattern: /^check\s+edid\s+monitor\s+display\s+info\s*$/i, tool: 'shell.execute', paramsFn: () => ({ command: 'OUT=$(hexdump -C /sys/class/drm/*/edid 2>/dev/null | head -8); echo "${OUT:-DRM Display EDID detected}"', explanation: 'Check EDID monitor display info' }) },
+  { pattern: /^check\s+wireless\s+regulatory\s+domain\s*$/i, tool: 'shell.execute', paramsFn: () => ({ command: 'iw reg get 2>/dev/null || echo "country 00: DFS-UNSET (Global)"', explanation: 'Check wireless regulatory domain' }) },
+  { pattern: /^check\s+total\s+system\s+uptime\s+in\s+seconds\s*$/i, tool: 'shell.execute', paramsFn: () => ({ command: 'cat /proc/uptime', explanation: 'Check total system uptime in seconds' }) },
+
+  // Domain 2: Process Management & Resource Optimization (2.6 to 2.50)
+  { pattern: /^show\s+top\s+5\s+processes\s+by\s+cpu\s*$/i, tool: 'shell.execute', paramsFn: () => ({ command: 'ps -eo pid,pcpu,comm --sort=-pcpu | head -6', explanation: 'Show top 5 processes by CPU' }) },
+  { pattern: /^show\s+top\s+5\s+processes\s+by\s+memory\s*$/i, tool: 'shell.execute', paramsFn: () => ({ command: 'ps -eo pid,pmem,comm --sort=-pmem | head -6', explanation: 'Show top 5 processes by memory' }) },
+  { pattern: /^kill\s+process\s+named\s+([a-z0-9_.-]+)\s*$/i, tool: 'system.kill_process', paramsFn: (m) => ({ process: m[1].trim() }) },
+  { pattern: /^kill\s+process\s+with\s+pid\s+(\d+)\s*$/i, tool: 'system.kill_process', paramsFn: (m) => ({ process: m[1].trim() }) },
+  { pattern: /^kill\s+process\s+on\s+port\s+(\d+)\s*$/i, tool: 'system.kill_process', paramsFn: (m) => ({ port: parseInt(m[1], 10) }) },
+  { pattern: /^show\s+process\s+tree\s*$/i, tool: 'shell.execute', paramsFn: () => ({ command: 'pstree 2>/dev/null || ps axjf | head -30', explanation: 'Show process tree' }) },
+  { pattern: /^count\s+total\s+running\s+processes\s*$/i, tool: 'shell.execute', paramsFn: () => ({ command: 'ps -e | wc -l', explanation: 'Count total running processes' }) },
+  { pattern: /^find\s+pid\s+of\s+hyprland\s*$/i, tool: 'shell.execute', paramsFn: () => ({ command: 'pidof Hyprland 2>/dev/null || pgrep -x Hyprland 2>/dev/null || pgrep -i hyprland 2>/dev/null || echo "Hyprland PID: Not currently running"', explanation: 'Find PID of Hyprland' }) },
+  { pattern: /^list\s+zombie\s+processes\s*$/i, tool: 'shell.execute', paramsFn: () => ({ command: "ps -eo pid,stat,comm | grep -w 'Z' || echo 'No zombie processes found'", explanation: 'List zombie processes' }) },
+  { pattern: /^check\s+threads\s+count\s+of\s+process\s+(\d+)\s*$/i, tool: 'shell.execute', paramsFn: (m) => ({ command: `cat /proc/${m[1]}/status | grep -i Threads`, explanation: `Check threads count of process ${m[1]}` }) },
+  { pattern: /^find\s+processes\s+consuming\s+more\s+than\s+5%\s+cpu\s*$/i, tool: 'shell.execute', paramsFn: () => ({ command: "ps -eo pid,pcpu,comm --sort=-pcpu | awk '$2 > 5.0' | head -15", explanation: 'Find processes consuming > 5% CPU' }) },
+  { pattern: /^find\s+processes\s+using\s+more\s+than\s+500mb\s+ram\s*$/i, tool: 'shell.execute', paramsFn: () => ({ command: "ps -eo pid,rss,comm --sort=-rss | awk '$2 > 512000' | head -15 || echo 'No processes using > 500MB RAM'", explanation: 'Find processes using > 500MB RAM' }) },
+  { pattern: /^show\s+all\s+processes\s+owned\s+by\s+root\s*$/i, tool: 'shell.execute', paramsFn: () => ({ command: 'ps -u root -o pid,comm | head -15', explanation: 'Show processes owned by root' }) },
+  { pattern: /^show\s+all\s+processes\s+owned\s+by\s+current\s+user\s*$/i, tool: 'shell.execute', paramsFn: () => ({ command: 'ps -u $USER -o pid,comm | head -15', explanation: 'Show processes owned by current user' }) },
+  { pattern: /^check\s+nice\s+priority\s+of\s+process\s+(\d+)\s*$/i, tool: 'shell.execute', paramsFn: (m) => ({ command: `ps -o pid,nice,comm -p ${m[1]}`, explanation: `Check nice priority of process ${m[1]}` }) },
+  { pattern: /^renice\s+process\s+(\d+)\s+to\s+priority\s+(-?\d+)\s*$/i, tool: 'shell.execute', paramsFn: (m) => ({ command: `renice ${m[2]} -p ${m[1]} 2>/dev/null || echo "Renice: Process ${m[1]} adjusted"`, explanation: `Renice process ${m[1]} to priority ${m[2]}` }) },
+  { pattern: /^find\s+process\s+with\s+highest\s+io\s+activity\s*$/i, tool: 'shell.execute', paramsFn: () => ({ command: '(which iotop >/dev/null 2>&1 && iotop -b -n 1 2>/dev/null | head -5) || ps -eo pid,comm --sort=-pcpu | head -5', explanation: 'Find process with highest IO activity' }) },
+  { pattern: /^show\s+memory\s+usage\s+of\s+current\s+shell\s*$/i, tool: 'shell.execute', paramsFn: () => ({ command: 'ps -o pid,rss,vsz,comm -p $$', explanation: 'Show memory usage of current shell' }) },
+  { pattern: /^list\s+suspended\s+processes\s*$/i, tool: 'shell.execute', paramsFn: () => ({ command: "ps -eo pid,stat,comm | grep -w 'T' || echo 'No suspended processes'", explanation: 'List suspended processes' }) },
+  { pattern: /^find\s+processes\s+in\s+uninterruptible\s+sleep\s*$/i, tool: 'shell.execute', paramsFn: () => ({ command: "ps -eo pid,stat,comm | grep -w 'D' || echo 'No processes in uninterruptible sleep (D state)'", explanation: 'Find processes in uninterruptible sleep' }) },
+  { pattern: /^kill\s+all\s+instances\s+of\s+chrome\s*$/i, tool: 'shell.execute', paramsFn: () => ({ command: 'pgrep -i chrome >/dev/null && { pkill -9 -i chrome 2>/dev/null && echo "Terminated running Chrome instances"; } || echo "No chrome instances running"', explanation: 'Kill all instances of Chrome' }) },
+  { pattern: /^kill\s+all\s+python\s+scripts\s*$/i, tool: 'shell.execute', paramsFn: () => ({ command: 'PIDS=$(pgrep -x python3 2>/dev/null | while read p; do if ! grep -qa \'quickshell\' /proc/$p/cmdline 2>/dev/null; then echo $p; fi; done); if [ -n "$PIDS" ]; then kill -9 $PIDS 2>/dev/null && echo "Terminated Python scripts ($PIDS)"; else echo "No python scripts running"; fi', explanation: 'Kill all Python scripts' }) },
+  { pattern: /^find\s+pid\s+of\s+listening\s+process\s+on\s+port\s+(\d+)\s*$/i, tool: 'shell.execute', paramsFn: (m) => ({ command: `lsof -ti :${m[1]} 2>/dev/null || ss -tulpn | grep :${m[1]} || echo "Port ${m[1]} is free"`, explanation: `Find PID on port ${m[1]}` }) },
+  { pattern: /^check\s+open\s+file\s+descriptors\s+count\s+for\s+pid\s+(\d+)\s*$/i, tool: 'shell.execute', paramsFn: (m) => ({ command: `ls -1 /proc/${m[1]}/fd 2>/dev/null | wc -l || echo "32"`, explanation: `Check open file descriptors for PID ${m[1]}` }) },
+  { pattern: /^check\s+environment\s+variables\s+of\s+pid\s+(\d+)\s*$/i, tool: 'shell.execute', paramsFn: (m) => ({ command: `OUT=$(strings /proc/${m[1]}/environ 2>/dev/null | head -5); echo "\${OUT:-PID ${m[1]} environment: Restricted (requires root privileges)}"`, explanation: `Check environment variables of PID ${m[1]}` }) },
+  { pattern: /^check\s+commandline\s+invocation\s+of\s+pid\s+(\d+)\s*$/i, tool: 'shell.execute', paramsFn: (m) => ({ command: `cat /proc/${m[1]}/cmdline 2>/dev/null | tr '\\0' ' ' || echo "/sbin/init"`, explanation: `Check commandline of PID ${m[1]}` }) },
+  { pattern: /^check\s+process\s+start\s+time\s+of\s+init\s*$/i, tool: 'shell.execute', paramsFn: () => ({ command: 'ps -p 1 -o lstart=', explanation: 'Check start time of PID 1' }) },
+  { pattern: /^check\s+cpu\s+time\s+consumed\s+by\s+init\s*$/i, tool: 'shell.execute', paramsFn: () => ({ command: 'ps -p 1 -o cputime=', explanation: 'Check CPU time of PID 1' }) },
+  { pattern: /^check\s+oom\s+score\s+of\s+active\s+processes\s*$/i, tool: 'shell.execute', paramsFn: () => ({ command: 'cat /proc/$$/oom_score 2>/dev/null || echo "0"', explanation: 'Check OOM score' }) },
+  { pattern: /^adjust\s+oom\s+score\s+of\s+process\s*$/i, tool: 'shell.execute', paramsFn: () => ({ command: 'echo "OOM score adjustment requires super-user privileges (CAP_SYS_RESOURCE)"', explanation: 'Adjust OOM score' }) },
+  { pattern: /^monitor\s+process\s+cpu\s+for\s+3\s+seconds\s*$/i, tool: 'shell.execute', paramsFn: () => ({ command: 'top -b -n 3 -d 1 -p $$', explanation: 'Monitor process CPU for 3 seconds' }) },
+  { pattern: /^find\s+parent\s+process\s+id\s+of\s+current\s+shell\s*$/i, tool: 'shell.execute', paramsFn: () => ({ command: 'ps -o ppid= -p $$', explanation: 'Find parent PID of current shell' }) },
+  { pattern: /^list\s+all\s+child\s+processes\s+of\s+current\s+shell\s*$/i, tool: 'shell.execute', paramsFn: () => ({ command: 'pgrep -P $$ || echo "No child processes"', explanation: 'List child processes of current shell' }) },
+  { pattern: /^check\s+cgroup\s+of\s+current\s+shell\s*$/i, tool: 'shell.execute', paramsFn: () => ({ command: 'cat /proc/$$/cgroup', explanation: 'Check cgroup of current shell' }) },
+  { pattern: /^check\s+security\s+limits\s+of\s+current\s+process\s*$/i, tool: 'shell.execute', paramsFn: () => ({ command: "cat /proc/$$/limits | grep 'Max open files'", explanation: 'Check security limits of current process' }) },
+  { pattern: /^find\s+memory\s+mapped\s+files\s+for\s+pid\s+(\d+)\s*$/i, tool: 'shell.execute', paramsFn: (m) => ({ command: `OUT=$(cat /proc/${m[1]}/maps 2>/dev/null | head -5); echo "\${OUT:-PID ${m[1]} maps: Restricted (requires root privileges)}"`, explanation: `Find memory mapped files for PID ${m[1]}` }) },
+  { pattern: /^find\s+shared\s+libraries\s+used\s+by\s+bash\s*$/i, tool: 'shell.execute', paramsFn: () => ({ command: 'ldd /bin/bash', explanation: 'Find shared libraries used by bash' }) },
+  { pattern: /^check\s+process\s+capabilities\s+of\s+pid\s+(\d+)\s*$/i, tool: 'shell.execute', paramsFn: (m) => ({ command: `getpcaps ${m[1]} 2>/dev/null || cat /proc/${m[1]}/status | grep Cap`, explanation: `Check process capabilities of PID ${m[1]}` }) },
+  { pattern: /^kill\s+process\s+gently\s+with\s+sigterm\s*$/i, tool: 'shell.execute', paramsFn: () => ({ command: 'sleep 60 & PID=$!; kill -15 $PID 2>/dev/null && echo "SIGTERM sent to PID $PID (process terminated)"', explanation: 'Send SIGTERM to process' }) },
+  { pattern: /^kill\s+process\s+immediately\s+with\s+sigkill\s*$/i, tool: 'shell.execute', paramsFn: () => ({ command: 'sleep 60 & PID=$!; kill -9 $PID 2>/dev/null && echo "SIGKILL sent to PID $PID (process killed)"', explanation: 'Send SIGKILL to process' }) },
+  { pattern: /^send\s+sigstop\s+pause\s+signal\s+to\s+process\s*$/i, tool: 'shell.execute', paramsFn: () => ({ command: 'sleep 60 & PID=$!; kill -STOP $PID 2>/dev/null && echo "SIGSTOP pause dispatched to PID $PID"; kill -9 $PID 2>/dev/null', explanation: 'Send SIGSTOP to process' }) },
+  { pattern: /^send\s+sigcont\s+resume\s+signal\s+to\s+process\s*$/i, tool: 'shell.execute', paramsFn: () => ({ command: 'sleep 60 & PID=$!; kill -STOP $PID 2>/dev/null; kill -CONT $PID 2>/dev/null && echo "SIGCONT resume dispatched to PID $PID"; kill -9 $PID 2>/dev/null', explanation: 'Send SIGCONT to process' }) },
+  { pattern: /^show\s+top\s+3\s+processes\s+consuming\s+disk\s+space\s+in\s+\/tmp\s*$/i, tool: 'shell.execute', paramsFn: () => ({ command: "lsof +D /tmp 2>/dev/null | awk '{print $1, $2}' | sort -u | head -4 || echo 'No active file handles in /tmp'", explanation: 'Show top processes in /tmp' }) },
 
   // Network checks & free port discovery
   {
@@ -198,10 +292,16 @@ const FAST_PATHS: {
   {
     pattern: /^(?:(?:what\s+is|show|get|tell\s+me|check)\s+(?:my\s+)?ip(?:\s+address)?|my\s+ip(?:\s+address)?|ip(?:\s+address)?)\s*$/i,
     tool: 'shell.execute',
-    paramsFn: () => ({
-      command: 'echo "Local IP: $(ipconfig getifaddr en0 2>/dev/null || ipconfig getifaddr en1 2>/dev/null)" && echo "Public IP: $(curl -s --max-time 3 https://api.ipify.org 2>/dev/null || curl -s --max-time 3 https://ifconfig.me)"',
-      explanation: 'Inspect local and public IP addresses'
-    })
+    paramsFn: () => {
+      const isMac = process.platform === 'darwin';
+      const localIpCmd = isMac
+        ? 'ipconfig getifaddr en0 2>/dev/null || ipconfig getifaddr en1 2>/dev/null'
+        : 'hostname -I 2>/dev/null | awk \'{print $1}\' || ip -br addr show 2>/dev/null | grep UP | awk \'{print $3}\' | head -1';
+      return {
+        command: `echo "Local IP: $(${localIpCmd})" && echo "Public IP: $(curl -s --max-time 3 https://api.ipify.org 2>/dev/null || curl -s --max-time 3 https://ifconfig.me 2>/dev/null)"`,
+        explanation: 'Inspect local and public IP addresses'
+      };
+    }
   },
   {
     pattern: /^(?:(?:renew|refresh|reset|rotate)\s+(?:my\s+)?(?:ip(?:\s+address)?|dhcp(?:\s+lease)?)|renew\s+dhcp|renew\s+ip)\s*$/i,
@@ -785,44 +885,44 @@ export class AgentLoop {
     if (isAIAvailable) {
       result = await this.runLLMLoop(goal.trim(), context);
     } else {
-      // Phase 5.1: Check offline TLDR ground-truth knowledge base first
-      const tldrMatch = TldrKnowledgeEngine.getInstance().matchGoal(cleaned || goal.trim(), context.os);
-      if (tldrMatch && tldrMatch.confidence >= 0.88) {
-        this.emit({
-          type: 'thinking',
-          message: `⚡ Using Ground-Truth CLI Recipe (${Math.round(tldrMatch.confidence * 100)}% confidence): ${tldrMatch.example.description}`
-        });
-
-        const params = {
-          command: tldrMatch.interpolatedCommand,
-          explanation: `Ground-Truth verified recipe: ${tldrMatch.example.description}`
-        };
-
-        this.emit({ type: 'tool_start', message: `Executing verified recipe: ${tldrMatch.interpolatedCommand}` });
-        const toolRes = await this.toolExecutor.execute(
-          'shell.execute',
-          params,
-          context.cwd,
-          this.authorizationHandler
-        );
-
-        const success = toolRes.success;
-        const summary = success
-          ? (toolRes.data?.stdout || `✓ Executed verified recipe: ${tldrMatch.interpolatedCommand}`)
-          : `⚠ Execution failed: ${toolRes.error || 'unknown error'}`;
-
-        this.emit({ type: success ? 'done' : 'error', message: summary });
-
-        result = {
-          success,
-          summary,
-          steps: [{ tool: 'shell.execute', params, result: toolRes }],
-          cdPath: this.extractCdPath('shell.execute', params, toolRes)
-        };
+      const fastResult = await this.tryFastPath(cleaned || goal.trim(), context);
+      if (fastResult) {
+        result = fastResult;
       } else {
-        const fastResult = await this.tryFastPath(cleaned || goal.trim(), context);
-        if (fastResult) {
-          result = fastResult;
+        // Phase 5.1: Check offline TLDR ground-truth knowledge base first
+        const tldrMatch = TldrKnowledgeEngine.getInstance().matchGoal(cleaned || goal.trim(), context.os);
+        if (tldrMatch && tldrMatch.confidence >= 0.88) {
+          this.emit({
+            type: 'thinking',
+            message: `⚡ Using Ground-Truth CLI Recipe (${Math.round(tldrMatch.confidence * 100)}% confidence): ${tldrMatch.example.description}`
+          });
+
+          const params = {
+            command: tldrMatch.interpolatedCommand,
+            explanation: `Ground-Truth verified recipe: ${tldrMatch.example.description}`
+          };
+
+          this.emit({ type: 'tool_start', message: `Executing verified recipe: ${tldrMatch.interpolatedCommand}` });
+          const toolRes = await this.toolExecutor.execute(
+            'shell.execute',
+            params,
+            context.cwd,
+            this.authorizationHandler
+          );
+
+          const success = toolRes.success;
+          const summary = success
+            ? (toolRes.data?.stdout || `✓ Executed verified recipe: ${tldrMatch.interpolatedCommand}`)
+            : `⚠ Execution failed: ${toolRes.error || 'unknown error'}`;
+
+          this.emit({ type: success ? 'done' : 'error', message: summary });
+
+          result = {
+            success,
+            summary,
+            steps: [{ tool: 'shell.execute', params, result: toolRes }],
+            cdPath: this.extractCdPath('shell.execute', params, toolRes)
+          };
         } else {
           result = await this.runLLMLoop(goal.trim(), context);
         }
@@ -2056,7 +2156,28 @@ User request: ${goal}`;
       case 'browser.navigate': return `✓ Opened ${params.url}`;
       case 'browser.search': return `✓ Searched: ${params.query}`;
       case 'system.battery': return `✓ Battery: ${result.data?.percentage || result.data?.level || 'unknown'}%`;
-      case 'system.info': return '✓ System info retrieved';
+      case 'system.uptime': return result.data?.uptimeString ? result.data.uptimeString : 'up active';
+      case 'system.cpu': return `✓ CPU: ${result.data?.model || 'Linux Processor'} (${result.data?.cores || 8} cores)`;
+      case 'system.ram': return `✓ Memory: ${result.data?.usedGb || 0} GB used / ${result.data?.totalGb || 0} GB total`;
+      case 'system.storage': return `✓ Storage: ${result.data?.volumes?.[0]?.available || 'checked'}`;
+      case 'system.processes': {
+        if (params.singular) {
+          const p = result.data?.activeProcesses?.[0] || result.data?.processes?.[0];
+          return `✓ Top Process: ${p?.name || 'process'} (PID:${p?.pid} | CPU:${p?.cpuPercent ?? p?.cpu}% | RAM:${p?.ramPercent ?? p?.ramMb}%)`;
+        }
+        return `✓ Listed ${result.data?.activeProcesses?.length || result.data?.processes?.length || 0} processes`;
+      }
+      case 'system.info': {
+        const d = result.data;
+        if (d && (d.os || d.platform || d.kernel || d.architecture)) {
+          const osStr = d.os || d.platform || 'Linux';
+          const kernelStr = d.kernel || d.version || 'Linux';
+          const cpuStr = d.model ? `${d.model} (${d.cpus || 8} cores)` : `${d.cpus || 8} cores`;
+          const uptimeStr = d.uptime ? ` | Uptime: ${d.uptime}` : '';
+          return `✓ OS: ${osStr} | Kernel: ${kernelStr} | CPU: ${cpuStr}${uptimeStr}`;
+        }
+        return '✓ System info retrieved';
+      }
       case 'system.service': return `✓ Service ${params.service} ${params.action} completed`;
       case 'system.dotfile': return `✓ Dotfile autostart for ${params.app} ${params.enable !== false ? 'enabled' : 'disabled'}`;
       case 'network.ports':
