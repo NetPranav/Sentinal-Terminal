@@ -40,9 +40,13 @@ export class EmbeddedEngineManager {
     metalAcceleration: true
   };
 
-  // Official release archive for llama-server on macOS arm64 (Metal GPU)
-  public static readonly LLAMA_SERVER_RELEASE_URL = 
-    'https://github.com/ggerganov/llama.cpp/releases/download/b4522/llama-b4522-bin-macos-arm64.zip';
+  // Official release archive for llama-server on Linux x64 and macOS arm64
+  public static get LLAMA_SERVER_RELEASE_URL(): string {
+    const isLinux = typeof process !== 'undefined' ? process.platform === 'linux' : true;
+    return isLinux
+      ? 'https://github.com/ggerganov/llama.cpp/releases/download/b4522/llama-b4522-bin-ubuntu-x64.zip'
+      : 'https://github.com/ggerganov/llama.cpp/releases/download/b4522/llama-b4522-bin-macos-arm64.zip';
+  }
 
   public static getInstance(): EmbeddedEngineManager {
     if (!EmbeddedEngineManager.instance) {
@@ -152,7 +156,7 @@ export class EmbeddedEngineManager {
   public async checkEngineExists(): Promise<boolean> {
     if (typeof process !== 'undefined' && process.env.NODE_ENV === 'test') return true;
     try {
-      const checkCmd = `test -x "$HOME/.sentinel/bin/llama-server" || which llama-server`;
+      const checkCmd = `test -x "$HOME/.sentinel/bin/llama-server" || test -x "/usr/lib/ollama/llama-server" || which llama-server`;
       const res = await invoke<{ code: number }>('execute_command', {
         command: 'sh',
         args: ['-c', checkCmd]

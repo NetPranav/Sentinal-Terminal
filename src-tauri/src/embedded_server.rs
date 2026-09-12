@@ -42,17 +42,22 @@ fn find_llama_server_binary() -> Option<PathBuf> {
 
     if let Some(home) = get_home_dir() {
         candidates.push(home.join(".sentinel").join("bin").join("llama-server"));
+        candidates.push(home.join(".local").join("bin").join("llama-server"));
     }
 
     if let Ok(exe) = std::env::current_exe() {
         if let Some(parent) = exe.parent() {
             candidates.push(parent.join("llama-server"));
             candidates.push(parent.join("../MacOS/llama-server"));
+            candidates.push(parent.join("../bin/llama-server"));
         }
     }
 
-    candidates.push(PathBuf::from("/opt/homebrew/bin/llama-server"));
+    // Common Linux and package locations
+    candidates.push(PathBuf::from("/usr/lib/ollama/llama-server"));
+    candidates.push(PathBuf::from("/usr/bin/llama-server"));
     candidates.push(PathBuf::from("/usr/local/bin/llama-server"));
+    candidates.push(PathBuf::from("/opt/homebrew/bin/llama-server"));
 
     candidates.into_iter().find(|p| p.exists() && p.is_file())
 }
@@ -82,6 +87,32 @@ fn find_model_file(preferred: Option<String>) -> Option<PathBuf> {
                 }
             }
         }
+
+        // Check user's Ollama model cache
+        let ollama_blobs = home.join(".ollama").join("models").join("blobs");
+        if let Ok(entries) = std::fs::read_dir(&ollama_blobs) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if let Ok(metadata) = path.metadata() {
+                    if metadata.len() > 500 * 1024 * 1024 {
+                        candidates.push(path);
+                    }
+                }
+            }
+        }
+    }
+
+    // Check system Ollama blobs (/var/lib/ollama/blobs)
+    let var_ollama = PathBuf::from("/var/lib/ollama/blobs");
+    if let Ok(entries) = std::fs::read_dir(&var_ollama) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if let Ok(metadata) = path.metadata() {
+                if metadata.len() > 500 * 1024 * 1024 {
+                    candidates.push(path);
+                }
+            }
+        }
     }
 
     candidates.into_iter().find(|p| p.exists() && p.is_file())
@@ -94,11 +125,11 @@ pub fn start_embedded_llm(
     lora_path: Option<String>,
 ) -> Result<bool, String> {
     let bin_path = find_llama_server_binary().ok_or_else(|| {
-        "llama-server binary not found in ~/.sentinel/bin, app bundle, or /opt/homebrew/bin".to_string()
+        "llama-server binary not found in ~/.sentinel/bin, /usr/lib/ollama, or /usr/bin".to_string()
     })?;
 
     let model_file = find_model_file(model_path).ok_or_else(|| {
-        "No GGUF model file found. Download Qwen2.5-Coder-3B into ~/.sentinel/models/".to_string()
+        "No GGUF model file found. Download a model into ~/.sentinel/models/".to_string()
     })?;
 
     let mut proc_guard = state.process.lock().map_err(|e| e.to_string())?;
@@ -122,7 +153,7 @@ pub fn start_embedded_llm(
         "-m".to_string(), model_str.clone(),
         "-ngl".to_string(), "99".to_string(),
         "-t".to_string(), n_threads,
-        "--flash-attn".to_string(),
+        "--flash-attn".to_string(), "auto".to_string(),
         "-b".to_string(), "2048".to_string(),
         "-c".to_string(), "4096".to_string(),
         "--no-warmup".to_string(),

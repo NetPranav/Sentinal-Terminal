@@ -1057,7 +1057,7 @@ export class AgentLoop {
 
         const response = await provider.generate(fullPrompt, modelId, {
           temperature: 0.05,
-          maxTokens: 256,
+          maxTokens: 1024,
           format: 'json',
           messages: chatMessages,
           logitBias,
@@ -1078,7 +1078,11 @@ export class AgentLoop {
 
           // If the model responded with plain natural language, treat as conversation answer
           if (response.content && response.content.trim()) {
-            const cleanText = response.content.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+            let cleanText = response.content.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+            if (!cleanText) {
+              // If the entire response was inside <think>, extract text directly
+              cleanText = response.content.replace(/<\/?think>/gi, '').trim();
+            }
             if (cleanText) {
               parsed = { action: 'done', summary: cleanText };
             }

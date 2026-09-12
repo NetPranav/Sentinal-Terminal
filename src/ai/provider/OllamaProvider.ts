@@ -93,8 +93,9 @@ export class OllamaProvider implements ModelProvider {
       body: JSON.stringify({
         model: modelId,
         prompt,
-        format: options?.format || 'json',
+        format: options?.format === 'json' ? 'json' : options?.format,
         stream: false,
+        think: false,
         options: {
           temperature: options?.temperature ?? 0.1,
           top_p: options?.topP ?? 0.9,
@@ -114,8 +115,14 @@ export class OllamaProvider implements ModelProvider {
     const promptTokens = data.prompt_eval_count || 0;
     const completionTokens = data.eval_count || 0;
 
+    let content = (typeof data.response === 'string' && data.response.trim().length > 0)
+      ? data.response
+      : (typeof data.thinking === 'string' && data.thinking.trim().length > 0)
+        ? data.thinking
+        : (data.response || '');
+
     return {
-      content: data.response || '',
+      content,
       raw: data,
       usage: {
         promptTokens,

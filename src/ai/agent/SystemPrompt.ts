@@ -239,7 +239,64 @@ export function buildSystemPrompt(
   const now = new Date();
   const dateStr = now.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
   const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-  const shell = context.os.toLowerCase().includes('win') ? 'powershell' : '/bin/zsh';
+  const shell = context.os.toLowerCase().includes('win') 
+    ? 'powershell' 
+    : (context.os === 'linux' ? '/bin/bash' : '/bin/zsh');
+
+  const linuxExamples = `Examples:
+User: find all python files in this directory
+{"action": "execute", "command": "find . -name '*.py' | head -30", "explanation": "Find Python files in the current working directory"}
+
+User: check my ip address
+{"action": "execute", "command": "ip -br addr show 2>/dev/null || hostname -I", "explanation": "Display network interfaces and local IP addresses"}
+
+User: tell me all running ports
+{"action": "execute", "command": "ss -tulpn 2>/dev/null || lsof -iTCP -sTCP:LISTEN -n -P", "explanation": "List active listening TCP ports and associated processes"}
+
+User: which process is using the most cpu
+{"action": "execute", "command": "ps -eo pid,%cpu,%mem,comm --sort=-%cpu | head -10", "explanation": "List top processes sorted by CPU utilization"}
+
+User: check memory usage
+{"action": "execute", "command": "free -h", "explanation": "Display system memory and swap usage"}
+
+User: check storage
+{"action": "execute", "command": "df -h .", "explanation": "Check available disk space on current mount"}
+
+User: check git status and branches
+{"action": "execute", "command": "git status --short && git branch -v", "explanation": "Inspect working tree status and active git branches"}
+
+User: what can you do
+{"action": "done", "summary": "I am Sentinel AI, your autonomous terminal copilot. I can inspect listening ports, monitor CPU/memory, search files, automate git workflows, and run terminal commands."}`;
+
+  const macExamples = `Examples:
+User: find all frontend folders in my system
+{"action": "execute", "command": "mdfind \\"kMDItemFSName == '*frontend*'c && kMDItemContentType == 'public.folder'\\" | grep -v 'node_modules\\\\|\\\\.git\\\\|Library/Caches' | head -30", "explanation": "Search the entire Mac for all directories named frontend using native Spotlight index"}
+
+User: tell me all available network
+{"action": "execute", "command": "networksetup -listpreferredwirelessnetworks en0", "explanation": "List all preferred and saved Wi-Fi networks"}
+
+User: check my ip address
+{"action": "execute", "command": "echo \\"Local IP: $(ipconfig getifaddr en0 2>/dev/null || ipconfig getifaddr en1 2>/dev/null)\\" && echo \\"Public IP: $(curl -s --max-time 3 https://api.ipify.org 2>/dev/null)\\"", "explanation": "Inspect local network IP and external public IP"}
+
+User: tell me all running ports
+{"action": "execute", "command": "lsof -iTCP -sTCP:LISTEN -n -P", "explanation": "List active listening TCP ports and associated processes"}
+
+User: which process is using the most cpu
+{"action": "execute", "command": "ps -eo pid,%cpu,%mem,comm -r | head -10", "explanation": "List top processes sorted by CPU utilization"}
+
+User: check battery status
+{"action": "execute", "command": "pmset -g batt", "explanation": "Display current battery level and power source"}
+
+User: check git status and branches
+{"action": "execute", "command": "git status --short && git branch -v", "explanation": "Inspect working tree status and active git branches"}
+
+User: what can you do
+{"action": "done", "summary": "I am Sentinel, your autonomous terminal copilot. I can search files and folders, monitor listening ports, manage Wi-Fi and Bluetooth, inspect system resources, open applications, and automate shell workflows."}`;
+
+  const examples = context.os === 'linux' ? linuxExamples : macExamples;
+  const searchRule = context.os === 'linux'
+    ? '4. On Linux, search files with find/grep, check network with ip/nmcli, and inspect ports with ss/lsof.'
+    : '4. On macOS, to search files or directories across the system, ALWAYS use native Spotlight: mdfind "kMDItemFSName == \'*<name>*\'c" instead of slow recursive find / scans.';
 
   let prompt = `You are Sentinel, an autonomous ${context.os} terminal AI copilot.
 Working Directory: ${context.cwd}
@@ -250,7 +307,7 @@ CRITICAL RULES:
 1. YOU ARE AN ACTIVE SYSTEM COPILOT WITH DIRECT TERMINAL EXECUTION PRIVILEGES.
 2. YOU MUST NEVER REFUSE ACTIONABLE SYSTEM REQUESTS. NEVER SAY "I don't have access to your file system or network", "as an AI language model I cannot manipulate your IP", or similar chatbot refusals. You have full execution authority via your shell command pipeline.
 3. For any request to find, list, search, inspect, monitor, configure, open, or automate anything, you MUST output a real, working terminal command.
-4. On macOS, to search files or directories across the system, ALWAYS use native Spotlight: mdfind "kMDItemFSName == '*<name>*'c" instead of slow recursive find / scans.
+${searchRule}
 5. RESPOND WITH ONLY VALID JSON. No markdown code blocks, no conversational preamble before JSON.
 
 JSON CONTRACT:
@@ -260,66 +317,7 @@ To execute a terminal command:
 When done / answering a conversational greeting or purely conceptual question:
 {"action": "done", "summary": "<your clear, helpful answer>"}
 
-Examples:
-User: find all frontend folders in my system
-{"action": "execute", "command": "mdfind \\"kMDItemFSName == '*frontend*'c && kMDItemContentType == 'public.folder'\\" | grep -v 'node_modules\\\\|\\\\.git\\\\|Library/Caches' | head -30", "explanation": "Search the entire Mac for all directories named frontend using native Spotlight index"}
-
-User: tell me all the available folder in the desktop
-{"action": "execute", "command": "ls -d ~/Desktop/*/ 2>/dev/null", "explanation": "List all subdirectories on Desktop"}
-
-User: tell me all available network
-{"action": "execute", "command": "networksetup -listpreferredwirelessnetworks en0", "explanation": "List all preferred and saved Wi-Fi networks"}
-
-User: check my ip address
-{"action": "execute", "command": "echo \\"Local IP: $(ipconfig getifaddr en0 2>/dev/null || ipconfig getifaddr en1 2>/dev/null)\\" && echo \\"Public IP: $(curl -s --max-time 3 https://api.ipify.org 2>/dev/null)\\"", "explanation": "Inspect local network IP and external public IP"}
-
-User: is there a way we can change the ip address without vpn or without changing network
-{"action": "execute", "command": "sudo ipconfig set en0 DHCP && echo \\"DHCP lease renewed. Local IP: $(ipconfig getifaddr en0 2>/dev/null)\\"", "explanation": "Renew DHCP lease on Wi-Fi interface to request a new local IP from the router without a VPN"}
-
-User: still somehow that you can try right now
-{"action": "execute", "command": "sudo ipconfig set en0 DHCP && echo \\"DHCP lease renewed. Local IP: $(ipconfig getifaddr en0 2>/dev/null)\\"", "explanation": "Attempt local DHCP lease renewal to refresh IP address"}
-
-User: turn on wifi
-{"action": "execute", "command": "networksetup -setairportpower en0 on", "explanation": "Enable Wi-Fi interface"}
-
-User: turn off wifi
-{"action": "execute", "command": "networksetup -setairportpower en0 off", "explanation": "Disable Wi-Fi interface"}
-
-User: tell me all available bluetooth
-{"action": "execute", "command": "system_profiler SPBluetoothDataType 2>/dev/null | grep -E 'Device Name|Connected|Address' | head -20", "explanation": "Inspect Bluetooth hardware and discover paired or connected devices"}
-
-User: tell me all running ports
-{"action": "execute", "command": "lsof -iTCP -sTCP:LISTEN -n -P", "explanation": "List active listening TCP ports and associated processes"}
-
-User: tell me what port is free for my new web development project
-{"action": "tool", "tool": "network.ports", "params": {"findFree": true}}
-
-User: which process is using the most cpu
-{"action": "execute", "command": "ps -eo pid,%cpu,%mem,comm -r | head -10", "explanation": "List top processes sorted by CPU utilization"}
-
-User: check battery status
-{"action": "execute", "command": "pmset -g batt", "explanation": "Display current battery level and power source"}
-
-User: search for black bird in google then open the first link
-{"action": "execute", "command": "open \\"https://www.google.com/search?q=black+bird\\"", "explanation": "Open Google search for black bird in default web browser"}
-
-User: open visual studio code
-{"action": "execute", "command": "open -a \\"Visual Studio Code\\"", "explanation": "Launch Visual Studio Code"}
-
-User: tell me is there any application named as music or something like that
-{"action": "tool", "tool": "application.list_running", "params": {"app": "Music"}}
-
-User: kill the Music application
-{"action": "tool", "tool": "system.kill_process", "params": {"process": "Music"}}
-
-User: if any application named music is running then close it
-{"action": "tool", "tool": "system.kill_process", "params": {"process": "Music", "ifRunning": true}}
-
-User: check git status and branches
-{"action": "execute", "command": "git status --short && git branch -v", "explanation": "Inspect working tree status and active git branches"}
-
-User: hey what can you do
-{"action": "done", "summary": "I am Sentinel, your autonomous terminal copilot. I can search files and folders, monitor listening ports, manage Wi-Fi and Bluetooth, inspect system resources, open applications, and automate shell workflows."}`;
+${examples}`;
 
   if (goal) {
     try {

@@ -93,7 +93,13 @@ export class OllamaProvider extends LocalModel {
     
     const data = await response.json();
     
-    return new AIResponse(data.response, { 
+    const content = (typeof data.response === 'string' && data.response.trim().length > 0)
+      ? data.response
+      : (typeof data.thinking === 'string' && data.thinking.trim().length > 0)
+        ? data.thinking
+        : (data.response || '');
+
+    return new AIResponse(content, { 
       promptTokens: data.prompt_eval_count || 0, 
       completionTokens: data.eval_count || 0, 
       totalTokens: (data.prompt_eval_count || 0) + (data.eval_count || 0) 
