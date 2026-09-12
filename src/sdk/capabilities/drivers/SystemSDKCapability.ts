@@ -460,6 +460,8 @@ export class SystemSDKCapability extends BaseCapabilityDriver<SystemDriverInput,
       case 'processes': {
         const isMemSort = input.sort === 'ram' || input.sort === 'mem' || input.sort === 'memory';
         const sortKey = isMemSort ? 'ram' : 'cpu';
+        const targetCount = input.count !== undefined ? input.count : (input.singular ? 1 : 15);
+        const isSingular = input.singular === true || targetCount === 1;
 
         if (typeof process === 'undefined' || process.env.NODE_ENV !== 'test') {
           try {
@@ -476,7 +478,7 @@ export class SystemSDKCapability extends BaseCapabilityDriver<SystemDriverInput,
             }
             const out = await invoke<{ stdout: string }>('execute_command', { command: 'ps', args });
             if (out && out.stdout) {
-              const lines = out.stdout.trim().split('\n').slice(1, (input.count || 15) + 1);
+              const lines = out.stdout.trim().split('\n').slice(1, targetCount + 1);
               const procList = lines.map(line => {
                 const parts = line.trim().split(/\s+/);
                 const pid = parseInt(parts[0], 10) || 0;
@@ -487,7 +489,7 @@ export class SystemSDKCapability extends BaseCapabilityDriver<SystemDriverInput,
               });
               return { 
                 success: true, 
-                data: { sortedBy: sortKey, activeProcesses: procList }, 
+                data: { sortedBy: sortKey, activeProcesses: procList, count: targetCount, singular: isSingular }, 
                 commandExecuted: isLinux 
                   ? `ps -eo pid,pcpu,pmem,comm --sort=-${isMemSort ? 'pmem' : 'pcpu'}` 
                   : `ps -eo pid,pcpu,pmem,comm ${isMemSort ? '-m' : '-r'}` 
@@ -501,14 +503,18 @@ export class SystemSDKCapability extends BaseCapabilityDriver<SystemDriverInput,
           success: true,
           data: {
             sortedBy: sortKey,
-            processes: [
+            count: targetCount,
+            singular: isSingular,
+            processes: isSingular ? [
+              { pid: 1423, name: 'Sentinel AI', cpuPercent: 12.4, ramMb: 310 }
+            ] : [
               { pid: 1423, name: 'Sentinel AI', cpuPercent: 12.4, ramMb: 310 },
               { pid: 821, name: 'Google Chrome', cpuPercent: 8.1, ramMb: 1450 },
               { pid: 31, name: 'WindowServer', cpuPercent: 6.0, ramMb: 420 },
               { pid: 5190, name: 'Terminal', cpuPercent: 1.2, ramMb: 95 }
             ]
           },
-          commandExecuted: `ps -eo pid,pcpu,pmem,comm -r | head -n ${input.count || 15}`
+          commandExecuted: `ps -eo pid,pcpu,pmem,comm -r | head -n ${targetCount}`
         };
       }
 

@@ -254,10 +254,13 @@ User: tell me all running ports
 {"action": "execute", "command": "ss -tulpn 2>/dev/null || lsof -iTCP -sTCP:LISTEN -n -P", "explanation": "List active listening TCP ports and associated processes"}
 
 User: which process is using the most cpu
-{"action": "execute", "command": "ps -eo pid,%cpu,%mem,comm --sort=-%cpu | head -10", "explanation": "List top processes sorted by CPU utilization"}
+{"action": "execute", "command": "ps -eo pid,%cpu,%mem,comm --sort=-%cpu | head -n 2", "explanation": "Display the top CPU-consuming process"}
 
 User: which process is using the most memory
-{"action": "execute", "command": "ps -eo pid,%cpu,%mem,comm --sort=-%mem | head -10", "explanation": "List top processes sorted by memory utilization"}
+{"action": "execute", "command": "ps -eo pid,%cpu,%mem,comm --sort=-%mem | head -n 2", "explanation": "Display the top memory-consuming process"}
+
+User: list running processes
+{"action": "execute", "command": "ps -eo pid,%cpu,%mem,comm --sort=-%cpu | head -10", "explanation": "List top processes sorted by CPU utilization"}
 
 User: check memory usage
 {"action": "execute", "command": "free -h", "explanation": "Display system memory and swap usage"}

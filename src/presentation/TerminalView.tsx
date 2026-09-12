@@ -518,7 +518,7 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
 
                   // Show structured data (file lists, devices, etc.) when available
                   if (event.data && (event.type === 'tool_done' || event.type === 'done')) {
-                    const dataOutput = formatDataOutput(event.data);
+                    const dataOutput = formatDataOutput(event.data, { goal: aiGoal });
                     if (dataOutput && (!text || !text.includes(dataOutput.trim()))) {
                       writeTerm(dataOutput);
                     }

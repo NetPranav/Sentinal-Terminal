@@ -22,6 +22,7 @@ const C = {
   boldCyan: '\x1b[1;36m',
   boldRed: '\x1b[1;31m',
   boldYellow: '\x1b[1;33m',
+  boldMagenta: '\x1b[1;35m',
   boldWhite: '\x1b[1;37m',
 };
 
@@ -132,7 +133,7 @@ export function formatAgentEvent(event: AgentEventFormatted): string {
 /**
  * Format structured data (like file lists, device lists, etc.) for clean terminal display.
  */
-export function formatDataOutput(data: any): string {
+export function formatDataOutput(data: any, options?: { goal?: string }): string {
   if (!data) return '';
 
   // File/directory listing
@@ -164,8 +165,12 @@ export function formatDataOutput(data: any): string {
   // Process list
   const procs = data.activeProcesses || data.processes;
   if (procs && Array.isArray(procs)) {
+    const isSingular = data.singular === true 
+      || data.count === 1 
+      || procs.length === 1 
+      || /\b(?:which\s+process|what\s+process|single\s+process|top\s+process|highest\s+(?:cpu|ram|memory)|most\s+(?:cpu|ram|memory))\b/i.test(options?.goal || '');
     const sortBy = data.sortedBy ? ` (sorted by ${String(data.sortedBy).toUpperCase()})` : '';
-    return formatProcessList(procs, sortBy);
+    return formatProcessList(procs, sortBy, isSingular);
   }
 
   // Storage volumes
@@ -278,8 +283,22 @@ function formatSearchResults(results: any[]): string {
   return `\r\n${lines.join('\r\n')}\r\n`;
 }
 
-function formatProcessList(processes: any[], titleExtra: string = ''): string {
+function formatProcessList(processes: any[], titleExtra: string = '', isSingular: boolean = false): string {
   if (processes.length === 0) return `\r\n${C.dim}  No processes found${C.reset}\r\n`;
+
+  if (isSingular) {
+    const p = processes[0];
+    const name = p.name || p.command || String(p);
+    const pid = p.pid !== undefined ? `${C.dim}PID:${p.pid}${C.reset}` : '';
+    const cpuVal = p.cpuPercent ?? p.cpu;
+    const cpu = cpuVal !== undefined ? `${C.boldYellow}CPU: ${cpuVal}%${C.reset}` : '';
+    const ramVal = p.ramPercent ?? (p.ramMb ? `${p.ramMb}MB` : undefined);
+    const ram = ramVal !== undefined ? `${C.boldMagenta}RAM: ${typeof ramVal === 'number' ? `${ramVal}%` : ramVal}${C.reset}` : '';
+
+    const details = [pid, cpu, ram].filter(Boolean).join(` ${C.dim}|${C.reset} `);
+    const label = titleExtra ? `Top Process${titleExtra}` : 'Top Process';
+    return `\r\n  ${C.boldCyan}▶ ${label}:${C.reset} ${C.boldWhite}${name}${C.reset}${details ? `  (${details})` : ''}\r\n`;
+  }
   
   const header = titleExtra ? `\r\n${C.boldCyan}Top Processes${titleExtra}:${C.reset}\r\n` : '\r\n';
   const lines = processes.slice(0, 20).map(p => {

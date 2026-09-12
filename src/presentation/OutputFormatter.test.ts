@@ -118,4 +118,36 @@ sudo networksetup -setmanual en1 192.168.1.100 255.255.255.0 192.168.1.1
     expect(ramOut).toContain('6.4 GB used');
     expect(ramOut).toContain('15.1 GB total');
   });
+
+  it('formats single process card when singular query is requested', () => {
+    const out = formatDataOutput({
+      sortedBy: 'cpu',
+      count: 1,
+      singular: true,
+      activeProcesses: [
+        { pid: 52374, name: 'llama-server', cpuPercent: 196, ramPercent: 19.9 }
+      ]
+    });
+
+    expect(out).toContain('▶ Top Process (sorted by CPU):');
+    expect(out).toContain('llama-server');
+    expect(out).toContain('PID:52374');
+    expect(out).toContain('CPU: 196%');
+    expect(out).toContain('RAM: 19.9%');
+    expect(/(?<!\r)\n/.test(out)).toBe(false);
+  });
+
+  it('formats single process card when goal asks "which process is using the most cpu"', () => {
+    const out = formatDataOutput({
+      sortedBy: 'cpu',
+      activeProcesses: [
+        { pid: 52374, name: 'llama-server', cpuPercent: 196, ramPercent: 19.9 },
+        { pid: 50208, name: 'Isolated Web Co', cpuPercent: 29.7, ramPercent: 4.3 }
+      ]
+    }, { goal: 'which process is using the most cpu' });
+
+    expect(out).toContain('▶ Top Process (sorted by CPU):');
+    expect(out).toContain('llama-server');
+    expect(out).not.toContain('Isolated Web Co');
+  });
 });

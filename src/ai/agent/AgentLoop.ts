@@ -165,8 +165,10 @@ const FAST_PATHS: {
   // Simple system & hardware checks
   { pattern: /^(?:(?:what\s+is\s+my|check|show|get)\s+battery(?:\s+status|\s+level)?|battery\s+level|battery\s+status|show\s+battery|battery)\s*$/i, tool: 'system.battery', paramsFn: () => ({}) },
   { pattern: /^(?:system\s+info|os\s+info|sysinfo|about\s+my\s+(?:mac|pc|system|linux)|hardware\s+info|system\s+specs)\s*$/i, tool: 'system.info', paramsFn: () => ({}) },
-  { pattern: /^(?:running\s+processes|list\s+processes|show\s+processes|which\s+process\s+is\s+using\s+the\s+most\s+cpu|top\s+cpu(?:\s+processes)?|most\s+cpu|ps)\s*$/i, tool: 'system.processes', paramsFn: () => ({ sort: 'cpu' }) },
-  { pattern: /^(?:top\s+ram(?:\s+processes)?|most\s+ram|top\s+memory|which\s+process\s+is\s+using\s+the\s+most\s+(?:memory|ram))\s*$/i, tool: 'system.processes', paramsFn: () => ({ sort: 'ram' }) },
+  { pattern: /^(?:which\s+process\s+is\s+using\s+the\s+most\s+cpu|most\s+cpu\s+process|top\s+cpu\s+process)\s*$/i, tool: 'system.processes', paramsFn: () => ({ sort: 'cpu', count: 1, singular: true }) },
+  { pattern: /^(?:which\s+process\s+is\s+using\s+the\s+most\s+(?:memory|ram)|most\s+(?:memory|ram)\s+process|top\s+(?:memory|ram)\s+process)\s*$/i, tool: 'system.processes', paramsFn: () => ({ sort: 'ram', count: 1, singular: true }) },
+  { pattern: /^(?:running\s+processes|list\s+processes|show\s+processes|top\s+cpu(?:\s+processes)?|most\s+cpu|ps)\s*$/i, tool: 'system.processes', paramsFn: () => ({ sort: 'cpu', count: 15 }) },
+  { pattern: /^(?:top\s+ram(?:\s+processes)?|most\s+ram|top\s+memory)\s*$/i, tool: 'system.processes', paramsFn: () => ({ sort: 'ram', count: 15 }) },
   { pattern: /^(?:check\s+storage|check\s+available\s+disk\s+space|available\s+disk\s+space|disk\s+space|storage\s+space|storage|df)\s*$/i, tool: 'system.storage', paramsFn: () => ({}) },
 
   // Network checks & free port discovery
@@ -1753,7 +1755,15 @@ User request: ${goal}`;
         if (target.toLowerCase().includes('antigrav')) target = 'Antigravity IDE';
         if (target) return { tool: 'system.kill_process', params: { process: target } };
       }
-      return { tool: 'system.processes', params: { sort: lower.includes('ram') || lower.includes('memory') ? 'ram' : 'cpu' } };
+      const isSingular = /\b(?:which\s+process|what\s+process|single\s+process|top\s+process|highest\s+(?:cpu|ram|memory)|most\s+(?:cpu|ram|memory))\b/i.test(lower);
+      return { 
+        tool: 'system.processes', 
+        params: { 
+          sort: lower.includes('ram') || lower.includes('memory') ? 'ram' : 'cpu',
+          count: isSingular ? 1 : 15,
+          singular: isSingular
+        } 
+      };
     }
 
     // Network Utilities: Ping, Ports, Interfaces, DNS, IP
