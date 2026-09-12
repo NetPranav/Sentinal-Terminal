@@ -256,11 +256,20 @@ User: tell me all running ports
 User: which process is using the most cpu
 {"action": "execute", "command": "ps -eo pid,%cpu,%mem,comm --sort=-%cpu | head -10", "explanation": "List top processes sorted by CPU utilization"}
 
+User: which process is using the most memory
+{"action": "execute", "command": "ps -eo pid,%cpu,%mem,comm --sort=-%mem | head -10", "explanation": "List top processes sorted by memory utilization"}
+
 User: check memory usage
 {"action": "execute", "command": "free -h", "explanation": "Display system memory and swap usage"}
 
 User: check storage
 {"action": "execute", "command": "df -h .", "explanation": "Check available disk space on current mount"}
+
+User: check battery status
+{"action": "execute", "command": "for b in /sys/class/power_supply/BAT*; do [ -d \"$b\" ] && echo \"$b: $(cat $b/capacity 2>/dev/null)% $(cat $b/status 2>/dev/null)\"; done || upower -i $(upower -e 2>/dev/null | grep -i 'battery' | head -1) 2>/dev/null || acpi -b 2>/dev/null || echo 'AC Power / Desktop (No battery)'", "explanation": "Display Linux battery level and charging status"}
+
+User: system info
+{"action": "execute", "command": "uname -srm && cat /etc/os-release | grep PRETTY_NAME && lscpu | grep 'Model name' && free -h | grep 'Mem:' && uptime -p", "explanation": "Inspect OS release, kernel, processor model, memory, and uptime"}
 
 User: check git status and branches
 {"action": "execute", "command": "git status --short && git branch -v", "explanation": "Inspect working tree status and active git branches"}

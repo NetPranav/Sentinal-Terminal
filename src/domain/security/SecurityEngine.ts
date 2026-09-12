@@ -77,7 +77,9 @@ export class SecurityEngine implements ISecurityEngine {
       'ls', 'pwd', 'echo', 'cat', 'whoami', 'date', 'time', 'cal', 'env', 'clear',
       'uptime', 'uname', 'which', 'head', 'tail', 'grep', 'system_profiler', 'ps',
       'osascript', 'df', 'du', 'top', 'htop', 'id', 'hostname', 'groups', 'printenv',
-      'mdfind', 'lsof', 'sw_vers', 'file', 'wc', 'sort', 'uniq', 'awk', 'sed', 'cut', 'tr'
+      'mdfind', 'lsof', 'sw_vers', 'file', 'wc', 'sort', 'uniq', 'awk', 'sed', 'cut', 'tr',
+      'free', 'ip', 'ss', 'ping', 'lscpu', 'acpi', 'upower', 'nmcli', 'lsblk',
+      'timedatectl', 'resolvectl', 'sensors', 'hostnamectl', 'inxi', 'lsusb', 'lspci', 'arch'
     ];
     const parts = lowerCmd.split(/\s+/);
     const firstWord = parts[0];

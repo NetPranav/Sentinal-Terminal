@@ -6,9 +6,10 @@
 
 import { BaseCapabilityDriver, CapabilityExecutionResult, ExecutionContext, Platform } from '../CapabilitySDK';
 import { invoke } from '@tauri-apps/api/core';
+import { isLinux, isWindows } from '../../../shared/platform';
 
 export interface ShellDriverInput {
-  /** A complete zsh command line, for example `git status --short`. */
+  /** A complete shell command line, for example `git status --short`. */
   command: string;
   /** One-line plain English explanation of what the command does, without jargon */
   explanation?: string;
@@ -52,12 +53,12 @@ export class ShellSDKCapability extends BaseCapabilityDriver<ShellDriverInput, a
 
     try {
       const commandLine = this.toCommandLine(input);
+      const shellBinary = isLinux() ? '/bin/bash' : (isWindows() ? 'powershell.exe' : '/bin/zsh');
+      const shellArgs = isWindows() ? ['-Command', commandLine] : ['-c', commandLine];
+
       const output = await invoke<{ stdout: string; stderr: string; code: number; pid?: number }>('execute_command', {
-        // macOS users expect a command *line*, not only a binary name.  zsh
-        // supports pipes, redirects, built-ins, quoted paths, and installed
-        // developer tools without maintaining a tool definition for each one.
-        command: '/bin/zsh',
-        args: ['-lc', commandLine],
+        command: shellBinary,
+        args: shellArgs,
         cwd: input.cwd || _context?.cwd
       });
 
