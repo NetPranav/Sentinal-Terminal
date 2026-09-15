@@ -117,7 +117,7 @@ export class MultistagePromptDecomposer {
     if (!trimmed) return false;
 
     // Colon-delimited workflow declaration: "deploy staging: build ..., test ..."
-    if (/^[a-zA-Z0-9_\-\s]+:\s+.+[,;]|then/i.test(trimmed)) {
+    if (/^[a-zA-Z0-9_\-\s]+:\s+(?:.+[,;]|.+then\b)/i.test(trimmed)) {
       return true;
     }
 

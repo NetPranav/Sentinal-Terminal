@@ -353,7 +353,7 @@ describe('AgentLoop fast-path routing', () => {
         expect.any(String),
         expect.any(String),
         expect.objectContaining({
-          grammar: expect.stringContaining('action_execute')
+          grammar: expect.stringContaining('action-execute')
         })
       );
 
