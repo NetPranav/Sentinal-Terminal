@@ -71,7 +71,7 @@ Sentinel utilizes a dual-font architecture:
 | Size | Weight | Line Height | Usage |
 | :--- | :--- | :--- | :--- |
 | `10px` | Medium (500) | `1.2` | Telemetry units, keyboard shortcut badges, micro progress counts |
-| `11px` | Regular (400) / SemiBold (600) | `1.3` | Status bar, path breadcrumbs, progress percentage |
+| `11px` | Regular (400) / SemiBold (600) | `1.3` | Status bar, path breadcrumbs, port labels |
 | `12px` | Regular (400) / Medium (500) | `1.4` | Tab pills, card metadata, list item descriptions |
 | `13px` | Regular (400) | `1.4` | Command palette search input, form inputs, drawer step commands |
 | `14px` | Regular (400) | `1.45` | Core xterm terminal buffer, modal body copy |
@@ -133,10 +133,9 @@ Sentinel utilizes a dual-font architecture:
   - Clickable breadcrumb path navigation with subtle right chevron separators. Clicking any folder segment issues an automatic directory change command.
 - **Right Cluster**:
   - Quick launcher buttons (`[Projects]`, `[Ports]`, `[Workflows]`) in Visual Mode.
-  - **Embedded AI & Real-Time Prompt Progress**:
-    - **Idle State**: Muted monochrome status pill (`● AI: Ready` or `● AI (CPU)`).
-    - **Active Prompt State**: Sleek live progress pill displaying status dot, bold percentage (e.g. `45%`), active stage label (e.g. `Thinking...`, `Planning...`, `Running: ...`), estimated time countdown (`~1.8s`), and a 36px micro progress bar.
-    - **Completed State**: Smoothly renders `Done (X.Xs)` in clear high-contrast white text for 3.5 seconds before returning to idle.
+  - **Embedded AI Status**:
+    - **Active Engine**: Muted monochrome status pill (`● AI: Ready` or `● AI (CPU)`) with glowing white status dot indicating native sidecar readiness. Clicking opens AI settings.
+    - **Offline Engine**: Soft muted pill (`● AI: Off`) with `rgba(255, 255, 255, 0.25)` dot.
   - **Telemetry Indicators**:
     - CPU usage percentage with hardware icon.
     - RAM memory allocation (`MB` / `GB`).

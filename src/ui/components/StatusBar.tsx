@@ -16,7 +16,6 @@ import {
 import { invoke } from '@tauri-apps/api/core';
 import { isLinux, getShortcutModifier } from '../../shared/platform';
 import { EmbeddedEngineManager, EmbeddedStatus } from '../../ai/models/EmbeddedEngineManager';
-import { PromptProgressManager, PromptProgressState } from '../../ai/agent/PromptProgressManager';
 
 export interface StatusBarProps {
   currentShell?: string;
@@ -54,21 +53,6 @@ export const StatusBar: React.FC<StatusBarProps> = ({
     new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
   );
   const [aiStatus, setAiStatus] = useState<EmbeddedStatus | null>(null);
-  const [promptProgress, setPromptProgress] = useState<PromptProgressState | null>(() => 
-    typeof window !== 'undefined' ? PromptProgressManager.getInstance().getState() : null
-  );
-
-  useEffect(() => {
-    const handleProgress = (e: any) => {
-      if (e.detail) {
-        setPromptProgress(e.detail);
-      }
-    };
-    window.addEventListener('sentinel:prompt-progress', handleProgress);
-    return () => {
-      window.removeEventListener('sentinel:prompt-progress', handleProgress);
-    };
-  }, []);
 
   useEffect(() => {
     let isMounted = true;
@@ -287,165 +271,56 @@ export const StatusBar: React.FC<StatusBarProps> = ({
                 }}
                 title="Workflow & Macro Manager"
               >
-                <GitBranch size={11} style={{ color: '#38bdf8' }} />
+                <GitBranch size={11} style={{ color: 'rgba(255, 255, 255, 0.7)' }} />
                 <span>Workflows</span>
               </button>
             )}
           </div>
         )}
 
-        {/* Embedded AI Inference Engine Status / Live Prompt Progress */}
-        {(() => {
-          const isPromptActive = Boolean(promptProgress?.active);
-          const isPromptRecent = Boolean(
-            !isPromptActive && 
-            promptProgress?.completedAt && 
-            Date.now() - promptProgress.completedAt < 3500
-          );
-
-          if (isPromptActive || isPromptRecent) {
-            const isSuccess = promptProgress?.success !== false;
-            const accentColor = isPromptActive ? '#38bdf8' : (isSuccess ? '#22c55e' : '#ef4444');
-            const percent = promptProgress?.percent ?? 0;
-            const elapsed = promptProgress?.elapsedSec ?? 0;
-            const estLeft = promptProgress?.estimatedSecLeft ?? 0;
-            const stage = promptProgress?.stage || 'Processing...';
-
-            return (
-              <button
-                onClick={onOpenAiSettings}
-                title={isPromptActive
-                  ? `AI Prompt: "${promptProgress?.goal}"\nStage: ${stage}\nProgress: ${percent}%\nElapsed: ${elapsed}s\nEstimated remaining: ~${estLeft}s\nClick to inspect AI settings`
-                  : `AI Prompt Completed: "${promptProgress?.goal}"\nTotal time: ${elapsed}s\nResult: ${isSuccess ? 'Success' : 'Failed'}\nClick to inspect AI settings`}
-                style={{
-                  background: isPromptActive ? 'rgba(56, 189, 248, 0.08)' : (isSuccess ? 'rgba(34, 197, 94, 0.08)' : 'rgba(239, 68, 68, 0.08)'),
-                  border: `1px solid ${isPromptActive ? 'rgba(56, 189, 248, 0.35)' : (isSuccess ? 'rgba(34, 197, 94, 0.35)' : 'rgba(239, 68, 68, 0.35)')}`,
-                  borderRadius: '4px',
-                  padding: '1px 8px',
-                  color: '#ffffff',
-                  fontSize: '11px',
-                  fontFamily: 'inherit',
-                  cursor: 'pointer',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  transition: 'all 0.15s ease'
-                }}
-              >
-                {/* Status Dot with subtle glow */}
-                <span style={{
-                  width: '6px',
-                  height: '6px',
-                  borderRadius: '50%',
-                  backgroundColor: accentColor,
-                  boxShadow: `0 0 6px ${accentColor}`,
-                  display: 'inline-block',
-                  flexShrink: 0
-                }} />
-
-                <Sparkles size={11} style={{ color: accentColor, flexShrink: 0 }} />
-
-                {/* Percentage */}
-                <span style={{ 
-                  fontWeight: 600, 
-                  color: accentColor,
-                  fontVariantNumeric: 'tabular-nums',
-                  flexShrink: 0
-                }}>
-                  {percent}%
-                </span>
-
-                {/* Stage Text */}
-                <span style={{ 
-                  maxWidth: '120px', 
-                  overflow: 'hidden', 
-                  textOverflow: 'ellipsis', 
-                  whiteSpace: 'nowrap',
-                  color: 'rgba(255, 255, 255, 0.9)',
-                  fontSize: '10.5px'
-                }}>
-                  {isPromptActive ? stage : (isSuccess ? `Done (${elapsed}s)` : `Failed (${elapsed}s)`)}
-                </span>
-
-                {/* Estimated Time Remaining */}
-                {isPromptActive && (
-                  <span style={{ 
-                    color: 'rgba(255, 255, 255, 0.55)', 
-                    fontSize: '10px',
-                    fontVariantNumeric: 'tabular-nums',
-                    flexShrink: 0
-                  }}>
-                    ~{estLeft}s
-                  </span>
-                )}
-
-                {/* Micro Progress Bar Track */}
-                <div style={{
-                  width: '36px',
-                  height: '3px',
-                  backgroundColor: 'rgba(255, 255, 255, 0.14)',
-                  borderRadius: '2px',
-                  overflow: 'hidden',
-                  flexShrink: 0,
-                  marginLeft: '2px'
-                }}>
-                  <div style={{
-                    width: `${percent}%`,
-                    height: '100%',
-                    backgroundColor: accentColor,
-                    borderRadius: '2px',
-                    transition: 'width 0.12s ease-out'
-                  }} />
-                </div>
-              </button>
-            );
-          }
-
-          return (
-            <button
-              onClick={onOpenAiSettings}
-              title={aiStatus?.isRunning 
-                ? `Sentinel Embedded AI: Running (Port ${aiStatus.port})\nModel: ${aiStatus.activeModel || 'Qwen 2.5 Coder 3B'}${aiStatus.isCpuFallback ? ' (CPU Mode)' : ' (GPU Acceleration)'}\nClick to configure AI settings`
-                : `Sentinel Embedded AI: Offline\nClick to open AI settings and start engine`}
-              style={{
-                background: aiStatus?.isRunning ? 'rgba(255, 255, 255, 0.05)' : 'rgba(255, 255, 255, 0.02)',
-                border: aiStatus?.isRunning ? '1px solid rgba(255, 255, 255, 0.16)' : '1px solid rgba(255, 255, 255, 0.07)',
-                borderRadius: '4px',
-                padding: '1px 7px',
-                color: aiStatus?.isRunning ? '#ffffff' : 'rgba(255, 255, 255, 0.55)',
-                fontSize: '11px',
-                fontFamily: 'inherit',
-                cursor: 'pointer',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '5px',
-                transition: 'all 0.15s ease'
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.09)';
-                e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.25)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = aiStatus?.isRunning ? 'rgba(255, 255, 255, 0.05)' : 'rgba(255, 255, 255, 0.02)';
-                e.currentTarget.style.borderColor = aiStatus?.isRunning ? '1px solid rgba(255, 255, 255, 0.16)' : '1px solid rgba(255, 255, 255, 0.07)';
-              }}
-            >
-              <span style={{
-                width: '6px',
-                height: '6px',
-                borderRadius: '50%',
-                backgroundColor: aiStatus?.isRunning ? (aiStatus.isCpuFallback ? '#eab308' : '#22c55e') : 'rgba(255, 255, 255, 0.3)',
-                boxShadow: aiStatus?.isRunning ? (aiStatus.isCpuFallback ? '0 0 6px rgba(234, 179, 8, 0.4)' : '0 0 6px rgba(34, 197, 94, 0.4)') : 'none',
-                display: 'inline-block',
-                flexShrink: 0
-              }} />
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                <Sparkles size={11} style={{ opacity: aiStatus?.isRunning ? 0.9 : 0.45 }} />
-                <span>{aiStatus?.isRunning ? (aiStatus.isCpuFallback ? 'AI (CPU)' : 'AI: Ready') : 'AI: Off'}</span>
-              </span>
-            </button>
-          );
-        })()}
+        {/* Embedded AI Inference Engine Status */}
+        <button
+          onClick={onOpenAiSettings}
+          title={aiStatus?.isRunning 
+            ? `Sentinel Embedded AI: Running (Port ${aiStatus.port})\nModel: ${aiStatus.activeModel || 'Qwen 2.5 Coder 3B'}${aiStatus.isCpuFallback ? ' (CPU Mode)' : ' (GPU Acceleration)'}\nClick to configure AI settings`
+            : `Sentinel Embedded AI: Offline\nClick to open AI settings and start engine`}
+          style={{
+            background: aiStatus?.isRunning ? 'rgba(255, 255, 255, 0.05)' : 'rgba(255, 255, 255, 0.02)',
+            border: aiStatus?.isRunning ? '1px solid rgba(255, 255, 255, 0.16)' : '1px solid rgba(255, 255, 255, 0.07)',
+            borderRadius: '4px',
+            padding: '1px 7px',
+            color: aiStatus?.isRunning ? '#ffffff' : 'rgba(255, 255, 255, 0.55)',
+            fontSize: '11px',
+            fontFamily: 'inherit',
+            cursor: 'pointer',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '5px',
+            transition: 'all 0.15s ease'
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.09)';
+            e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.25)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = aiStatus?.isRunning ? 'rgba(255, 255, 255, 0.05)' : 'rgba(255, 255, 255, 0.02)';
+            e.currentTarget.style.borderColor = aiStatus?.isRunning ? '1px solid rgba(255, 255, 255, 0.16)' : '1px solid rgba(255, 255, 255, 0.07)';
+          }}
+        >
+          <span style={{
+            width: '6px',
+            height: '6px',
+            borderRadius: '50%',
+            backgroundColor: aiStatus?.isRunning ? '#ffffff' : 'rgba(255, 255, 255, 0.25)',
+            boxShadow: aiStatus?.isRunning ? '0 0 6px rgba(255, 255, 255, 0.6)' : 'none',
+            display: 'inline-block',
+            flexShrink: 0
+          }} />
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+            <Sparkles size={11} style={{ opacity: aiStatus?.isRunning ? 0.9 : 0.45 }} />
+            <span>{aiStatus?.isRunning ? (aiStatus.isCpuFallback ? 'AI (CPU)' : 'AI: Ready') : 'AI: Off'}</span>
+          </span>
+        </button>
 
         <span style={{ color: 'rgba(255, 255, 255, 0.12)' }}>|</span>
 
