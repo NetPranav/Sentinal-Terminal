@@ -39,3 +39,26 @@ sentinel_lora_colab/
 build/
 scratch/
 
+# Environment variables and secrets
+.env
+.env.*
+!.env.example
+
+# Python cache & virtual environments
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.venv/
+venv/
+
+# Test & coverage outputs
+coverage/
+*.lcov
+
+# Temporary & backup files
+*.tmp
+*.bak
+*.orig
+*~
+Thumbs.db

@@ -1,14 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   Search, 
-  FolderGit2, 
   Folder, 
-  Bot, 
-  Hexagon, 
-  Boxes, 
-  FileCode, 
-  Container, 
-  Zap 
+  Code2, 
+  FileText
 } from 'lucide-react';
 import { DiscoveredProject } from '../../domain/discovery/ProjectDiscoveryEngine';
 import { WorkspaceRegistry } from '../../domain/discovery/WorkspaceRegistry';
@@ -17,12 +12,14 @@ export interface WorkspaceSwitcherModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSelect: (path: string, action: 'navigate' | 'new-tab', setupScript?: string) => void;
+  currentCwd?: string;
 }
 
 export const WorkspaceSwitcherModal: React.FC<WorkspaceSwitcherModalProps> = ({
   isOpen,
   onClose,
-  onSelect
+  onSelect,
+  currentCwd
 }) => {
   const [query, setQuery] = useState('');
   const [projects, setProjects] = useState<DiscoveredProject[]>([]);
@@ -34,16 +31,12 @@ export const WorkspaceSwitcherModal: React.FC<WorkspaceSwitcherModalProps> = ({
       setQuery('');
       setSelectedIndex(0);
       const registry = WorkspaceRegistry.getInstance();
-      const cached = registry.getCachedProjects();
-      if (cached.length > 0) {
-        setProjects(cached);
-      }
-      registry.getProjects().then(p => {
+      registry.getProjects(true, currentCwd).then(p => {
         setProjects(p);
       });
       setTimeout(() => inputRef.current?.focus(), 50);
     }
-  }, [isOpen]);
+  }, [isOpen, currentCwd]);
 
   const filtered = projects.filter(p => {
     const q = query.toLowerCase().trim();
@@ -60,6 +53,7 @@ export const WorkspaceSwitcherModal: React.FC<WorkspaceSwitcherModalProps> = ({
       if (!isOpen) return;
 
       if (e.key === 'Escape') {
+        e.preventDefault();
         onClose();
         return;
       }
@@ -84,6 +78,17 @@ export const WorkspaceSwitcherModal: React.FC<WorkspaceSwitcherModalProps> = ({
           onSelect(selected.path, isNewTab ? 'new-tab' : 'navigate', selected.setupScript);
           onClose();
         }
+        return;
+      }
+
+      // Quick jump with numbers 2..9 when query is empty or with Alt/Ctrl
+      if (!query && /^[2-9]$/.test(e.key)) {
+        const targetIdx = parseInt(e.key, 10) - 1;
+        if (filtered[targetIdx]) {
+          e.preventDefault();
+          onSelect(filtered[targetIdx].path, 'navigate', filtered[targetIdx].setupScript);
+          onClose();
+        }
       }
     };
 
@@ -91,26 +96,29 @@ export const WorkspaceSwitcherModal: React.FC<WorkspaceSwitcherModalProps> = ({
       window.addEventListener('keydown', handleKeyDown);
     }
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, filtered, selectedIndex, onClose, onSelect]);
+  }, [isOpen, filtered, selectedIndex, onClose, onSelect, query]);
 
   if (!isOpen) return null;
 
-  const getTypeBadge = (type: string) => {
-    switch (type) {
-      case 'ros2':
-      case 'ros1':
-        return { label: 'ROS', icon: <Bot size={11} />, bg: 'rgba(249, 115, 22, 0.18)', color: '#fb923c', border: 'rgba(249, 115, 22, 0.35)' };
-      case 'node':
-        return { label: 'Node.js', icon: <Hexagon size={11} />, bg: 'rgba(34, 197, 94, 0.18)', color: '#4ade80', border: 'rgba(34, 197, 94, 0.35)' };
-      case 'rust':
-        return { label: 'Rust', icon: <Boxes size={11} />, bg: 'rgba(239, 68, 68, 0.18)', color: '#f87171', border: 'rgba(239, 68, 68, 0.35)' };
-      case 'python':
-        return { label: 'Python', icon: <FileCode size={11} />, bg: 'rgba(59, 130, 246, 0.18)', color: '#60a5fa', border: 'rgba(59, 130, 246, 0.35)' };
-      case 'docker':
-        return { label: 'Docker', icon: <Container size={11} />, bg: 'rgba(14, 165, 233, 0.18)', color: '#38bdf8', border: 'rgba(14, 165, 233, 0.35)' };
-      default:
-        return { label: 'Workspace', icon: <Folder size={11} />, bg: 'rgba(148, 163, 184, 0.14)', color: '#cbd5e1', border: 'rgba(148, 163, 184, 0.25)' };
+  // Determine icon based on project type and name
+  const getItemIcon = (proj: DiscoveredProject) => {
+    const nameLower = proj.name.toLowerCase();
+    const typeLower = proj.type.toLowerCase();
+
+    if (nameLower.startsWith('.') || typeLower === 'node' || typeLower === 'rust' || typeLower === 'python' || typeLower === 'ros2' || typeLower === 'ros1') {
+      return <Code2 size={16} style={{ color: 'rgba(255, 255, 255, 0.65)' }} />;
     }
+    if (nameLower.includes('note') || nameLower.includes('material') || nameLower.includes('tutorial') || nameLower.includes('doc')) {
+      return <FileText size={16} style={{ color: 'rgba(255, 255, 255, 0.65)' }} />;
+    }
+    return <Folder size={16} style={{ color: 'rgba(255, 255, 255, 0.65)' }} />;
+  };
+
+  const isCurrentProject = (path: string) => {
+    if (!currentCwd) return false;
+    const cleanCurrent = currentCwd.replace(/\/+$/, '');
+    const cleanPath = path.replace(/\/+$/, '');
+    return cleanCurrent === cleanPath;
   };
 
   return (
@@ -119,9 +127,9 @@ export const WorkspaceSwitcherModal: React.FC<WorkspaceSwitcherModalProps> = ({
       style={{
         position: 'fixed',
         top: 0, left: 0, right: 0, bottom: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.72)',
-        backdropFilter: 'blur(16px)',
-        WebkitBackdropFilter: 'blur(16px)',
+        backgroundColor: 'rgba(0, 0, 0, 0.38)',
+        backdropFilter: 'blur(7px)',
+        WebkitBackdropFilter: 'blur(7px)',
         display: 'flex',
         justifyContent: 'center',
         alignItems: 'flex-start',
@@ -134,9 +142,9 @@ export const WorkspaceSwitcherModal: React.FC<WorkspaceSwitcherModalProps> = ({
         style={{
           width: '560px',
           maxWidth: '92vw',
-          backgroundColor: 'rgba(18, 22, 34, 0.94)',
-          borderRadius: '16px',
-          boxShadow: '0 24px 64px rgba(0, 0, 0, 0.85), 0 0 0 1px rgba(255, 255, 255, 0.1)',
+          backgroundColor: 'rgba(18, 20, 25, 0.96)',
+          borderRadius: '14px',
+          boxShadow: '0 24px 64px rgba(0, 0, 0, 0.85), 0 0 0 1px rgba(255, 255, 255, 0.08)',
           display: 'flex',
           flexDirection: 'column',
           overflow: 'hidden',
@@ -144,14 +152,15 @@ export const WorkspaceSwitcherModal: React.FC<WorkspaceSwitcherModalProps> = ({
           color: '#f8fafc'
         }}
       >
+        {/* Top Search Input Bar */}
         <div style={{
           display: 'flex',
           alignItems: 'center',
           gap: '12px',
-          padding: '16px 20px',
-          borderBottom: '1px solid rgba(255, 255, 255, 0.08)'
+          padding: '14px 18px',
+          borderBottom: '1px solid rgba(255, 255, 255, 0.06)'
         }}>
-          <Search size={16} color="rgba(255,255,255,0.6)" style={{ flexShrink: 0 }} />
+          <Search size={15} color="rgba(255, 255, 255, 0.45)" style={{ flexShrink: 0 }} />
           <input 
             ref={inputRef}
             value={query}
@@ -162,31 +171,35 @@ export const WorkspaceSwitcherModal: React.FC<WorkspaceSwitcherModalProps> = ({
               backgroundColor: 'transparent',
               border: 'none',
               outline: 'none',
-              fontSize: '15px',
+              fontSize: '14px',
               color: '#f8fafc',
-              fontWeight: 500
+              fontWeight: 400
             }}
           />
           <span style={{
             fontSize: '11px',
             color: 'rgba(255, 255, 255, 0.4)',
-            background: 'rgba(255, 255, 255, 0.06)',
-            padding: '2px 6px',
-            borderRadius: '4px'
+            background: 'rgba(255, 255, 255, 0.05)',
+            border: '1px solid rgba(255, 255, 255, 0.08)',
+            padding: '2px 7px',
+            borderRadius: '5px'
           }}>
             ESC to close
           </span>
         </div>
 
-        <div style={{ maxHeight: '360px', overflowY: 'auto', padding: '8px' }}>
+        {/* Project Items List */}
+        <div style={{ maxHeight: '380px', overflowY: 'auto', padding: '6px 8px' }}>
           {filtered.length === 0 ? (
-            <div style={{ padding: '32px 20px', textAlign: 'center', color: 'rgba(255, 255, 255, 0.4)', fontSize: '13px' }}>
+            <div style={{ padding: '36px 20px', textAlign: 'center', color: 'rgba(255, 255, 255, 0.35)', fontSize: '13px' }}>
               No matching projects found
             </div>
           ) : (
             filtered.map((proj, idx) => {
               const isSelected = idx === selectedIndex;
-              const badge = getTypeBadge(proj.type);
+              const isCurrent = isCurrentProject(proj.path);
+              const shortcutNumber = idx < 9 ? idx + 1 : null;
+
               return (
                 <div 
                   key={proj.path}
@@ -199,29 +212,38 @@ export const WorkspaceSwitcherModal: React.FC<WorkspaceSwitcherModalProps> = ({
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
-                    padding: '10px 14px',
-                    borderRadius: '10px',
+                    padding: '8px 12px',
+                    borderRadius: '8px',
                     cursor: 'pointer',
-                    backgroundColor: isSelected ? 'rgba(56, 189, 248, 0.12)' : 'transparent',
-                    border: isSelected ? '1px solid rgba(56, 189, 248, 0.28)' : '1px solid transparent',
-                    transition: 'all 0.15s ease',
-                    marginBottom: '2px'
+                    backgroundColor: isSelected ? 'rgba(255, 255, 255, 0.07)' : 'transparent',
+                    border: isSelected ? '1px solid rgba(255, 255, 255, 0.08)' : '1px solid transparent',
+                    transition: 'all 0.12s ease',
+                    marginBottom: '1px'
                   }}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
-                    <FolderGit2 size={16} style={{ color: isSelected ? '#38bdf8' : 'rgba(255, 255, 255, 0.45)', flexShrink: 0 }} />
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', minWidth: 0 }}>
-                      <span style={{ fontSize: '13px', fontWeight: 600, color: isSelected ? '#38bdf8' : '#f8fafc' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }}>
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      width: '24px',
+                      height: '24px',
+                      flexShrink: 0
+                    }}>
+                      {getItemIcon(proj)}
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0 }}>
+                      <span style={{ fontSize: '13px', fontWeight: 500, color: isSelected ? '#ffffff' : '#e2e8f0' }}>
                         {proj.name}
                       </span>
                       <span style={{
                         fontSize: '11px',
-                        color: 'rgba(255, 255, 255, 0.45)',
+                        color: 'rgba(255, 255, 255, 0.38)',
                         overflow: 'hidden',
                         textOverflow: 'ellipsis',
                         whiteSpace: 'nowrap',
-                        maxWidth: '360px',
-                        fontFamily: 'monospace'
+                        maxWidth: '380px',
+                        fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, monospace'
                       }}>
                         {proj.path}
                       </span>
@@ -229,37 +251,45 @@ export const WorkspaceSwitcherModal: React.FC<WorkspaceSwitcherModalProps> = ({
                   </div>
 
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
-                    {proj.setupScript && (
+                    {isCurrent && (
                       <span style={{
                         fontSize: '10px',
-                        padding: '2px 6px',
+                        padding: '1px 6px',
                         borderRadius: '4px',
-                        backgroundColor: 'rgba(168, 85, 247, 0.15)',
-                        color: '#c084fc',
-                        border: '1px solid rgba(168, 85, 247, 0.3)',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '3px'
+                        backgroundColor: 'rgba(255, 255, 255, 0.08)',
+                        color: 'rgba(255, 255, 255, 0.65)',
+                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                        fontWeight: 400
                       }}>
-                        <Zap size={10} />
-                        <span>env</span>
+                        Current
                       </span>
                     )}
-                    <span style={{
-                      fontSize: '11px',
-                      padding: '2px 8px',
-                      borderRadius: '5px',
-                      backgroundColor: badge.bg,
-                      color: badge.color,
-                      border: `1px solid ${badge.border}`,
-                      fontWeight: 500,
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '4px'
-                    }}>
-                      {badge.icon}
-                      <span>{badge.label}</span>
-                    </span>
+
+                    {isSelected ? (
+                      <kbd style={{
+                        fontSize: '11px',
+                        padding: '1px 6px',
+                        borderRadius: '4px',
+                        backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                        color: 'rgba(255, 255, 255, 0.85)',
+                        border: '1px solid rgba(255, 255, 255, 0.15)',
+                        fontFamily: 'inherit'
+                      }}>
+                        ↵
+                      </kbd>
+                    ) : shortcutNumber && shortcutNumber > 1 ? (
+                      <kbd style={{
+                        fontSize: '11px',
+                        padding: '1px 6px',
+                        borderRadius: '4px',
+                        backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                        color: 'rgba(255, 255, 255, 0.4)',
+                        border: '1px solid rgba(255, 255, 255, 0.08)',
+                        fontFamily: 'inherit'
+                      }}>
+                        {shortcutNumber}
+                      </kbd>
+                    ) : null}
                   </div>
                 </div>
               );
@@ -267,20 +297,32 @@ export const WorkspaceSwitcherModal: React.FC<WorkspaceSwitcherModalProps> = ({
           )}
         </div>
 
+        {/* Modal Footer with Keyboard Navigation Hints */}
         <div style={{
-          padding: '10px 16px',
-          borderTop: '1px solid rgba(255, 255, 255, 0.08)',
+          padding: '9px 16px',
+          borderTop: '1px solid rgba(255, 255, 255, 0.06)',
           backgroundColor: 'rgba(0, 0, 0, 0.2)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
           fontSize: '11px',
-          color: 'rgba(255, 255, 255, 0.45)'
+          color: 'rgba(255, 255, 255, 0.4)'
         }}>
-          <span>{filtered.length} projects discovered</span>
-          <div style={{ display: 'flex', gap: '12px' }}>
-            <span><kbd style={{ background: 'rgba(255,255,255,0.08)', padding: '1px 5px', borderRadius: '3px' }}>↵</kbd> Switch cwd</span>
-            <span><kbd style={{ background: 'rgba(255,255,255,0.08)', padding: '1px 5px', borderRadius: '3px' }}>⌘↵</kbd> New Tab</span>
+          <span>{filtered.length} item{filtered.length === 1 ? '' : 's'}</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+              <kbd style={{ background: 'rgba(255,255,255,0.08)', padding: '1px 4px', borderRadius: '3px', fontSize: '10px' }}>↑</kbd>
+              <kbd style={{ background: 'rgba(255,255,255,0.08)', padding: '1px 4px', borderRadius: '3px', fontSize: '10px' }}>↓</kbd>
+              <span>Navigate</span>
+            </span>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+              <kbd style={{ background: 'rgba(255,255,255,0.08)', padding: '1px 4px', borderRadius: '3px', fontSize: '10px' }}>↵</kbd>
+              <span>Open</span>
+            </span>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+              <kbd style={{ background: 'rgba(255,255,255,0.08)', padding: '1px 4px', borderRadius: '3px', fontSize: '10px' }}>/</kbd>
+              <span>Search</span>
+            </span>
           </div>
         </div>
       </div>

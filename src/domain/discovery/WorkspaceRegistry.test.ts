@@ -25,4 +25,13 @@ describe('WorkspaceRegistry (Pillar 2.2)', () => {
     const cached = registry.getCachedProjects();
     expect(Array.isArray(cached)).toBe(true);
   });
+
+  it('scans specified currentCwd without using hardcoded paths', async () => {
+    const cwd = path.resolve('.');
+    const projects = await registry.getProjects(true, cwd);
+    expect(Array.isArray(projects)).toBe(true);
+    // Should re-scan if cwd changes
+    const projectsOther = await registry.getProjects(false, path.resolve('..'));
+    expect(Array.isArray(projectsOther)).toBe(true);
+  });
 });

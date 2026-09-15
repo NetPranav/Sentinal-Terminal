@@ -43,17 +43,18 @@ const colors = {
 // Install the Tauri IPC polyfill so all drivers execute native OS commands via Node
 NodeTauriBridge.install();
 
-interface CliOptions {
+export interface CliOptions {
   prompt?: string;
   verbose: boolean;
   json: boolean;
   cwd: string;
   dryRun: boolean;
   autoApprove: boolean;
+  silent?: boolean;
 }
 
-function parseArgs(): CliOptions {
-  const args = process.argv.slice(2);
+export function parseArgs(customArgs?: string[]): CliOptions {
+  const args = customArgs !== undefined ? customArgs : process.argv.slice(2);
   let verbose = false;
   let json = false;
   let dryRun = false;
@@ -142,7 +143,7 @@ async function runPrompt(
   // Track OS command executions for this prompt
   const unlistenCommand = NodeTauriBridge.onCommand((record) => {
     executedCommands.push(record);
-    if (!options.json) {
+    if (!options.json && !options.silent) {
       console.log(`  ${colors.gray}⚡ [OS Command]${colors.reset} ${colors.yellow}${record.fullCommand}${colors.reset}`);
       if (options.verbose) {
         if (record.stdout && record.stdout.trim()) {
@@ -158,13 +159,13 @@ async function runPrompt(
     }
   });
 
-  if (!options.json) {
+  if (!options.json && !options.silent) {
     console.log(`\n${colors.bold}${colors.cyan}► Prompt:${colors.reset} "${colors.bold}${prompt}${colors.reset}"`);
   }
 
   // Set up event streaming
   agentLoop.onEvent((event: AgentEvent) => {
-    if (options.json) return;
+    if (options.json || options.silent) return;
 
     switch (event.type) {
       case 'thinking':
@@ -233,25 +234,26 @@ async function runPrompt(
 
   const duration = (performance.now() - startTime).toFixed(1);
 
-  if (options.json) {
-    console.log(JSON.stringify({
-      prompt,
-      success: result.success,
-      summary: result.summary,
-      steps: result.steps,
-      cdPath: result.cdPath,
-      executedCommands: executedCommands.map(c => ({
-        command: c.fullCommand,
-        code: c.code,
-        durationMs: c.durationMs,
-        stdout: c.stdout,
-        stderr: c.stderr
-      })),
-      durationMs: parseFloat(duration)
-    }, null, 2));
-  } else {
-    console.log(`\n${colors.bold}${result.success ? colors.green + '✓ SUCCESS' : colors.red + '✗ FAILED'}${colors.reset} ${colors.gray}(${duration}ms)${colors.reset}`);
-    console.log(`${colors.bold}Summary:${colors.reset} ${result.summary}`);
+  if (!options.silent) {
+    if (options.json) {
+      console.log(JSON.stringify({
+        prompt,
+        success: result.success,
+        summary: result.summary,
+        steps: result.steps,
+        cdPath: result.cdPath,
+        executedCommands: executedCommands.map(c => ({
+          command: c.fullCommand,
+          code: c.code,
+          durationMs: c.durationMs,
+          stdout: c.stdout,
+          stderr: c.stderr
+        })),
+        durationMs: parseFloat(duration)
+      }, null, 2));
+    } else {
+      console.log(`\n${colors.bold}${result.success ? colors.green + '✓ SUCCESS' : colors.red + '✗ FAILED'}${colors.reset} ${colors.gray}(${duration}ms)${colors.reset}`);
+      console.log(`${colors.bold}Summary:${colors.reset} ${result.summary}`);
     if (result.steps.length > 0) {
       console.log(`\n${colors.bold}Steps Executed (${result.steps.length}):${colors.reset}`);
       result.steps.forEach((step, idx) => {
@@ -266,6 +268,7 @@ async function runPrompt(
       console.log(`${colors.cyan}Directory change:${colors.reset} ${result.cdPath}`);
     }
     console.log('');
+    }
   }
 
   return result;
@@ -366,7 +369,13 @@ async function main(): Promise<void> {
   }
 }
 
-main().catch((err) => {
-  console.error(`${colors.red}[Sentinel CLI Fatal Error]${colors.reset}`, err);
-  process.exit(1);
-});
+export { formatData, runPrompt, showHelp };
+
+const isDirectRun = process.argv[1] && process.argv[1].includes('agent-cli');
+
+if (isDirectRun) {
+  main().catch((err) => {
+    console.error(`${colors.red}[Sentinel CLI Fatal Error]${colors.reset}`, err);
+    process.exit(1);
+  });
+}

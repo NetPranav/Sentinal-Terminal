@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  Network, 
   Radio, 
   RefreshCw, 
   X, 
-  Brain, 
+  Cpu, 
   Trash2 
 } from 'lucide-react';
 import { ListeningPortInfo, ProcessPortManager } from '../../domain/process/ProcessPortManager';
@@ -76,9 +75,9 @@ export const ProcessPortManagerDrawer: React.FC<ProcessPortManagerDrawerProps> =
       style={{
         position: 'fixed',
         top: 0, left: 0, right: 0, bottom: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.65)',
-        backdropFilter: 'blur(12px)',
-        WebkitBackdropFilter: 'blur(12px)',
+        backgroundColor: 'rgba(0, 0, 0, 0.35)',
+        backdropFilter: 'blur(6px)',
+        WebkitBackdropFilter: 'blur(6px)',
         display: 'flex',
         justifyContent: 'flex-end',
         zIndex: 99990
@@ -90,9 +89,9 @@ export const ProcessPortManagerDrawer: React.FC<ProcessPortManagerDrawerProps> =
           width: '460px',
           maxWidth: '92vw',
           height: '100%',
-          backgroundColor: 'rgba(17, 21, 33, 0.96)',
-          borderLeft: '1px solid rgba(255, 255, 255, 0.1)',
-          boxShadow: '-12px 0 36px rgba(0, 0, 0, 0.75)',
+          backgroundColor: 'rgba(18, 20, 25, 0.97)',
+          borderLeft: '1px solid rgba(255, 255, 255, 0.08)',
+          boxShadow: '-16px 0 48px rgba(0, 0, 0, 0.75)',
           display: 'flex',
           flexDirection: 'column',
           color: '#f8fafc',
@@ -104,15 +103,15 @@ export const ProcessPortManagerDrawer: React.FC<ProcessPortManagerDrawerProps> =
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          padding: '18px 20px',
-          borderBottom: '1px solid rgba(255, 255, 255, 0.08)'
+          padding: '16px 20px',
+          borderBottom: '1px solid rgba(255, 255, 255, 0.06)'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <Network size={18} color="#38bdf8" />
+            <Radio size={16} color="rgba(255, 255, 255, 0.75)" />
             <div>
-              <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 600 }}>Active Ports & Activities</h3>
-              <span style={{ fontSize: '11px', color: 'rgba(255, 255, 255, 0.5)' }}>
-                {ports.length} listening network port{ports.length === 1 ? '' : 's'} • Hardware & AI Status
+              <h3 style={{ margin: 0, fontSize: '14px', fontWeight: 600 }}>Active Ports & Activities</h3>
+              <span style={{ fontSize: '11px', color: 'rgba(255, 255, 255, 0.45)' }}>
+                {ports.length} listening network port{ports.length === 1 ? '' : 's'}
               </span>
             </div>
           </div>
@@ -122,15 +121,15 @@ export const ProcessPortManagerDrawer: React.FC<ProcessPortManagerDrawerProps> =
               disabled={isLoading}
               style={{
                 background: 'rgba(255, 255, 255, 0.05)',
-                border: '1px solid rgba(255, 255, 255, 0.1)',
-                borderRadius: '6px',
-                color: 'rgba(255, 255, 255, 0.7)',
-                padding: '4px 8px',
+                border: '1px solid rgba(255, 255, 255, 0.08)',
+                borderRadius: '5px',
+                color: 'rgba(255, 255, 255, 0.65)',
+                padding: '3px 8px',
                 fontSize: '11px',
                 cursor: 'pointer',
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: '5px'
+                gap: '4px'
               }}
             >
               <RefreshCw size={11} />
@@ -139,16 +138,16 @@ export const ProcessPortManagerDrawer: React.FC<ProcessPortManagerDrawerProps> =
             <button
               onClick={onClose}
               style={{
-                background: 'none',
-                border: 'none',
+                background: 'rgba(255, 255, 255, 0.05)',
+                border: '1px solid rgba(255, 255, 255, 0.08)',
                 color: 'rgba(255, 255, 255, 0.5)',
-                cursor: 'pointer',
-                padding: '4px',
-                display: 'flex',
-                alignItems: 'center'
+                borderRadius: '5px',
+                padding: '2px 6px',
+                fontSize: '11px',
+                cursor: 'pointer'
               }}
             >
-              <X size={16} />
+              <X size={13} />
             </button>
           </div>
         </div>
@@ -156,54 +155,55 @@ export const ProcessPortManagerDrawer: React.FC<ProcessPortManagerDrawerProps> =
         {/* Feedback message banner */}
         {feedbackMsg && (
           <div style={{
-            margin: '12px 20px 0',
-            padding: '8px 12px',
-            backgroundColor: 'rgba(56, 189, 248, 0.15)',
-            border: '1px solid rgba(56, 189, 248, 0.35)',
+            margin: '10px 16px 0',
+            padding: '7px 12px',
+            backgroundColor: 'rgba(255, 255, 255, 0.08)',
+            border: '1px solid rgba(255, 255, 255, 0.12)',
             borderRadius: '6px',
-            fontSize: '12px',
-            color: '#38bdf8'
+            fontSize: '11px',
+            color: '#f8fafc'
           }}>
             {feedbackMsg}
           </div>
         )}
 
         {/* AI & Background Task HUD Card */}
-        <div style={{ padding: '14px 20px 0' }}>
+        <div style={{ padding: '12px 16px 0' }}>
           <div style={{
-            backgroundColor: 'rgba(56, 189, 248, 0.06)',
-            border: '1px solid rgba(56, 189, 248, 0.2)',
-            borderRadius: '10px',
-            padding: '12px 14px',
+            backgroundColor: 'rgba(255, 255, 255, 0.03)',
+            border: '1px solid rgba(255, 255, 255, 0.06)',
+            borderRadius: '8px',
+            padding: '10px 12px',
             display: 'flex',
             flexDirection: 'column',
-            gap: '6px'
+            gap: '5px'
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', fontWeight: 600, color: '#38bdf8' }}>
-                <Brain size={14} color="#38bdf8" />
-                <span>Sentinel Embedded AI</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', fontWeight: 500, color: '#f8fafc' }}>
+                <Cpu size={13} style={{ color: 'rgba(255, 255, 255, 0.65)' }} />
+                <span>Sentinel In-App AI Engine</span>
               </div>
               <span style={{
                 fontSize: '10px',
-                padding: '2px 6px',
+                padding: '1px 6px',
                 borderRadius: '4px',
-                backgroundColor: embeddedStatus?.modelDownloaded ? 'rgba(34, 197, 94, 0.15)' : 'rgba(234, 179, 8, 0.15)',
-                color: embeddedStatus?.modelDownloaded ? '#4ade80' : '#facc15',
-                fontWeight: 600
+                backgroundColor: embeddedStatus?.modelDownloaded ? 'rgba(255, 255, 255, 0.08)' : 'rgba(255, 255, 255, 0.05)',
+                color: embeddedStatus?.modelDownloaded ? '#ffffff' : 'rgba(255, 255, 255, 0.45)',
+                border: '1px solid rgba(255, 255, 255, 0.08)',
+                fontWeight: 500
               }}>
-                {embeddedStatus?.modelDownloaded ? 'Model Ready (Qwen 2.5 3B)' : 'Model Not Downloaded'}
+                {embeddedStatus?.modelDownloaded ? 'Qwen 2.5 3B' : 'Not Downloaded'}
               </span>
             </div>
 
-            <div style={{ fontSize: '11px', color: 'rgba(255, 255, 255, 0.65)', lineHeight: 1.4 }}>
+            <div style={{ fontSize: '11px', color: 'rgba(255, 255, 255, 0.45)', lineHeight: 1.4 }}>
               {embeddedStatus?.modelDownloaded
-                ? 'Model stored in ~/.sentinel/models/ • Metal GPU acceleration ready'
-                : 'Download model via Command Palette (Cmd+Shift+P > "Sentinel Embedded AI") or type ">setup-ai"'}
+                ? 'Local offline weights loaded in ~/.sentinel/models/'
+                : 'Download weights via Command Palette > "Sentinel Embedded AI"'}
             </div>
 
             {embeddedStatus?.isRunning && (
-              <div style={{ display: 'flex', gap: '8px', fontSize: '10px', color: '#4ade80', marginTop: '2px' }}>
+              <div style={{ display: 'flex', gap: '8px', fontSize: '10px', color: 'rgba(255, 255, 255, 0.7)', marginTop: '2px' }}>
                 <span>● Server Active on Port {embeddedStatus.port}</span>
                 {embeddedStatus.pid && <span>• PID {embeddedStatus.pid}</span>}
               </div>
@@ -215,17 +215,17 @@ export const ProcessPortManagerDrawer: React.FC<ProcessPortManagerDrawerProps> =
         <div style={{
           flex: 1,
           overflowY: 'auto',
-          padding: '14px 20px 20px',
+          padding: '12px 16px 16px',
           display: 'flex',
           flexDirection: 'column',
-          gap: '10px'
+          gap: '8px'
         }}>
           {ports.length === 0 ? (
             <div style={{
               textAlign: 'center',
               padding: '40px 20px',
-              color: 'rgba(255, 255, 255, 0.4)',
-              fontSize: '13px'
+              color: 'rgba(255, 255, 255, 0.35)',
+              fontSize: '12px'
             }}>
               {isLoading ? 'Scanning active ports...' : 'No listening ports detected.'}
             </div>
@@ -234,53 +234,55 @@ export const ProcessPortManagerDrawer: React.FC<ProcessPortManagerDrawerProps> =
               <div
                 key={p.port}
                 style={{
-                  backgroundColor: 'rgba(255, 255, 255, 0.03)',
-                  border: '1px solid rgba(255, 255, 255, 0.06)',
-                  borderRadius: '10px',
-                  padding: '12px 14px',
+                  backgroundColor: 'rgba(255, 255, 255, 0.02)',
+                  border: '1px solid rgba(255, 255, 255, 0.05)',
+                  borderRadius: '8px',
+                  padding: '10px 12px',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',
-                  gap: '12px'
+                  gap: '12px',
+                  transition: 'background 0.15s ease'
                 }}
+                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.05)')}
+                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.02)')}
               >
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                    <Radio size={13} style={{ color: '#38bdf8', flexShrink: 0 }} />
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '3px' }}>
                     <span style={{
-                      fontFamily: 'monospace',
-                      fontSize: '14px',
-                      fontWeight: 700,
-                      color: '#38bdf8'
+                      fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, monospace',
+                      fontSize: '13px',
+                      fontWeight: 600,
+                      color: '#ffffff'
                     }}>
                       :{p.port}
                     </span>
                     <span style={{
-                      fontSize: '10px',
-                      padding: '1px 6px',
-                      borderRadius: '4px',
-                      backgroundColor: 'rgba(34, 197, 94, 0.15)',
-                      color: '#4ade80',
-                      fontWeight: 600
+                      fontSize: '9px',
+                      padding: '1px 5px',
+                      borderRadius: '3px',
+                      backgroundColor: 'rgba(255, 255, 255, 0.08)',
+                      color: 'rgba(255, 255, 255, 0.75)',
+                      fontWeight: 500
                     }}>
-                      ● {p.status || 'LISTEN'}
+                      {p.status || 'LISTEN'}
                     </span>
                     <span style={{
-                      fontSize: '10px',
-                      padding: '1px 6px',
-                      borderRadius: '4px',
-                      backgroundColor: 'rgba(255, 255, 255, 0.06)',
-                      color: 'rgba(255, 255, 255, 0.6)'
+                      fontSize: '9px',
+                      padding: '1px 5px',
+                      borderRadius: '3px',
+                      backgroundColor: 'rgba(255, 255, 255, 0.04)',
+                      color: 'rgba(255, 255, 255, 0.45)'
                     }}>
                       {p.category || 'Service'}
                     </span>
                   </div>
 
-                  <div style={{ fontSize: '11px', color: 'rgba(255, 255, 255, 0.8)', marginBottom: '2px' }}>
+                  <div style={{ fontSize: '11px', color: 'rgba(255, 255, 255, 0.75)', marginBottom: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {p.description || p.processName}
                   </div>
 
-                  <div style={{ fontSize: '10px', color: 'rgba(255, 255, 255, 0.4)', fontFamily: 'monospace' }}>
+                  <div style={{ fontSize: '10px', color: 'rgba(255, 255, 255, 0.35)', fontFamily: 'ui-monospace, SFMono-Regular, monospace' }}>
                     PID {p.pid} • {p.processName} • {p.protocol}
                   </div>
                 </div>
@@ -289,24 +291,34 @@ export const ProcessPortManagerDrawer: React.FC<ProcessPortManagerDrawerProps> =
                   onClick={() => handleFreePort(p.port)}
                   disabled={freeingPort === p.port}
                   style={{
-                    padding: '6px 12px',
-                    borderRadius: '6px',
-                    border: '1px solid rgba(239, 68, 68, 0.3)',
-                    backgroundColor: 'rgba(239, 68, 68, 0.1)',
-                    color: '#f87171',
+                    padding: '4px 10px',
+                    borderRadius: '5px',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                    color: 'rgba(255, 255, 255, 0.65)',
                     fontSize: '11px',
-                    fontWeight: 600,
+                    fontWeight: 500,
                     cursor: freeingPort === p.port ? 'not-allowed' : 'pointer',
-                    opacity: freeingPort === p.port ? 0.6 : 1,
+                    opacity: freeingPort === p.port ? 0.5 : 1,
                     transition: 'all 0.15s ease',
                     display: 'inline-flex',
                     alignItems: 'center',
                     gap: '4px',
                     flexShrink: 0
                   }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.borderColor = 'rgba(239, 68, 68, 0.4)';
+                    e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.12)';
+                    e.currentTarget.style.color = '#f87171';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)';
+                    e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.05)';
+                    e.currentTarget.style.color = 'rgba(255, 255, 255, 0.65)';
+                  }}
                 >
                   <Trash2 size={11} />
-                  <span>{freeingPort === p.port ? 'Freeing...' : 'Free Port'}</span>
+                  <span>{freeingPort === p.port ? 'Freeing...' : 'Free'}</span>
                 </button>
               </div>
             ))
@@ -315,8 +327,8 @@ export const ProcessPortManagerDrawer: React.FC<ProcessPortManagerDrawerProps> =
 
         {/* Footer */}
         <div style={{
-          padding: '12px 20px',
-          borderTop: '1px solid rgba(255, 255, 255, 0.08)',
+          padding: '10px 16px',
+          borderTop: '1px solid rgba(255, 255, 255, 0.06)',
           backgroundColor: 'rgba(0, 0, 0, 0.2)',
           display: 'flex',
           justifyContent: 'space-between',
@@ -324,8 +336,8 @@ export const ProcessPortManagerDrawer: React.FC<ProcessPortManagerDrawerProps> =
           fontSize: '11px',
           color: 'rgba(255, 255, 255, 0.4)'
         }}>
-          <span>Cmd+Shift+P to toggle</span>
           <span>Auto-refreshes every 3s</span>
+          <span><kbd style={{ background: 'rgba(255,255,255,0.08)', padding: '1px 4px', borderRadius: '3px' }}>ESC</kbd> Close</span>
         </div>
       </div>
     </div>

@@ -87,23 +87,57 @@ export class OllamaProvider implements ModelProvider {
 
   public async generate(prompt: string, modelId: string = 'qwen2.5:1.5b', options?: GenerateOptions): Promise<ProviderResponse> {
     const startTime = performance.now();
-    const response = await fetch(`${this.baseUrl}/api/generate`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: modelId,
-        prompt,
-        format: options?.format === 'json' ? 'json' : options?.format,
-        stream: false,
-        think: false,
-        options: {
-          temperature: options?.temperature ?? 0.1,
-          top_p: options?.topP ?? 0.9,
-          num_predict: options?.maxTokens ?? 2048,
-          stop: options?.stopSequences
+    const timeoutMs = options?.timeoutMs ?? 180000;
+    const controller = new AbortController();
+    const timeoutHandle = setTimeout(() => controller.abort(), timeoutMs);
+
+    const isChat = Array.isArray(options?.messages) && options.messages.length > 0;
+    const endpoint = isChat ? `${this.baseUrl}/api/chat` : `${this.baseUrl}/api/generate`;
+    const payload = isChat
+      ? {
+          model: modelId,
+          messages: options!.messages,
+          stream: false,
+          options: {
+            temperature: options?.temperature ?? 0.1,
+            top_p: options?.topP ?? 0.9,
+            num_predict: options?.maxTokens ?? 1024,
+            num_thread: 8,
+            stop: options?.stopSequences
+          }
         }
-      })
-    });
+      : {
+          model: modelId,
+          prompt,
+          format: options?.format === 'json' ? 'json' : options?.format,
+          stream: false,
+          think: false,
+          options: {
+            temperature: options?.temperature ?? 0.1,
+            top_p: options?.topP ?? 0.9,
+            num_predict: options?.maxTokens ?? 1024,
+            num_thread: 8,
+            stop: options?.stopSequences
+          }
+        };
+
+    let response: Response;
+    try {
+      response = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        signal: controller.signal,
+        body: JSON.stringify(payload)
+      });
+    } catch (err: any) {
+      clearTimeout(timeoutHandle);
+      if (err.name === 'AbortError' || controller.signal.aborted) {
+        throw new Error(`[OllamaProvider] Model inference timed out after ${Math.round(timeoutMs / 1000)}s.`);
+      }
+      throw err;
+    } finally {
+      clearTimeout(timeoutHandle);
+    }
 
     const latencyMs = performance.now() - startTime;
 
@@ -115,11 +149,18 @@ export class OllamaProvider implements ModelProvider {
     const promptTokens = data.prompt_eval_count || 0;
     const completionTokens = data.eval_count || 0;
 
-    let content = (typeof data.response === 'string' && data.response.trim().length > 0)
-      ? data.response
-      : (typeof data.thinking === 'string' && data.thinking.trim().length > 0)
-        ? data.thinking
-        : (data.response || '');
+    let content = '';
+    if (isChat && data.message) {
+      content = (typeof data.message.content === 'string' && data.message.content.trim().length > 0)
+        ? data.message.content
+        : (typeof data.message.thinking === 'string' ? data.message.thinking : '');
+    } else {
+      content = (typeof data.response === 'string' && data.response.trim().length > 0)
+        ? data.response
+        : (typeof data.thinking === 'string' && data.thinking.trim().length > 0)
+          ? data.thinking
+          : (data.response || '');
+    }
 
     return {
       content,

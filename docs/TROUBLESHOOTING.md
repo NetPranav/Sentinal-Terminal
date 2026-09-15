@@ -1,44 +1,66 @@
-# Sentinel Terminal Troubleshooting & Maintenance Guide
+# Sentinel Terminal — Troubleshooting & Diagnostics Guide
 
-Encountering an unexpected behavior while utilizing Sentinel? Follow these simple resolution steps to maintain peak operational performance for both your shell sessions and local AI engine.
+Encountering an unexpected behavior in Sentinel? Follow these step-by-step diagnostic and resolution procedures for the embedded AI engine, terminal PTY, and Linux desktop integration.
 
 ---
 
-## 🤖 Local AI Runtime Connectivity
+## 1. Embedded AI Inference Engine Diagnostics
 
-### AI Planner Reports "Connection Error" or Inactivity
-If natural language commands (such as `"open youtube.com in safari"`) result in a backend connection error or slow timeout:
-1. **Verify Ollama Service**: Confirm that your local Ollama desktop engine is running in the background. You can start Ollama directly from your applications folder or verify from a terminal tab by typing:
+### A. AI Status Shows "AI: Off" in Bottom Status Bar
+If the status indicator displays `AI: Off`:
+1. **Check AI Settings**: Click the `AI: Off` button or open AI Settings via the Command Palette (`Ctrl+Shift+P`).
+2. **Start Engine Manually**: In the AI Settings drawer, click **Start Engine**. Sentinel will spawn `llama-server` on the next available port.
+3. **Check Port Availability**: The embedded server defaults to port `8080`. If another process occupies port 8080, Sentinel automatically increments to `8081`, `8082`, etc. Verify running status via:
    ```bash
-   ollama serve
+   curl http://localhost:8080/health
+   # or
+   curl http://localhost:8081/health
    ```
-2. **Confirm AI Model Presence**: Guarantee that the optimal lightweight model has been pulled to your machine:
+4. **Inspect Lingering Processes**: If an unexpected crash left an orphan process running, terminate it cleanly:
    ```bash
-   ollama list
-   # If missing, pull instantly:
-   ollama pull qwen2.5:1.5b
+   pkill -f llama-server
    ```
-3. **Check AI Engine Settings**: Open the system top menu bar under **`Personalization ➔ AI Engine & Model Settings...`** to confirm the correct endpoint port (`http://localhost:11434`) and model selection are enabled.
+
+### B. Slow AI Inference or GPU VRAM Exhaustion
+- **VRAM Exhaustion**: If running alongside heavy 3D rendering (e.g. Gazebo or Blender), your GPU may run out of memory for the 3B model.
+- **CPU Fallback**: In the AI Settings drawer, toggle **CPU Fallback Mode**. Sentinel will offload model computation layers to your host CPU threads, ensuring uninterrupted inference.
+
+### C. GBNF Grammar Initialization Errors
+- **Error Code 400 (`failed to parse grammar`)**: Older `llama-server` builds forbid underscores in rule names (e.g. `action_done`). Sentinel's `GbnfGrammarManager.ts` automatically sanitizes rule identifiers to hyphen-case (`action-done`).
+- If an unhandled grammar parse error occurs, `EmbeddedProvider.ts` automatically falls back to unconstrained JSON completion.
 
 ---
 
-## ⌨️ Shell Input & Keyboard Behaviors
+## 2. Shell Input, PTY & Keyboard Behaviors
 
-### Backspace Key Acting Like Spacebar in Custom zsh Profiles
-When launching packaged macOS desktop apps directly from Finder, system environment variables vary from developer command-line shells. Sentinel handles this natively by injecting `TERM=xterm-256color`, `COLORTERM=truecolor`, and `LANG=en_US.UTF-8` automatically.
-- **Resolution**: Ensure you are running the latest official application build of **`Sentinel Terminal.app`**. If you maintain customized `.zshrc` bindkeys, ensure standard backward character deletion mappings are preserved:
-  ```bash
-  bindkey '^?' backward-delete-char
-  ```
+### A. `Ctrl+Shift+P` vs. `Ctrl+Alt+P` Conflict
+- **Command Palette**: Bound to **`Ctrl + Shift + P`** (or `Cmd + Shift + P`).
+- **Listening Ports Drawer**: Bound to **`Ctrl + Alt + P`** (or `Ctrl + Option + P`).
+- If a shortcut does not trigger, open **`[F1 help]`** in the status bar to verify active keybindings.
 
-### CLI Command "Not Found" for Ollama, Brew, or Node in Standalone App
-- **Automatic Path Enrichment**: Sentinel automatically incorporates standard macOS distribution directories into your application session (including `/opt/homebrew/bin`, `/usr/local/bin`, and system directories). If you rely on custom installation pathways (such as `.nvm` or `.pyenv`), confirm they are exported directly within your `.zshenv` or `.zprofile` initialization scripts.
+### B. `Ctrl+R` History Search Interception
+- Sentinel intercepts `Ctrl+R` in the terminal to display an interactive, visual fuzzy history search modal.
+- If raw bash reverse-search (`(reverse-i-search)`) appears instead, ensure your terminal is running Sentinel version 5.0+ where keydown events are captured prior to PTY byte transmission.
+
+### C. Fullscreen Interactive Programs (`vim`, `nano`, `htop`, `tmux`)
+- Sentinel's PTY state tracker detects the alternate screen buffer (`\x1b[?1049h`) and automatically suspends ghost-text autocompletions and output observers, preventing cursor jumping or display glitches during interactive editing.
 
 ---
 
-## 🍎 macOS Permissions & Application Control
+## 3. Linux Desktop & Wayland Integration
 
-### "Operation Not Permitted" When Killing Processes or Launching Web Apps
-When executing conversational automation (such as `"stop chrome"` or `"open google.com in chrome"`):
-- **Desktop Launcher Privileges**: On initial launch, macOS may prompt you for confirmation to automate application switching or execute Launch Services. Select **Allow** in your macOS dialog prompt to guarantee uninterrupted conversational execution.
-- **Security Guardrails**: If Sentinel blocks a requested filesystem cleanup operation, inspect the interactive terminal notification. Destructive operations require confirming administrative risk credentials to prevent unintentional system loss.
+### A. Virtual Keyboard & Mouse Automation (`ydotoold`)
+- For desktop application automation under Wayland / Hyprland, Sentinel interfaces with `ydotoold`.
+- If automation commands fail with `cannot open /dev/uinput`:
+  1. Add your user to the `input` group:
+     ```bash
+     sudo usermod -aG input $USER
+     ```
+  2. Ensure the `ydotool` systemd user daemon is active:
+     ```bash
+     systemctl --user enable --now ydotool
+     ```
+
+### B. Missing Binaries in Standalone App
+- Sentinel automatically incorporates standard paths into session environments (`/usr/local/bin`, `~/.cargo/bin`, `~/.local/bin`, `/opt/homebrew/bin`).
+- If custom toolchains (e.g. `nvm`, `pyenv`, `asdf`) are not found, ensure their exports are present in `~/.bashrc` or `~/.zshrc`.

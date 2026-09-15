@@ -14,6 +14,7 @@
  */
 
 import { ModelProvider, ModelMetadata, GenerateOptions, ProviderResponse } from './Provider';
+import { EmbeddedEngineManager } from '../models/EmbeddedEngineManager';
 
 const EMBEDDED_PORT = 8847;
 const EMBEDDED_BASE_URL = `http://localhost:${EMBEDDED_PORT}`;
@@ -134,8 +135,24 @@ export class EmbeddedProvider implements ModelProvider {
    * Generate text using the embedded llama-server.
    * Uses /v1/chat/completions (OpenAI-compatible) as primary — best for instruct models.
    * Falls back to raw /completion endpoint if chat endpoint fails.
+   * Tagged with sessionId and requestId for per-tab request isolation.
    */
   public async generate(prompt: string, _modelId?: string, options?: GenerateOptions): Promise<ProviderResponse> {
+    const sessionId = options?.sessionId || 'default-session';
+    const requestId = options?.requestId || `req_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+
+    return EmbeddedEngineManager.getInstance().enqueueInference(sessionId, requestId, async () => {
+      return this.executeInference(prompt, sessionId, requestId, options, true);
+    });
+  }
+
+  private async executeInference(
+    prompt: string,
+    sessionId: string,
+    requestId: string,
+    options?: GenerateOptions,
+    allowOomRecovery = true
+  ): Promise<ProviderResponse> {
     const startTime = performance.now();
 
     let messages: { role: string; content: string }[];
@@ -181,11 +198,17 @@ export class EmbeddedProvider implements ModelProvider {
       }
     }
 
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      'X-Session-ID': sessionId,
+      'X-Request-ID': requestId
+    };
+
     // Primary: OpenAI-compatible chat completions (best for instruct models)
     try {
       const response = await fetch(`${this.baseUrl}/v1/chat/completions`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({
           messages,
           max_tokens: options?.maxTokens ?? 256,
@@ -202,7 +225,8 @@ export class EmbeddedProvider implements ModelProvider {
       });
 
       if (!response.ok) {
-        throw new Error(`Chat completion failed: ${response.status}`);
+        const errText = await response.text().catch(() => '');
+        throw new Error(`Chat completion failed: ${response.status} ${errText}`);
       }
 
       const data = await response.json() as any;
@@ -220,11 +244,26 @@ export class EmbeddedProvider implements ModelProvider {
         latencyMs
       };
     } catch (chatError) {
+      // If error was caused by grammar parsing failure, retry immediately without grammar constraint
+      if (options?.grammar && String(chatError).toLowerCase().includes('grammar')) {
+        console.warn('[EmbeddedProvider] Grammar rejected by llama-server, falling back to unconstrained inference:', chatError);
+        return this.executeInference(prompt, sessionId, requestId, { ...options, grammar: undefined }, allowOomRecovery);
+      }
+
+      // Check for GPU VRAM exhaustion on chat failure
+      if (allowOomRecovery && EmbeddedEngineManager.getInstance().isVramExhaustionError(chatError)) {
+        const recovered = await EmbeddedEngineManager.getInstance().handleOomCrash(String(chatError));
+        if (recovered) {
+          await this.waitForReady();
+          return this.executeInference(prompt, sessionId, requestId, options, false);
+        }
+      }
+
       // Fallback: raw /completion endpoint
       try {
         const response = await fetch(`${this.baseUrl}/completion`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers,
           body: JSON.stringify({
             prompt,
             n_predict: options?.maxTokens ?? 256,
@@ -237,7 +276,8 @@ export class EmbeddedProvider implements ModelProvider {
         });
 
         if (!response.ok) {
-          throw new Error(`Completion failed: ${response.status}`);
+          const errText = await response.text().catch(() => '');
+          throw new Error(`Completion failed: ${response.status} ${errText}`);
         }
 
         const data = await response.json() as any;
@@ -255,6 +295,14 @@ export class EmbeddedProvider implements ModelProvider {
           latencyMs
         };
       } catch (completionError) {
+        if (allowOomRecovery && EmbeddedEngineManager.getInstance().isVramExhaustionError(completionError)) {
+          const recovered = await EmbeddedEngineManager.getInstance().handleOomCrash(String(completionError));
+          if (recovered) {
+            await this.waitForReady();
+            return this.executeInference(prompt, sessionId, requestId, options, false);
+          }
+        }
+
         throw new Error(`[EmbeddedProvider] All inference endpoints failed. Chat: ${chatError}. Completion: ${completionError}`);
       }
     }

@@ -265,5 +265,45 @@ describe('ShadowPtySimulator — Speculative Shadow-PTY Simulation Engine', () =
       // PID 999999 does not exist, so exitCode is 1
       expect(report.evaluatedCandidates[0].exitCode).toBe(1);
     });
+
+    it('should route high-risk AST-only command to AST assessment without sandbox execution (0.5.5)', async () => {
+      const mockExecutor = vi.fn();
+      const mockSim = new ShadowPtySimulator({ executor: mockExecutor });
+
+      const report = await mockSim.speculate(
+        'delete all files from root',
+        'rm -rf /',
+        { os: 'linux', cwd: '/' }
+      );
+
+      // Should NOT have called the executor (skips sandbox execution!)
+      expect(mockExecutor).not.toHaveBeenCalled();
+
+      // Primary candidate should be evaluated via AST and pruned
+      const primary = report.evaluatedCandidates[0];
+      expect(primary.pruned).toBe(true);
+      expect(primary.stdout).toContain('AST-Only Assessment');
+      expect(primary.empiricalScore).toBeLessThan(0);
+    });
+
+    it('should transform cargo build to cargo check via dry-run routing (0.5.5)', async () => {
+      const mockExecutor = vi.fn().mockResolvedValue({ stdout: 'Finished dev profile', stderr: '', code: 0 });
+      const mockSim = new ShadowPtySimulator({ executor: mockExecutor });
+
+      const report = await mockSim.speculate(
+        'compile rust binary',
+        'cargo build --release',
+        { os: 'linux', cwd: '/tmp' }
+      );
+
+      expect(report.evaluatedCandidates[0].isPredicateTransformed).toBe(true);
+      expect(report.evaluatedCandidates[0].executedCommand).toBe('cargo check --release');
+      expect(mockExecutor).toHaveBeenCalledWith(
+        expect.any(String),
+        ['-c', 'cargo check --release'],
+        '/tmp'
+      );
+    });
   });
 });
+

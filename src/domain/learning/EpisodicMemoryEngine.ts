@@ -10,6 +10,8 @@
 
 import { invoke } from '@tauri-apps/api/core';
 import { safeBase64Encode } from '../../utils/encodingUtils';
+import { SecretRedactor } from '../security/SecretRedactor';
+import { ProjectFingerprint } from './ProjectFingerprint';
 
 export interface EpisodicMemory {
   id: string;
@@ -22,6 +24,11 @@ export interface EpisodicMemory {
   source: 'demonstration' | 'verified_execution' | 'explicit_teach';
   confidence: number;
   timesRetrieved: number;
+  projectFingerprint?: string; // Phase 0.5, Item 4
+  successCount?: number;       // Phase 0.5, Item 12
+  failCount?: number;          // Phase 0.5, Item 12
+  rollingSuccessRate?: number; // Phase 0.5, Item 12 (0.0 to 1.0)
+  retired?: boolean;           // Phase 0.5, Item 12 (<0.2 success rate)
 }
 
 export class EpisodicMemoryEngine {
@@ -51,18 +58,28 @@ export class EpisodicMemoryEngine {
       cwd?: string;
       os?: string;
       source?: 'demonstration' | 'verified_execution' | 'explicit_teach';
+      projectFingerprint?: string;
     }
   ): EpisodicMemory {
-    const cleanGoal = goal.trim();
-    const cleanCmd = command.trim();
+    const cleanGoal = SecretRedactor.redact(goal.trim());
+    const cleanCmd = SecretRedactor.redact(command.trim());
+    const cleanExplanation = options?.explanation ? SecretRedactor.redact(options.explanation) : undefined;
+    const projectFp = options?.projectFingerprint || ProjectFingerprint.compute(options?.cwd).fingerprint;
 
-    // Check if an existing memory for this goal already exists
+    // Check if an existing memory for this goal already exists in this project
     for (const mem of this.memories.values()) {
-      if (mem.goal.toLowerCase() === cleanGoal.toLowerCase()) {
+      if (
+        mem.goal.toLowerCase() === cleanGoal.toLowerCase() &&
+        (mem.projectFingerprint === projectFp || mem.projectFingerprint === 'global' || projectFp === 'global')
+      ) {
         mem.command = cleanCmd;
-        mem.explanation = options?.explanation || mem.explanation;
+        mem.explanation = cleanExplanation || mem.explanation;
         mem.timestamp = Date.now();
-        mem.confidence = Math.min(1.0, mem.confidence + 0.1);
+        mem.successCount = (mem.successCount || 0) + 1;
+        const total = (mem.successCount || 0) + (mem.failCount || 0);
+        mem.rollingSuccessRate = total > 0 ? (mem.successCount || 0) / total : 1.0;
+        mem.retired = false;
+        mem.confidence = Math.min(1.0, mem.rollingSuccessRate);
         this.saveMemories();
         this.appendTrainingSampleFromMemory(mem);
         return mem;
@@ -74,13 +91,18 @@ export class EpisodicMemoryEngine {
       id,
       goal: cleanGoal,
       command: cleanCmd,
-      explanation: options?.explanation || `Execute command: ${cleanCmd}`,
+      explanation: cleanExplanation || `Execute command: ${cleanCmd}`,
       cwd: options?.cwd,
       os: options?.os || (typeof process !== 'undefined' ? process.platform : 'darwin'),
       timestamp: Date.now(),
       source: options?.source || 'demonstration',
       confidence: 1.0,
-      timesRetrieved: 0
+      timesRetrieved: 0,
+      projectFingerprint: projectFp,
+      successCount: 1,
+      failCount: 0,
+      rollingSuccessRate: 1.0,
+      retired: false
     };
 
     this.memories.set(id, newMemory);
@@ -90,17 +112,84 @@ export class EpisodicMemoryEngine {
   }
 
   /**
+   * Records execution outcome (success/failure) for decay and rolling confidence tracking.
+   */
+  public recordOutcome(memoryIdOrGoal: string, success: boolean): boolean {
+    let target: EpisodicMemory | undefined;
+    if (this.memories.has(memoryIdOrGoal)) {
+      target = this.memories.get(memoryIdOrGoal);
+    } else {
+      const lower = memoryIdOrGoal.toLowerCase().trim();
+      for (const m of this.memories.values()) {
+        if (m.goal.toLowerCase() === lower || m.id === memoryIdOrGoal) {
+          target = m;
+          break;
+        }
+      }
+    }
+
+    if (!target) return false;
+
+    if (success) {
+      target.successCount = (target.successCount || 0) + 1;
+    } else {
+      target.failCount = (target.failCount || 0) + 1;
+    }
+
+    const total = (target.successCount || 0) + (target.failCount || 0);
+    target.rollingSuccessRate = total > 0 ? (target.successCount || 0) / total : 1.0;
+
+    // Retire flaky or stale patterns whose success rate drops below 0.2 (Phase 0.5, Item 12)
+    if (target.rollingSuccessRate < 0.2 && total >= 3) {
+      target.retired = true;
+      target.confidence = 0.05;
+    } else {
+      target.confidence = Math.max(0.1, target.rollingSuccessRate);
+    }
+
+    this.saveMemories();
+    return true;
+  }
+
+  /**
    * Retrieves top-K most semantically similar episodic memories for a given user goal.
    */
-  public retrieveSimilar(query: string, topK: number = 3, minScore: number = 0.1): EpisodicMemory[] {
+  public retrieveSimilar(
+    query: string, 
+    topK: number = 3, 
+    minScore: number = 0.1,
+    cwd?: string
+  ): EpisodicMemory[] {
     const queryTokens = this.tokenize(query);
     if (queryTokens.size === 0) return [];
+
+    const activeProjectFp = ProjectFingerprint.compute(cwd).fingerprint;
 
     const scored: { memory: EpisodicMemory; score: number }[] = [];
 
     for (const memory of this.memories.values()) {
+      // Skip retired patterns (success rate < 0.2)
+      if (memory.retired) {
+        continue;
+      }
+
       const memTokens = this.tokenize(memory.goal);
-      const score = this.calculateSimilarity(queryTokens, memTokens, query, memory.goal);
+      let score = this.calculateSimilarity(queryTokens, memTokens, query, memory.goal);
+
+      // Phase 0.5, Item 4: Project relevance adjustment
+      if (memory.projectFingerprint) {
+        if (memory.projectFingerprint === activeProjectFp) {
+          score += 0.25; // boost same-project matches
+        } else if (memory.projectFingerprint !== 'global' && activeProjectFp !== 'global') {
+          score *= 0.55; // penalize patterns from foreign/unrelated projects
+        }
+      }
+
+      // Phase 0.5, Item 12: Down-weight patterns with rollingSuccessRate < 0.5
+      if (typeof memory.rollingSuccessRate === 'number' && memory.rollingSuccessRate < 0.5) {
+        score *= memory.rollingSuccessRate;
+      }
+
       if (score >= minScore) {
         scored.push({ memory, score });
       }
@@ -150,7 +239,11 @@ export class EpisodicMemoryEngine {
     }
 
     try {
-      const sample = JSON.stringify({ messages });
+      const sanitizedMessages = messages.map(m => ({
+        role: m.role,
+        content: SecretRedactor.redact(m.content)
+      }));
+      const sample = JSON.stringify({ messages: sanitizedMessages });
       const b64 = safeBase64Encode(sample + '\n');
       const cmd = `mkdir -p "$HOME/.sentinel/training" && echo '${b64}' | base64 --decode >> "$HOME/.sentinel/training/sentinel_shell_dataset.jsonl"`;
 

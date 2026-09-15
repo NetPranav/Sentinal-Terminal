@@ -68,4 +68,39 @@ describe('DemonstrationLearningEngine — Experiential Learning & Pattern Genera
     expect(engine.getAllPatterns().length).toBe(0);
     expect(engine.matchGoal('test command').matched).toBe(false);
   });
+
+  it('redacts secrets from demonstrated and explicitly taught patterns', () => {
+    const pattern = engine.learnExplicit(
+      'connect to db with password="super_secret_123"',
+      'psql -h localhost -U admin -W "super_secret_123" && export AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE',
+      'auth_token: abcdef123456789'
+    );
+
+    expect(pattern.originalGoal).toContain('[REDACTED:SECRET_VALUE]');
+    expect(pattern.originalGoal).not.toContain('super_secret_123');
+    expect(pattern.commandTemplate).toContain('[REDACTED:AWS_KEY]');
+    expect(pattern.commandTemplate).not.toContain('AKIAIOSFODNN7EXAMPLE');
+    expect(pattern.explanation).toContain('[REDACTED:SECRET_VALUE]');
+  });
+
+  it('tags patterns with project fingerprint and updates pattern confidence on outcome (0.5.4 & 0.5.12)', () => {
+    const pattern = engine.learnExplicit(
+      'build release binary',
+      'cargo build --release',
+      'Compiles release binary for Rust project',
+      '/workspace/rust-app'
+    );
+
+    expect(pattern.projectFingerprint).toBeDefined();
+    expect(pattern.successCount).toBe(1);
+    expect(pattern.failCount).toBe(0);
+    expect(pattern.rollingSuccessRate).toBe(1.0);
+
+    // Record a failure
+    engine.recordPatternOutcome(pattern.id, false);
+    const updated = engine.getAllPatterns().find(p => p.id === pattern.id)!;
+    expect(updated.failCount).toBe(1);
+    expect(updated.rollingSuccessRate).toBe(0.5);
+  });
 });
+

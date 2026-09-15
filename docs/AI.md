@@ -1,51 +1,103 @@
 # Sentinel Terminal — Local AI Cognitive Architecture
 
-Sentinel brings native desktop computing and offline artificial intelligence together. Instead of requiring subscription APIs or transmitting sensitive project code across external internet servers, Sentinel natively coordinates an offline Large Language Model engine operating directly on your computer hardware.
+Sentinel brings native desktop computing and offline artificial intelligence together. Unlike cloud-based assistants that transmit sensitive code, environment credentials, and terminal buffers to external servers, Sentinel operates an in-app embedded Large Language Model engine directly on local machine hardware with zero external dependencies.
 
 ---
 
-## 🚀 Privacy-First Offline Processing
+## 1. Embedded In-App Inference Engine
 
-### Zero-Data Leakage Architecture
-Traditional developer AI assistants transmit command terminal history, environment secrets, and private repository architecture over remote API endpoints. Sentinel flips this paradigm completely:
-- **Local Inference**: All intelligence reasoning executes entirely inside your localized desktop memory footprint.
-- **Strict Network Isolation**: Whether you are traveling without internet access or operating in secure, air-gapped corporate development environments, your terminal AI continues functioning at full capability without external connectivity.
+### A. Zero-Ollama Embedded Server
+- **Native llama-server Integration**: Sentinel bundles an embedded, standalone `llama-server` binary natively managed by Tauri's Rust backend (`src-tauri/src/embedded_server.rs`).
+- **Zero External Dependencies**: Users do not need to install, run, or configure Ollama or any external daemon. Sentinel handles process spawning, port discovery (defaulting to `8080` with automatic port-conflict incrementing), health polling, and clean child-process termination on application exit.
+- **Auto-Start on Application Launch**: When Sentinel opens, the embedded inference engine automatically initializes in the background. Live engine status is reflected on the bottom bar (`StatusBar.tsx`).
+- **Optional External Ollama Fallback**: For users with pre-existing Ollama models or remote inference servers, Sentinel retains a high-performance `OllamaProvider.ts` with instant toggle capability in the AI Settings drawer.
 
----
+### B. Bundled Model Profile: Qwen 2.5 Coder 3B GGUF
+- **Target Model**: `Qwen2.5-Coder-3B-Instruct` quantized in 4-bit / 8-bit GGUF format.
+- **Hardware Acceleration**: Automatically compiles with and utilizes GPU acceleration backends (**Vulkan** on Linux, **CUDA** on NVIDIA, and **Metal** on Apple Silicon).
+- **Graceful CPU Degradation**: If GPU VRAM is exhausted or hardware acceleration is unavailable, Sentinel seamlessly falls back to CPU thread layers without crashing or throwing unhandled errors.
 
-## ⚡ Accelerated Hardware Optimization
-
-Sentinel works alongside modern runtime infrastructure (including **Ollama**) to deliver near-instantaneous command processing:
-- **Apple Silicon & CoreML Adaptations**: Takes full advantage of unified memory architectures (M1, M2, M3, and M4 chips) using dedicated GPU/NPU Metal hardware pipelines for sub-second responses.
-- **Lightweight Intelligence Models**: By utilizing optimized architectural profiles like **Qwen 2.5 (1.5B / 3B / 7B)**, Sentinel delivers high-precision shell navigation translations and operating system automation without slowing down your machine or eating into compiling CPU resources.
-
----
-
-## 🧠 Cognitive Architecture: How Small Models Punch Above Their Weight
-
-Small local models often hallucinate or fail when presented with dozens of tool schemas at once. Sentinel solves this through a **Three-Pillar Cognitive Architecture**:
-
-### 1. Dynamic Domain Tool Pruning (Laser-Focused Context)
-Instead of dumping 100+ raw tool definitions into a small model's prompt:
-1. Sentinel's lightweight classifier determines the intent domain (`DevOps`, `SystemServices`, `Filesystem`, `Hardware`, `AppControl`).
-2. Only the **4 to 6 tools relevant to that domain** are dynamically injected into the context window.
-3. This eliminates context clutter, prevents argument hallucination, and enables a 3B model to execute with the precision of a 70B frontier model.
-
-### 2. "Probe Before You Leap" Discovery Engine
-When a user asks for a target not in the current directory (`>run my gazebo`, `>start robotics node`):
-- Sentinel does not blindly guess or fail with `command not found`.
-- It executes a **Discovery Probe** across development workspaces (scanning for `package.xml`, `launch.py`, `docker-compose.yml`, `Cargo.toml`).
-- If multiple candidates exist, it pauses and presents an **Interactive Disambiguation Menu** so the user can select their target with 1 keystroke.
-
-### 3. In-Loop Error Self-Healing & Physical Action Pausing
-When a command fails:
-- **Software Errors**: Sentinel inspects `stderr` and exit codes, formulates a corrective sub-phase (e.g. `Phase 2.1: Free port 3000`), and retries automatically.
-- **Physical Action Required**: If the error requires human intervention (`device offline`, `insert USB`, `power on hardware`), Sentinel enters the **`AwaitingPhysicalConfirmation`** state, prompts the user clearly, and resumes execution the moment confirmation is provided.
+### C. GBNF Grammar-Constrained Sampling
+- **Deterministic Tool Calling**: Raw LLM output is constrained through Backus-Naur Form (GBNF) grammar schemas managed by `GbnfGrammarManager.ts`.
+- **Zero Parse Failures**: The model is mathematically forbidden from emitting malformed JSON, unclosed quotes, or illegal tool signatures. Every token sampled adheres to Sentinel's strictly validated tool schema.
+- **Unconstrained Fallback**: If an unsupported grammar rule or sampler initialization error occurs, `EmbeddedProvider.ts` automatically falls back to unconstrained JSON completion.
 
 ---
 
-## ⚙️ Customizing AI Engine Settings
+## 2. Real-Time Prompt Progress & Latency Estimation
 
-Adjust AI behavior directly from your macOS system screen header:
-1. Click **`Personalization ➔ AI Engine & Model Settings...`** in your top monitor menu bar.
-2. Select your preferred local model profile, adjust responsiveness thresholds, or switch underlying localized host endpoints effortlessly.
+### A. Prompt Lifecycle & Bottom Bar Indicator
+Whenever a natural language prompt is executed (e.g. `> write a python script...` or auto-heal remediation):
+- **Dynamic Progress Crawling**: `PromptProgressManager.ts` tracks the live execution lifecycle:
+  - `Thinking...` (30%)
+  - `Planning...` (50%)
+  - `Running: <tool/command>` (75%)
+  - `Executing...` (82%)
+  - `Verifying...` (92%)
+  - `Done` (100%)
+- **Hardware-Adaptive Time Estimation**: Employs an exponential moving average (EMA) of inference latency that automatically calibrates remaining time countdowns (`~1.8s`) based on user hardware speed (GPU vs. CPU mode).
+- **Sleek Micro-Progress Bar**: Rendered in the bottom `StatusBar.tsx` with high-contrast monochrome percentages and a smooth 36px progress track.
+
+---
+
+## 3. Cognitive Architecture & Multi-Domain Tool Routing
+
+Small local models often hallucinate or struggle when exposed to dozens of complex tools simultaneously. Sentinel overcomes this through a multi-pillar cognitive pipeline:
+
+### A. Dynamic Domain Tool Pruning
+Instead of saturating context with 100+ raw tool specifications:
+1. Sentinel's lightweight classifier determines the intent domain among 9 specialized functional domains:
+   - *Domain 1: System Diagnostics & Hardware Monitoring*
+   - *Domain 2: Process Management & Resource Optimization*
+   - *Domain 3: Network Diagnostics, Ports & Connections*
+   - *Domain 4: Filesystem, Directory Navigation & Search*
+   - *Domain 5: Git & Developer Lifecycle Workflows*
+   - *Domain 6: Linux Daemons & Systemd Services*
+   - *Domain 7: Desktop Applications & UI Automation*
+   - *Domain 8: Linux Dotfiles & Rice Management (Hyprland)*
+   - *Domain 9: Multi-Stage Composite Workflows*
+2. Only the **4 to 6 tools relevant to the classified domain** are injected into the active context window.
+3. This eliminates context clutter, prevents argument hallucination, and enables a 3B model to execute with the accuracy of frontier models.
+
+### B. "Probe Before You Leap" Discovery Engine
+When target files, robotics nodes, or build targets are not in the current directory (`>run my gazebo`, `>start robotics node`):
+- Executes a **Discovery Probe** across development workspaces (scanning for `package.xml`, `*.launch.py`, `Cargo.toml`, `docker-compose.yml`).
+- If multiple candidates exist, presents an interactive disambiguation menu so the user can select their target with 1 keystroke.
+
+### C. In-Loop Self-Healing & Failure Classification
+When an automated command fails:
+- **Failure Classification**: `FailureClassifier.ts` analyzes `stderr`, exit codes, and output patterns to distinguish between missing binaries, incorrect flags, environment misconfigurations, and physical device disconnections.
+- **Automated Sub-Phases**: Sentinel injects dynamic remediation steps (e.g. `Phase 2.1: Terminate process on port 3000`) and automatically retries.
+- **Physical Action Confirmation**: If human intervention is required (e.g., plugging in a USB drive or powering on hardware), Sentinel enters `AwaitingPhysicalConfirmation`, prompts the user, and resumes upon confirmation.
+
+---
+
+## 4. Continuous Learning & Memory Engines
+
+### A. Episodic Memory Engine (`EpisodicMemoryEngine.ts`)
+- Stores execution trajectories, intent embeddings, and user corrections in localized storage (`~/.sentinel/memory/`).
+- Future prompts matching past goals query episodic memory to replay proven command patterns instantaneously.
+
+### B. Demonstration Learning Engine (`DemonstrationLearningEngine.ts`)
+- If an AI prompt fails or is unresolved, and the user manually executes the correct terminal command within 3 minutes, Sentinel automatically links the user's command to the goal.
+- Generates verified pattern templates in `~/.sentinel/learned_patterns.json` so the AI remembers the exact solution next time.
+
+### C. Sentinel SERL Coordinator (`SentinelSerlCoordinator.ts`)
+- Implements Self-Evolving Reinforcement Learning (SERL).
+- Logs successful command executions into instruction-tuning datasets:
+  - **SFT Dataset**: Supervised fine-tuning pairs (`sentinel_sft_dataset.jsonl`).
+  - **DPO Dataset**: Direct preference optimization pairs (`sentinel_dpo_dataset.jsonl`).
+- Enables localized LoRA fine-tuning tailored to the user's specific developer environment and aliases.
+
+### D. Session Undo Log & Destructive Rollback (`UndoLog.ts`)
+- Records reversible operations (file creations, package installations, branch switches).
+- Users can inspect recent actions by asking `>what did you just do` and trigger deterministic rollback via `>undo last step`.
+
+---
+
+## 5. Security & Guardrails
+
+- **Categorical Policy Engine**: Categorizes actions into `SAFE`, `CONFIRMATION_REQUIRED`, `ADMIN_REQUIRED`, and `BLOCKED` (replacing scalar risk scores).
+- **Asynchronous Consent Queue**: High-risk operations (e.g., `rm -rf`, disk formatting, service kills) are routed through a non-blocking UI confirmation modal before execution.
+- **AST Shell Validation**: All model-generated shell commands are parsed by `ShellAstParser.ts` prior to execution to catch hidden subshells, command injection, or obfuscated payloads (`eval`, `base64 -d | bash`).
+- **Secret Redaction**: Redacts API keys, tokens, and passwords prior to writing traces to disk or terminal logs.

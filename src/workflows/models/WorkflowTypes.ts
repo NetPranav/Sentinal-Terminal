@@ -304,3 +304,42 @@ export interface WorkflowExportPayload {
   readonly templateId?: string;
   readonly checksum: string;
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Phase 1: Saved Workflow JSON File Schema (Version 1)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const CURRENT_WORKFLOW_SCHEMA_VERSION = 1;
+
+export interface EnvironmentPrerequisites {
+  readonly requiredBinaries?: string[];
+  readonly requiredEnvVars?: string[];
+  readonly requiredPorts?: number[];
+  readonly requiredPaths?: string[];
+}
+
+export interface WorkflowStepDefinition {
+  readonly id: string;
+  readonly name: string;
+  readonly command: string;
+  readonly cwd?: string;
+  readonly timeoutMs?: number;
+  readonly expectedExitCode?: number;
+  readonly validationCriteria?: string;
+  readonly dependsOn?: string[];
+  readonly isDestructive?: boolean;
+}
+
+export interface SavedWorkflowDefinition {
+  readonly schemaVersion: number;
+  readonly name: string;
+  readonly description?: string;
+  readonly steps: WorkflowStepDefinition[];
+  readonly parameters?: WorkflowVariable[];
+  readonly environmentPrerequisites?: EnvironmentPrerequisites;
+  readonly createdAt: number;
+  readonly updatedAt: number;
+  readonly author?: string;
+  readonly tags?: string[];
+}
+

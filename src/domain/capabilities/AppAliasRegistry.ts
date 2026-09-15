@@ -26,6 +26,9 @@ export class AppAliasRegistry {
     'microsoft edge': 'Microsoft Edge',
     'firefox': 'Firefox',
     'brave': 'Brave Browser',
+    'zen': 'zen-browser',
+    'zen browser': 'zen-browser',
+    'zen-browser': 'zen-browser',
     'sublime': 'Sublime Text',
     'pycharm': 'PyCharm',
     'intellij': 'IntelliJ IDEA',
@@ -113,6 +116,9 @@ export class AppAliasRegistry {
     }
   }
 
+  private discoveredApps: Map<string, string> = new Map();
+  private isScanningApps = false;
+
   private initStorage(): void {
     if (typeof localStorage !== 'undefined') {
       try {
@@ -140,7 +146,92 @@ export class AppAliasRegistry {
           }
         })
         .catch(() => { /* Ignore in environments without native backend */ });
+
+      // Scan installed desktop applications dynamically
+      this.scanInstalledApplications().catch(() => { /* Ignore */ });
     }
+  }
+
+  /**
+   * Dynamically scan native desktop application entry files (.desktop on Linux, /Applications on macOS)
+   * into executable application mappings.
+   */
+  public async scanInstalledApplications(): Promise<Map<string, string>> {
+    if (this.discoveredApps.size > 0 && !this.isScanningApps) {
+      return this.discoveredApps;
+    }
+    this.isScanningApps = true;
+
+    try {
+      if (typeof window !== 'undefined' && Boolean((window as any).__TAURI_INTERNALS__)) {
+        const { invoke: nativeInvoke } = await import('@tauri-apps/api/core');
+
+        const pyScanner = `python3 -c "
+import os, glob, re, shutil, json
+
+apps = {}
+dirs = [
+    '/usr/share/applications',
+    '/usr/local/share/applications',
+    os.path.expanduser('~/.local/share/applications'),
+    '/var/lib/flatpak/exports/share/applications',
+    os.path.expanduser('~/.local/share/flatpak/exports/share/applications'),
+    '/var/lib/snapd/desktop/applications'
+]
+
+for d in dirs:
+    if not os.path.isdir(d): continue
+    for f in glob.glob(os.path.join(d, '*.desktop')):
+        try:
+            with open(f, 'r', encoding='utf-8', errors='ignore') as fp:
+                name, exec_cmd = None, None
+                for line in fp:
+                    line = line.strip()
+                    if line.startswith('Name=') and not name:
+                        name = line[5:].strip()
+                    elif line.startswith('Exec=') and not exec_cmd:
+                        raw = line[5:].strip()
+                        clean = re.sub(r'%[a-zA-Z]', '', raw).strip()
+                        exec_cmd = clean.split()[0] if clean else None
+                    if name and exec_cmd: break
+                if name and exec_cmd:
+                    base = os.path.splitext(os.path.basename(f))[0].lower()
+                    executable = None
+                    for cand in [f'{base}-browser', base, os.path.basename(exec_cmd), exec_cmd]:
+                        if cand and shutil.which(cand):
+                            executable = cand
+                            break
+                    if not executable and os.path.isabs(exec_cmd) and os.path.exists(exec_cmd):
+                        executable = exec_cmd
+                    if executable:
+                        apps[name.lower()] = executable
+                        apps[base] = executable
+                        clean_name = re.sub(r'\\s+(browser|editor|terminal|client|player)$', '', name.lower())
+                        apps[clean_name] = executable
+        except: pass
+
+print(json.dumps(apps))
+" 2>/dev/null`;
+
+        const res = await nativeInvoke<{ stdout: string }>('execute_command', {
+          command: 'sh',
+          args: ['-c', pyScanner]
+        });
+        const stdout = (res?.stdout || '').trim();
+        if (stdout.startsWith('{')) {
+          const parsed = JSON.parse(stdout) as Record<string, string>;
+          for (const [k, v] of Object.entries(parsed)) {
+            if (k && v) this.discoveredApps.set(k.toLowerCase().trim(), v);
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('[AppAliasRegistry] Desktop application scan failed:', e);
+    } finally {
+      this.isScanningApps = false;
+    }
+
+    return this.discoveredApps;
   }
 
   private saveState(): void {
@@ -178,19 +269,60 @@ export class AppAliasRegistry {
       .trim();
     const lower = clean.toLowerCase();
 
-    // Check direct alias lookup
+    // 1. Direct explicit alias lookup
     if (this.aliases.has(lower)) {
       return this.aliases.get(lower)!;
     }
 
-    // Check if stripping .app suffix matches
+    // 2. Check if stripping .app suffix matches
     const noApp = lower.replace(/\.app$/i, '').trim();
     if (this.aliases.has(noApp)) {
       return this.aliases.get(noApp)!;
     }
 
+    // 3. Dynamically discovered desktop applications
+    if (this.discoveredApps.has(lower)) {
+      return this.discoveredApps.get(lower)!;
+    }
+    if (this.discoveredApps.has(noApp)) {
+      return this.discoveredApps.get(noApp)!;
+    }
+
+    // 4. Fuzzy match in discovered applications
+    for (const [key, executable] of this.discoveredApps.entries()) {
+      if (key === lower || key.startsWith(`${lower} `) || key.endsWith(` ${lower}`) || key.includes(` ${lower} `)) {
+        return executable;
+      }
+    }
+
     // Otherwise return original trimmed name
     return clean;
+  }
+
+  /**
+   * Resolves an application name or alias to its actual executable binary command.
+   */
+  public resolveBinary(appNameOrAlias: string): string {
+    const resolved = this.resolve(appNameOrAlias);
+    const lower = resolved.toLowerCase();
+
+    const binaryMap: Record<string, string> = {
+      'visual studio code': 'code',
+      'vscode': 'code',
+      'google chrome': 'google-chrome-stable',
+      'chrome': 'google-chrome-stable',
+      'brave browser': 'brave',
+      'sublime text': 'subl',
+      'intellij idea': 'idea',
+      'zen browser': 'zen-browser',
+      'zen': 'zen-browser'
+    };
+
+    if (binaryMap[lower]) {
+      return binaryMap[lower];
+    }
+
+    return resolved;
   }
 
   /**

@@ -95,6 +95,17 @@ export class NodeTauriBridge {
   }
 
   /**
+   * Directly execute a command using the bridge.
+   */
+  public static execute(command: string, args: string[] = [], cwd?: string): { code: number; stdout: string; stderr: string } {
+    // When called with a bare command string (no args), use sh -c for shell evaluation
+    if (args.length === 0) {
+      return this.handleInvoke('execute_command', { command: 'sh', args: ['-c', command], cwd });
+    }
+    return this.handleInvoke('execute_command', { command, args, cwd });
+  }
+
+  /**
    * Core dispatcher handling Tauri command requests.
    */
   private static handleInvoke(cmd: string, payload: Record<string, any>): any {

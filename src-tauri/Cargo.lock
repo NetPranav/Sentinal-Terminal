@@ -4077,6 +4077,7 @@ dependencies = [
 name = "tauri-app"
 version = "2.0.0"
 dependencies = [
+ "libc",
  "objc",
  "once_cell",
  "parking_lot",

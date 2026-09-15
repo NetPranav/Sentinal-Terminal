@@ -35,4 +35,17 @@ describe('AgentLoop Conversational & Offline Resilience', () => {
     expect(res.success).toBe(true);
     expect(res.summary).toContain('Qwen 2.5 Coder 3B');
   });
+
+  it('answers ">what did you just do" with recent actions from UndoLog (0.5.9)', async () => {
+    const res = await agentLoop.run('>what did you just do', { os: 'darwin', cwd: '/tmp' });
+    expect(res.success).toBe(true);
+    expect(res.summary).toBeDefined();
+  });
+
+  it('handles ">undo last step" via UndoLog rollback (0.5.9)', async () => {
+    const res = await agentLoop.run('>undo last step', { os: 'darwin', cwd: '/tmp' });
+    // In empty session, reports no actions found
+    expect(res.summary).toContain('No destructive actions');
+  });
 });
+

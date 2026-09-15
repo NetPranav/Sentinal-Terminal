@@ -239,7 +239,7 @@ export class FilesystemSDKCapability extends BaseCapabilityDriver<FsDriverInput,
         case 'cd': {
           if (!resolvedPath) return { success: false, error: { code: 'MISSING_PATH', message: 'Path required' } };
           const stdout = `Changed directory to: ${targetPath}`;
-          return { success: true, data: { path: resolvedPath, stdout }, commandExecuted: `cd "${resolvedPath}"` };
+          return { success: true, data: { path: resolvedPath, stdout, code: 0 }, commandExecuted: `cd "${resolvedPath}"` };
         }
 
         case 'copy': {

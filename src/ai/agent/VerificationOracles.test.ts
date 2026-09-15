@@ -126,3 +126,72 @@ describe('VerificationOracles.verifyCriteria — Discriminative Oracle Verificat
     expect(oracle.passed).toBe(true);
   });
 });
+
+describe('VerificationOracles.verifyNoOsError — Strict Gate on Exit Codes & IPC Errors', () => {
+  it('DELIBERATE FAILURE: correctly rejects non-zero exit code (code 1 / 2)', () => {
+    const successResult: AgentResult = {
+      success: true,
+      summary: 'Command executed successfully',
+      steps: []
+    };
+    const failedCmd: CommandExecutionRecord = {
+      command: 'sh',
+      args: ['-c', 'ls /nonexistent'],
+      fullCommand: 'ls /nonexistent',
+      stdout: '',
+      stderr: 'ls: cannot access',
+      code: 2,
+      durationMs: 5,
+      timestamp: Date.now()
+    };
+
+    const oracle = VerificationOracles.verifyNoOsError(successResult, [failedCmd], failedCmd, 2);
+    expect(oracle.passed).toBe(false);
+    expect(oracle.message).toMatch(/exit code 2|cannot access/);
+  });
+
+  it('DELIBERATE FAILURE: correctly rejects Hyprland Lua dispatch parse error in stdout', () => {
+    const hyprError = 'error: [string "return hl.dispatch(focuswindow firefox)"]:1: \')\' expected near \'firefox\'';
+    const fakeResult: AgentResult = {
+      success: true,
+      summary: hyprError,
+      steps: []
+    };
+    const fakeCmd: CommandExecutionRecord = {
+      command: 'sh',
+      args: ['-c', 'hyprctl dispatch focuswindow firefox'],
+      fullCommand: 'hyprctl dispatch focuswindow firefox',
+      stdout: hyprError,
+      stderr: '',
+      code: 0,
+      durationMs: 5,
+      timestamp: Date.now()
+    };
+
+    const oracle = VerificationOracles.verifyNoOsError(fakeResult, [fakeCmd], fakeCmd, 0);
+    expect(oracle.passed).toBe(false);
+    expect(oracle.message).toContain('IPC Failure');
+  });
+
+  it('PASSES on clean exit code 0 and zero OS error text', () => {
+    const cleanResult: AgentResult = {
+      success: true,
+      summary: 'ok (Dispatches focus event for window firefox)',
+      steps: []
+    };
+    const cleanCmd: CommandExecutionRecord = {
+      command: 'sh',
+      args: ['-c', 'hyprctl dispatch ...'],
+      fullCommand: 'hyprctl dispatch ...',
+      stdout: 'ok (Dispatches focus event for window firefox)',
+      stderr: '',
+      code: 0,
+      durationMs: 5,
+      timestamp: Date.now()
+    };
+
+    const oracle = VerificationOracles.verifyNoOsError(cleanResult, [cleanCmd], cleanCmd, 0);
+    expect(oracle.passed).toBe(true);
+  });
+});
+

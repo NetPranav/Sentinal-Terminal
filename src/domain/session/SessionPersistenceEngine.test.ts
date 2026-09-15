@@ -69,4 +69,50 @@ describe('SessionPersistenceEngine (Issue 5.3)', () => {
     mockStore = {};
     expect(engine.loadSession()).toBeNull();
   });
+
+  it('preserves activePaneId across save and restore', async () => {
+    const tabs = [
+      { id: 't1', name: 'Dev', rootPane: { type: 'terminal', data: { id: 'pane_alpha' } } }
+    ];
+    engine.saveSession(tabs, 't1', { pane_alpha: '/opt/projects' }, 'pane_alpha', 0);
+    await new Promise(r => setTimeout(r, 10));
+
+    const restored = engine.loadSession();
+    expect(restored).not.toBeNull();
+    expect(restored?.activePaneId).toBe('pane_alpha');
+    expect(restored?.panePaths['pane_alpha']).toBe('/opt/projects');
+  });
+
+  it('safely handles corrupted or invalid JSON in storage', () => {
+    mockStore['sentinel_session_state'] = '{ "invalid_json": true, ... corrupted';
+    expect(engine.loadSession()).toBeNull();
+  });
+
+  it('safely handles malformed schema (missing tabs array)', () => {
+    mockStore['sentinel_session_state'] = JSON.stringify({ version: 1, tabs: "not_an_array" });
+    expect(engine.loadSession()).toBeNull();
+  });
+
+  it('clears stored session on clearSession call', () => {
+    mockStore['sentinel_session_state'] = JSON.stringify({ version: 1, tabs: [] });
+    engine.clearSession();
+    expect(mockStore['sentinel_session_state']).toBeUndefined();
+  });
+
+  it('saves and loads named workspace sessions', async () => {
+    const tabs = [
+      { id: 't1', name: 'Monitoring', rootPane: { type: 'terminal', data: { id: 'p_mon' } } }
+    ];
+    const saved = await engine.saveNamedSession('prod-cluster', tabs, 't1', { p_mon: '/var/log' });
+    expect(saved).toBe(true);
+
+    const loaded = await engine.loadNamedSession('prod-cluster');
+    expect(loaded).not.toBeNull();
+    expect(loaded?.tabs[0].name).toBe('Monitoring');
+    expect(loaded?.panePaths['p_mon']).toBe('/var/log');
+
+    const sessions = await engine.listSavedSessions();
+    expect(sessions).toContain('prod-cluster');
+  });
 });
+

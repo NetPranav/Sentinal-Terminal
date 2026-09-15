@@ -86,14 +86,18 @@ export class NetworkingCapability extends BaseCapabilityDriver<NetDriverInput, a
           args = [input.host];
           break;
 
-        case 'ports':
-          cmd = 'lsof';
-          args = input.port ? ['-i', `:${input.port}`, '-P', '-n'] : ['-i', '-P', '-n', '-sTCP:LISTEN'];
+        case 'ports': {
+          cmd = 'sh';
+          const innerCmd = input.port
+            ? `(lsof -i :${input.port} -P -n 2>/dev/null || ss -tulpn 2>/dev/null | grep :${input.port}) || true`
+            : `(lsof -i -P -n -sTCP:LISTEN 2>/dev/null || ss -tulpn 2>/dev/null) || true`;
+          args = ['-c', innerCmd];
           break;
+        }
 
         case 'interfaces':
-          cmd = 'ifconfig';
-          args = ['-a'];
+          cmd = 'sh';
+          args = ['-c', 'ip -br addr show 2>/dev/null || ip link show 2>/dev/null || ifconfig -a 2>/dev/null || true'];
           break;
 
         case 'dns':
@@ -129,7 +133,7 @@ export class NetworkingCapability extends BaseCapabilityDriver<NetDriverInput, a
             // Extract all occupied listening ports
             const occupied = new Set<number>();
             for (const line of stdout.split('\n')) {
-              const m = line.match(/:(\d+)\s+\(LISTEN\)/) || line.match(/:(\d+)$/);
+              const m = line.match(/:(\d+)\s+\(LISTEN\)/) || line.match(/:(\d+)$/) || line.match(/:(\d+)\b/);
               if (m) occupied.add(parseInt(m[1], 10));
             }
 
@@ -138,8 +142,9 @@ export class NetworkingCapability extends BaseCapabilityDriver<NetDriverInput, a
             const occupiedWeb = candidateWebPorts.filter(p => occupied.has(p));
 
             if (input.findFree || input.free || !stdout.trim()) {
+              const reqCount = input.count || 1;
               let msg = `Available Free Ports for Web Development:\n`;
-              freeWeb.forEach(p => {
+              freeWeb.slice(0, reqCount === 1 ? 4 : reqCount).forEach(p => {
                 const label = p === 3000 ? 'React / Next.js default' : p === 5173 ? 'Vite default' : p === 8080 ? 'HTTP alternate' : p === 8000 ? 'Python / Django default' : 'General Web';
                 msg += `  • Port ${p} (${label}) — Available ✅\n`;
               });

@@ -31,72 +31,8 @@ fn request_bluetooth_permission() {}
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
-        .setup(|app| {
+        .setup(|_app| {
             request_bluetooth_permission();
-
-            // Spawn Embedded LLM Sidecar
-            use tauri::Manager;
-            
-            // Find the llama-server binary — it's placed next to our main executable by Tauri
-            let exe_dir = std::env::current_exe()
-                .ok()
-                .and_then(|p| p.parent().map(|d| d.to_path_buf()));
-            
-            if let Some(exe_dir) = exe_dir {
-                // Model is in the resources directory
-                let model_path = if let Ok(resource_dir) = app.path().resource_dir() {
-                    resource_dir.join("resources/models/model.gguf")
-                } else {
-                    exe_dir.join("resources/models/model.gguf")
-                };
-                
-                let mut possible_paths = vec![
-                    exe_dir.join("llama-server"),                    // dev mode: target/debug/llama-server
-                    exe_dir.join("../MacOS/llama-server"),           // bundled .app: Contents/MacOS/llama-server
-                ];
-                if let Ok(home) = std::env::var("HOME") {
-                    possible_paths.push(std::path::PathBuf::from(home).join(".sentinel/bin/llama-server"));
-                }
-                possible_paths.push(std::path::PathBuf::from("/usr/bin/llama-server"));
-                possible_paths.push(std::path::PathBuf::from("/usr/local/bin/llama-server"));
-                
-                let binary_path = possible_paths.iter().find(|p| p.exists());
-                
-                match binary_path {
-                    Some(bin_path) => {
-                        let model_str = model_path.to_string_lossy().into_owned();
-                        let bin_str = bin_path.to_string_lossy().into_owned();
-                        println!("Starting llama-server: {} with model: {}", bin_str, model_str);
-                        // Get CPU thread count for optimal threading
-                        let n_threads = std::thread::available_parallelism()
-                            .map(|n| n.get())
-                            .unwrap_or(4)
-                            .to_string();
-                        
-                        match std::process::Command::new(bin_path)
-                            .args([
-                                "--port", "8847",
-                                "-m", &model_str,
-                                "-ngl", "99",           // Offload ALL layers to GPU
-                                "-t", &n_threads,       // Use all CPU threads for prompt processing
-                                "--flash-attn",         // Flash attention for faster inference
-                                "-b", "2048",           // Larger batch size for throughput
-                                "-c", "4096",           // Context window
-                                "--no-warmup",          // Skip warmup for faster startup
-                            ])
-                            .stdout(std::process::Stdio::null())
-                            .stderr(std::process::Stdio::null())
-                            .spawn()
-                        {
-                            Ok(child) => println!("Successfully spawned llama-server (pid: {})", child.id()),
-                            Err(e) => eprintln!("Failed to spawn llama-server: {}", e),
-                        }
-                    },
-                    None => {
-                        // Embedded llama-server not present; Sentinel falls back to Ollama or remote providers
-                    }
-                }
-            }
             
             #[cfg(target_os = "macos")]
             {
@@ -206,16 +142,38 @@ pub fn run() {
             process_cmds::get_launch_args,
             embedded_server::start_embedded_llm,
             embedded_server::stop_embedded_llm,
-            embedded_server::get_embedded_llm_status
+            embedded_server::get_embedded_llm_status,
+            embedded_server::acquire_inference_slot,
+            embedded_server::release_inference_slot,
+            embedded_server::cancel_session_requests,
+            embedded_server::get_inference_queue_status,
+            embedded_server::verify_file_checksum
         ])
+        .on_window_event(|window, event| {
+            if let tauri::WindowEvent::Destroyed = event {
+                use tauri::Manager;
+                if let Some(state) = window.try_state::<embedded_server::EmbeddedLlmState>() {
+                    embedded_server::terminate_embedded_llm_child(&state);
+                }
+            }
+        })
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
-        .run(|_app_handle, _event| {
-            #[cfg(any(target_os = "macos", target_os = "ios"))]
-            if let tauri::RunEvent::Opened { urls } = _event {
-                use tauri::Emitter;
-                let url_strings: Vec<String> = urls.into_iter().map(|u| u.to_string()).collect();
-                let _ = _app_handle.emit("sentinel-url", url_strings);
+        .run(|app_handle, event| {
+            match event {
+                tauri::RunEvent::ExitRequested { .. } | tauri::RunEvent::Exit => {
+                    use tauri::Manager;
+                    if let Some(state) = app_handle.try_state::<embedded_server::EmbeddedLlmState>() {
+                        embedded_server::terminate_embedded_llm_child(&state);
+                    }
+                }
+                #[cfg(any(target_os = "macos", target_os = "ios"))]
+                tauri::RunEvent::Opened { urls } => {
+                    use tauri::Emitter;
+                    let url_strings: Vec<String> = urls.into_iter().map(|u| u.to_string()).collect();
+                    let _ = app_handle.emit("sentinel-url", url_strings);
+                }
+                _ => {}
             }
         });
 }

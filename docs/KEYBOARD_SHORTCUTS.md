@@ -1,43 +1,69 @@
-# Sentinel Terminal Keyboard Shortcuts
+# Sentinel Terminal — Master Keyboard Shortcuts Guide
 
-Sentinel is engineered for rapid keyboard-first navigation and efficient control of multi-pane terminal workspaces. Use the following keyboard shortcuts to streamline your productivity.
+Sentinel is engineered for rapid keyboard-first navigation and efficient control of multi-pane terminal workspaces. All capabilities, navigation panels, and modal overlays are accessible via keybindings.
 
 ---
 
-## ⚡ Global Application Navigation
+## 1. Global Navigation & Developer Modals
 
-| Action | macOS Shortcut | Windows / Linux Shortcut | Description |
+| Action | Linux / Windows Shortcut | macOS Shortcut | Description |
 | :--- | :--- | :--- | :--- |
-| **Open Command Palette** | `Cmd + Shift + P` | `Ctrl + Shift + P` | Launches the interactive command palette for instant tool execution and settings search. |
-| **New Terminal Tab** | `Cmd + T` | `Ctrl + T` | Creates a new independent terminal session tab in your current workspace. |
-| **Close Current Tab** | `Cmd + W` | `Ctrl + W` | Closes the active terminal session and terminates any attached sub-processes safely. |
-| **Cycle Next Tab** | `Cmd + Shift + ]` or `Cmd + Tab` | `Ctrl + Shift + ]` | Switches focus immediately to the next open workspace tab. |
-| **Cycle Previous Tab** | `Cmd + Shift + [` | `Ctrl + Shift + [` | Switches focus immediately to the previously active workspace tab. |
+| **Open Command Palette** | `Ctrl + Shift + P` | `Cmd + Shift + P` | Launches the interactive prompt and capability search palette. |
+| **Inspect Listening Ports** | `Ctrl + Alt + P` | `Ctrl + Option + P` | Opens the Ports & Process Inspector drawer to monitor and kill listening processes. |
+| **Workspace & Project Switcher**| `Ctrl + O` | `Cmd + O` | Scans and switches between Git, Rust, Node, and ROS2 workspaces. |
+| **Fuzzy History Search** | `Ctrl + R` | `Ctrl + R` | Interactive fuzzy search across past command history with instant paste-to-terminal. |
+| **Terminal Find / Search** | `Ctrl + F` | `Cmd + F` | Opens floating terminal search bar overlay with match counters. |
+| **Toggle Zen / Visual Mode** | `Ctrl + Shift + Z` | `Cmd + Shift + Z` | Switches between distraction-free Zen mode and full Visual Mode with quick buttons. |
+| **Keyboard Shortcuts & Help** | `F1` or `Ctrl + ?` | `F1` or `Cmd + ?` | Opens the interactive Keyboard Shortcuts & Help modal overlay. |
 
 ---
 
-## 🪟 Multi-Pane Workspace Controls
+## 2. Tab Management
 
-| Action | macOS Shortcut | Windows / Linux Shortcut | Description |
+| Action | Linux / Windows Shortcut | macOS Shortcut | Description |
 | :--- | :--- | :--- | :--- |
-| **Split Pane Vertically** | `Cmd + D` | `Ctrl + Shift + D` | Divides the active terminal window vertically into two side-by-side execution environments. |
-| **Split Pane Horizontally** | `Cmd + Shift + D` | `Ctrl + Shift + H` | Divides the active terminal window horizontally into upper and lower workspaces. |
-| **Navigate Panes** | `Cmd + Alt + Arrow Keys` | `Alt + Arrow Keys` | Moves visual and interactive keyboard focus between adjacent split panes. |
+| **New Tab** | `Ctrl + T` | `Cmd + T` | Creates a new terminal session tab in the active workspace. |
+| **Close Active Tab** | `Ctrl + W` | `Cmd + W` | Closes active tab and safely terminates running child processes. |
+| **Switch to Tab (1–9)** | `Ctrl + 1` … `Ctrl + 9` | `Cmd + 1` … `Cmd + 9` | Directly selects tab by numerical index. |
+| **Next Tab** | `Ctrl + Tab` or `Ctrl + Shift + ]` | `Cmd + Shift + ]` | Moves focus to the next open workspace tab. |
+| **Previous Tab** | `Ctrl + Shift + Tab` or `Ctrl + Shift + [` | `Cmd + Shift + [` | Moves focus to the previous open workspace tab. |
+| **Rename Tab** | *Double-Click Tab Pill* | *Double-Click Tab Pill* | Activates inline text editor to assign persistent custom tab labels. |
 
 ---
 
-## 🍏 Native macOS Top Menu Bar Actions
+## 3. Split Pane Controls
 
-When running on macOS, utilize your desktop monitor's top application menu bar right next to the apple icon:
-- **`Sentinel Terminal ➔ Personalization ➔ Appearance & Color Themes...`**: Access visual styling, glassmorphism blur intensity, and custom color layouts.
-- **`Sentinel Terminal ➔ Personalization ➔ AI Engine & Model Settings...`**: Inspect active local Ollama connections, switch AI intelligence models, and configure natural language preferences.
-
----
-
-## 🐚 Interactive Shell & Command Editing
-
-| Action | macOS Shortcut | Windows / Linux Shortcut | Description |
+| Action | Linux / Windows Shortcut | macOS Shortcut | Description |
 | :--- | :--- | :--- | :--- |
-| **Cancel Interactive Prompt** | `Ctrl + C` | `Ctrl + C` | Instantly halts active terminal programs or interrupts natural language task queries. |
-| **Accept AI Ghost Suggestion** | `Tab` or `Right Arrow` | `Tab` or `Right Arrow` | Seamlessly autocompletes terminal commands proposed by Sentinel's intelligent autocomplete engine. |
-| **Clear Terminal Screen** | `Cmd + K` or type `clear` | `Ctrl + L` or type `clear` | Wipes scrollback screen buffer while retaining session directory memory and environment variables. |
+| **Split Pane Vertically** | `Ctrl + Shift + D` | `Cmd + D` | Divides active pane vertically into two side-by-side environments. |
+| **Split Pane Horizontally** | `Ctrl + Shift + H` | `Cmd + Shift + D` | Divides active pane horizontally into upper and lower environments. |
+| **Navigate Panes** | `Alt + Arrow Keys` | `Cmd + Option + Arrow Keys` | Moves focus between adjacent split panes. |
+| **Resize Split Panes** | *Drag Divider* | *Drag Divider* | Drag the hairline split divider with 8px hitbox to adjust pane ratios. |
+
+---
+
+## 4. Terminal Search Bar Shortcuts (`Ctrl + F`)
+
+When the search overlay is open:
+
+| Action | Shortcut | Description |
+| :--- | :--- | :--- |
+| **Toggle Case Sensitivity** | `Alt + C` | Matches exact uppercase/lowercase character casing. |
+| **Toggle Whole Word** | `Alt + W` | Matches only complete whole words surrounded by word boundaries. |
+| **Toggle Regular Expressions** | `Alt + R` | Enables full regex pattern search syntax. |
+| **Find Next Match** | `Enter` or `Down Arrow` | Navigates to next occurrence in scrollback buffer. |
+| **Find Previous Match** | `Shift + Enter` or `Up Arrow` | Navigates to previous occurrence in scrollback buffer. |
+| **Close Search Bar** | `Escape` | Closes search overlay and refocuses terminal PTY. |
+
+---
+
+## 5. Shell & AI Interaction Shortcuts
+
+| Action | Shortcut | Description |
+| :--- | :--- | :--- |
+| **Summon AI Assistant** | `>` + *Instruction* | Prefix commands with `>` to trigger natural language execution. |
+| **Accept Ghost Text Suggestion** | `Tab` or `Right Arrow` | Autocompletes suggested commands from demonstration/episodic memory. |
+| **Accept Auto-Heal Remediation** | `Tab` | When an error occurs with an active remediation pill, press `Tab` to execute. |
+| **Direct Auto-Heal Commands** | `>fix` or `>heal` | Manually triggers diagnostic auto-heal on recent terminal error output. |
+| **Cancel Active AI / Shell Process** | `Ctrl + C` | Cancels prompt generation or terminates running foreground process. |
+| **Clear Terminal Buffer** | `Ctrl + L` or `clear` | Wipes visual terminal screen while preserving session context. |

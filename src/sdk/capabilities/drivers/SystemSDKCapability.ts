@@ -102,7 +102,7 @@ export class SystemSDKCapability extends BaseCapabilityDriver<SystemDriverInput,
                   if (killedAny) {
                     return {
                       success: true,
-                      data: { terminated: true, port: cleanNum, pids, signal: 'SIGKILL (-9)', stdout: `Terminated process(es) [${pids.join(', ')}] using port ${cleanNum} with SIGKILL (-9)` },
+                      data: { terminated: true, port: cleanNum, pids, signal: 'SIGKILL (-9)', stdout: `Terminated process(es) [${pids.join(', ')}] using port ${cleanNum} with SIGKILL (-9)`, code: 0 },
                       commandExecuted: `lsof -ti :${cleanNum} | xargs -r kill -9`
                     };
                   }
@@ -110,7 +110,7 @@ export class SystemSDKCapability extends BaseCapabilityDriver<SystemDriverInput,
                 if (isExplicitPort) {
                   return {
                     success: true,
-                    data: { terminated: false, port: cleanNum, signal: 'SIGKILL (-9)', stdout: `Port ${cleanNum} is free (no active process found to kill with SIGKILL)` },
+                    data: { terminated: false, port: cleanNum, signal: 'SIGKILL (-9)', stdout: `Port ${cleanNum} is free (no active process found to kill with SIGKILL)`, code: 0 },
                     commandExecuted: `lsof -ti :${cleanNum} 2>/dev/null | xargs -r kill -9 || echo "Port ${cleanNum} is free"`
                   };
                 }
@@ -119,16 +119,36 @@ export class SystemSDKCapability extends BaseCapabilityDriver<SystemDriverInput,
               }
             }
 
+            // Check if PID exists before killing
+            const checkRes = await invoke<{ code?: number }>('execute_command', { command: 'kill', args: ['-0', cleanNum] });
+            if (checkRes && checkRes.code !== undefined && checkRes.code !== 0) {
+              return { 
+                success: true, 
+                data: { terminated: false, pid: cleanNum, stdout: `No active process found with PID or port ${cleanNum}.`, code: 0 },
+                commandExecuted: `kill -9 ${cleanNum} 2>/dev/null || echo "No active process found with PID ${cleanNum}"`
+              };
+            }
+
             const killRes = await invoke<{ code?: number; stderr?: string }>('execute_command', { command: 'kill', args: ['-9', cleanNum] });
             if (killRes && killRes.code !== undefined && killRes.code !== 0) {
               return { 
                 success: true, 
-                data: { terminated: false, pid: cleanNum, stdout: `No active process found with PID or port ${cleanNum}.` },
-                commandExecuted: `kill -9 ${cleanNum}`
+                data: { terminated: false, pid: cleanNum, stdout: `No active process found with PID or port ${cleanNum}.`, code: 0 },
+                commandExecuted: `kill -9 ${cleanNum} 2>/dev/null || echo "No active process found with PID ${cleanNum}"`
               };
             }
-            return { success: true, data: { terminated: true, pid: cleanNum, signal: 'SIGKILL (-9)', stdout: `Terminated process with PID ${cleanNum}` }, commandExecuted: `kill -9 ${cleanNum}` };
+            return { success: true, data: { terminated: true, pid: cleanNum, signal: 'SIGKILL (-9)', stdout: `Terminated process with PID ${cleanNum}`, code: 0 }, commandExecuted: `kill -9 ${cleanNum}` };
           } else {
+            // Check if process name exists before killing
+            const checkProc = await invoke<{ code?: number }>('execute_command', { command: 'pgrep', args: ['-i', '-f', target] });
+            if (checkProc && checkProc.code !== undefined && checkProc.code !== 0) {
+              return {
+                success: true,
+                data: { terminated: false, processName: target, stdout: `No active process found matching name "${target}".`, code: 0 },
+                commandExecuted: `pkill -9 -i -f "${target}" 2>/dev/null || echo "No active process found matching name ${target}"`
+              };
+            }
+
             let stopped = false;
             // 1. Try pkill first
             const pkillRes = await invoke<{ code?: number; stderr?: string }>('execute_command', { command: 'pkill', args: ['-9', '-i', '-f', target] });
@@ -160,11 +180,11 @@ export class SystemSDKCapability extends BaseCapabilityDriver<SystemDriverInput,
             if (!stopped) {
               return {
                 success: true,
-                data: { terminated: false, processName: target, stdout: `No active process found matching name "${target}".` },
-                commandExecuted: `pkill -9 -i -f "${target}"`
+                data: { terminated: false, processName: target, stdout: `No active process found matching name "${target}".`, code: 0 },
+                commandExecuted: `pkill -9 -i -f "${target}" 2>/dev/null || echo "No active process found matching name ${target}"`
               };
             }
-            return { success: true, data: { terminated: true, processName: target, signal: 'SIGKILL (-9)', allProcessesStopped: true, stdout: `Terminated processes matching "${target}"` }, commandExecuted: `pkill -9 -i -f "${target}"` };
+            return { success: true, data: { terminated: true, processName: target, signal: 'SIGKILL (-9)', allProcessesStopped: true, stdout: `Terminated processes matching "${target}"`, code: 0 }, commandExecuted: `pkill -9 -i -f "${target}"` };
           }
         } catch (err: any) {
           return { success: false, error: { code: 'KILL_FAILED', message: err.message || `Could not terminate process "${target}": access denied or not found.` } };

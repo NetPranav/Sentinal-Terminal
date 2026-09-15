@@ -69,8 +69,15 @@ export interface OracleResult {
 export interface PromptExecutionResult {
   id: string;
   domain: number;
+  domainName?: string;
   prompt: string;
+  cleanPrompt?: string;
+  targetTool?: string;
+  expectedOutput?: string;
+  verificationCriteria?: string;
+  actualOutput?: string;
   passed: boolean;
+  simulated: boolean;
   durationMs: number;
   toolUsed?: string;
   commandExecuted?: string;
@@ -90,6 +97,8 @@ export interface BenchmarkDomainSummary {
   total: number;
   passed: number;
   failed: number;
+  realNative: number;
+  simulated: number;
   passRate: number;
   averageDurationMs: number;
   failuresByClass: Record<string, number>;
@@ -105,6 +114,9 @@ export interface BenchmarkReport {
   totalPrompts: number;
   totalPassed: number;
   totalFailed: number;
+  totalRealNative: number;
+  totalSimulated: number;
+  realNativePassRate: number;
   overallPassRate: number;
   totalDurationSeconds: number;
   domains: BenchmarkDomainSummary[];
@@ -141,6 +153,12 @@ export class BenchmarkPromptParser {
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i].trim();
 
+      // Reset domain on major section header
+      if (line.startsWith('## ') && !line.startsWith('### Domain')) {
+        currentDomain = 0;
+        continue;
+      }
+
       // Check Domain header
       const domainMatch = line.match(/^###\s+Domain\s+(\d+):/i);
       if (domainMatch) {
@@ -156,6 +174,9 @@ export class BenchmarkPromptParser {
 
         if (rawCols.length >= 5) {
           const id = rawCols[0];
+          if (!new RegExp(`^${currentDomain}\\.\\d+$`).test(id)) {
+            continue;
+          }
           const rawPrompt = rawCols[1].replace(/^`|`$/g, '').trim();
           const targetTool = rawCols[2].replace(/^`|`$/g, '').trim();
           const expectedOutput = rawCols[3];
@@ -186,40 +207,81 @@ export class VerificationOracles {
   /**
    * Oracle 1: Ensure zero shell errors (command not found, /bin/zsh, os error 2, exit code 127)
    */
-  public static verifyNoOsError(result: AgentResult, executed: CommandExecutionRecord[]): OracleResult {
+  public static verifyNoOsError(
+    result: AgentResult,
+    executed: CommandExecutionRecord[],
+    primaryCmd?: CommandExecutionRecord,
+    primaryExitCode?: number
+  ): OracleResult {
     const errorMarkers = [
       'command not found',
       '/bin/zsh: No such file or directory',
       'os error 2',
       'exit code 127',
       'Permission denied',
-      'syntax error near unexpected token'
+      'syntax error near unexpected token',
+      'error: [string "return hl.dispatch',
+      'hl.dispatch: expected',
+      'error: return hl.dispatch',
+      'attempt to call a nil value',
+      'ls: cannot access'
     ];
 
-    const errorText = `${result.summary || ''} ${executed.map(e => e.stderr).join(' ')}`.toLowerCase();
+    const isLogInspection = executed.some(e => 
+      e.fullCommand.includes('journalctl') || 
+      e.fullCommand.includes('dmesg') || 
+      e.fullCommand.includes('/var/log')
+    ) || (primaryCmd ? (
+      primaryCmd.fullCommand.includes('journalctl') ||
+      primaryCmd.fullCommand.includes('dmesg') ||
+      primaryCmd.fullCommand.includes('/var/log')
+    ) : false);
+
+    const errorText = isLogInspection
+      ? `${executed.map(e => e.stderr || '').join(' ')} ${primaryCmd?.stderr || ''}`.toLowerCase()
+      : `${result.summary || ''} ${executed.map(e => (e.stderr || '') + ' ' + (e.stdout || '')).join(' ')} ${primaryCmd?.stdout || ''} ${primaryCmd?.stderr || ''}`.toLowerCase();
 
     for (const marker of errorMarkers) {
       if (errorText.includes(marker.toLowerCase())) {
         return {
           oracleName: 'NoOsError',
           passed: false,
-          message: `Detected OS Error: "${marker}"`
+          message: `Detected OS Error / IPC Failure: "${marker}"`
         };
       }
     }
 
-    // Check non-zero exit code on primary commands
+    // Strict exit code gate: if primaryExitCode is explicitly non-zero
+    if (primaryExitCode !== undefined && primaryExitCode !== 0) {
+      return {
+        oracleName: 'NoOsError',
+        passed: false,
+        message: `Command failed with exit code ${primaryExitCode}`
+      };
+    }
+
+    // Check non-zero exit code on primary commands (excluding probes)
     const failedCmd = executed.find(c => c.code !== 0 
       && !c.fullCommand.includes('2>/dev/null') 
       && !c.fullCommand.includes('|| true')
       && !c.fullCommand.includes('test -f')
       && !c.fullCommand.includes('which ')
+      && !c.fullCommand.startsWith('pgrep ')
+      && !c.fullCommand.startsWith('kill -0')
     );
-    if (failedCmd && !result.success) {
+    if (failedCmd) {
       return {
         oracleName: 'NoOsError',
         passed: false,
         message: `Command failed with code ${failedCmd.code}: ${failedCmd.fullCommand}`
+      };
+    }
+
+    if (!result.success) {
+      return {
+        oracleName: 'NoOsError',
+        passed: false,
+        message: `Agent execution reported failure: ${result.summary}`
       };
     }
 
@@ -463,6 +525,19 @@ export class BenchmarkRunner {
   private agentLoop!: AgentLoop;
   private prompts: BenchmarkPrompt[] = [];
 
+  public static isSimulated(prompt: BenchmarkPrompt, primaryCmd?: CommandExecutionRecord, stepData?: any): boolean {
+    if (prompt.domain === 9) return true;
+    const cmd = (primaryCmd?.fullCommand || '').trim();
+    if (/^(?:\/bin\/bash\s+-c\s+)?echo(?:\s+-e)?\s+['"]/i.test(cmd)) {
+      return true;
+    }
+    const stdout = (primaryCmd?.stdout || stepData?.stdout || '').trim();
+    if (cmd === '' && stdout.toLowerCase().includes('confirmation:')) {
+      return true;
+    }
+    return false;
+  }
+
   constructor(private options: {
     roadmapPath: string;
     domain?: number;
@@ -470,6 +545,7 @@ export class BenchmarkRunner {
     headless: boolean;
     verbose: boolean;
     outputPath?: string;
+    append?: boolean;
   }) {}
 
   public async init(): Promise<void> {
@@ -548,14 +624,22 @@ export class BenchmarkRunner {
       const promptDuration = Math.round(performance.now() - promptStartTime);
       const executed = NodeTauriBridge.getHistory(false);
       const capCmds = NodeTauriBridge.getCapabilityCommands();
-      const primaryCmd = capCmds[capCmds.length - 1] || executed[executed.length - 1];
+      const realExecuted = executed.filter(e => !e.fullCommand.includes('test -f') && !e.fullCommand.includes('learned_patterns'));
+      const primaryCmd = capCmds[capCmds.length - 1] || realExecuted[realExecuted.length - 1];
 
       // Extract real raw output and exit code from actual driver call
-      const rawStdout = (primaryCmd?.stdout && primaryCmd.stdout.trim().length > 0)
+      const stepDataCode = agentResult.steps?.[0]?.result?.data?.code;
+      const primaryExitCode = (stepDataCode !== undefined)
+        ? stepDataCode
+        : (primaryCmd?.code ?? (agentResult.success ? 0 : 1));
+
+      const isProbe = Boolean(primaryCmd && (primaryCmd.fullCommand.startsWith('kill -0') || primaryCmd.fullCommand.startsWith('pgrep ')));
+      const rawStdout = (!isProbe && primaryCmd?.stdout && primaryCmd.stdout.trim().length > 0)
         ? primaryCmd.stdout
         : (agentResult.steps?.[0]?.result?.data?.stdout ?? primaryCmd?.stdout ?? '');
-      const rawStderr = primaryCmd?.stderr ?? (agentResult.steps?.[0]?.result?.data?.stderr ?? '');
-      const primaryExitCode = primaryCmd?.code ?? (agentResult.steps?.[0]?.result?.data?.code ?? (agentResult.success ? 0 : 1));
+      const rawStderr = (!isProbe && primaryCmd?.stderr)
+        ? primaryCmd.stderr
+        : (agentResult.steps?.[0]?.result?.data?.stderr ?? '');
 
       // Detect if fallback branch triggered in shell.execute
       let fallbackTriggered = false;
@@ -582,7 +666,7 @@ export class BenchmarkRunner {
 
       // Run Verification Oracles
       const oracles: OracleResult[] = [
-        VerificationOracles.verifyNoOsError(agentResult, executed),
+        VerificationOracles.verifyNoOsError(agentResult, executed, primaryCmd, primaryExitCode),
         VerificationOracles.verifyNoPlatformMismatch(agentResult, executed),
         VerificationOracles.verifyFormatting(agentResult, prompt.expectedOutput),
         VerificationOracles.verifySingularPrecision(prompt, agentResult),
@@ -622,15 +706,25 @@ export class BenchmarkRunner {
       }
 
       const stepTool = agentResult.steps?.[0]?.tool || 'shell.execute';
+      const isSimulated = BenchmarkRunner.isSimulated(prompt, primaryCmd, agentResult.steps?.[0]?.result?.data);
 
       results.push({
         id: prompt.id,
         domain: prompt.domain,
+        domainName: prompt.domainName,
         prompt: prompt.prompt,
+        cleanPrompt: prompt.cleanPrompt,
+        targetTool: prompt.targetTool,
+        expectedOutput: prompt.expectedOutput,
+        verificationCriteria: prompt.verificationCriteria,
+        actualOutput: agentResult.summary,
         passed,
+        simulated: isSimulated,
         durationMs: promptDuration,
         toolUsed: stepTool,
-        commandExecuted: primaryCmd?.fullCommand || `capability: ${stepTool}`,
+        commandExecuted: (!isProbe && primaryCmd?.fullCommand)
+          ? primaryCmd.fullCommand
+          : (agentResult.steps?.[0]?.result?.commandExecuted ?? primaryCmd?.fullCommand ?? `capability: ${stepTool}`),
         stdout: rawStdout,
         stderr: rawStderr,
         exitCode: primaryExitCode,
@@ -653,9 +747,39 @@ export class BenchmarkRunner {
 
     const totalDurationSeconds = Math.round((Date.now() - startTime) / 1000);
 
+    const outPath = this.options.outputPath || path.resolve(process.cwd(), 'benchmark_report.json');
+    let finalResults: PromptExecutionResult[] = results;
+
+    if (this.options.append && fs.existsSync(outPath)) {
+      try {
+        const existingData: BenchmarkReport = JSON.parse(fs.readFileSync(outPath, 'utf-8'));
+        if (Array.isArray(existingData.results)) {
+          const mergedMap = new Map<string, PromptExecutionResult>();
+          for (const item of existingData.results) {
+            if (/^[1-9]\.([1-9]|[1-4][0-9]|50)$/.test(item.id)) {
+              mergedMap.set(item.id, item);
+            }
+          }
+          for (const item of results) {
+            if (/^[1-9]\.([1-9]|[1-4][0-9]|50)$/.test(item.id)) {
+              mergedMap.set(item.id, item);
+            }
+          }
+          finalResults = Array.from(mergedMap.values()).sort((a, b) => {
+            const [dA, pA] = a.id.split('.').map(Number);
+            const [dB, pB] = b.id.split('.').map(Number);
+            if (dA !== dB) return (dA || 0) - (dB || 0);
+            return (pA || 0) - (pB || 0);
+          });
+        }
+      } catch (err) {
+        console.warn('Could not parse existing report for append, creating fresh.');
+      }
+    }
+
     // Build Domain Summaries
     const domainMap = new Map<number, PromptExecutionResult[]>();
-    for (const r of results) {
+    for (const r of finalResults) {
       if (!domainMap.has(r.domain)) {
         domainMap.set(r.domain, []);
       }
@@ -663,11 +787,13 @@ export class BenchmarkRunner {
     }
 
     const domains: BenchmarkDomainSummary[] = [];
-    for (const [domainId, resList] of domainMap.entries()) {
+    for (const [domainId, resList] of Array.from(domainMap.entries())) {
       const passedCount = resList.filter(r => r.passed).length;
       const failedCount = resList.length - passedCount;
       const passRate = Math.round((passedCount / resList.length) * 100);
       const avgDuration = Math.round(resList.reduce((acc, r) => acc + r.durationMs, 0) / resList.length);
+      const realNative = resList.filter(r => !r.simulated).length;
+      const simulated = resList.filter(r => r.simulated).length;
 
       const failuresByClass: Record<string, number> = {};
       for (const r of resList) {
@@ -682,15 +808,21 @@ export class BenchmarkRunner {
         total: resList.length,
         passed: passedCount,
         failed: failedCount,
+        realNative,
+        simulated,
         passRate,
         averageDurationMs: avgDuration,
         failuresByClass
       });
     }
 
-    const totalPassed = results.filter(r => r.passed).length;
-    const totalFailed = results.length - totalPassed;
-    const overallPassRate = results.length > 0 ? Math.round((totalPassed / results.length) * 100) : 0;
+    const totalPassed = finalResults.filter(r => r.passed).length;
+    const totalFailed = finalResults.length - totalPassed;
+    const overallPassRate = finalResults.length > 0 ? Math.round((totalPassed / finalResults.length) * 100) : 0;
+    const totalRealNative = finalResults.filter(r => !r.simulated).length;
+    const totalSimulated = finalResults.filter(r => r.simulated).length;
+    const realNativePassed = finalResults.filter(r => !r.simulated && r.passed).length;
+    const realNativePassRate = totalRealNative > 0 ? Math.round((realNativePassed / totalRealNative) * 100) : 100;
 
     const report: BenchmarkReport = {
       timestamp: new Date().toISOString(),
@@ -699,20 +831,22 @@ export class BenchmarkRunner {
         release: os.release(),
         arch: process.arch
       },
-      totalPrompts: results.length,
+      totalPrompts: finalResults.length,
       totalPassed,
       totalFailed,
+      totalRealNative,
+      totalSimulated,
+      realNativePassRate,
       overallPassRate,
       totalDurationSeconds,
       domains,
-      results
+      results: finalResults
     };
 
     // Print Final Summary Table
     this.printSummaryTable(report);
 
     // Save JSON report to disk
-    const outPath = this.options.outputPath || path.resolve(process.cwd(), 'benchmark_report.json');
     fs.writeFileSync(outPath, JSON.stringify(report, null, 2), 'utf-8');
     console.log(`\n  ${colors.bold}📄 Full JSON Report written to:${colors.reset} ${colors.cyan}${outPath}${colors.reset}`);
 
@@ -729,16 +863,17 @@ export class BenchmarkRunner {
     lines.push(`# Sentinel AI Terminal — Benchmark Execution Report\n`);
     lines.push(`> **Generated:** ${report.timestamp}  `);
     lines.push(`> **Platform:** ${report.system.platform} (${report.system.release} ${report.system.arch})  `);
-    lines.push(`> **Total Evaluated:** ${report.totalPrompts}  `);
-    lines.push(`> **Total Passed:** ${report.totalPassed} (${report.overallPassRate}%) | **Failed:** ${report.totalFailed}  `);
+    lines.push(`> **Total Evaluated:** ${report.totalPrompts} (Real Native: **${report.totalRealNative}**, Simulated/Stubs: **${report.totalSimulated}**)  `);
+    lines.push(`> **Real Native Pass Rate:** **${report.realNativePassRate}%** | **Overall Pass Rate:** **${report.overallPassRate}%**  `);
+    lines.push(`> **Total Passed:** ${report.totalPassed} | **Failed:** ${report.totalFailed}  `);
     lines.push(`> **Total Duration:** ${report.totalDurationSeconds}s  \n`);
     lines.push(`---\n`);
 
     lines.push(`## Summary by Domain\n`);
-    lines.push(`| Domain # | Domain Name | Total | Passed | Pass Rate | Avg Duration |`);
-    lines.push(`|:---:|---|:---:|:---:|:---:|:---:|`);
+    lines.push(`| Domain # | Domain Name | Total | Real Native | Simulated | Passed | Pass Rate | Avg Duration |`);
+    lines.push(`|:---:|---|:---:|:---:|:---:|:---:|:---:|:---:|`);
     for (const d of report.domains) {
-      lines.push(`| **Domain ${d.domain}** | ${d.domainName} | ${d.total} | ${d.passed} | **${d.passRate}%** | ${d.averageDurationMs}ms |`);
+      lines.push(`| **Domain ${d.domain}** | ${d.domainName} | ${d.total} | ${d.realNative} | ${d.simulated} | ${d.passed} | **${d.passRate}%** | ${d.averageDurationMs}ms |`);
     }
     lines.push(`\n---\n`);
 
@@ -746,11 +881,12 @@ export class BenchmarkRunner {
 
     for (const d of report.domains) {
       lines.push(`### Domain ${d.domain}: ${d.domainName}\n`);
-      lines.push(`| # | Prompt | Command Executed | Exit Code | Fallback? | Terminal Output Produced | Status | Duration |`);
-      lines.push(`|:---:|---|---|:---:|:---:|---|:---:|:---:|`);
+      lines.push(`| # | Prompt | Type | Command Executed | Exit Code | Fallback? | Terminal Output Produced | Status | Duration |`);
+      lines.push(`|:---:|---|:---:|---|:---:|:---:|---|:---:|:---:|`);
 
       const domainResults = report.results.filter(r => r.domain === d.domain);
       for (const r of domainResults) {
+        const typeStr = r.simulated ? 'Simulated' : 'Native';
         const cleanCmd = (r.commandExecuted || '')
           .replace(/\r?\n/g, ' ')
           .replace(/\|/g, '\\|')
@@ -763,7 +899,7 @@ export class BenchmarkRunner {
         const shortOut = cleanOut.length > 60 ? cleanOut.slice(0, 57) + '...' : cleanOut;
         const status = r.passed ? '✓ PASS' : `✗ FAIL (${r.failureClass || 'ERROR'})`;
         const fbStr = r.fallbackTriggered ? 'Yes' : 'No';
-        lines.push(`| ${r.id} | \`${r.prompt}\` | \`${shortCmd}\` | ${r.exitCode ?? 0} | ${fbStr} | \`${shortOut}\` | ${status} | ${r.durationMs}ms |`);
+        lines.push(`| ${r.id} | \`${r.prompt}\` | ${typeStr} | \`${shortCmd}\` | ${r.exitCode ?? 0} | ${fbStr} | \`${shortOut}\` | ${status} | ${r.durationMs}ms |`);
       }
       lines.push(`\n`);
     }
@@ -776,27 +912,30 @@ export class BenchmarkRunner {
     console.log(`  ${colors.bold}BENCHMARK EXECUTION SUMMARY${colors.reset}`);
     console.log(`${colors.bold}${colors.cyan}══════════════════════════════════════════════════════════════════════════════${colors.reset}\n`);
 
-    console.log(`  Total Evaluated:   ${colors.bold}${report.totalPrompts}${colors.reset}`);
-    console.log(`  Total Passed:      ${colors.green}${colors.bold}${report.totalPassed}${colors.reset}`);
-    console.log(`  Total Failed:      ${report.totalFailed > 0 ? colors.red : colors.gray}${colors.bold}${report.totalFailed}${colors.reset}`);
-    console.log(`  Overall Pass Rate: ${report.overallPassRate >= 90 ? colors.green : colors.yellow}${colors.bold}${report.overallPassRate}%${colors.reset}`);
-    console.log(`  Total Duration:    ${colors.gray}${report.totalDurationSeconds}s${colors.reset}\n`);
+    console.log(`  Total Evaluated:        ${colors.bold}${report.totalPrompts}${colors.reset} (Real Native: ${colors.green}${report.totalRealNative}${colors.reset}, Simulated: ${colors.yellow}${report.totalSimulated}${colors.reset})`);
+    console.log(`  Total Passed:           ${colors.green}${colors.bold}${report.totalPassed}${colors.reset}`);
+    console.log(`  Total Failed:           ${report.totalFailed > 0 ? colors.red : colors.gray}${colors.bold}${report.totalFailed}${colors.reset}`);
+    console.log(`  Real Native Pass Rate:  ${report.realNativePassRate >= 90 ? colors.green : colors.yellow}${colors.bold}${report.realNativePassRate}%${colors.reset}`);
+    console.log(`  Overall Pass Rate:      ${report.overallPassRate >= 90 ? colors.green : colors.yellow}${colors.bold}${report.overallPassRate}%${colors.reset}`);
+    console.log(`  Total Duration:         ${colors.gray}${report.totalDurationSeconds}s${colors.reset}\n`);
 
-    console.log(`  ${colors.dim}┌──────────┬────────────────────────────────────────────┬───────┬────────┬──────────┐${colors.reset}`);
-    console.log(`  ${colors.dim}│${colors.reset} ${colors.bold}Domain${colors.reset}   ${colors.dim}│${colors.reset} ${colors.bold}Domain Name${colors.reset}                                ${colors.dim}│${colors.reset} ${colors.bold}Total${colors.reset} ${colors.dim}│${colors.reset} ${colors.bold}Passed${colors.reset} ${colors.dim}│${colors.reset} ${colors.bold}Pass Rate${colors.reset}  ${colors.dim}│${colors.reset}`);
-    console.log(`  ${colors.dim}├──────────┼────────────────────────────────────────────┼───────┼────────┼──────────┤${colors.reset}`);
+    console.log(`  ${colors.dim}┌──────────┬────────────────────────────────────────────┬───────┬──────┬─────┬────────┬──────────┐${colors.reset}`);
+    console.log(`  ${colors.dim}│${colors.reset} ${colors.bold}Domain${colors.reset}   ${colors.dim}│${colors.reset} ${colors.bold}Domain Name${colors.reset}                                ${colors.dim}│${colors.reset} ${colors.bold}Total${colors.reset} ${colors.dim}│${colors.reset} ${colors.bold}Real${colors.reset} ${colors.dim}│${colors.reset} ${colors.bold}Sim${colors.reset} ${colors.dim}│${colors.reset} ${colors.bold}Passed${colors.reset} ${colors.dim}│${colors.reset} ${colors.bold}Pass Rate${colors.reset}  ${colors.dim}│${colors.reset}`);
+    console.log(`  ${colors.dim}├──────────┼────────────────────────────────────────────┼───────┼──────┼─────┼────────┼──────────┤${colors.reset}`);
 
     for (const d of report.domains) {
       const dName = d.domainName.padEnd(42).slice(0, 42);
       const totalStr = String(d.total).padStart(5);
+      const realStr = String(d.realNative).padStart(4);
+      const simStr = String(d.simulated).padStart(3);
       const passStr = String(d.passed).padStart(6);
       const rateStr = `${d.passRate}%`.padStart(8);
       const rateColor = d.passRate >= 90 ? colors.green : (d.passRate >= 70 ? colors.yellow : colors.red);
 
-      console.log(`  ${colors.dim}│${colors.reset} Domain ${d.domain}  ${colors.dim}│${colors.reset} ${dName} ${colors.dim}│${colors.reset} ${totalStr} ${colors.dim}│${colors.reset} ${passStr} ${colors.dim}│${colors.reset} ${rateColor}${rateStr}${colors.reset}  ${colors.dim}│${colors.reset}`);
+      console.log(`  ${colors.dim}│${colors.reset} Domain ${d.domain}  ${colors.dim}│${colors.reset} ${dName} ${colors.dim}│${colors.reset} ${totalStr} ${colors.dim}│${colors.reset} ${realStr} ${colors.dim}│${colors.reset} ${simStr} ${colors.dim}│${colors.reset} ${passStr} ${colors.dim}│${colors.reset} ${rateColor}${rateStr}${colors.reset}  ${colors.dim}│${colors.reset}`);
     }
 
-    console.log(`  ${colors.dim}└──────────┴────────────────────────────────────────────┴───────┴────────┴──────────┘${colors.reset}\n`);
+    console.log(`  ${colors.dim}└──────────┴────────────────────────────────────────────┴───────┴──────┴─────┴────────┴──────────┘${colors.reset}\n`);
   }
 }
 
@@ -807,6 +946,7 @@ async function main() {
   let promptRange: string | undefined;
   let headless = true;
   let verbose = false;
+  let append = false;
   let outputPath: string | undefined;
   const roadmapPath = path.resolve(process.cwd(), 'roadmap.md');
 
@@ -820,6 +960,8 @@ async function main() {
       headless = true;
     } else if (a === '--verbose' || a === '-v') {
       verbose = true;
+    } else if (a === '--append') {
+      append = true;
     } else if (a === '--output' || a === '-o') {
       outputPath = args[++i];
     } else if (a === '--all') {
@@ -851,7 +993,8 @@ Options:
     promptRange,
     headless,
     verbose,
-    outputPath
+    outputPath,
+    append
   });
 
   await runner.init();

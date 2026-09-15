@@ -51,25 +51,30 @@ body {
 /* Apple macOS style capsule/pill header bar with traffic-light inset and drag region */
 .tabs-bar {
   display: flex;
-  background-color: var(--sentinel-bg, rgba(11, 13, 23, 0.75));
+  background-color: var(--sentinel-bg, rgba(16, 18, 24, 0.9));
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
-  border-bottom: 1px solid var(--sentinel-border, rgba(255, 255, 255, 0.08));
-  height: 38px;
+  border-bottom: 1px solid var(--sentinel-border, rgba(255, 255, 255, 0.07));
+  height: 36px;
   align-items: center;
   flex-shrink: 0;
   user-select: none;
   -webkit-user-select: none;
   z-index: 200;
-  padding: 0 10px 0 78px; /* Inset clears native macOS traffic lights (close, minimize, zoom) */
+  padding: 0 10px 0 78px; /* Inset clears native macOS traffic lights */
   color: var(--sentinel-fg, #ffffff);
   -webkit-app-region: drag; /* Allows moving the window by dragging the tabs bar */
+}
+
+/* On Linux or non-macOS, start tabs cleanly on the left edge */
+.tabs-bar.platform-linux {
+  padding: 0 10px 0 12px;
 }
 
 .tabs-track {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   width: 100%;
   overflow-x: auto;
   height: 100%;
@@ -79,44 +84,45 @@ body {
 .tab-pill {
   display: flex;
   align-items: center;
-  justify-content: center;
-  height: 26px;
-  padding: 0 12px;
-  min-width: 110px;
-  max-width: 210px;
+  justify-content: flex-start;
+  height: 28px;
+  padding: 0 10px 0 12px;
+  min-width: 120px;
+  max-width: 220px;
   flex-shrink: 0;
-  border-radius: 9999px;
+  border-radius: 6px 6px 0 0;
   background-color: transparent;
   border: 1px solid transparent;
+  border-bottom: none;
   color: var(--sentinel-fg, #ffffff);
-  opacity: 0.6;
+  opacity: 0.55;
   cursor: pointer;
   user-select: none;
   font-size: 12px;
   font-weight: 400;
-  transition: all 0.2s ease;
+  transition: all 0.15s ease;
   position: relative;
 }
 
 .tab-pill:hover {
-  background-color: var(--sentinel-hover, rgba(255, 255, 255, 0.06));
+  background-color: rgba(255, 255, 255, 0.04);
   opacity: 0.85;
 }
 
 .tab-pill.active {
-  background-color: var(--sentinel-hover, rgba(255, 255, 255, 0.12));
-  border: 1px solid var(--sentinel-border-active, rgba(255, 255, 255, 0.25));
-  color: var(--sentinel-fg, #ffffff);
+  background-color: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-bottom: 1px solid transparent;
+  color: #ffffff;
   opacity: 1;
   font-weight: 500;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
 }
 
 .tab-pill-text {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  text-align: center;
+  text-align: left;
   flex: 1;
 }
 
@@ -127,19 +133,19 @@ body {
   cursor: pointer;
   font-size: 11px;
   margin-left: 6px;
-  border-radius: 50%;
+  border-radius: 4px;
   width: 16px;
   height: 16px;
   display: flex;
   align-items: center;
   justify-content: center;
-  opacity: 0.5;
-  transition: all 0.2s ease;
+  opacity: 0.45;
+  transition: all 0.15s ease;
   flex-shrink: 0;
 }
 
 .pill-close-btn:hover {
-  background-color: rgba(255, 59, 48, 0.25);
+  background-color: rgba(255, 59, 48, 0.2);
   color: #ff3b30;
   opacity: 1;
 }
@@ -148,25 +154,24 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 26px;
-  height: 26px;
-  border-radius: 50%;
-  background: var(--sentinel-hover, rgba(255, 255, 255, 0.04));
-  border: 1px solid var(--sentinel-border, rgba(255, 255, 255, 0.14));
-  color: var(--sentinel-fg, #ffffff);
-  opacity: 0.7;
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  background: transparent;
+  border: 1px solid transparent;
+  color: rgba(255, 255, 255, 0.45);
   cursor: pointer;
-  font-size: 16px;
-  transition: all 0.2s ease;
+  font-size: 14px;
+  transition: all 0.15s ease;
   flex-shrink: 0;
   margin-left: 2px;
 }
 
 .pill-add-btn:hover {
   opacity: 1;
-  background: var(--sentinel-hover, rgba(255, 255, 255, 0.15));
-  border-color: var(--sentinel-border-active, rgba(255, 255, 255, 0.35));
-  box-shadow: 0 0 8px rgba(0, 0, 0, 0.2);
+  background: rgba(255, 255, 255, 0.07);
+  border-color: rgba(255, 255, 255, 0.12);
+  color: #ffffff;
 }
 
 /* Main terminal workspace and splits */
@@ -207,24 +212,49 @@ body {
 }
 
 .split-divider {
-  background: var(--sentinel-border, rgba(255, 255, 255, 0.08));
-  transition: background 0.2s ease;
-  z-index: 20;
+  background: var(--sentinel-border, rgba(255, 255, 255, 0.12));
+  transition: background 0.15s ease, box-shadow 0.15s ease;
+  z-index: 25;
   flex-shrink: 0;
+  position: relative;
+  user-select: none;
 }
 
 .split-vertical > .split-divider {
-  width: 2px;
+  width: 3px;
   cursor: col-resize;
 }
 
+.split-vertical > .split-divider::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -4px;
+  right: -4px;
+  cursor: col-resize;
+  z-index: 30;
+}
+
 .split-horizontal > .split-divider {
-  height: 2px;
+  height: 3px;
   cursor: row-resize;
 }
 
+.split-horizontal > .split-divider::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -4px;
+  bottom: -4px;
+  cursor: row-resize;
+  z-index: 30;
+}
+
 .split-divider:hover, .split-divider:active {
-  background: var(--sentinel-border-active, rgba(255, 255, 255, 0.35));
+  background: #3b82f6;
+  box-shadow: 0 0 8px rgba(59, 130, 246, 0.6);
 }
 
 .pane-terminal-wrapper {
@@ -245,32 +275,52 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 4px 10px;
+  padding: 3px 10px;
   background: var(--sentinel-hover, rgba(255, 255, 255, 0.02));
   border-bottom: 1px solid var(--sentinel-border, rgba(255, 255, 255, 0.05));
-  font-size: 12px;
+  font-size: 11px;
+  position: relative;
+  z-index: 50;
 }
 
-.pane-action-buttons {
+.pane-action-buttons,
+.pane-action-buttons-zen {
   display: flex;
-  gap: 6px;
+  gap: 5px;
   align-items: center;
 }
 
-.pane-action-buttons button {
-  background: transparent;
-  border: 1px solid var(--sentinel-border, rgba(255, 255, 255, 0.1));
-  color: var(--sentinel-fg, rgba(255, 255, 255, 0.7));
-  font-size: 11px;
-  border-radius: 4px;
-  padding: 2px 8px;
-  cursor: pointer;
-  transition: all 0.2s ease;
+/* Zen Mode: buttons invisible by default, smoothly fade in when mouse hovers over pane header */
+.pane-action-buttons-zen {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.18s ease-in-out;
 }
 
-.pane-action-buttons button:hover {
+.pane-header-controls:hover .pane-action-buttons-zen,
+.pane-action-buttons-zen:hover,
+.pane-action-buttons-zen:focus-within,
+.pane-action-buttons-zen.menu-active {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.pane-action-buttons button,
+.pane-action-buttons-zen button {
+  background: transparent;
+  border: 1px solid var(--sentinel-border, rgba(255, 255, 255, 0.08));
+  color: var(--sentinel-fg, rgba(255, 255, 255, 0.65));
+  font-size: 11px;
+  border-radius: 4px;
+  padding: 1px 7px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.pane-action-buttons button:hover,
+.pane-action-buttons-zen button:hover {
   background: var(--sentinel-hover, rgba(255, 255, 255, 0.08));
-  border-color: var(--sentinel-border-active, rgba(255, 255, 255, 0.3));
+  border-color: var(--sentinel-border-active, rgba(255, 255, 255, 0.25));
   color: var(--sentinel-fg, #ffffff);
 }
 
@@ -301,6 +351,7 @@ body {
 .pill-close-btn,
 .pill-add-btn,
 .pane-action-buttons,
+.pane-action-buttons-zen,
 .split-divider,
 .personalize-btn,
 button,

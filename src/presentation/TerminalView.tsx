@@ -7,6 +7,7 @@ import { SessionManager } from '../domain/SessionManager';
 import { ToolLoader } from '../tools/loader/ToolLoader';
 import { AppAliasRegistry } from '../domain/capabilities/AppAliasRegistry';
 import { AgentLoop, AgentPlan } from '../ai/agent/AgentLoop';
+import { PromptProgressManager } from '../ai/agent/PromptProgressManager';
 import { DemonstrationLearningEngine } from '../domain/learning/DemonstrationLearningEngine';
 import { EpisodicMemoryEngine } from '../domain/learning/EpisodicMemoryEngine';
 import { SentinelSerlCoordinator } from '../domain/learning/SentinelSerlCoordinator';
@@ -19,6 +20,8 @@ import { DemonstrationProvider } from '../domain/autocomplete/DemonstrationProvi
 import { WorkspaceContextProvider } from '../domain/autocomplete/WorkspaceContextProvider';
 import { GhostTextRenderer } from '../ui/components/GhostText';
 import { ThemeManager } from '../ui/theme/ThemeManager';
+import { ConsentQueue } from '../domain/security/ConsentQueue';
+import { PtyStateTracker } from '../domain/terminal/PtyStateTracker';
 import { ShellAdapter } from '../domain/shell/ShellAdapter';
 import { isLinux, getPlatform } from '../shared/platform';
 import { 
@@ -29,6 +32,8 @@ import {
   AlertCircle, 
   Check 
 } from 'lucide-react';
+import { SearchAddon } from '@xterm/addon-search';
+import { TerminalSearchBar } from './TerminalSearchBar';
 import '@xterm/xterm/css/xterm.css';
 
 interface TerminalViewProps {
@@ -43,11 +48,14 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
   const terminalRef = useRef<HTMLDivElement>(null);
   const xtermRef = useRef<Terminal | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
+  const searchAddonRef = useRef<SearchAddon | null>(null);
   const [sessionId, setSessionId] = useState<string | undefined>(initialSessionId);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
 
   const [securityModalPlan, setSecurityModalPlan] = useState<{
     plan: any;
     resolve: (approved: boolean) => void;
+    requestId?: string;
   } | null>(null);
   const [authPassword, setAuthPassword] = useState('');
   const [authError, setAuthError] = useState('');
@@ -56,6 +64,7 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
   const [isPlanOpen, setIsPlanOpen] = useState(true);
   const [activeRemediation, setActiveRemediation] = useState<RemediationPrompt | null>(null);
   const agentLoopRef = useRef<AgentLoop | null>(null);
+  const ptyTrackerRef = useRef<PtyStateTracker>(new PtyStateTracker());
   const lastUnresolvedGoalRef = useRef<{ goal: string; timestamp: number } | null>(null);
 
   const handleExecuteRemediation = async (rem: RemediationPrompt) => {
@@ -70,7 +79,13 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
     if (rem.tool === 'shell.execute' && rem.params?.command && sessionId) {
       await SessionManager.getInstance().write(sessionId, `${rem.params.command}\r`);
     } else if (agentLoopRef.current) {
-      await agentLoopRef.current.run(`fix error: ${rem.actionTitle}`, { os: getPlatform() === 'linux' ? 'linux' : 'mac', cwd: currentPath || '~' });
+      PromptProgressManager.getInstance().startPrompt(`Auto-Heal: ${rem.actionTitle}`);
+      try {
+        const res = await agentLoopRef.current.run(`fix error: ${rem.actionTitle}`, { os: getPlatform() === 'linux' ? 'linux' : 'mac', cwd: currentPath || '~' });
+        PromptProgressManager.getInstance().completePrompt(res.success, res.summary);
+      } catch (err: any) {
+        PromptProgressManager.getInstance().completePrompt(false, err?.message);
+      }
     }
   };
 
@@ -147,6 +162,22 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
         cursor: currentTheme.colors.cursor,
         cursorAccent: currentTheme.colors.cursorAccent,
         selectionBackground: currentTheme.colors.selection,
+        black: currentTheme.colors.black,
+        red: currentTheme.colors.red,
+        green: currentTheme.colors.green,
+        yellow: currentTheme.colors.yellow,
+        blue: currentTheme.colors.blue,
+        magenta: currentTheme.colors.magenta,
+        cyan: currentTheme.colors.cyan,
+        white: currentTheme.colors.white,
+        brightBlack: currentTheme.colors.brightBlack,
+        brightRed: currentTheme.colors.brightRed,
+        brightGreen: currentTheme.colors.brightGreen,
+        brightYellow: currentTheme.colors.brightYellow,
+        brightBlue: currentTheme.colors.brightBlue,
+        brightMagenta: currentTheme.colors.brightMagenta,
+        brightCyan: currentTheme.colors.brightCyan,
+        brightWhite: currentTheme.colors.brightWhite,
       }
     });
 
@@ -160,11 +191,113 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
         cursor: t.colors.cursor,
         cursorAccent: t.colors.cursorAccent,
         selectionBackground: t.colors.selection,
+        black: t.colors.black,
+        red: t.colors.red,
+        green: t.colors.green,
+        yellow: t.colors.yellow,
+        blue: t.colors.blue,
+        magenta: t.colors.magenta,
+        cyan: t.colors.cyan,
+        white: t.colors.white,
+        brightBlack: t.colors.brightBlack,
+        brightRed: t.colors.brightRed,
+        brightGreen: t.colors.brightGreen,
+        brightYellow: t.colors.brightYellow,
+        brightBlue: t.colors.brightBlue,
+        brightMagenta: t.colors.brightMagenta,
+        brightCyan: t.colors.brightCyan,
+        brightWhite: t.colors.brightWhite,
       };
     });
 
     const fitAddon = new FitAddon();
     term.loadAddon(fitAddon);
+
+    const searchAddon = new SearchAddon({
+      highlightLimit: 1000
+    });
+    term.loadAddon(searchAddon);
+    searchAddonRef.current = searchAddon;
+
+    term.attachCustomKeyEventHandler((event: KeyboardEvent) => {
+      const isCmdOrCtrl = event.ctrlKey || event.metaKey;
+      if (!isCmdOrCtrl) return true;
+
+      const k = event.key?.toLowerCase();
+
+      // Ctrl+Shift+F: Toggle In-Buffer Search
+      if (k === 'f' && event.shiftKey) {
+        if (event.type === 'keydown') {
+          event.preventDefault();
+          event.stopPropagation();
+          setIsSearchOpen(prev => !prev);
+        }
+        return false;
+      }
+
+      // Copy: Ctrl+Shift+C OR (Ctrl+C when text is highlighted)
+      if (
+        (isCmdOrCtrl && event.shiftKey && (k === 'c' || event.code === 'KeyC')) ||
+        (isCmdOrCtrl && !event.shiftKey && (k === 'c' || event.code === 'KeyC') && term.hasSelection())
+      ) {
+        if (event.type === 'keydown') {
+          const selection = term.getSelection();
+          if (selection) {
+            navigator.clipboard.writeText(selection);
+          }
+        }
+        return false;
+      }
+
+      // Paste: Ctrl+Shift+V OR Ctrl+V
+      if (isCmdOrCtrl && (k === 'v' || event.code === 'KeyV')) {
+        if (event.type === 'keydown') {
+          navigator.clipboard.readText().then(text => {
+            if (text && sessionId) {
+              SessionManager.getInstance().write(sessionId, text);
+            }
+          }).catch(() => {});
+        }
+        return false;
+      }
+
+      // Fuzzy History Search: Ctrl+R
+      if (isCmdOrCtrl && !event.shiftKey && (k === 'r' || event.code === 'KeyR')) {
+        if (event.type === 'keydown') {
+          event.preventDefault();
+          event.stopPropagation();
+          window.dispatchEvent(new CustomEvent('sentinel:toggle-history'));
+        }
+        return false;
+      }
+
+      // Application shortcuts that must bubble to React / window listeners:
+      // Ctrl+T (New Tab), Ctrl+W (Close Tab/Split), Ctrl+D / Ctrl+Shift+D (Split Panes),
+      // Ctrl+O (Workspaces), Ctrl+R (History), Ctrl+Shift+P (Palette), Ctrl+Alt+P (Ports),
+      // Ctrl+Shift+W (Workflows), Ctrl+Shift+X (Plugins), Ctrl+, (Settings), Ctrl+K (Clear)
+      if (
+        k === 't' ||
+        k === 'w' ||
+        k === 'd' ||
+        k === 'o' ||
+        k === 'r' ||
+        (k === 'p' && (event.shiftKey || event.altKey)) ||
+        (k === 'w' && event.shiftKey) ||
+        (k === 'x' && event.shiftKey) ||
+        k === ',' ||
+        k === 'k'
+      ) {
+        return false;
+      }
+
+      return true;
+    });
+
+    const handleToggleSearch = () => {
+      setIsSearchOpen(prev => !prev);
+    };
+    window.addEventListener('sentinel:toggle-search', handleToggleSearch);
+
     term.open(terminalRef.current);
     
     try {
@@ -193,6 +326,7 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
     // We must define the callback here so we can remove it later
     let outputCallback: ((data: Uint8Array) => void) | null = null;
     let unsubRemediation: (() => void) | null = null;
+    let unsubConsent: (() => void) | null = null;
 
     const initSession = async () => {
       try {
@@ -219,11 +353,10 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
         }
 
         outputCallback = (data: Uint8Array) => {
-          term.write(data);
-          try {
-            const str = new TextDecoder().decode(data);
-            PtyOutputObserver.getInstance().ingest(str, currentPath);
-          } catch { /* ignore decode error */ }
+          const text = new TextDecoder().decode(data);
+          ptyTrackerRef.current.feedOutput(text);
+          PtyOutputObserver.getInstance().ingest(text, currentPath);
+          writeTerm(text);
         };
 
         unsubRemediation = PtyOutputObserver.getInstance().onRemediation((rem) => {
@@ -243,9 +376,30 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
         
         const agentLoop = new AgentLoop(toolLoader.getState());
         agentLoopRef.current = agentLoop;
-        agentLoop.setAuthorizationHandler((plan) => new Promise(resolve => {
-          setSecurityModalPlan({ plan, resolve });
-        }));
+
+        // Subscribe to asynchronous ConsentQueue for this tab/session
+        unsubConsent = ConsentQueue.getInstance().subscribe((pending) => {
+          const matching = pending.find(r => !r.tabId || r.tabId === currentSessionId);
+          if (matching) {
+            setSecurityModalPlan({
+              plan: matching.plan,
+              resolve: (approved: boolean) => {
+                if (approved) {
+                  ConsentQueue.getInstance().approve(matching.id);
+                } else {
+                  ConsentQueue.getInstance().deny(matching.id);
+                }
+              },
+              requestId: matching.id
+            });
+          } else {
+            setSecurityModalPlan((prev) => (prev?.requestId ? null : prev));
+          }
+        });
+
+        agentLoop.setAuthorizationHandler((plan: any) => {
+          return ConsentQueue.getInstance().enqueue(plan, currentSessionId);
+        });
 
         // Initialize Autocomplete with History, Demonstration, and Workspace Context providers
         const autocompleteEngine = new AutocompleteEngine();
@@ -278,13 +432,19 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
              // If Tab is pressed and an auto-heal remediation is active
              const activeRem = PtyOutputObserver.getInstance().getActiveRemediation();
              if (activeRem) {
-               await sessionManager.write(currentSessionId, '\x03');
+               await ptyTrackerRef.current.safeClearLine(d => sessionManager.write(currentSessionId!, d));
                writeTerm(`\r\n\x1b[1;32m[Sentinel Auto-Heal] Executing: ${activeRem.actionTitle}...\x1b[0m\r\n`);
                PtyOutputObserver.getInstance().clearRemediation();
                if (activeRem.tool === 'shell.execute' && activeRem.params?.command) {
-                 await sessionManager.write(currentSessionId, `${activeRem.params.command}\r`);
+                 await sessionManager.write(currentSessionId!, `${activeRem.params.command}\r`);
                } else {
-                 await agentLoop.run(`fix error: ${activeRem.actionTitle}`, { os: getPlatform() === 'linux' ? 'linux' : 'mac', cwd: currentPath || '~' });
+                 PromptProgressManager.getInstance().startPrompt(`Auto-Heal: ${activeRem.actionTitle}`);
+                 try {
+                   const res = await agentLoop.run(`fix error: ${activeRem.actionTitle}`, { os: getPlatform() === 'linux' ? 'linux' : 'mac', cwd: currentPath || '~' });
+                   PromptProgressManager.getInstance().completePrompt(res.success, res.summary);
+                 } catch (err: any) {
+                   PromptProgressManager.getInstance().completePrompt(false, err?.message);
+                 }
                }
                return;
              }
@@ -358,7 +518,7 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
 
               // Intercept application mapping slash commands: /app, /apps, /alias, /aliases
               if (cleanCmd.startsWith('/app') || cleanCmd.startsWith('/alias')) {
-                await sessionManager.write(currentSessionId!, '\x03');
+                await ptyTrackerRef.current.safeClearLine(d => sessionManager.write(currentSessionId!, d));
                 const match = cleanCmd.match(/^\/(?:apps?|aliases?)(?:\s+([^\s"']+)\s+["']?(.+?)["']?)?\s*$/i);
                 if (match && match[1] && match[2]) {
                   AppAliasRegistry.getInstance().setAlias(match[1], match[2]);
@@ -379,7 +539,7 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
 
               // Intercept demonstration learning slash commands: /learn, /learned, /forget
               if (cleanCmd.startsWith('/learn') || cleanCmd.startsWith('/learned') || cleanCmd.startsWith('/forget')) {
-                await sessionManager.write(currentSessionId!, '\x03');
+                await ptyTrackerRef.current.safeClearLine(d => sessionManager.write(currentSessionId!, d));
                 if (cleanCmd.startsWith('/learned')) {
                   const patterns = DemonstrationLearningEngine.getInstance().getAllPatterns();
                   if (patterns.length === 0) {
@@ -427,12 +587,18 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
 
               // Intercept auto-heal remediation commands: >fix, >heal
               if (cleanCmd === '>fix' || cleanCmd === '>heal') {
-                await sessionManager.write(currentSessionId!, '\x03');
+                await ptyTrackerRef.current.safeClearLine(d => sessionManager.write(currentSessionId!, d));
                 const rem = PtyOutputObserver.getInstance().getActiveRemediation();
                 if (rem) {
                   writeTerm(`\r\n\x1b[1;32m[Sentinel Auto-Heal] Executing: ${rem.actionTitle}...\x1b[0m\r\n`);
                   PtyOutputObserver.getInstance().clearRemediation();
-                  await agentLoop.run(`fix error: ${rem.actionTitle}`, { os: getPlatform() === 'linux' ? 'linux' : 'mac', cwd: currentPath || '~' });
+                  PromptProgressManager.getInstance().startPrompt(`Auto-Heal: ${rem.actionTitle}`);
+                  try {
+                    const res = await agentLoop.run(`fix error: ${rem.actionTitle}`, { os: getPlatform() === 'linux' ? 'linux' : 'mac', cwd: currentPath || '~' });
+                    PromptProgressManager.getInstance().completePrompt(res.success, res.summary);
+                  } catch (err: any) {
+                    PromptProgressManager.getInstance().completePrompt(false, err?.message);
+                  }
                 } else {
                   writeTerm(`\r\n\x1b[33m[Sentinel Auto-Heal] No active error diagnosed in recent output.\x1b[0m\r\n\r\n`);
                 }
@@ -480,7 +646,7 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
               // workflow can resume without making the user retype the request.
               const answeringAgentQuestion = agentLoop.hasPendingQuestion();
               if (answeringAgentQuestion && cleanCmd === '/cancel') {
-                await sessionManager.write(currentSessionId!, '\x03');
+                await ptyTrackerRef.current.safeClearLine(d => sessionManager.write(currentSessionId!, d));
                 agentLoop.cancelPendingQuestion();
                 setLatestPlan(null);
                 writeTerm('\r\n\x1b[33m  Workflow cancelled.\x1b[0m\r\n\r\n');
@@ -494,23 +660,38 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
                   return; // Empty AI instruction
                 }
 
-                // Cancel the shell echo of the > command
-                await sessionManager.write(currentSessionId!, '\x03');
+                // Safely cancel the shell line without killing running foreground processes
+                await ptyTrackerRef.current.safeClearLine(d => sessionManager.write(currentSessionId!, d));
+
+                // Initiate live progress tracking in the bottom bar
+                PromptProgressManager.getInstance().startPrompt(aiGoal);
 
                 // Set up event listener for live output
                 agentLoop.onEvent((event) => {
-                  if (event.type === 'plan') {
+                  if (event.type === 'thinking') {
+                    PromptProgressManager.getInstance().updateStage(event.message || 'Thinking...', 30);
+                  } else if (event.type === 'plan') {
+                    PromptProgressManager.getInstance().updateStage('Planning...', 50);
                     if (event.data) {
                       setLatestPlan(event.data as AgentPlan);
                       setIsPlanOpen(true);
                     }
                     // Keep execution plan strictly in dropdown overlay; avoid terminal buffer spam
                     return;
-                  }
-
-                  if (event.type === 'done') {
+                  } else if (event.type === 'tool_start') {
+                    const rawMsg = event.message || '';
+                    const cleanMsg = rawMsg.replace(/^(Running|Executing|Phase \d+:?)\s*/i, '').trim();
+                    PromptProgressManager.getInstance().updateStage(cleanMsg ? `Running: ${cleanMsg.slice(0, 24)}` : 'Executing...', 75);
+                  } else if (event.type === 'step_output') {
+                    PromptProgressManager.getInstance().updateStage('Executing...', 82);
+                  } else if (event.type === 'tool_done') {
+                    PromptProgressManager.getInstance().updateStage('Verifying...', 92);
+                  } else if (event.type === 'done') {
                     // Automatically collapse the dropdown plan when goal completes successfully
                     setIsPlanOpen(false);
+                    PromptProgressManager.getInstance().completePrompt(true, event.message);
+                  } else if (event.type === 'error') {
+                    PromptProgressManager.getInstance().completePrompt(false, event.message);
                   }
 
                   const text = formatAgentEvent(event);
@@ -527,6 +708,7 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
 
                 // Run the agent loop
                 agentLoop.run(aiGoal, { os: getPlatform() === 'linux' ? 'linux' : 'mac', cwd: currentPath || '~' }).then(result => {
+                  PromptProgressManager.getInstance().completePrompt(result.success, result.summary);
                   if (!result.success) {
                     lastUnresolvedGoalRef.current = { goal: aiGoal, timestamp: Date.now() };
                   } else {
@@ -551,12 +733,16 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
                     sessionManager.write(currentSessionId!, '\r');
                   }
                 }).catch(err => {
+                  PromptProgressManager.getInstance().completePrompt(false, err?.message || 'Error');
                   lastUnresolvedGoalRef.current = { goal: aiGoal, timestamp: Date.now() };
                   writeTerm(`\r\n\x1b[1;31m  ✗ ${err.message || 'Something went wrong'}\x1b[0m\r\n\r\n`);
                   sessionManager.write(currentSessionId!, '\r');
                 });
                 
                 return; // Do NOT send the \r to the shell
+              } else if (cleanCmd) {
+                // User submitted a command to the shell
+                ptyTrackerRef.current.notifyCommandStarted(cleanCmd);
               }
             }
           }
@@ -638,6 +824,10 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
       }
       unsubRemediation?.();
       unsubscribeTheme();
+      unsubConsent?.();
+      ConsentQueue.getInstance().clearQueue(currentSessionId);
+      window.removeEventListener('sentinel:toggle-search', handleToggleSearch);
+      searchAddon.dispose();
       term.dispose();
     };
   }, []); // Run once on mount
@@ -659,7 +849,35 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
     <div style={{ position: 'relative', width: '100%', height: '100%', overflow: 'hidden', display: isActive ? 'block' : 'none' }}>
       <div 
         ref={terminalRef} 
+        className="allow-context-menu"
         style={{ position: 'relative', width: '100%', height: '100%', overflow: 'hidden' }} 
+        onContextMenu={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          const term = xtermRef.current;
+          if (!term) return;
+          if (term.hasSelection()) {
+            const text = term.getSelection();
+            if (text) {
+              navigator.clipboard.writeText(text);
+              term.clearSelection();
+            }
+          } else {
+            navigator.clipboard.readText().then(text => {
+              if (text && sessionId) {
+                SessionManager.getInstance().write(sessionId, text);
+              }
+            }).catch(() => {});
+          }
+        }}
+      />
+
+      {/* In-Buffer Regex Search Bar (Ctrl+Shift+F) */}
+      <TerminalSearchBar
+        isOpen={isSearchOpen}
+        onClose={() => setIsSearchOpen(false)}
+        searchAddon={searchAddonRef.current}
+        onFocusTerminal={() => xtermRef.current?.focus()}
       />
 
       {latestPlan && (

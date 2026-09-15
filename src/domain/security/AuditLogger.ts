@@ -1,4 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
+import { SecretRedactor } from './SecretRedactor';
 
 export interface AuditLogEntry {
   id: string;
@@ -79,12 +80,14 @@ export class AuditLogger implements IAuditLogger {
 
     const isBenchmark = typeof process !== 'undefined' && process.env.SENTINEL_BENCHMARK === 'true';
     const source: 'user' | 'benchmark' | 'system' = entry.source || (isBenchmark ? 'benchmark' : 'user');
+    const sanitizedParameters = SecretRedactor.redactObject(entry.parameters);
 
     const entryWithoutHash = {
       id: crypto.randomUUID ? crypto.randomUUID() : `log_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`,
       timestamp: new Date().toISOString(),
       source,
       ...entry,
+      parameters: sanitizedParameters,
       previousHash
     };
 
