@@ -219,19 +219,12 @@ function App() {
         if (autostartPref === 'false') return;
 
         const manager = EmbeddedEngineManager.getInstance();
-        const status = await manager.getStatus();
-        if (status.modelDownloaded && status.engineInstalled && !status.isRunning) {
-          console.log('[Sentinel] Auto-starting embedded AI inference engine on launch...');
-          const started = await manager.startEngine();
-          if (started) {
-            window.dispatchEvent(new CustomEvent('sentinel:ai-status-changed'));
-          }
-        }
+        await manager.proactiveWarmup();
       } catch (err) {
         console.warn('[Sentinel] Auto-start inference engine error:', err);
       }
     };
-    const timer = setTimeout(autoStartInference, 350);
+    const timer = setTimeout(autoStartInference, 150);
     return () => clearTimeout(timer);
   }, []);
 

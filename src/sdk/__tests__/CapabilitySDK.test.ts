@@ -102,6 +102,31 @@ describe('Capability SDK — End-to-End Concrete Execution Drivers', () => {
       const cancelRes = await appDriver.cancel();
       expect(typeof cancelRes).toBe('boolean');
     });
+
+    it('should skip package installation if target is already installed', async () => {
+      const appDriver = new ApplicationCapability('application.install');
+      const res = await appDriver.execute({
+        operation: 'install',
+        app: 'neovim',
+        mockAlreadyInstalled: true
+      });
+      expect(res.success).toBe(true);
+      expect(res.data?.alreadyInstalled).toBe(true);
+      expect(res.data?.stdout).toContain('already installed');
+    });
+
+    it('should execute reinstall when reinstall or force flag is specified even if installed', async () => {
+      const appDriver = new ApplicationCapability('application.install');
+      const res = await appDriver.execute({
+        operation: 'install',
+        app: 'neovim',
+        mockAlreadyInstalled: true,
+        reinstall: true
+      });
+      expect(res.success).toBe(true);
+      expect(res.data?.reinstalled).toBe(true);
+      expect(res.data?.alreadyInstalled).toBeUndefined();
+    });
   });
 
   describe('2. BrowserCapability (System Default Browser Driver)', () => {

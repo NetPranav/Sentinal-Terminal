@@ -276,5 +276,18 @@ describe('EmbeddedEngineManager (In-App Local AI Integration)', () => {
       expect(deleted).toBe(true);
     });
   });
+
+  describe('Proactive Engine Warmup (Task 0.75.7)', () => {
+    it('supports proactive engine warmup and exposes isWarming state', async () => {
+      expect(manager.isEngineWarming()).toBe(false);
+      const warmed = await manager.proactiveWarmup();
+      expect(typeof warmed).toBe('boolean');
+      expect(manager.isEngineWarming()).toBe(false);
+
+      const status = await manager.getStatus();
+      expect(status).toHaveProperty('isWarming');
+      expect(status.isWarming).toBe(false);
+    });
+  });
 });
 

@@ -753,6 +753,18 @@ const FAST_PATHS: {
     tool: 'application.open',
     paramsFn: (m) => ({ app: m[1].trim() })
   },
+  // Generalized application launcher (Phase 0.75 Task 0.75.6)
+  // Directly maps single/hyphenated application launch requests (e.g. open nvim, launch vlc, start htop)
+  // to application.open (<100ms execution without waiting for LLM generation).
+  {
+    pattern: /^(?:open|launch|start)\s+(?:the\s+)?([a-zA-Z0-9_\-\.]+)\s*$/i,
+    tool: 'application.open',
+    paramsFn: (m) => ({ app: m[1].trim(), operation: 'open' }),
+    shouldHandle: (goal) => {
+      const lower = goal.toLowerCase().trim();
+      return !/(?:settings|workflow|port|window|http|github|screen|volume|brightness|workspace|screenshot|file|folder|directory|script|service|socket|connection|terminal\s+color|theme|rice|dotfile|bluetooth|wifi|network|container|docker|podman|database|repo|git|branch|pr|issue|test|benchmark|pipeline|daemon|systemctl|journalctl|autostart|history)/i.test(lower);
+    }
+  },
 
   // Search & Find files & folders
   {

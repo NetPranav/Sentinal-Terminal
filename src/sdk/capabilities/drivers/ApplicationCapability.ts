@@ -106,7 +106,24 @@ export class ApplicationCapability extends BaseCapabilityDriver<AppDriverInput, 
         }
         case 'install': {
           const pkgInfo = AppAliasRegistry.getInstance().resolvePackage(target);
-          return { success: true, data: { installed: true, package: pkgInfo.name, isCask: pkgInfo.isCask }, commandExecuted: `brew install ${pkgInfo.isCask ? '--cask ' : ''}${pkgInfo.name}`, rollbackPayload: { action: 'uninstall', package: pkgInfo.name } };
+          const isReinstall = Boolean(
+            input.reinstall || 
+            input.force || 
+            (input.prompt && /re-?install|remove\s+and\s+install/i.test(input.prompt))
+          );
+          if (input.mockAlreadyInstalled && !isReinstall) {
+            return {
+              success: true,
+              data: { installed: true, alreadyInstalled: true, package: pkgInfo.name, isCask: pkgInfo.isCask, stdout: `${target} is already installed.` },
+              commandExecuted: `which ${target}`
+            };
+          }
+          return { 
+            success: true, 
+            data: { installed: true, package: pkgInfo.name, isCask: pkgInfo.isCask, reinstalled: isReinstall }, 
+            commandExecuted: isReinstall ? `brew reinstall ${pkgInfo.name}` : `brew install ${pkgInfo.isCask ? '--cask ' : ''}${pkgInfo.name}`, 
+            rollbackPayload: { action: 'uninstall', package: pkgInfo.name } 
+          };
         }
         case 'uninstall': {
           const pkgInfo = AppAliasRegistry.getInstance().resolvePackage(target);
@@ -387,16 +404,71 @@ export class ApplicationCapability extends BaseCapabilityDriver<AppDriverInput, 
       }
 
       if (op === 'install') {
+        const isReinstall = Boolean(
+          input.reinstall || 
+          input.force || 
+          (input.prompt && /re-?install|remove\s+and\s+install/i.test(input.prompt))
+        );
+
         if (platform === 'macos') {
           const pkgInfo = AppAliasRegistry.getInstance().resolvePackage(target);
+          if (!isReinstall) {
+            try {
+              const checkRes = await invoke<{ code: number }>('execute_command', {
+                command: 'sh',
+                args: ['-c', `which "${target.toLowerCase()}" >/dev/null 2>&1 || brew list "${pkgInfo.name}" >/dev/null 2>&1`]
+              });
+              if (checkRes.code === 0) {
+                return {
+                  success: true,
+                  data: { installed: true, alreadyInstalled: true, package: pkgInfo.name, isCask: pkgInfo.isCask, stdout: `${target} is already installed. Skipped installation.` },
+                  commandExecuted: `which ${target.toLowerCase()}`
+                };
+              }
+            } catch { /* proceed to install */ }
+          } else {
+            try {
+              const unargs = pkgInfo.isCask ? ['uninstall', '--cask', pkgInfo.name] : ['uninstall', pkgInfo.name];
+              await invoke('execute_command', { command: 'brew', args: unargs });
+            } catch { /* ignore uninstall failure */ }
+          }
+
           const args = pkgInfo.isCask ? ['install', '--cask', pkgInfo.name] : ['install', pkgInfo.name];
           await invoke('execute_command', { command: 'brew', args });
-          return { success: true, data: { installed: true, package: pkgInfo.name, isCask: pkgInfo.isCask }, commandExecuted: `brew ${args.join(' ')}`, rollbackPayload: { action: 'uninstall', package: pkgInfo.name } };
+          return { success: true, data: { installed: true, package: pkgInfo.name, isCask: pkgInfo.isCask, reinstalled: isReinstall }, commandExecuted: `brew ${args.join(' ')}`, rollbackPayload: { action: 'uninstall', package: pkgInfo.name } };
         } else {
+          // Linux (Arch / Debian / Fedora / Flatpak)
+          if (!isReinstall) {
+            try {
+              const checkRes = await invoke<{ code: number }>('execute_command', {
+                command: 'sh',
+                args: ['-c', `which "${target.toLowerCase()}" >/dev/null 2>&1 || (which pacman >/dev/null 2>&1 && pacman -Q "${target.toLowerCase()}" >/dev/null 2>&1) || (which dpkg-query >/dev/null 2>&1 && dpkg-query -W -f='\${Status}' "${target.toLowerCase()}" 2>/dev/null | grep -q "ok installed")`]
+              });
+              if (checkRes.code === 0) {
+                return {
+                  success: true,
+                  data: {
+                    installed: true,
+                    alreadyInstalled: true,
+                    package: target,
+                    stdout: `Package "${target}" is already installed on the system. Skipped package manager installation.`
+                  },
+                  commandExecuted: `which ${target.toLowerCase()}`
+                };
+              }
+            } catch { /* proceed to install */ }
+          } else {
+            try {
+              const unCmd = 'sh';
+              const unArgs = ['-c', `which pacman >/dev/null 2>&1 && sudo pacman -R --noconfirm "${target}" || which apt-get >/dev/null 2>&1 && sudo apt-get remove -y "${target}" || which dnf >/dev/null 2>&1 && sudo dnf remove -y "${target}"`];
+              await invoke('execute_command', { command: unCmd, args: unArgs });
+            } catch { /* ignore removal error */ }
+          }
+
           const cmd = 'sh';
           const args = ['-c', `which pacman >/dev/null 2>&1 && sudo pacman -S --noconfirm "${target}" || which apt-get >/dev/null 2>&1 && sudo apt-get install -y "${target}" || which dnf >/dev/null 2>&1 && sudo dnf install -y "${target}" || which flatpak >/dev/null 2>&1 && flatpak install -y "${target}"`];
           await invoke('execute_command', { command: cmd, args });
-          return { success: true, data: { installed: true, package: target }, commandExecuted: `${cmd} ${args.join(' ')}`, rollbackPayload: { action: 'uninstall', package: target } };
+          return { success: true, data: { installed: true, package: target, reinstalled: isReinstall }, commandExecuted: `${cmd} ${args.join(' ')}`, rollbackPayload: { action: 'uninstall', package: target } };
         }
       }
 

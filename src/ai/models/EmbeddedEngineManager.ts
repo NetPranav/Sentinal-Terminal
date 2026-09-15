@@ -9,6 +9,7 @@ import { invoke } from '@tauri-apps/api/core';
 
 export interface EmbeddedStatus {
   isRunning: boolean;
+  isWarming?: boolean;
   pid?: number;
   activeModel?: string;
   activeLora?: string;
@@ -110,6 +111,7 @@ export class EmbeddedEngineManager {
   }
 
   private activeLora?: string;
+  private isWarming = false;
 
   // Phase 0.5 item 17: GPU VRAM exhaustion fallback state
   private isCpuFallbackMode = false;
@@ -126,6 +128,7 @@ export class EmbeddedEngineManager {
   public async getStatus(): Promise<EmbeddedStatus> {
     const defaultStatus: EmbeddedStatus = {
       isRunning: false,
+      isWarming: this.isWarming,
       port: 8847,
       engineInstalled: false,
       modelDownloaded: false,
@@ -141,6 +144,7 @@ export class EmbeddedEngineManager {
         engineInstalled: true,
         modelDownloaded: true,
         isRunning: true,
+        isWarming: this.isWarming,
         port: 8847,
         activeModel: 'qwen2.5-coder-3b-instruct-q4_k_m.gguf',
         activeLora: this.activeLora,
@@ -165,6 +169,7 @@ export class EmbeddedEngineManager {
 
       return {
         isRunning: res.is_running,
+        isWarming: this.isWarming,
         pid: res.pid,
         activeModel: res.active_model,
         activeLora: res.active_lora || this.activeLora,
@@ -335,6 +340,45 @@ export class EmbeddedEngineManager {
       console.warn('[EmbeddedEngineManager] Failed to start embedded LLM:', err);
       return false;
     }
+  }
+
+  /**
+   * Proactively warms up the embedded engine on startup if downloaded (Phase 0.75 Task 0.75.7).
+   * Prevents cold-start inference latency penalty on first user prompt.
+   */
+  public async proactiveWarmup(): Promise<boolean> {
+    if (this.isWarming) return false;
+    try {
+      const status = await this.getStatus();
+      if (status.isRunning) return true;
+      if (!status.engineInstalled || !status.modelDownloaded) return false;
+
+      this.isWarming = true;
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('sentinel:ai-status-changed'));
+      }
+      console.log('[EmbeddedEngineManager] Proactively warming up embedded engine...');
+      const started = await this.startEngine();
+      if (started && typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('sentinel:ai-status-changed'));
+      }
+      return started;
+    } catch (err) {
+      console.warn('[EmbeddedEngineManager] Proactive engine warmup error:', err);
+      return false;
+    } finally {
+      this.isWarming = false;
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('sentinel:ai-status-changed'));
+      }
+    }
+  }
+
+  /**
+   * Check if the embedded engine is currently warming up.
+   */
+  public isEngineWarming(): boolean {
+    return this.isWarming;
   }
 
   /**

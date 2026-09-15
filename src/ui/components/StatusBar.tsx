@@ -303,22 +303,22 @@ export const StatusBar: React.FC<StatusBarProps> = ({
             e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.25)';
           }}
           onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = aiStatus?.isRunning ? 'rgba(255, 255, 255, 0.05)' : 'rgba(255, 255, 255, 0.02)';
-            e.currentTarget.style.borderColor = aiStatus?.isRunning ? '1px solid rgba(255, 255, 255, 0.16)' : '1px solid rgba(255, 255, 255, 0.07)';
+            e.currentTarget.style.backgroundColor = aiStatus?.isRunning ? 'rgba(255, 255, 255, 0.05)' : (aiStatus?.isWarming ? 'rgba(255, 255, 255, 0.04)' : 'rgba(255, 255, 255, 0.02)');
+            e.currentTarget.style.borderColor = aiStatus?.isRunning ? '1px solid rgba(255, 255, 255, 0.16)' : (aiStatus?.isWarming ? '1px solid rgba(255, 255, 255, 0.12)' : '1px solid rgba(255, 255, 255, 0.07)');
           }}
         >
           <span style={{
             width: '6px',
             height: '6px',
             borderRadius: '50%',
-            backgroundColor: aiStatus?.isRunning ? '#ffffff' : 'rgba(255, 255, 255, 0.25)',
-            boxShadow: aiStatus?.isRunning ? '0 0 6px rgba(255, 255, 255, 0.6)' : 'none',
+            backgroundColor: aiStatus?.isRunning ? '#ffffff' : (aiStatus?.isWarming ? 'rgba(255, 255, 255, 0.65)' : 'rgba(255, 255, 255, 0.25)'),
+            boxShadow: aiStatus?.isRunning ? '0 0 6px rgba(255, 255, 255, 0.6)' : (aiStatus?.isWarming ? '0 0 4px rgba(255, 255, 255, 0.35)' : 'none'),
             display: 'inline-block',
             flexShrink: 0
           }} />
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-            <Sparkles size={11} style={{ opacity: aiStatus?.isRunning ? 0.9 : 0.45 }} />
-            <span>{aiStatus?.isRunning ? (aiStatus.isCpuFallback ? 'AI (CPU)' : 'AI: Ready') : 'AI: Off'}</span>
+            <Sparkles size={11} style={{ opacity: aiStatus?.isRunning ? 0.9 : (aiStatus?.isWarming ? 0.7 : 0.45) }} />
+            <span>{aiStatus?.isRunning ? (aiStatus.isCpuFallback ? 'AI (CPU)' : 'AI: Ready') : (aiStatus?.isWarming ? 'AI: Warming...' : 'AI: Off')}</span>
           </span>
         </button>
 

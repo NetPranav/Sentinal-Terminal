@@ -47,5 +47,22 @@ describe('AgentLoop Conversational & Offline Resilience', () => {
     // In empty session, reports no actions found
     expect(res.summary).toContain('No destructive actions');
   });
+
+  it('resolves generalized app launch requests via fast-path in sub-100ms (Task 0.75.6)', async () => {
+    const res = await agentLoop.run('open nvim', { os: 'linux', cwd: '/tmp' });
+    expect(res.success).toBe(true);
+    expect(res.steps[0].tool).toBe('application.open');
+    expect(res.steps[0].params.app).toBe('nvim');
+
+    const res2 = await agentLoop.run('launch vlc', { os: 'linux', cwd: '/tmp' });
+    expect(res2.success).toBe(true);
+    expect(res2.steps[0].tool).toBe('application.open');
+    expect(res2.steps[0].params.app).toBe('vlc');
+
+    const res3 = await agentLoop.run('start htop', { os: 'linux', cwd: '/tmp' });
+    expect(res3.success).toBe(true);
+    expect(res3.steps[0].tool).toBe('application.open');
+    expect(res3.steps[0].params.app).toBe('htop');
+  });
 });
 
