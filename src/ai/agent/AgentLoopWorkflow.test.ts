@@ -222,5 +222,50 @@ describe('AgentLoop Workflow Generic Fast-Path', () => {
     expect(loaded?.schemaVersion).toBe(1);
     expect(loaded?.steps.length).toBeGreaterThanOrEqual(2);
   });
+
+  it('evaluates stage preconditions during multi-stage execution and skips satisfied steps (Tasks 0.75.2 & 0.75.3)', async () => {
+    const executedCommands: string[] = [];
+
+    const mockToolExecutor = {
+      hasDriver: vi.fn().mockReturnValue(true),
+      execute: vi.fn().mockImplementation((tool: string, params: any) => {
+        const cmdStr = params?.command || params?.app || '';
+        executedCommands.push(cmdStr);
+        // If checking which neovim, return 0 (installed)
+        if (typeof cmdStr === 'string' && cmdStr.includes('neovim')) {
+          return Promise.resolve({ success: true, data: { stdout: '/usr/bin/nvim', code: 0 } });
+        }
+        return Promise.resolve({ success: true, data: { stdout: 'done', code: 0 } });
+      })
+    };
+
+    const mockRegistry = {
+      toolIndex: {
+        has: () => true,
+        getAll: () => [
+          { definition: { id: 'shell.execute', displayName: 'Shell', description: 'Execute shell commands', parameters: [] } },
+          { definition: { id: 'filesystem.search', displayName: 'Search', description: 'Search files and folders', parameters: [] } },
+          { definition: { id: 'network.wifi.scan', displayName: 'Wifi', description: 'Scan wifi', parameters: [] } }
+        ]
+      }
+    } as any;
+
+    const agent = new AgentLoop(mockRegistry);
+    (agent as any).toolExecutor = mockToolExecutor;
+
+    const result = await agent.run('first install neovim, then build frontend, after that free port 3000', {
+      os: 'linux',
+      cwd: '/home/test'
+    });
+
+    expect(result.success).toBe(true);
+    // Precondition check was executed
+    expect(executedCommands.some(cmd => typeof cmd === 'string' && cmd.includes('neovim'))).toBe(true);
+    // Because which nvim succeeded and if_precondition_true === 'skip', pacman/brew install was skipped
+    expect(executedCommands.some(cmd => typeof cmd === 'string' && (cmd.includes('pacman -S') || cmd.includes('brew install')))).toBe(false);
+    // Subsequent stages were executed
+    expect(executedCommands.some(cmd => typeof cmd === 'string' && cmd.includes('npm run build'))).toBe(true);
+    expect(executedCommands.some(cmd => typeof cmd === 'string' && cmd.includes('3000'))).toBe(true);
+  });
 });
 

@@ -232,7 +232,10 @@ export class DiskWorkflowStorage {
           expectedExitCode: s.expectedExitCode,
           validationCriteria: s.validationCriteria,
           dependsOn: s.dependsOn,
-          isDestructive: s.isDestructive
+          isDestructive: s.isDestructive,
+          precondition_check: s.precondition_check,
+          if_precondition_true: s.if_precondition_true,
+          if_precondition_false: s.if_precondition_false
         };
       });
 

@@ -161,4 +161,92 @@ describe('DeterministicReplayEngine', () => {
     expect(result.stepResults[1].exitCode).toBe(2);
     expect(result.error).toContain('Step failed with exit code 2');
   });
+
+  it('skips step when precondition passes and if_precondition_true is "skip" (Task 0.75.2)', async () => {
+    const executedCommands: string[] = [];
+    const mockWorkflow: SavedWorkflowDefinition = {
+      schemaVersion: 1,
+      name: 'precondition-skip-flow',
+      steps: [
+        {
+          id: '1',
+          name: 'Install Neovim',
+          command: 'sudo pacman -S neovim',
+          precondition_check: 'which nvim',
+          if_precondition_true: 'skip',
+          if_precondition_false: 'continue'
+        },
+        {
+          id: '2',
+          name: 'Open Neovim',
+          command: 'nvim'
+        }
+      ],
+      createdAt: Date.now(),
+      updatedAt: Date.now()
+    };
+
+    const mockExecutor = async (cmd: string) => {
+      executedCommands.push(cmd);
+      if (cmd === 'which nvim') {
+        return { code: 0, stdout: '/usr/bin/nvim', stderr: '' };
+      }
+      return { code: 0, stdout: 'ok', stderr: '' };
+    };
+
+    const result = await engine.replay(mockWorkflow, {
+      autoApprove: true,
+      executor: mockExecutor
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.stepResults[0].status).toBe('skipped');
+    // Verify pacman install was never run, but nvim command was run
+    expect(executedCommands).not.toContain('sudo pacman -S neovim');
+    expect(executedCommands).toContain('nvim');
+  });
+
+  it('aborts workflow when precondition fails and if_precondition_false is "abort" (Task 0.75.2)', async () => {
+    const executedCommands: string[] = [];
+    const mockWorkflow: SavedWorkflowDefinition = {
+      schemaVersion: 1,
+      name: 'precondition-abort-flow',
+      steps: [
+        {
+          id: '1',
+          name: 'Build Frontend',
+          command: 'npm run build',
+          precondition_check: 'test -f package.json',
+          if_precondition_true: 'continue',
+          if_precondition_false: 'abort'
+        },
+        {
+          id: '2',
+          name: 'Deploy',
+          command: 'npm run deploy'
+        }
+      ],
+      createdAt: Date.now(),
+      updatedAt: Date.now()
+    };
+
+    const mockExecutor = async (cmd: string) => {
+      executedCommands.push(cmd);
+      if (cmd === 'test -f package.json') {
+        return { code: 1, stdout: '', stderr: 'No such file' };
+      }
+      return { code: 0, stdout: 'ok', stderr: '' };
+    };
+
+    const result = await engine.replay(mockWorkflow, {
+      autoApprove: true,
+      executor: mockExecutor
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.stepResults[0].status).toBe('failed');
+    expect(result.error).toContain('package.json');
+    expect(executedCommands).not.toContain('npm run build');
+    expect(executedCommands).not.toContain('npm run deploy');
+  });
 });

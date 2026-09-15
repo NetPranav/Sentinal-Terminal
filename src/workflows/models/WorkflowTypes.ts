@@ -328,6 +328,10 @@ export interface WorkflowStepDefinition {
   readonly validationCriteria?: string;
   readonly dependsOn?: string[];
   readonly isDestructive?: boolean;
+  // Phase 0.75 Task 0.75.2: Precondition-aware execution fields
+  readonly precondition_check?: string;
+  readonly if_precondition_true?: 'skip' | 'continue' | 'abort';
+  readonly if_precondition_false?: 'install' | 'continue' | 'abort' | 'skip';
 }
 
 export interface SavedWorkflowDefinition {

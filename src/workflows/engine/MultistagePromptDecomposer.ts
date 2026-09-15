@@ -25,6 +25,10 @@ export interface DecomposedStage {
   isDestructive: boolean;
   parameters?: Record<string, string | number>;
   expectedOutputValidator?: string;
+  // Phase 0.75 Task 0.75.2: Precondition-aware step schema
+  precondition_check?: string;
+  if_precondition_true?: 'skip' | 'continue' | 'abort';
+  if_precondition_false?: 'install' | 'continue' | 'abort' | 'skip';
 }
 
 export interface DecomposedWorkflowPlan {
@@ -175,7 +179,17 @@ export class MultistagePromptDecomposer {
       if (!clause) continue;
 
       const stageId = `stage-${i + 1}`;
-      const { command, name, isDestructive, binaries, ports, params } = this.synthesizeStageCommand(
+      const {
+        command,
+        name,
+        isDestructive,
+        binaries,
+        ports,
+        params,
+        precondition_check,
+        if_precondition_true,
+        if_precondition_false
+      } = this.synthesizeStageCommand(
         clause,
         context
       );
@@ -204,7 +218,10 @@ export class MultistagePromptDecomposer {
         cwd: context?.cwd,
         dependencies: previousStageId ? [previousStageId] : [],
         isDestructive,
-        parameters: Object.keys(params).length > 0 ? params : undefined
+        parameters: Object.keys(params).length > 0 ? params : undefined,
+        precondition_check,
+        if_precondition_true,
+        if_precondition_false
       };
 
       stages.push(stage);
@@ -247,7 +264,10 @@ export class MultistagePromptDecomposer {
       cwd: s.cwd,
       dependsOn: s.dependencies.length > 0 ? s.dependencies : undefined,
       isDestructive: s.isDestructive,
-      validationCriteria: s.expectedOutputValidator
+      validationCriteria: s.expectedOutputValidator,
+      precondition_check: s.precondition_check,
+      if_precondition_true: s.if_precondition_true,
+      if_precondition_false: s.if_precondition_false
     }));
 
     return {
@@ -329,6 +349,9 @@ export class MultistagePromptDecomposer {
     binaries: string[];
     ports: number[];
     params: Record<string, string | number>;
+    precondition_check?: string;
+    if_precondition_true?: 'skip' | 'continue' | 'abort';
+    if_precondition_false?: 'install' | 'continue' | 'abort' | 'skip';
   } {
     const lower = clause.toLowerCase();
     const binaries: string[] = [];
@@ -338,6 +361,9 @@ export class MultistagePromptDecomposer {
     let isDestructive = false;
     let command = clause;
     let name = clause;
+    let precondition_check: string | undefined;
+    let if_precondition_true: 'skip' | 'continue' | 'abort' | undefined;
+    let if_precondition_false: 'install' | 'continue' | 'abort' | 'skip' | undefined;
 
     // Detect ports
     const portMatch = clause.match(/(?:port\s+|:)(\d{2,5})/i);
@@ -360,36 +386,61 @@ export class MultistagePromptDecomposer {
       command = 'npm run build';
       name = 'Build Frontend';
       binaries.push('npm');
+      precondition_check = 'test -f package.json';
+      if_precondition_true = 'continue';
+      if_precondition_false = 'abort';
     } else if (/build\s+(?:backend|server|rust|cargo)/i.test(lower)) {
       command = 'cargo build --release';
       name = 'Build Backend (Cargo)';
       binaries.push('cargo');
+      precondition_check = 'test -f Cargo.toml';
+      if_precondition_true = 'continue';
+      if_precondition_false = 'abort';
     } else if (/package\s+container|docker\s+build/i.test(lower)) {
       command = 'docker build -t app:latest .';
       name = 'Package Container';
       binaries.push('docker');
+      precondition_check = 'which docker >/dev/null 2>&1 && docker info >/dev/null 2>&1';
+      if_precondition_true = 'continue';
+      if_precondition_false = 'abort';
     } else if (/push\s+to\s+registry|docker\s+push/i.test(lower)) {
       command = 'docker push app:latest';
       name = 'Push Container Image';
       binaries.push('docker');
+      precondition_check = 'which docker >/dev/null 2>&1';
+      if_precondition_true = 'continue';
+      if_precondition_false = 'abort';
     } else if (/run\s+migration|db\s+migrate/i.test(lower)) {
       command = 'npx prisma migrate deploy || npm run db:migrate';
       name = 'Run Database Migrations';
       binaries.push('npm');
       isDestructive = true;
+      precondition_check = 'test -f prisma/schema.prisma || test -f package.json';
+      if_precondition_true = 'continue';
+      if_precondition_false = 'abort';
     } else if (/health\s*check|verify\s+health/i.test(lower)) {
       const p = params['PORT'] || 8080;
       command = `curl -f -s http://localhost:${p}/health || curl -f -s http://localhost:${p}/`;
       name = `Health Check (Port ${p})`;
       binaries.push('curl');
+      precondition_check = 'which curl >/dev/null 2>&1';
+      if_precondition_true = 'continue';
+      if_precondition_false = 'abort';
     } else if (/git\s+pull|pull\s+latest/i.test(lower)) {
       command = 'git pull --ff-only';
       name = 'Git Pull Latest';
       binaries.push('git');
+      precondition_check = 'git rev-parse --is-inside-work-tree >/dev/null 2>&1';
+      if_precondition_true = 'continue';
+      if_precondition_false = 'abort';
     } else if (/run\s+test|npm\s+test|cargo\s+test/i.test(lower)) {
-      command = lower.includes('cargo') ? 'cargo test' : 'npm test';
+      const isCargo = lower.includes('cargo');
+      command = isCargo ? 'cargo test' : 'npm test';
       name = 'Run Test Suite';
-      binaries.push(lower.includes('cargo') ? 'cargo' : 'npm');
+      binaries.push(isCargo ? 'cargo' : 'npm');
+      precondition_check = isCargo ? 'test -f Cargo.toml' : 'test -f package.json';
+      if_precondition_true = 'continue';
+      if_precondition_false = 'abort';
     } else if (/clean\s+(?:target|cache|build)/i.test(lower)) {
       command = lower.includes('cargo') || lower.includes('rust') ? 'cargo clean' : 'npm run clean 2>/dev/null || rm -rf dist target';
       name = 'Clean Build Artifacts';
@@ -399,11 +450,33 @@ export class MultistagePromptDecomposer {
       command = `fuser -k ${p}/tcp 2>/dev/null || true`;
       name = `Free Port ${p}`;
       isDestructive = true;
+      precondition_check = `lsof -i :${p} >/dev/null 2>&1 || fuser ${p}/tcp >/dev/null 2>&1`;
+      if_precondition_true = 'continue';
+      if_precondition_false = 'skip';
+    } else if (/^(?:install|setup|add\s+package)\s+([a-zA-Z0-9_\-\.]+)/i.test(clause.trim())) {
+      const pkgMatch = clause.trim().match(/^(?:install|setup|add\s+package)\s+([a-zA-Z0-9_\-\.]+)/i);
+      const pkgName = pkgMatch ? pkgMatch[1].trim() : 'app';
+      command = `which pacman >/dev/null 2>&1 && sudo pacman -S --noconfirm "${pkgName}" || which apt-get >/dev/null 2>&1 && sudo apt-get install -y "${pkgName}" || brew install "${pkgName}"`;
+      name = `Install ${pkgName}`;
+      binaries.push(pkgName);
+      precondition_check = `which "${pkgName.toLowerCase()}" >/dev/null 2>&1`;
+      if_precondition_true = 'skip';
+      if_precondition_false = 'continue';
     } else {
       // Direct shell or natural action
       name = clause.charAt(0).toUpperCase() + clause.slice(1);
     }
 
-    return { command, name, isDestructive, binaries, ports, params };
+    return {
+      command,
+      name,
+      isDestructive,
+      binaries,
+      ports,
+      params,
+      precondition_check,
+      if_precondition_true,
+      if_precondition_false
+    };
   }
 }

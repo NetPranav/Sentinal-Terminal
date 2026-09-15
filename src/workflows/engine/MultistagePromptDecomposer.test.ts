@@ -127,5 +127,36 @@ describe('MultistagePromptDecomposer', () => {
       expect(saved.name).toBe('staging-deploy-v1');
       expect(saved.schemaVersion).toBe(1);
     });
+
+    it('infers explicit precondition checks and handlers (Task 0.75.2)', () => {
+      const prompt = 'first install neovim, then build frontend, after that free port 3000';
+      const plan = decomposer.decompose(prompt);
+
+      expect(plan.stages).toHaveLength(3);
+
+      // Stage 1: Install neovim -> should have precondition check 'which neovim' with if_precondition_true = 'skip'
+      const installStage = plan.stages[0];
+      expect(installStage.precondition_check).toContain('neovim');
+      expect(installStage.if_precondition_true).toBe('skip');
+      expect(installStage.if_precondition_false).toBe('continue');
+
+      // Stage 2: Build frontend -> should have precondition check 'test -f package.json' with if_precondition_false = 'abort'
+      const buildStage = plan.stages[1];
+      expect(buildStage.precondition_check).toBe('test -f package.json');
+      expect(buildStage.if_precondition_true).toBe('continue');
+      expect(buildStage.if_precondition_false).toBe('abort');
+
+      // Stage 3: Free port 3000 -> precondition check port listener, if_precondition_false = 'skip'
+      const portStage = plan.stages[2];
+      expect(portStage.precondition_check).toContain('3000');
+      expect(portStage.if_precondition_false).toBe('skip');
+
+      // Verify persistence mapping
+      const saved = decomposer.toSavedWorkflow(plan);
+      expect(saved.steps[0].precondition_check).toBe(installStage.precondition_check);
+      expect(saved.steps[0].if_precondition_true).toBe('skip');
+      expect(saved.steps[1].precondition_check).toBe(buildStage.precondition_check);
+      expect(saved.steps[1].if_precondition_false).toBe('abort');
+    });
   });
 });

@@ -40,7 +40,7 @@ export interface ReplayStepResult {
   stderr: string;
   durationMs: number;
   riskAnalysis: RiskAnalysisResult;
-  status: 'completed' | 'failed' | 'skipped_dry_run';
+  status: 'completed' | 'failed' | 'skipped_dry_run' | 'skipped';
   error?: string;
 }
 
@@ -255,6 +255,114 @@ export class DeterministicReplayEngine {
         stepResults.push(stepRes);
         options.onStepDone?.(step, stepRes);
         continue;
+      }
+
+      // Precondition Check (Phase 0.75 Task 0.75.2)
+      if (step.precondition_check) {
+        options.onLog?.(`[ReplayEngine] Evaluating precondition for step "${step.name}": ${step.precondition_check}`);
+        let preOutput: { code: number; stdout: string; stderr: string };
+        try {
+          if (options.executor) {
+            preOutput = await options.executor(step.precondition_check, expandedCwd);
+          } else {
+            preOutput = await this.defaultExecute(step.precondition_check, expandedCwd);
+          }
+        } catch {
+          preOutput = { code: 1, stdout: '', stderr: 'Precondition evaluation failed' };
+        }
+
+        const prePassed = preOutput.code === 0;
+        if (prePassed) {
+          if (step.if_precondition_true === 'skip') {
+            options.onLog?.(`[ReplayEngine] Precondition satisfied for "${step.name}". Skipping step.`);
+            const skipRes: ReplayStepResult = {
+              stepId: step.id,
+              name: step.name,
+              command: expandedCommand,
+              exitCode: 0,
+              stdout: `[SKIPPED] Precondition satisfied (${step.precondition_check})`,
+              stderr: '',
+              durationMs: performance.now() - stepStart,
+              riskAnalysis,
+              status: 'skipped'
+            };
+            stepResults.push(skipRes);
+            options.onStepDone?.(step, skipRes);
+            continue;
+          } else if (step.if_precondition_true === 'abort') {
+            const err = `Step "${step.name}" aborted because precondition (${step.precondition_check}) evaluated to true.`;
+            options.onLog?.(`[ReplayEngine] ${err}`);
+            const failRes: ReplayStepResult = {
+              stepId: step.id,
+              name: step.name,
+              command: expandedCommand,
+              exitCode: 1,
+              stdout: '',
+              stderr: err,
+              durationMs: performance.now() - stepStart,
+              riskAnalysis,
+              status: 'failed',
+              error: err
+            };
+            stepResults.push(failRes);
+            options.onStepDone?.(step, failRes);
+            return {
+              workflowName: workflow.name,
+              success: false,
+              durationMs: performance.now() - startTime,
+              stepsExecuted: stepResults.length,
+              totalSteps,
+              stepResults,
+              environmentValidation: envValidation,
+              error: err
+            };
+          }
+        } else {
+          if (step.if_precondition_false === 'abort') {
+            const err = `Step "${step.name}" aborted because precondition (${step.precondition_check}) failed with code ${preOutput.code}.`;
+            options.onLog?.(`[ReplayEngine] ${err}`);
+            const failRes: ReplayStepResult = {
+              stepId: step.id,
+              name: step.name,
+              command: expandedCommand,
+              exitCode: preOutput.code || 1,
+              stdout: preOutput.stdout,
+              stderr: preOutput.stderr || err,
+              durationMs: performance.now() - stepStart,
+              riskAnalysis,
+              status: 'failed',
+              error: err
+            };
+            stepResults.push(failRes);
+            options.onStepDone?.(step, failRes);
+            return {
+              workflowName: workflow.name,
+              success: false,
+              durationMs: performance.now() - startTime,
+              stepsExecuted: stepResults.length,
+              totalSteps,
+              stepResults,
+              environmentValidation: envValidation,
+              error: err
+            };
+          } else if (step.if_precondition_false === 'skip') {
+            options.onLog?.(`[ReplayEngine] Precondition not satisfied for "${step.name}". Skipping step.`);
+            const skipRes: ReplayStepResult = {
+              stepId: step.id,
+              name: step.name,
+              command: expandedCommand,
+              exitCode: 0,
+              stdout: `[SKIPPED] Precondition not satisfied (${step.precondition_check})`,
+              stderr: '',
+              durationMs: performance.now() - stepStart,
+              riskAnalysis,
+              status: 'skipped'
+            };
+            stepResults.push(skipRes);
+            options.onStepDone?.(step, skipRes);
+            continue;
+          }
+        }
       }
 
       // Check Consent if SENSITIVE and not auto-approved

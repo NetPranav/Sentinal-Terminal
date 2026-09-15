@@ -687,7 +687,7 @@ const FAST_PATHS: {
     paramsFn: () => ({ findFree: true })
   },
   {
-    pattern: /(?:check\s+if\s+port|check\s+port|is\s+port|port)\s+(\d+)(?:\s+(?:is\s+)?(?:in\s+use|free|available|open))?/i,
+    pattern: /^(?:check\s+if\s+port|check\s+port|is\s+port|port)\s+(\d+)(?:\s+(?:is\s+)?(?:in\s+use|free|available|open))?\s*$/i,
     tool: 'network.ports',
     paramsFn: (m) => ({ port: parseInt(m[1], 10) })
   },
@@ -1043,6 +1043,10 @@ function resolvePathAlias(raw: string): string {
  * Find matching fast path definition and extracted parameters for a goal.
  */
 export function findFastPath(goal: string): { tool: string; params: Record<string, any> } | null {
+  // If the goal is a multi-stage composite workflow, bypass single fast-path matching
+  if (MultistagePromptDecomposer.getInstance().isMultistagePrompt(goal)) {
+    return null;
+  }
   const normalized = normalizeGoalText(goal).trim();
   let cleanGoal = normalized;
   let prev = '';
@@ -1636,24 +1640,89 @@ export class AgentLoop {
 
       for (let i = 0; i < plan.stages.length; i++) {
         const stage = plan.stages[i];
-        this.emit({ type: 'tool_start', message: `Stage ${i + 1}/${plan.stages.length}: ${stage.name} (${stage.inferredCommand})` });
-        const result = await this.toolExecutor.execute(
-          'shell.execute',
-          { command: stage.inferredCommand, explanation: stage.name },
-          stage.cwd || context.cwd,
-          this.authorizationHandler
-        );
-        steps.push({
-          tool: 'shell.execute',
-          params: { command: stage.inferredCommand, explanation: stage.name },
-          result
-        });
-        if (!result.success) {
-          allSuccess = false;
-          this.emit({ type: 'error', message: `Stage failed: ${stage.name}` });
-          break;
+
+        // 1. Evaluate Precondition Check if defined (Phase 0.75 Task 0.75.2)
+        if (stage.precondition_check) {
+          this.emit({ type: 'thinking', message: `Evaluating precondition for stage "${stage.name}": ${stage.precondition_check}` });
+          const preResult = await this.toolExecutor.execute(
+            'shell.execute',
+            { command: stage.precondition_check, explanation: `Precondition check for ${stage.name}` },
+            stage.cwd || context.cwd,
+            this.authorizationHandler
+          );
+
+          const prePassed = preResult.success && (preResult.data?.code === 0 || preResult.data?.code === undefined);
+
+          if (prePassed) {
+            if (stage.if_precondition_true === 'skip') {
+              this.emit({ type: 'tool_done', message: `✓ Precondition satisfied for ${stage.name}. Skipping redundant step.` });
+              steps.push({
+                tool: 'shell.execute',
+                params: { command: stage.precondition_check, explanation: `Precondition satisfied: skip ${stage.name}` },
+                result: { success: true, data: { stdout: `Precondition satisfied (${stage.precondition_check}): ${stage.name} skipped.`, code: 0 } }
+              });
+              continue;
+            } else if (stage.if_precondition_true === 'abort') {
+              allSuccess = false;
+              this.emit({ type: 'error', message: `Precondition triggered abort for stage "${stage.name}".` });
+              break;
+            }
+          } else {
+            if (stage.if_precondition_false === 'abort') {
+              allSuccess = false;
+              this.emit({ type: 'error', message: `Precondition check failed for stage "${stage.name}": ${stage.precondition_check}. Aborting.` });
+              break;
+            } else if (stage.if_precondition_false === 'skip') {
+              this.emit({ type: 'thinking', message: `Precondition unsatisfied for ${stage.name}. Skipping step.` });
+              continue;
+            }
+            // If 'install' or 'continue', proceed with execution
+          }
+        }
+
+        // 2. Step-Level Routing & Dynamic Tool Pruning (Phase 0.75 Task 0.75.3)
+        const prunedTools = DynamicToolPruner.prune(this.toolSpecs, stage.rawPrompt, { maxTools: 5 });
+
+        // If stage is an un-synthesized natural language step, route to coder model with pruned tools
+        if (stage.inferredCommand === stage.rawPrompt && !/^(?:sudo\s+)?[a-zA-Z0-9_\-\.\/]+(?:\s+.*)?$/.test(stage.inferredCommand.trim())) {
+          this.emit({ type: 'tool_start', message: `Stage ${i + 1}/${plan.stages.length}: ${stage.name} (dispatching to coder model with ${prunedTools.length} domain tools)` });
+          const stageResult = await this.runLLMLoop(
+            stage.rawPrompt,
+            { ...context, cwd: stage.cwd || context.cwd },
+            { toolSubset: prunedTools, stageContext: stage.precondition_check ? `Precondition check: ${stage.precondition_check}` : undefined }
+          );
+
+          if (stageResult.steps) {
+            steps.push(...stageResult.steps);
+          }
+          if (!stageResult.success) {
+            allSuccess = false;
+            this.emit({ type: 'error', message: `Stage failed: ${stage.name}` });
+            break;
+          } else {
+            this.emit({ type: 'tool_done', message: `✓ ${stage.name}` });
+          }
         } else {
-          this.emit({ type: 'tool_done', message: `✓ ${stage.name}` });
+          // Direct execution of synthesized command
+          this.emit({ type: 'tool_start', message: `Stage ${i + 1}/${plan.stages.length}: ${stage.name} (${stage.inferredCommand})` });
+          const result = await this.toolExecutor.execute(
+            'shell.execute',
+            { command: stage.inferredCommand, explanation: stage.name },
+            stage.cwd || context.cwd,
+            this.authorizationHandler
+          );
+          steps.push({
+            tool: 'shell.execute',
+            params: { command: stage.inferredCommand, explanation: stage.name },
+            result
+          });
+          if (!result.success) {
+            allSuccess = false;
+            this.emit({ type: 'error', message: `Stage failed: ${stage.name}` });
+            break;
+          } else {
+            this.emit({ type: 'tool_done', message: `✓ ${stage.name}` });
+          }
         }
       }
 
@@ -1677,8 +1746,16 @@ export class AgentLoop {
    * The core LLM agent loop — sends the goal to Ollama, executes tools,
    * feeds results back, and repeats until done.
    */
-  private async runLLMLoop(goal: string, context: { os: string; cwd: string; sessionId?: string }): Promise<AgentResult> {
-    let systemPrompt = buildSystemPrompt(this.toolSpecs, context, goal);
+  private async runLLMLoop(
+    goal: string,
+    context: { os: string; cwd: string; sessionId?: string },
+    options?: { toolSubset?: ToolSpec[]; stageContext?: string }
+  ): Promise<AgentResult> {
+    const activeTools = options?.toolSubset || this.toolSpecs;
+    let systemPrompt = buildSystemPrompt(activeTools, context, goal);
+    if (options?.stageContext) {
+      systemPrompt += `\n\n[STAGE CONTEXT & PRECONDITIONS]\n${options.stageContext}\n`;
+    }
 
     // Phase 5.1: Ground-Truth Exemplar Enrichment from TLDR Knowledge Base
     const words = goal.toLowerCase().split(/[\s,;:.!?]+/);

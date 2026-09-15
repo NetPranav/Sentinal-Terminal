@@ -100,8 +100,8 @@ Each of the 9 domains contains **50 prompts** (totaling 450 prompts). Evaluated 
 ### Phase 0.75: AI Model Intelligence — Intent/Coder Split, Latency & Continuous Learning Pipeline (Next Priority)
 #### A. Architectural Changes: The Intent/Coder Split
 - [ ] **0.75.1**: Implement `IntentModel.classify()` backed by a lightweight quantized 0.5B–1.5B model on CPU (`IntentModel.ts` / `IntentRouter.ts`).
-- [ ] **0.75.2**: Extend step-decomposition schema with explicit `precondition_check`, `if_precondition_true`, and `if_precondition_false` fields.
-- [ ] **0.75.3**: Route individual decomposed steps to coder model with `DynamicToolPruner` subset and precondition context.
+- [x] **0.75.2**: Extend step-decomposition schema with explicit `precondition_check`, `if_precondition_true`, and `if_precondition_false` fields.
+- [x] **0.75.3**: Route individual decomposed steps to coder model with `DynamicToolPruner` subset and precondition context.
 - [x] **0.75.4**: Fix unconditional reinstall bug in `ApplicationCapability.ts` with `which "${target}"` check and explicit reinstall routing.
 - [ ] **0.75.5**: Add decomposition-correctness reward term to `scripts/train_sentinel_grpo.py` separate from execution outcome.
 
