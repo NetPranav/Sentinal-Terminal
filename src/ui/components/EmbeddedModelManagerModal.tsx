@@ -303,7 +303,8 @@ export const EmbeddedModelManagerModal: React.FC<EmbeddedModelManagerModalProps>
                 width: '8px',
                 height: '8px',
                 borderRadius: '50%',
-                backgroundColor: status?.isRunning ? '#22c55e' : '#64748b'
+                backgroundColor: status?.isRunning ? '#ffffff' : 'rgba(255, 255, 255, 0.25)',
+                boxShadow: status?.isRunning ? '0 0 8px rgba(255, 255, 255, 0.6)' : 'none'
               }} />
               <div>
                 <span style={{ fontSize: '12px', fontWeight: 500, color: '#f8fafc' }}>
@@ -323,9 +324,9 @@ export const EmbeddedModelManagerModal: React.FC<EmbeddedModelManagerModalProps>
                   style={{
                     padding: '4px 10px',
                     borderRadius: '5px',
-                    border: '1px solid rgba(239, 68, 68, 0.25)',
-                    backgroundColor: 'rgba(239, 68, 68, 0.08)',
-                    color: '#f87171',
+                    border: '1px solid rgba(255, 255, 255, 0.16)',
+                    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+                    color: '#ffffff',
                     fontSize: '11px',
                     fontWeight: 500,
                     cursor: 'pointer',
@@ -333,6 +334,8 @@ export const EmbeddedModelManagerModal: React.FC<EmbeddedModelManagerModalProps>
                     alignItems: 'center',
                     gap: '4px'
                   }}
+                  onMouseEnter={e => { e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.14)'; }}
+                  onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.08)'; }}
                 >
                   <Square size={11} />
                   <span>Stop</span>
@@ -371,12 +374,16 @@ export const EmbeddedModelManagerModal: React.FC<EmbeddedModelManagerModalProps>
               border: '1px solid rgba(255, 255, 255, 0.08)',
               borderRadius: '6px',
               fontSize: '11px',
-              color: downloadMsg.toLowerCase().includes('error') ? '#f87171' : downloadMsg.includes('complete') ? '#4ade80' : '#e2e8f0',
+              color: '#ffffff',
               display: 'flex',
               alignItems: 'center',
               gap: '6px'
             }}>
-              {downloadMsg.includes('complete') ? <CheckCircle2 size={13} /> : <Info size={13} />}
+              {downloadMsg.includes('complete') ? (
+                <CheckCircle2 size={13} style={{ color: '#ffffff' }} />
+              ) : (
+                <Info size={13} style={{ color: 'rgba(255, 255, 255, 0.65)' }} />
+              )}
               <span>{downloadMsg}</span>
             </div>
           )}
@@ -440,11 +447,11 @@ export const EmbeddedModelManagerModal: React.FC<EmbeddedModelManagerModalProps>
                   onClick={handleCancelDownload}
                   disabled={isActionBusy}
                   style={{
-                    background: 'rgba(239, 68, 68, 0.08)',
-                    border: '1px solid rgba(239, 68, 68, 0.2)',
+                    background: 'rgba(255, 255, 255, 0.06)',
+                    border: '1px solid rgba(255, 255, 255, 0.14)',
                     borderRadius: '4px',
                     padding: '2px 7px',
-                    color: '#f87171',
+                    color: 'rgba(255, 255, 255, 0.85)',
                     fontSize: '10px',
                     fontWeight: 500,
                     cursor: isActionBusy ? 'not-allowed' : 'pointer',
@@ -452,6 +459,8 @@ export const EmbeddedModelManagerModal: React.FC<EmbeddedModelManagerModalProps>
                     alignItems: 'center',
                     gap: '3px'
                   }}
+                  onMouseEnter={e => { e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.12)'; }}
+                  onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.06)'; }}
                 >
                   <X size={10} />
                   <span>Cancel</span>
@@ -485,7 +494,7 @@ export const EmbeddedModelManagerModal: React.FC<EmbeddedModelManagerModalProps>
                 borderRadius: '4px',
                 backgroundColor: 'rgba(255, 255, 255, 0.06)',
                 border: '1px solid rgba(255, 255, 255, 0.08)',
-                color: status?.modelDownloaded ? '#4ade80' : isModelDownloading ? '#ffffff' : 'rgba(255, 255, 255, 0.45)',
+                color: status?.modelDownloaded ? '#ffffff' : isModelDownloading ? '#ffffff' : 'rgba(255, 255, 255, 0.45)',
                 fontWeight: 400
               }}>
                 {status?.modelDownloaded ? 'Installed (~2.1 GB)' : isModelDownloading ? `Downloading (${percent.toFixed(0)}%)` : 'Not Downloaded'}
@@ -524,13 +533,15 @@ export const EmbeddedModelManagerModal: React.FC<EmbeddedModelManagerModalProps>
                       style={{
                         background: 'transparent',
                         border: 'none',
-                        color: '#f87171',
+                        color: 'rgba(255, 255, 255, 0.65)',
                         fontSize: '10px',
                         cursor: 'pointer',
                         display: 'flex',
                         alignItems: 'center',
                         gap: '3px'
                       }}
+                      onMouseEnter={e => { e.currentTarget.style.color = '#ffffff'; }}
+                      onMouseLeave={e => { e.currentTarget.style.color = 'rgba(255, 255, 255, 0.65)'; }}
                     >
                       <Trash2 size={10} />
                       <span>Discard</span>
@@ -571,25 +582,34 @@ export const EmbeddedModelManagerModal: React.FC<EmbeddedModelManagerModalProps>
               <div style={{ marginTop: '2px' }}>
                 {!confirmDelete ? (
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: '11px', color: '#10b981', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      <CheckCircle2 size={12} />
+                    <span style={{ fontSize: '11px', color: 'rgba(255, 255, 255, 0.85)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <CheckCircle2 size={12} style={{ color: '#ffffff' }} />
                       <span>Model ready for offline zero-token terminal automation</span>
                     </span>
                     <button
                       onClick={() => setConfirmDelete(true)}
                       disabled={isActionBusy}
                       style={{
-                        background: 'rgba(239, 68, 68, 0.08)',
-                        border: '1px solid rgba(239, 68, 68, 0.2)',
+                        background: 'rgba(255, 255, 255, 0.06)',
+                        border: '1px solid rgba(255, 255, 255, 0.12)',
                         borderRadius: '5px',
                         padding: '4px 10px',
-                        color: '#f87171',
+                        color: 'rgba(255, 255, 255, 0.8)',
                         fontSize: '11px',
-                        fontWeight: 400,
+                        fontWeight: 500,
                         cursor: isActionBusy ? 'not-allowed' : 'pointer',
                         display: 'inline-flex',
                         alignItems: 'center',
-                        gap: '4px'
+                        gap: '5px',
+                        transition: 'all 0.15s ease'
+                      }}
+                      onMouseEnter={e => {
+                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.12)';
+                        e.currentTarget.style.color = '#ffffff';
+                      }}
+                      onMouseLeave={e => {
+                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.06)';
+                        e.currentTarget.style.color = 'rgba(255, 255, 255, 0.8)';
                       }}
                     >
                       <Trash2 size={11} />
@@ -599,15 +619,15 @@ export const EmbeddedModelManagerModal: React.FC<EmbeddedModelManagerModalProps>
                 ) : (
                   <div style={{
                     padding: '8px 12px',
-                    backgroundColor: 'rgba(239, 68, 68, 0.08)',
-                    border: '1px solid rgba(239, 68, 68, 0.2)',
+                    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+                    border: '1px solid rgba(255, 255, 255, 0.14)',
                     borderRadius: '6px',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between'
                   }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: '#f87171' }}>
-                      <AlertTriangle size={13} />
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: '#ffffff' }}>
+                      <AlertTriangle size={13} style={{ color: 'rgba(255, 255, 255, 0.7)' }} />
                       <span>Delete model (~2.1 GB)?</span>
                     </div>
                     <div style={{ display: 'flex', gap: '6px' }}>
@@ -615,30 +635,46 @@ export const EmbeddedModelManagerModal: React.FC<EmbeddedModelManagerModalProps>
                         onClick={handleDeleteModel}
                         disabled={isActionBusy}
                         style={{
-                          background: '#ef4444',
-                          border: 'none',
+                          background: 'rgba(255, 255, 255, 0.16)',
+                          border: '1px solid rgba(255, 255, 255, 0.25)',
                           borderRadius: '4px',
-                          padding: '3px 10px',
-                          color: '#fff',
+                          padding: '4px 10px',
+                          color: '#ffffff',
                           fontSize: '11px',
-                          fontWeight: 500,
-                          cursor: isActionBusy ? 'not-allowed' : 'pointer'
+                          fontWeight: 600,
+                          cursor: isActionBusy ? 'not-allowed' : 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          transition: 'all 0.15s ease'
+                        }}
+                        onMouseEnter={e => {
+                          e.currentTarget.style.background = '#ffffff';
+                          e.currentTarget.style.color = '#000000';
+                        }}
+                        onMouseLeave={e => {
+                          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.16)';
+                          e.currentTarget.style.color = '#ffffff';
                         }}
                       >
-                        Yes, Delete
+                        <Trash2 size={11} />
+                        <span>Yes, Delete</span>
                       </button>
                       <button
                         onClick={() => setConfirmDelete(false)}
                         disabled={isActionBusy}
                         style={{
-                          background: 'rgba(255, 255, 255, 0.06)',
+                          background: 'rgba(255, 255, 255, 0.05)',
                           border: '1px solid rgba(255, 255, 255, 0.1)',
                           borderRadius: '4px',
-                          padding: '3px 8px',
-                          color: '#cbd5e1',
+                          padding: '4px 10px',
+                          color: 'rgba(255, 255, 255, 0.75)',
                           fontSize: '11px',
-                          cursor: 'pointer'
+                          cursor: 'pointer',
+                          transition: 'all 0.15s ease'
                         }}
+                        onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'; }}
+                        onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'; }}
                       >
                         Cancel
                       </button>

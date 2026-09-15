@@ -44,6 +44,7 @@ export const WorkflowManagerDrawer: React.FC<WorkflowManagerDrawerProps> = ({
   const [replayResult, setReplayResult] = useState<ReplayExecutionResult | null>(null);
   const [activeStepIndex, setActiveStepIndex] = useState<number | null>(null);
   const [feedbackMsg, setFeedbackMsg] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
+  const [workflowToDelete, setWorkflowToDelete] = useState<string | null>(null);
 
   const fetchWorkflows = async () => {
     setIsLoading(true);
@@ -66,9 +67,27 @@ export const WorkflowManagerDrawer: React.FC<WorkflowManagerDrawerProps> = ({
       setReplayResult(null);
       setActiveStepIndex(null);
       setSearchFilter('');
+      setWorkflowToDelete(null);
       fetchWorkflows();
     }
   }, [isOpen]);
+
+  useEffect(() => {
+    if (!workflowToDelete) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
+        setWorkflowToDelete(null);
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        e.stopPropagation();
+        handleConfirmDelete();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown, true);
+    return () => window.removeEventListener('keydown', handleKeyDown, true);
+  }, [workflowToDelete]);
 
   const filteredWorkflows = workflows.filter(wf => {
     if (!searchFilter.trim()) return true;
@@ -85,11 +104,15 @@ export const WorkflowManagerDrawer: React.FC<WorkflowManagerDrawerProps> = ({
     setTimeout(() => setFeedbackMsg(null), 3500);
   };
 
-  const handleDelete = async (name: string, e: React.MouseEvent) => {
+  const handleDelete = (name: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!window.confirm(`Are you sure you want to delete workflow "${name}"?`)) {
-      return;
-    }
+    setWorkflowToDelete(name);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!workflowToDelete) return;
+    const name = workflowToDelete;
+    setWorkflowToDelete(null);
     try {
       const storage = DiskWorkflowStorage.getInstance();
       const ok = await storage.deleteWorkflow(name);
@@ -284,15 +307,15 @@ export const WorkflowManagerDrawer: React.FC<WorkflowManagerDrawerProps> = ({
         {feedbackMsg && (
           <div style={{
             padding: '10px 16px',
-            backgroundColor: feedbackMsg.type === 'success' ? 'rgba(34, 197, 94, 0.15)' : 'rgba(239, 68, 68, 0.15)',
-            borderBottom: `1px solid ${feedbackMsg.type === 'success' ? 'rgba(34, 197, 94, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`,
-            color: feedbackMsg.type === 'success' ? '#4ade80' : '#f87171',
+            backgroundColor: 'rgba(255, 255, 255, 0.04)',
+            borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+            color: '#ffffff',
             fontSize: '12px',
             display: 'flex',
             alignItems: 'center',
             gap: '8px'
           }}>
-            {feedbackMsg.type === 'success' ? <CheckCircle2 size={14} /> : <AlertCircle size={14} />}
+            {feedbackMsg.type === 'success' ? <CheckCircle2 size={14} style={{ color: '#ffffff' }} /> : <AlertCircle size={14} style={{ color: 'rgba(255, 255, 255, 0.75)' }} />}
             <span>{feedbackMsg.text}</span>
           </div>
         )}
@@ -512,9 +535,9 @@ export const WorkflowManagerDrawer: React.FC<WorkflowManagerDrawerProps> = ({
                           transition: 'all 0.15s ease'
                         }}
                         onMouseEnter={e => {
-                          e.currentTarget.style.background = 'rgba(239, 68, 68, 0.08)';
-                          e.currentTarget.style.borderColor = 'rgba(239, 68, 68, 0.2)';
-                          e.currentTarget.style.color = '#f87171';
+                          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)';
+                          e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.2)';
+                          e.currentTarget.style.color = '#ffffff';
                         }}
                         onMouseLeave={e => {
                           e.currentTarget.style.background = 'rgba(255, 255, 255, 0.04)';
@@ -684,12 +707,12 @@ export const WorkflowManagerDrawer: React.FC<WorkflowManagerDrawerProps> = ({
                             <span style={{ 
                               fontSize: '12px', 
                               fontWeight: 600, 
-                              color: replayResult.success ? '#ffffff' : '#f87171',
+                              color: replayResult.success ? '#ffffff' : 'rgba(255, 255, 255, 0.85)',
                               display: 'flex',
                               alignItems: 'center',
                               gap: '6px'
                             }}>
-                              {replayResult.success ? <CheckCircle2 size={13} style={{ color: 'rgba(255, 255, 255, 0.75)' }} /> : <AlertCircle size={13} style={{ color: '#f87171' }} />}
+                              {replayResult.success ? <CheckCircle2 size={13} style={{ color: 'rgba(255, 255, 255, 0.75)' }} /> : <AlertCircle size={13} style={{ color: 'rgba(255, 255, 255, 0.65)' }} />}
                               <span>{replayResult.success ? 'Replay Completed' : 'Replay Failed'}</span>
                             </span>
                             <span style={{ fontSize: '11px', color: 'rgba(255, 255, 255, 0.4)' }}>
@@ -716,7 +739,7 @@ export const WorkflowManagerDrawer: React.FC<WorkflowManagerDrawerProps> = ({
                                 backgroundColor: 'rgba(0, 0, 0, 0.3)',
                                 borderRadius: '4px'
                               }}>
-                                <span style={{ color: sr.status === 'completed' ? '#ffffff' : (sr.status === 'skipped_dry_run' ? 'rgba(255, 255, 255, 0.6)' : '#f87171') }}>
+                                <span style={{ color: sr.status === 'completed' ? '#ffffff' : (sr.status === 'skipped_dry_run' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(255, 255, 255, 0.85)') }}>
                                   [{idx + 1}] {sr.name} ({sr.durationMs.toFixed(0)}ms)
                                 </span>
                                 <span style={{ color: 'rgba(255, 255, 255, 0.4)' }}>{sr.status}</span>
@@ -874,6 +897,138 @@ export const WorkflowManagerDrawer: React.FC<WorkflowManagerDrawerProps> = ({
           </div>
           <span style={{ fontFamily: 'ui-monospace, monospace' }}>~/.sentinel/workflows/</span>
         </div>
+
+        {/* Custom Grayscale Delete Confirmation Modal */}
+        {workflowToDelete && (
+          <div
+            onClick={() => setWorkflowToDelete(null)}
+            style={{
+              position: 'fixed',
+              inset: 0,
+              backgroundColor: 'rgba(0, 0, 0, 0.7)',
+              backdropFilter: 'blur(8px)',
+              WebkitBackdropFilter: 'blur(8px)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 100000,
+              padding: '16px'
+            }}
+          >
+            <div
+              onClick={e => e.stopPropagation()}
+              style={{
+                width: '420px',
+                maxWidth: '92vw',
+                backgroundColor: 'rgba(18, 20, 25, 0.98)',
+                border: '1px solid rgba(255, 255, 255, 0.12)',
+                borderRadius: '12px',
+                boxShadow: '0 24px 64px rgba(0, 0, 0, 0.85), 0 0 0 1px rgba(255, 255, 255, 0.06)',
+                overflow: 'hidden',
+                display: 'flex',
+                flexDirection: 'column'
+              }}
+            >
+              <div style={{
+                padding: '16px 20px',
+                borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Trash2 size={16} style={{ color: '#ffffff' }} />
+                  <span style={{ fontSize: '14px', fontWeight: 600, color: '#ffffff' }}>
+                    Delete Workflow
+                  </span>
+                </div>
+                <button
+                  onClick={() => setWorkflowToDelete(null)}
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    color: 'rgba(255, 255, 255, 0.45)',
+                    cursor: 'pointer',
+                    padding: '4px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    borderRadius: '4px'
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.color = '#ffffff'; }}
+                  onMouseLeave={e => { e.currentTarget.style.color = 'rgba(255, 255, 255, 0.45)'; }}
+                >
+                  <X size={15} />
+                </button>
+              </div>
+
+              <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <p style={{ margin: 0, fontSize: '13px', lineHeight: '1.5', color: 'rgba(255, 255, 255, 0.75)' }}>
+                  Are you sure you want to delete workflow <span style={{ fontFamily: 'ui-monospace, monospace', color: '#ffffff', fontWeight: 600, backgroundColor: 'rgba(255, 255, 255, 0.08)', padding: '2px 6px', borderRadius: '4px' }}>"{workflowToDelete}"</span>?
+                </p>
+                <p style={{ margin: 0, fontSize: '11px', color: 'rgba(255, 255, 255, 0.4)' }}>
+                  This action cannot be undone. All AST steps, macro bindings, and replay history for this workflow will be permanently removed.
+                </p>
+              </div>
+
+              <div style={{
+                padding: '12px 20px',
+                borderTop: '1px solid rgba(255, 255, 255, 0.08)',
+                backgroundColor: 'rgba(0, 0, 0, 0.25)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'flex-end',
+                gap: '10px'
+              }}>
+                <button
+                  onClick={() => setWorkflowToDelete(null)}
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.05)',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    color: 'rgba(255, 255, 255, 0.8)',
+                    borderRadius: '6px',
+                    padding: '6px 14px',
+                    fontSize: '12px',
+                    fontWeight: 500,
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease'
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)'; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'; }}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleConfirmDelete}
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.16)',
+                    border: '1px solid rgba(255, 255, 255, 0.25)',
+                    color: '#ffffff',
+                    borderRadius: '6px',
+                    padding: '6px 14px',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    transition: 'all 0.15s ease'
+                  }}
+                  onMouseEnter={e => {
+                    e.currentTarget.style.background = '#ffffff';
+                    e.currentTarget.style.color = '#000000';
+                  }}
+                  onMouseLeave={e => {
+                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.16)';
+                    e.currentTarget.style.color = '#ffffff';
+                  }}
+                >
+                  <Trash2 size={13} />
+                  <span>Delete Workflow</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
