@@ -1,9 +1,9 @@
 # Sentinel Terminal: Master Implementation & Testing Checklist
 
-> **Document Version:** 1.0.0  
+> **Document Version:** 2.0.0  
 > **Target OS:** Linux (Arch Linux, Hyprland, Wayland, X11, Systemd)  
-> **Active Roadmap:** [`roadmap.md`](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/roadmap.md) (v5.0.0)  
-> **Status:** Phase 0 Active (Harness Automation)
+> **Active Roadmap:** [`roadmap.md`](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/roadmap.md) (v6.0.0) / [`docs/ROADMAP.md`](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/docs/ROADMAP.md)  
+> **Status:** Phase 0, 0.5 & 1 Completed; Phase 0.75 Next Priority
 
 ---
 
@@ -13,6 +13,7 @@
 |:---:|---|:---:|:---:|:---:|
 | **Phase 0** | Benchmark Harness Automation (450 Prompts) | **Hardened & Verified (9/9 Domains)** | **450 / 450** (336 Real Native: 100%, 114 Simulated: 100%) | CI/Regression Safety Net |
 | **Phase 0.5** | Core Reliability, Architecture & Hardening | **Completed & Certified** | **20 / 20 Items** (175/175 test suites, 1,214 tests passing) | Production Hardening |
+| **Phase 0.75** | AI Model Intelligence — Intent/Coder Split, Latency & Learning | **Pending (Next Priority)** | 0 / 12 Items (Target: ≥90% intent accuracy, <3s app launch) | Model Specialization & Latency |
 | **Phase 1** | Multi-Stage Workflow & Macro Recording Engine | **Completed & Certified** | **13/13 test suites passing** (56 tests) | 1-Word Macro Replays & Inline Save |
 | **Comprehensive Feature Testing** | Every Feature & Prompt Archetype Matrix | **Fully Certified** | **60 / 60 tests** (Prompt Taxonomy, Feature Engines, CLI Harness) | Exhaustive Verification |
 | **Phase 2** | Linux Desktop & System UI Automation | Pending | 0 / 50 Desktop Prompts | Hyprland/Wayland Control |
@@ -93,6 +94,27 @@ Each of the 9 domains contains **50 prompts** (totaling 450 prompts). Evaluated 
 - [x] **0.5.18**: Detect commands blocked on interactive stdin and auto-inject `-y` or kill/report.
 - [x] **0.5.19**: Truncate/cap large command outputs to prevent LLM context overflow.
 - [x] **0.5.20**: Flag obfuscated dynamic execution (`eval`, `base64 -d | bash`) as `SENSITIVE`.
+
+---
+
+### Phase 0.75: AI Model Intelligence — Intent/Coder Split, Latency & Continuous Learning Pipeline (Next Priority)
+#### A. Architectural Changes: The Intent/Coder Split
+- [ ] **0.75.1**: Implement `IntentModel.classify()` backed by a lightweight quantized 0.5B–1.5B model on CPU (`IntentModel.ts` / `IntentRouter.ts`).
+- [ ] **0.75.2**: Extend step-decomposition schema with explicit `precondition_check`, `if_precondition_true`, and `if_precondition_false` fields.
+- [ ] **0.75.3**: Route individual decomposed steps to coder model with `DynamicToolPruner` subset and precondition context.
+- [ ] **0.75.4**: Fix unconditional reinstall bug in `ApplicationCapability.ts` with `which "${target}"` check and explicit reinstall routing.
+- [ ] **0.75.5**: Add decomposition-correctness reward term to `scripts/train_sentinel_grpo.py` separate from execution outcome.
+
+#### B. Latency Fixes (Sub-3s Execution)
+- [ ] **0.75.6**: Add regex fast-path in `AgentLoop.ts` for simple application launches (`open nvim`, `check battery`) to bypass model round-trips.
+- [ ] **0.75.7**: Boot and proactively pre-warm embedded `llama-server` at application startup with visible UI warming indicator.
+- [ ] **0.75.8**: Enforce hard ~3s latency budget on CPU-resident intent model.
+
+#### C. Model Versioning, Resource Budget & Continuous Learning Without Regression
+- [ ] **0.75.9**: Resource budget partitioning: CPU for 0.5–1.5B intent model, GPU for 3B coder model.
+- [ ] **0.75.10**: Add replay buffer to nightly training loop (`SentinelSerlCoordinator.ts`) mixing new corrections with historical pairs.
+- [ ] **0.75.11**: Automated candidate adapter regression gate against `tests/tool_test_cases.json` and held-out eval set before promotion.
+- [ ] **0.75.12**: Model manifest (`~/.sentinel/models/manifest.json`), semantic versioning (`sentinel-intent-vX.Y.Z`), and instant rollback (`>rollback model intent`).
 
 ---
 
