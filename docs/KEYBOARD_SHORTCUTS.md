@@ -9,7 +9,7 @@ Sentinel is engineered for rapid keyboard-first navigation and efficient control
 | Action | Linux / Windows Shortcut | macOS Shortcut | Description |
 | :--- | :--- | :--- | :--- |
 | **Open Command Palette** | `Ctrl + Shift + P` | `Cmd + Shift + P` | Launches the interactive prompt and capability search palette. |
-| **AI Settings & Model Manager** | `Ctrl + ,` | `Cmd + ,` | Opens AI Settings modal (Local Model Tiers & Cloud API Keys). |
+| **Sentinel Settings Center** | `Ctrl + ,` | `Cmd + ,` | Opens full-screen Settings Center (AI Models, Desktop Integrations, Terminal Experience, General & Setup). |
 | **Fuzzy History Search** | `Ctrl + R` | `Ctrl + R` | Interactive fuzzy search across past command history with instant paste-to-terminal. |
 | **Terminal Find / Search** | `Ctrl + F` | `Cmd + F` | Opens floating terminal search bar overlay with match counters. |
 | **Toggle Zen / Visual Mode** | `Ctrl + Shift + Z` | `Cmd + Shift + Z` | Switches between distraction-free Zen mode and full Visual Mode with quick buttons. |

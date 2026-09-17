@@ -4,7 +4,7 @@ import { TerminalView } from "./presentation/TerminalView";
 import { CommandPalette } from "./ui/components/CommandPalette";
 import { StatusBar } from "./ui/components/StatusBar";
 import { ThemeManager } from "./ui/theme/ThemeManager";
-import { AiSettingsPage } from "./ui/components/AiSettingsPage";
+import { AiSettingsPage, SettingsTabId } from "./ui/components/AiSettingsPage";
 import { SessionManager } from "./domain/SessionManager";
 import { InstallerWizard } from "./ui/components/InstallerWizard";
 import { UrlSchemeHandler } from "./domain/integration/UrlSchemeHandler";
@@ -98,6 +98,7 @@ function App() {
   const [editingTabName, setEditingTabName] = useState<string>('');
   const [isCommandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [showAiSettings, setShowAiSettings] = useState(false);
+  const [settingsTab, setSettingsTab] = useState<SettingsTabId>('ai');
 
   // New UI & Theme customization states
   const [panePaths, setPanePaths] = useState<Record<string, string>>(() => {
@@ -1172,17 +1173,23 @@ function App() {
           else if (actionId === 'clear_screen' && activeTerminal?.sessionId) SessionManager.getInstance().write(activeTerminal.sessionId, 'clear\r');
           else if (actionId === 'command_palette') setCommandPaletteOpen(true);
           else if (actionId === 'workflow_manager') setShowWorkflowManager(true);
-          else if (actionId === 'ai_settings') setShowAiSettings(true);
+          else if (actionId === 'ai_settings') {
+            setSettingsTab('ai');
+            setShowAiSettings(true);
+          }
         }}
       />
       <CommandPalette 
         isOpen={isCommandPaletteOpen} 
         onClose={() => setCommandPaletteOpen(false)} 
         capabilities={[
+          { id: 'open_settings', name: 'Open Settings Center (Ctrl+,)', description: 'Configure AI models, desktop integrations, terminal experience, and preferences' },
+          { id: 'open_desktop_integrations', name: 'Settings: Desktop Integrations & CLI', description: 'Configure terminal launcher in PATH, Linux file manager scripts, and IDE profiles' },
+          { id: 'open_terminal_experience', name: 'Settings: Terminal Experience (Zen vs Visual Mode)', description: 'Switch between distraction-free Zen mode and persistent Visual controls' },
+          { id: 'open_general_settings', name: 'Settings: General & Setup Diagnostics', description: 'Shell detection, config storage, system platform details, and onboarding launcher' },
           { id: 'toggle_ui_mode', name: `Toggle UI Mode (Current: ${uiMode === 'zen' ? 'Zen Mode' : 'Visual Mode'})`, description: 'Switch between minimal hover-reveal controls and always-on visual buttons' },
           { id: 'keyboard_shortcuts', name: 'Keyboard Shortcuts & Help (F1)', description: 'View interactive cheatsheet of all hotkeys, splits, and workflows' },
           { id: 'open_embedded_ai', name: 'Sentinel Embedded AI (Qwen 2.5 3B)', description: 'Manage self-contained local model — Zero Ollama required' },
-          { id: 'open_ai_settings', name: 'Open AI Settings', description: 'Configure local AI models (Ollama, Qwen)' },
           { id: 'personalize', name: 'Personalize UI', description: 'Open color theme and glassmorphic appearance customization' },
           { id: 'workflow_manager', name: 'Workflow & Macro Manager (Cmd+Shift+W)', description: 'View, edit, reorder and replay deterministic zero-token multi-stage workflows' },
           { id: 'history_search', name: 'Command History (Ctrl+R)', description: 'Search previous commands ranked by frequency and recency' },
@@ -1192,7 +1199,19 @@ function App() {
           { id: 'export_rice_profile', name: 'Export Rice & AI Profile', description: 'Backup custom themes, aliases, and learned AI patterns' }
         ]}
         onExecuteCapability={async (id) => {
-          if (id === 'open_onboarding') {
+          if (id === 'open_settings') {
+            setSettingsTab('ai');
+            setShowAiSettings(true);
+          } else if (id === 'open_desktop_integrations') {
+            setSettingsTab('integrations');
+            setShowAiSettings(true);
+          } else if (id === 'open_terminal_experience') {
+            setSettingsTab('appearance');
+            setShowAiSettings(true);
+          } else if (id === 'open_general_settings') {
+            setSettingsTab('general');
+            setShowAiSettings(true);
+          } else if (id === 'open_onboarding') {
             setShowWizard(true);
           } else if (id === 'toggle_ui_mode') {
             handleToggleUiMode(uiMode === 'zen' ? 'visual' : 'zen');
@@ -1200,8 +1219,6 @@ function App() {
             setShowHelpModal(true);
           } else if (id === 'open_embedded_ai') {
             setShowEmbeddedModal(true);
-          } else if (id === 'open_ai_settings') {
-            setShowAiSettings(true);
           } else if (id === 'personalize') {
             setShowThemeModal(true);
           } else if (id === 'workflow_manager') {
@@ -1226,8 +1243,17 @@ function App() {
         }}
       />
       {showAiSettings && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 9999, backgroundColor: 'var(--sentinel-bg, #0b0d17)' }}>
-          <AiSettingsPage onClose={() => setShowAiSettings(false)} />
+        <div style={{ position: 'fixed', inset: 0, zIndex: 9999, backgroundColor: '#090b10' }}>
+          <AiSettingsPage 
+            onClose={() => setShowAiSettings(false)} 
+            initialTab={settingsTab}
+            currentUiMode={uiMode}
+            onSelectUiMode={handleToggleUiMode}
+            onLaunchOnboarding={() => {
+              setShowAiSettings(false);
+              setShowWizard(true);
+            }}
+          />
         </div>
       )}
       <InstallerWizard 

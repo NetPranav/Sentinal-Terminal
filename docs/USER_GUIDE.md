@@ -81,7 +81,12 @@ Click **Workflows** in the status bar (in Visual Mode) to inspect saved workflow
 
 ## 5. Developer Modals & Quick Launchers
 
-- **Command Palette (`Ctrl+Shift+P` / `Cmd+Shift+P`)**: Search capabilities, run tools, or jump to settings without touching the mouse.
+- **Settings Center (`Ctrl+,` / `Cmd+,`)**: Unified, full-screen configuration center with solid `#090b10` backdrop:
+  - **AI Models & Architecture**: Manage hardware tiers (Qwen 2.5 3B/4B), embedded engine sidecars, and Cloud API keys (Groq, Anthropic, OpenAI, OpenRouter, DeepSeek).
+  - **Desktop Integrations**: Install user-space command line launcher into PATH (`sentinel <path>`), register Linux file manager context actions, and configure VS Code / Cursor integrated terminal profiles.
+  - **Terminal Experience**: Switch between distraction-free Zen Mode and classic Visual Mode with real 16:9 previews.
+  - **General & Setup**: Inspect shell detection and config directories, reset first-run flags, and re-launch the full Onboarding Wizard.
+- **Command Palette (`Ctrl+Shift+P` / `Cmd+Shift+P`)**: Search capabilities, run tools, or jump directly to specific settings tabs without touching the mouse.
 - **Conversational Port & Project Management**:
   - Ask Sentinel directly in the terminal to inspect ports or change projects: `> what ports are open`, `> free port 3000`, or `> cd to sentinal`.
 - **Fuzzy History Search (`Ctrl+R`)**: Search your entire bash/zsh command history with interactive fuzzy matching and instant execution.

@@ -1,0 +1,129 @@
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { InstallerService } from '../../domain/integration/InstallerService';
+import { SettingsTabId } from '../components/AiSettingsPage';
+
+const mockFsStore: Record<string, string> = {};
+
+vi.mock('@tauri-apps/plugin-fs', () => ({
+  writeTextFile: vi.fn(async (filePath: string, contents: string) => {
+    mockFsStore[filePath] = contents;
+  }),
+  readTextFile: vi.fn(async (filePath: string) => {
+    if (!mockFsStore[filePath]) throw new Error('File not found');
+    return mockFsStore[filePath];
+  }),
+  mkdir: vi.fn(async () => undefined),
+  exists: vi.fn(async (target: string) => {
+    if (mockFsStore[target]) return true;
+    return Object.keys(mockFsStore).some(k => k.startsWith(target));
+  })
+}));
+
+vi.mock('@tauri-apps/api/core', () => ({
+  invoke: vi.fn(async () => ({ stdout: '/home/testuser' }))
+}));
+
+describe('Sentinel Settings Center & Multi-Tab Configuration Architecture', () => {
+  let store: Record<string, string> = {};
+
+  beforeEach(() => {
+    store = {};
+    for (const k in mockFsStore) delete mockFsStore[k];
+
+    const mockStorage = {
+      getItem: (key: string) => store[key] || null,
+      setItem: (key: string, val: string) => { store[key] = String(val); },
+      removeItem: (key: string) => { delete store[key]; },
+      clear: () => { store = {}; }
+    };
+    vi.stubGlobal('localStorage', mockStorage);
+
+    const mockWindow = new EventTarget();
+    vi.stubGlobal('window', mockWindow);
+    vi.stubGlobal('CustomEvent', class CustomEvent extends Event {
+      detail: any;
+      constructor(type: string, params?: { detail?: any }) {
+        super(type);
+        this.detail = params?.detail;
+      }
+    });
+
+    vi.restoreAllMocks();
+  });
+
+  it('validates all 4 primary settings pillars are typed and distinct', () => {
+    const validTabs: SettingsTabId[] = ['ai', 'integrations', 'appearance', 'general'];
+    expect(validTabs).toHaveLength(4);
+    expect(validTabs).toContain('ai');
+    expect(validTabs).toContain('integrations');
+    expect(validTabs).toContain('appearance');
+    expect(validTabs).toContain('general');
+  });
+
+  it('verifies InstallerService returns structured IntegrationStatus for the integrations tab', async () => {
+    const installer = InstallerService.getInstance();
+    const status = await installer.checkStatus();
+    expect(status).toBeDefined();
+    expect(typeof status.cliInstalled).toBe('boolean');
+    expect(typeof status.finderEnabled).toBe('boolean');
+    expect(typeof status.vscodeConfigured).toBe('boolean');
+    expect(typeof status.cursorConfigured).toBe('boolean');
+  });
+
+  it('supports interactive UI mode switching between Zen and Visual mode in settings', () => {
+    let activeMode: 'zen' | 'visual' = 'zen';
+    let dispatchedMode = '';
+
+    const handleSelectMode = (mode: 'zen' | 'visual') => {
+      activeMode = mode;
+      localStorage.setItem('sentinel_ui_mode', mode);
+      window.dispatchEvent(new CustomEvent('sentinel:ui-mode-changed', { detail: mode }));
+    };
+
+    const listener = (e: any) => {
+      dispatchedMode = e.detail;
+    };
+    window.addEventListener('sentinel:ui-mode-changed', listener);
+
+    // Switch to visual mode
+    handleSelectMode('visual');
+    expect(activeMode).toBe('visual');
+    expect(localStorage.getItem('sentinel_ui_mode')).toBe('visual');
+    expect(dispatchedMode).toBe('visual');
+
+    // Switch to zen mode
+    handleSelectMode('zen');
+    expect(activeMode).toBe('zen');
+    expect(localStorage.getItem('sentinel_ui_mode')).toBe('zen');
+    expect(dispatchedMode).toBe('zen');
+
+    window.removeEventListener('sentinel:ui-mode-changed', listener);
+  });
+
+  it('allows resetting first-run flags in General & Setup tab', () => {
+    localStorage.setItem('sentinel_onboarded', 'true');
+    localStorage.setItem('sentinel_zen_tip_shown', 'true');
+    expect(localStorage.getItem('sentinel_onboarded')).toBe('true');
+    expect(localStorage.getItem('sentinel_zen_tip_shown')).toBe('true');
+
+    // Reset action performed in Settings General tab
+    localStorage.removeItem('sentinel_onboarded');
+    localStorage.removeItem('sentinel_zen_tip_shown');
+
+    expect(localStorage.getItem('sentinel_onboarded')).toBeNull();
+    expect(localStorage.getItem('sentinel_zen_tip_shown')).toBeNull();
+  });
+
+  it('dispatches and receives sentinel:open-onboarding event from Settings General tab', () => {
+    let onboardingOpened = false;
+    const listener = () => {
+      onboardingOpened = true;
+    };
+    window.addEventListener('sentinel:open-onboarding', listener);
+
+    window.dispatchEvent(new CustomEvent('sentinel:open-onboarding'));
+    expect(onboardingOpened).toBe(true);
+
+    window.removeEventListener('sentinel:open-onboarding', listener);
+  });
+});

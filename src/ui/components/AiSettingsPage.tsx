@@ -11,19 +11,45 @@ import {
   Check,
   Eye,
   EyeOff,
-  Zap
+  Zap,
+  Layers,
+  Layout,
+  Settings,
+  Terminal,
+  Folder,
+  Code2,
+  ExternalLink,
+  RefreshCw,
+  Info,
+  ShieldCheck,
+  Compass
 } from 'lucide-react';
 import { OllamaProvider as OllamaModelManager, OllamaModel } from '../../ai/models/OllamaProvider';
 import { EmbeddedModelManagerModal } from './EmbeddedModelManagerModal';
 import { EmbeddedEngineManager, EmbeddedStatus } from '../../ai/models/EmbeddedEngineManager';
 import { ModelRecommendationEngine, TierRecommendationResult } from '../../ai/management/ModelRecommendationEngine';
 import { CloudApiProvider, CloudServiceId, CloudKeyConfig, CLOUD_CATALOG } from '../../ai/provider/CloudApiProvider';
+import { InstallerService, IntegrationStatus } from '../../domain/integration/InstallerService';
+import { isLinux } from '../../shared/platform';
+
+export type SettingsTabId = 'ai' | 'integrations' | 'appearance' | 'general';
 
 export interface AiSettingsPageProps {
   onClose?: () => void;
+  initialTab?: SettingsTabId;
+  onLaunchOnboarding?: () => void;
+  currentUiMode?: 'zen' | 'visual';
+  onSelectUiMode?: (mode: 'zen' | 'visual') => void;
 }
 
-export const AiSettingsPage: React.FC<AiSettingsPageProps> = ({ onClose }) => {
+export const AiSettingsPage: React.FC<AiSettingsPageProps> = ({ 
+  onClose,
+  initialTab = 'ai',
+  onLaunchOnboarding,
+  currentUiMode,
+  onSelectUiMode
+}) => {
+  const [mainTab, setMainTab] = useState<SettingsTabId>(initialTab);
   const [activeTab, setActiveTab] = useState<'local' | 'cloud'>('local');
   const [models, setModels] = useState<OllamaModel[]>([]);
   const [loading, setLoading] = useState(true);
@@ -48,16 +74,128 @@ export const AiSettingsPage: React.FC<AiSettingsPageProps> = ({ onClose }) => {
   const [testingConnection, setTestingConnection] = useState<boolean>(false);
   const [testResult, setTestResult] = useState<{ success: boolean; latencyMs?: number; error?: string } | null>(null);
   const [saveSuccessMsg, setSaveSuccessMsg] = useState<string | null>(null);
+
+  // Desktop Integrations State
+  const [integrationStatus, setIntegrationStatus] = useState<IntegrationStatus>({
+    cliInstalled: false,
+    finderEnabled: false,
+    vscodeConfigured: false,
+    cursorConfigured: false,
+  });
+  const [integrationLoading, setIntegrationLoading] = useState(false);
+  const [integrationMessage, setIntegrationMessage] = useState<string | null>(null);
+
+  // Terminal Experience (UI Mode) State
+  const [uiModeState, setUiModeState] = useState<'zen' | 'visual'>(() => {
+    return currentUiMode || (localStorage.getItem('sentinel_ui_mode') as 'zen' | 'visual') || 'zen';
+  });
+
+  // General Tab Feedback State
+  const [generalMessage, setGeneralMessage] = useState<string | null>(null);
   
   const manager = new OllamaModelManager();
   const cloudProvider = CloudApiProvider.getInstance();
+  const installer = InstallerService.getInstance();
+
+  useEffect(() => {
+    if (initialTab) {
+      setMainTab(initialTab);
+    }
+  }, [initialTab]);
+
+  useEffect(() => {
+    if (currentUiMode) {
+      setUiModeState(currentUiMode);
+    }
+  }, [currentUiMode]);
 
   useEffect(() => {
     checkHealthAndLoad();
     loadEmbeddedStatus();
     loadRecommendations();
     loadCloudConfigState(selectedCloudService);
+    refreshIntegrations();
   }, []);
+
+  const refreshIntegrations = async () => {
+    try {
+      const cur = await installer.checkStatus();
+      setIntegrationStatus(cur);
+    } catch {
+      // Non-fatal
+    }
+  };
+
+  const formatIntegrationError = (err: any): string => {
+    const msg = err?.message || String(err);
+    if (msg.includes('invoke') || msg.includes('undefined')) {
+      return 'Desktop integrations require the native Sentinel desktop runtime.';
+    }
+    return `Error: ${msg}`;
+  };
+
+  const handleInstallCli = async () => {
+    setIntegrationLoading(true);
+    try {
+      const res = await installer.installCli();
+      if (res.success) setIntegrationMessage('✓ Command line launcher installed in PATH!');
+      else setIntegrationMessage(formatIntegrationError(res.error));
+    } catch (err: any) {
+      setIntegrationMessage(formatIntegrationError(err));
+    }
+    await refreshIntegrations();
+    setIntegrationLoading(false);
+  };
+
+  const handleEnableFinder = async () => {
+    setIntegrationLoading(true);
+    try {
+      const res = await installer.enableFinderIntegration();
+      if (res.success) setIntegrationMessage(isLinux() ? '✓ Linux File Manager scripts registered!' : '✓ Finder Quick Actions registered!');
+      else setIntegrationMessage(formatIntegrationError(res.error));
+    } catch (err: any) {
+      setIntegrationMessage(formatIntegrationError(err));
+    }
+    await refreshIntegrations();
+    setIntegrationLoading(false);
+  };
+
+  const handleConfigureIdes = async () => {
+    setIntegrationLoading(true);
+    try {
+      await installer.configureVsCodeIntegration();
+      await installer.configureCursorIntegration();
+      setIntegrationMessage('✓ VS Code and Cursor integrated terminal profiles configured!');
+    } catch (err: any) {
+      setIntegrationMessage(formatIntegrationError(err));
+    }
+    await refreshIntegrations();
+    setIntegrationLoading(false);
+  };
+
+  const handleInstallAllIntegrations = async () => {
+    setIntegrationLoading(true);
+    setIntegrationMessage('Configuring desktop integrations...');
+    try {
+      await installer.installCli();
+      await installer.enableFinderIntegration();
+      await installer.configureVsCodeIntegration();
+      await installer.configureCursorIntegration();
+      await refreshIntegrations();
+      setIntegrationMessage('✓ All desktop integrations successfully configured!');
+    } catch (err: any) {
+      setIntegrationMessage(formatIntegrationError(err));
+    } finally {
+      setIntegrationLoading(false);
+    }
+  };
+
+  const handleSelectMode = (mode: 'zen' | 'visual') => {
+    setUiModeState(mode);
+    localStorage.setItem('sentinel_ui_mode', mode);
+    if (onSelectUiMode) onSelectUiMode(mode);
+    window.dispatchEvent(new CustomEvent('sentinel:ui-mode-changed', { detail: mode }));
+  };
 
   const loadRecommendations = () => {
     const rec = ModelRecommendationEngine.getInstance().getRecommendation();
@@ -189,16 +327,15 @@ export const AiSettingsPage: React.FC<AiSettingsPageProps> = ({ onClose }) => {
       fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif',
       height: '100%',
       overflowY: 'auto',
-      backgroundColor: 'rgba(14, 16, 20, 0.98)',
-      backdropFilter: 'blur(20px)',
-      WebkitBackdropFilter: 'blur(20px)',
+      backgroundColor: '#090b10',
+      boxSizing: 'border-box'
     }}>
       <div style={{
-        maxWidth: '860px',
+        maxWidth: '960px',
         margin: '0 auto',
         display: 'flex',
         flexDirection: 'column',
-        gap: '18px'
+        gap: '20px'
       }}>
         {/* Header */}
         <div style={{
@@ -210,24 +347,24 @@ export const AiSettingsPage: React.FC<AiSettingsPageProps> = ({ onClose }) => {
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <div style={{
-              width: '32px',
-              height: '32px',
+              width: '34px',
+              height: '34px',
               borderRadius: '8px',
               backgroundColor: 'rgba(255, 255, 255, 0.06)',
               border: '1px solid rgba(255, 255, 255, 0.12)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              color: 'rgba(255, 255, 255, 0.9)'
+              color: '#ffffff'
             }}>
-              <Cpu size={16} />
+              <Settings size={18} />
             </div>
             <div>
-              <h1 style={{ fontSize: '16px', margin: 0, fontWeight: 600, color: '#ffffff', letterSpacing: '-0.2px' }}>
-                AI Architecture & Model Management
+              <h1 style={{ fontSize: '17px', margin: 0, fontWeight: 600, color: '#ffffff', letterSpacing: '-0.2px' }}>
+                Sentinel Settings Center
               </h1>
               <p style={{ margin: '2px 0 0', fontSize: '12px', color: 'rgba(255, 255, 255, 0.55)' }}>
-                Hardware-tiered local models, embedded engines, and cloud API endpoints
+                AI models, native desktop integrations, terminal profile, and workspace preferences
               </p>
             </div>
           </div>
@@ -272,58 +409,173 @@ export const AiSettingsPage: React.FC<AiSettingsPageProps> = ({ onClose }) => {
           )}
         </div>
 
-        {/* Navigation Tabs (Grayscale Token Style) */}
+        {/* Primary Settings Navigation (4 Pillars) */}
         <div style={{ display: 'flex', gap: '8px', borderBottom: '1px solid rgba(255, 255, 255, 0.08)', paddingBottom: '10px' }}>
           <button
-            onClick={() => setActiveTab('local')}
+            type="button"
+            onClick={() => setMainTab('ai')}
             style={{
               padding: '7px 16px',
               borderRadius: '7px',
-              border: activeTab === 'local' ? '1px solid rgba(255, 255, 255, 0.35)' : '1px solid transparent',
-              backgroundColor: activeTab === 'local' ? 'rgba(255, 255, 255, 0.08)' : 'transparent',
-              color: activeTab === 'local' ? '#ffffff' : 'rgba(255, 255, 255, 0.55)',
+              border: mainTab === 'ai' ? '1px solid rgba(255, 255, 255, 0.35)' : '1px solid transparent',
+              backgroundColor: mainTab === 'ai' ? 'rgba(255, 255, 255, 0.08)' : 'transparent',
+              color: mainTab === 'ai' ? '#ffffff' : 'rgba(255, 255, 255, 0.55)',
               fontSize: '12.5px',
               fontWeight: 600,
               cursor: 'pointer',
               display: 'inline-flex',
               alignItems: 'center',
-              gap: '6px',
+              gap: '7px',
               transition: 'all 0.15s ease'
             }}
           >
             <Cpu size={14} />
-            <span>Local Engine & Hardware Tiers</span>
+            <span>AI Models & Architecture</span>
           </button>
 
           <button
-            onClick={() => setActiveTab('cloud')}
+            type="button"
+            onClick={() => setMainTab('integrations')}
             style={{
               padding: '7px 16px',
               borderRadius: '7px',
-              border: activeTab === 'cloud' ? '1px solid rgba(255, 255, 255, 0.35)' : '1px solid transparent',
-              backgroundColor: activeTab === 'cloud' ? 'rgba(255, 255, 255, 0.08)' : 'transparent',
-              color: activeTab === 'cloud' ? '#ffffff' : 'rgba(255, 255, 255, 0.55)',
+              border: mainTab === 'integrations' ? '1px solid rgba(255, 255, 255, 0.35)' : '1px solid transparent',
+              backgroundColor: mainTab === 'integrations' ? 'rgba(255, 255, 255, 0.08)' : 'transparent',
+              color: mainTab === 'integrations' ? '#ffffff' : 'rgba(255, 255, 255, 0.55)',
               fontSize: '12.5px',
               fontWeight: 600,
               cursor: 'pointer',
               display: 'inline-flex',
               alignItems: 'center',
-              gap: '6px',
+              gap: '7px',
               transition: 'all 0.15s ease'
             }}
           >
-            <Key size={14} />
-            <span>Cloud API Keys & External Providers</span>
-            {cloudProvider.getActiveConfig() && (
+            <Layers size={14} />
+            <span>Desktop Integrations</span>
+            {integrationStatus.cliInstalled && (
               <span style={{
                 width: '6px',
                 height: '6px',
                 borderRadius: '50%',
-                backgroundColor: '#ffffff'
+                backgroundColor: 'rgba(255, 255, 255, 0.7)'
               }} />
             )}
           </button>
+
+          <button
+            type="button"
+            onClick={() => setMainTab('appearance')}
+            style={{
+              padding: '7px 16px',
+              borderRadius: '7px',
+              border: mainTab === 'appearance' ? '1px solid rgba(255, 255, 255, 0.35)' : '1px solid transparent',
+              backgroundColor: mainTab === 'appearance' ? 'rgba(255, 255, 255, 0.08)' : 'transparent',
+              color: mainTab === 'appearance' ? '#ffffff' : 'rgba(255, 255, 255, 0.55)',
+              fontSize: '12.5px',
+              fontWeight: 600,
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '7px',
+              transition: 'all 0.15s ease'
+            }}
+          >
+            <Layout size={14} />
+            <span>Terminal Experience</span>
+            <span style={{
+              fontSize: '10px',
+              textTransform: 'uppercase',
+              letterSpacing: '0.4px',
+              color: 'rgba(255, 255, 255, 0.4)',
+              backgroundColor: 'rgba(255, 255, 255, 0.06)',
+              padding: '1px 5px',
+              borderRadius: '3px'
+            }}>
+              {uiModeState}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setMainTab('general')}
+            style={{
+              padding: '7px 16px',
+              borderRadius: '7px',
+              border: mainTab === 'general' ? '1px solid rgba(255, 255, 255, 0.35)' : '1px solid transparent',
+              backgroundColor: mainTab === 'general' ? 'rgba(255, 255, 255, 0.08)' : 'transparent',
+              color: mainTab === 'general' ? '#ffffff' : 'rgba(255, 255, 255, 0.55)',
+              fontSize: '12.5px',
+              fontWeight: 600,
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '7px',
+              transition: 'all 0.15s ease'
+            }}
+          >
+            <Compass size={14} />
+            <span>General & Setup</span>
+          </button>
         </div>
+
+        {/* TAB 1: AI MODELS & ARCHITECTURE */}
+        {mainTab === 'ai' && (
+          <>
+            {/* Secondary Navigation Tabs for AI */}
+            <div style={{ display: 'flex', gap: '8px', borderBottom: '1px solid rgba(255, 255, 255, 0.06)', paddingBottom: '8px' }}>
+              <button
+                type="button"
+                onClick={() => setActiveTab('local')}
+                style={{
+                  padding: '6px 14px',
+                  borderRadius: '6px',
+                  border: activeTab === 'local' ? '1px solid rgba(255, 255, 255, 0.3)' : '1px solid transparent',
+                  backgroundColor: activeTab === 'local' ? 'rgba(255, 255, 255, 0.07)' : 'transparent',
+                  color: activeTab === 'local' ? '#ffffff' : 'rgba(255, 255, 255, 0.55)',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  transition: 'all 0.15s ease'
+                }}
+              >
+                <Cpu size={13} />
+                <span>Local Engine & Hardware Tiers</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveTab('cloud')}
+                style={{
+                  padding: '6px 14px',
+                  borderRadius: '6px',
+                  border: activeTab === 'cloud' ? '1px solid rgba(255, 255, 255, 0.3)' : '1px solid transparent',
+                  backgroundColor: activeTab === 'cloud' ? 'rgba(255, 255, 255, 0.07)' : 'transparent',
+                  color: activeTab === 'cloud' ? '#ffffff' : 'rgba(255, 255, 255, 0.55)',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  transition: 'all 0.15s ease'
+                }}
+              >
+                <Key size={13} />
+                <span>Cloud API Keys & External Providers</span>
+                {cloudProvider.getActiveConfig() && (
+                  <span style={{
+                    width: '6px',
+                    height: '6px',
+                    borderRadius: '50%',
+                    backgroundColor: '#ffffff'
+                  }} />
+                )}
+              </button>
+            </div>
 
         {/* TAB 1: LOCAL HARDWARE & LOCAL MODELS */}
         {activeTab === 'local' && (
@@ -839,6 +1091,773 @@ export const AiSettingsPage: React.FC<AiSettingsPageProps> = ({ onClose }) => {
                 </button>
               </div>
             </div>
+          </div>
+        )}
+          </>
+        )}
+
+        {/* TAB 2: DESKTOP & SYSTEM INTEGRATIONS */}
+        {mainTab === 'integrations' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              padding: '16px 20px',
+              borderRadius: '10px',
+              backgroundColor: 'rgba(255, 255, 255, 0.025)',
+              border: '1px solid rgba(255, 255, 255, 0.08)'
+            }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <div style={{ fontWeight: 600, fontSize: '13.5px', color: '#ffffff' }}>
+                  Native Desktop & Shell Integrations
+                </div>
+                <div style={{ fontSize: '12px', color: 'rgba(255, 255, 255, 0.6)', lineHeight: 1.45 }}>
+                  Integrate Sentinel Terminal deeply with your operating system, terminal launchers, file managers, and IDEs.
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <button
+                  type="button"
+                  onClick={refreshIntegrations}
+                  disabled={integrationLoading}
+                  style={{
+                    padding: '7px 12px',
+                    borderRadius: '6px',
+                    border: '1px solid rgba(255, 255, 255, 0.12)',
+                    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+                    color: 'rgba(255, 255, 255, 0.8)',
+                    fontSize: '11.5px',
+                    fontWeight: 500,
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '5px'
+                  }}
+                >
+                  <RefreshCw size={12} className={integrationLoading ? 'spin' : ''} />
+                  <span>Refresh</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleInstallAllIntegrations}
+                  disabled={integrationLoading}
+                  style={{
+                    padding: '7px 16px',
+                    borderRadius: '6px',
+                    border: '1px solid #ffffff',
+                    backgroundColor: '#ffffff',
+                    color: '#090b10',
+                    fontSize: '11.5px',
+                    fontWeight: 600,
+                    cursor: integrationLoading ? 'not-allowed' : 'pointer',
+                    opacity: integrationLoading ? 0.6 : 1,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '5px'
+                  }}
+                >
+                  <Check size={13} />
+                  <span>Configure All Integrations</span>
+                </button>
+              </div>
+            </div>
+
+            {integrationMessage && (() => {
+              const isErr = integrationMessage.startsWith('Error') || integrationMessage.includes('require the native');
+              return (
+                <div style={{
+                  padding: '11px 16px',
+                  borderRadius: '8px',
+                  backgroundColor: isErr ? 'rgba(239, 68, 68, 0.08)' : 'rgba(34, 197, 94, 0.08)',
+                  border: isErr ? '1px solid rgba(239, 68, 68, 0.25)' : '1px solid rgba(34, 197, 94, 0.25)',
+                  color: isErr ? '#fca5a5' : '#86efac',
+                  fontSize: '12.5px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px'
+                }}>
+                  {isErr ? <AlertCircle size={14} /> : <Check size={14} />}
+                  <span>{integrationMessage}</span>
+                </div>
+              );
+            })()}
+
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(3, 1fr)',
+              gap: '16px'
+            }}>
+              {/* Box 1: CLI Launcher */}
+              <div style={{
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'space-between',
+                gap: '12px',
+                padding: '18px 20px',
+                backgroundColor: 'rgba(255, 255, 255, 0.025)',
+                border: '1px solid rgba(255, 255, 255, 0.09)',
+                borderRadius: '12px',
+                minHeight: '200px',
+                boxSizing: 'border-box'
+              }}>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
+                    <div style={{
+                      width: '30px',
+                      height: '30px',
+                      borderRadius: '7px',
+                      backgroundColor: 'rgba(255, 255, 255, 0.06)',
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: '#ffffff',
+                      flexShrink: 0
+                    }}>
+                      <Terminal size={15} />
+                    </div>
+                    <div style={{ fontWeight: 600, fontSize: '13.5px', color: '#ffffff', lineHeight: 1.3 }}>
+                      Command Line Launcher (<code style={{ fontSize: '11.5px', background: 'rgba(255, 255, 255, 0.08)', padding: '1px 5px', borderRadius: '4px' }}>sentinel</code>)
+                    </div>
+                  </div>
+
+                  <div style={{ fontSize: '11.8px', color: 'rgba(255, 255, 255, 0.65)', lineHeight: 1.5 }}>
+                    Installs a user-space launcher into your PATH. Enables launching Sentinel from any terminal prompt, bash/zsh script, or application launcher (Rofi, Wofi, dmenu) via <code style={{ fontSize: '11px', color: '#ffffff', background: 'rgba(255, 255, 255, 0.08)', padding: '2px 5px', borderRadius: '3px' }}>sentinel &lt;path&gt;</code>.
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', paddingTop: '8px', borderTop: '1px solid rgba(255, 255, 255, 0.05)' }}>
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    fontSize: '10px',
+                    color: 'rgba(255, 255, 255, 0.5)',
+                    fontFamily: 'ui-monospace, monospace',
+                    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+                    padding: '4px 8px',
+                    borderRadius: '5px',
+                    overflow: 'hidden'
+                  }}>
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{isLinux() ? '~/.local/bin/sentinel' : '/usr/local/bin/sentinel'}</span>
+                    <span>•</span>
+                    <span style={{ color: 'rgba(255, 255, 255, 0.75)', flexShrink: 0 }}>User Space</span>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleInstallCli}
+                    disabled={integrationLoading}
+                    style={{
+                      padding: '5px 14px',
+                      borderRadius: '6px',
+                      border: integrationStatus.cliInstalled ? '1px solid rgba(255, 255, 255, 0.25)' : '1px solid rgba(255, 255, 255, 0.18)',
+                      backgroundColor: integrationStatus.cliInstalled ? 'rgba(255, 255, 255, 0.1)' : 'rgba(255, 255, 255, 0.04)',
+                      color: integrationStatus.cliInstalled ? '#ffffff' : 'rgba(255, 255, 255, 0.9)',
+                      fontSize: '11.5px',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease',
+                      flexShrink: 0
+                    }}
+                  >
+                    {integrationStatus.cliInstalled ? 'Reinstall' : 'Install'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Box 2: File Manager Context Actions */}
+              <div style={{
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'space-between',
+                gap: '12px',
+                padding: '18px 20px',
+                backgroundColor: 'rgba(255, 255, 255, 0.025)',
+                border: '1px solid rgba(255, 255, 255, 0.09)',
+                borderRadius: '12px',
+                minHeight: '200px',
+                boxSizing: 'border-box'
+              }}>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
+                    <div style={{
+                      width: '30px',
+                      height: '30px',
+                      borderRadius: '7px',
+                      backgroundColor: 'rgba(255, 255, 255, 0.06)',
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: '#ffffff',
+                      flexShrink: 0
+                    }}>
+                      <Folder size={15} />
+                    </div>
+                    <div style={{ fontWeight: 600, fontSize: '13.5px', color: '#ffffff', lineHeight: 1.3 }}>
+                      {isLinux() ? 'Linux File Manager Scripts' : 'Finder Quick Actions'}
+                    </div>
+                  </div>
+
+                  <div style={{ fontSize: '11.8px', color: 'rgba(255, 255, 255, 0.65)', lineHeight: 1.5 }}>
+                    {isLinux()
+                      ? 'Adds "Open in Sentinel Terminal" to right-click context menus in Nautilus, Nemo, and Caja, plus XDG .desktop application directory registration.'
+                      : 'Registers a native macOS Finder service workflow allowing you to right-click any folder or directory and immediately open Sentinel.'}
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', paddingTop: '8px', borderTop: '1px solid rgba(255, 255, 255, 0.05)' }}>
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    fontSize: '10px',
+                    color: 'rgba(255, 255, 255, 0.5)',
+                    fontFamily: 'ui-monospace, monospace',
+                    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+                    padding: '4px 8px',
+                    borderRadius: '5px',
+                    overflow: 'hidden'
+                  }}>
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {isLinux() ? '~/.local/share/nautilus/scripts' : '~/Library/Services'}
+                    </span>
+                    <span>•</span>
+                    <span style={{ color: 'rgba(255, 255, 255, 0.75)', flexShrink: 0 }}>Context Menu</span>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleEnableFinder}
+                    disabled={integrationLoading}
+                    style={{
+                      padding: '5px 14px',
+                      borderRadius: '6px',
+                      border: integrationStatus.finderEnabled ? '1px solid rgba(255, 255, 255, 0.25)' : '1px solid rgba(255, 255, 255, 0.18)',
+                      backgroundColor: integrationStatus.finderEnabled ? 'rgba(255, 255, 255, 0.1)' : 'rgba(255, 255, 255, 0.04)',
+                      color: integrationStatus.finderEnabled ? '#ffffff' : 'rgba(255, 255, 255, 0.9)',
+                      fontSize: '11.5px',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease',
+                      flexShrink: 0
+                    }}
+                  >
+                    {integrationStatus.finderEnabled ? 'Enabled' : 'Enable'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Box 3: VS Code & Cursor IDE Profiles */}
+              <div style={{
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'space-between',
+                gap: '12px',
+                padding: '18px 20px',
+                backgroundColor: 'rgba(255, 255, 255, 0.025)',
+                border: '1px solid rgba(255, 255, 255, 0.09)',
+                borderRadius: '12px',
+                minHeight: '200px',
+                boxSizing: 'border-box'
+              }}>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
+                    <div style={{
+                      width: '30px',
+                      height: '30px',
+                      borderRadius: '7px',
+                      backgroundColor: 'rgba(255, 255, 255, 0.06)',
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: '#ffffff',
+                      flexShrink: 0
+                    }}>
+                      <Code2 size={15} />
+                    </div>
+                    <div style={{ fontWeight: 600, fontSize: '13.5px', color: '#ffffff', lineHeight: 1.3 }}>
+                      VS Code & Cursor Profiles
+                    </div>
+                  </div>
+
+                  <div style={{ fontSize: '11.8px', color: 'rgba(255, 255, 255, 0.65)', lineHeight: 1.5 }}>
+                    Updates your user <code style={{ fontSize: '11px', color: '#ffffff', background: 'rgba(255, 255, 255, 0.08)', padding: '2px 5px', borderRadius: '3px' }}>settings.json</code> to register Sentinel as an integrated terminal profile, allowing one-click launching inside editor panels.
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', paddingTop: '8px', borderTop: '1px solid rgba(255, 255, 255, 0.05)' }}>
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    fontSize: '10px',
+                    color: 'rgba(255, 255, 255, 0.5)',
+                    fontFamily: 'ui-monospace, monospace',
+                    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+                    padding: '4px 8px',
+                    borderRadius: '5px',
+                    overflow: 'hidden'
+                  }}>
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {isLinux() ? '~/.config/Code/User' : 'Application Support/Code'}
+                    </span>
+                    <span>•</span>
+                    <span style={{ color: 'rgba(255, 255, 255, 0.75)', flexShrink: 0 }}>IDE Profile</span>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleConfigureIdes}
+                    disabled={integrationLoading}
+                    style={{
+                      padding: '5px 14px',
+                      borderRadius: '6px',
+                      border: (integrationStatus.vscodeConfigured && integrationStatus.cursorConfigured) ? '1px solid rgba(255, 255, 255, 0.25)' : '1px solid rgba(255, 255, 255, 0.18)',
+                      backgroundColor: (integrationStatus.vscodeConfigured && integrationStatus.cursorConfigured) ? 'rgba(255, 255, 255, 0.1)' : 'rgba(255, 255, 255, 0.04)',
+                      color: (integrationStatus.vscodeConfigured && integrationStatus.cursorConfigured) ? '#ffffff' : 'rgba(255, 255, 255, 0.9)',
+                      fontSize: '11.5px',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease',
+                      flexShrink: 0
+                    }}
+                  >
+                    {(integrationStatus.vscodeConfigured && integrationStatus.cursorConfigured) ? 'Configured' : 'Configure'}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Zero Root Box */}
+            <div style={{
+              padding: '14px 18px',
+              borderRadius: '8px',
+              backgroundColor: 'rgba(255, 255, 255, 0.02)',
+              border: '1px solid rgba(255, 255, 255, 0.07)',
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: '12px'
+            }}>
+              <Info size={16} style={{ color: 'rgba(255, 255, 255, 0.5)', marginTop: '2px', flexShrink: 0 }} />
+              <div style={{ fontSize: '11.5px', color: 'rgba(255, 255, 255, 0.65)', lineHeight: 1.5 }}>
+                <strong style={{ color: 'rgba(255, 255, 255, 0.9)' }}>Zero Root Privileges Required:</strong> All Sentinel integrations write strictly to standard user-space directories (<code style={{ color: '#ffffff', backgroundColor: 'rgba(255, 255, 255, 0.07)', padding: '1px 4px', borderRadius: '3px' }}>~/.local/bin</code>, <code style={{ color: '#ffffff', backgroundColor: 'rgba(255, 255, 255, 0.07)', padding: '1px 4px', borderRadius: '3px' }}>~/.local/share/nautilus/scripts</code>, and <code style={{ color: '#ffffff', backgroundColor: 'rgba(255, 255, 255, 0.07)', padding: '1px 4px', borderRadius: '3px' }}>~/.config/Code/User</code>). No root or sudo credentials are ever requested or modified.
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* TAB 3: TERMINAL EXPERIENCE & APPEARANCE */}
+        {mainTab === 'appearance' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div>
+                <div style={{ fontWeight: 600, fontSize: '14px', color: '#ffffff' }}>
+                  Terminal Experience & Control Density
+                </div>
+                <div style={{ fontSize: '12px', color: 'rgba(255, 255, 255, 0.55)', marginTop: '2px' }}>
+                  Choose how action buttons, headers, and window controls are presented during sessions.
+                </div>
+              </div>
+              <div style={{
+                fontSize: '11.5px',
+                color: 'rgba(255, 255, 255, 0.55)',
+                backgroundColor: 'rgba(255, 255, 255, 0.04)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                padding: '5px 10px',
+                borderRadius: '6px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px'
+              }}>
+                <span>Quick Toggle:</span>
+                <kbd style={{ padding: '2px 6px', borderRadius: '4px', background: 'rgba(255, 255, 255, 0.1)', color: '#ffffff', fontSize: '10.5px' }}>Ctrl+Shift+Z</kbd>
+              </div>
+            </div>
+
+            {/* Zen vs Visual Mode Grid */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+              {/* Zen Mode Card */}
+              <div
+                onClick={() => handleSelectMode('zen')}
+                style={{
+                  padding: '16px',
+                  borderRadius: '12px',
+                  backgroundColor: uiModeState === 'zen' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(255, 255, 255, 0.015)',
+                  border: uiModeState === 'zen' ? '1.5px solid #ffffff' : '1px solid rgba(255, 255, 255, 0.1)',
+                  boxShadow: uiModeState === 'zen' ? '0 0 0 1px #ffffff, 0 14px 36px rgba(0, 0, 0, 0.75)' : 'none',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '14px',
+                  transition: 'all 0.15s ease'
+                }}
+              >
+                <div style={{
+                  width: '100%',
+                  aspectRatio: '16 / 9',
+                  borderRadius: '8px',
+                  border: '1px solid rgba(255, 255, 255, 0.12)',
+                  backgroundColor: '#05070a',
+                  overflow: 'hidden'
+                }}>
+                  <img
+                    src="/previews/zen_mode_preview.png"
+                    alt="Zen Mode Preview"
+                    style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                  />
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <div style={{
+                        width: '16px',
+                        height: '16px',
+                        borderRadius: '50%',
+                        border: uiModeState === 'zen' ? '1.5px solid #ffffff' : '1.5px solid rgba(255, 255, 255, 0.3)',
+                        backgroundColor: uiModeState === 'zen' ? '#ffffff' : 'transparent',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                      }}>
+                        {uiModeState === 'zen' && (
+                          <div style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#0a0a0c' }} />
+                        )}
+                      </div>
+                      <span style={{ fontWeight: 600, fontSize: '14px', color: '#ffffff' }}>
+                        Zen Mode
+                      </span>
+                      {uiModeState === 'zen' && (
+                        <span style={{ fontSize: '10px', color: 'rgba(255, 255, 255, 0.6)', backgroundColor: 'rgba(255, 255, 255, 0.08)', padding: '1px 6px', borderRadius: '4px' }}>
+                          Active
+                        </span>
+                      )}
+                    </div>
+
+                    <span style={{
+                      fontSize: '10.5px',
+                      fontWeight: 600,
+                      padding: '2px 8px',
+                      borderRadius: '4px',
+                      backgroundColor: 'rgba(255, 255, 255, 0.12)',
+                      color: '#ffffff',
+                      border: '1px solid rgba(255, 255, 255, 0.2)'
+                    }}>
+                      Recommended
+                    </span>
+                  </div>
+
+                  <span style={{ fontSize: '12px', color: 'rgba(255, 255, 255, 0.65)', lineHeight: 1.5, paddingLeft: '24px' }}>
+                    Distraction-free focus with auto-hiding chrome. Action buttons stay hidden until top header hover. Full multi-pane, tab & AI support.
+                  </span>
+                </div>
+              </div>
+
+              {/* Visual Mode Card */}
+              <div
+                onClick={() => handleSelectMode('visual')}
+                style={{
+                  padding: '16px',
+                  borderRadius: '12px',
+                  backgroundColor: uiModeState === 'visual' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(255, 255, 255, 0.015)',
+                  border: uiModeState === 'visual' ? '1.5px solid #ffffff' : '1px solid rgba(255, 255, 255, 0.1)',
+                  boxShadow: uiModeState === 'visual' ? '0 0 0 1px #ffffff, 0 14px 36px rgba(0, 0, 0, 0.75)' : 'none',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '14px',
+                  transition: 'all 0.15s ease'
+                }}
+              >
+                <div style={{
+                  width: '100%',
+                  aspectRatio: '16 / 9',
+                  borderRadius: '8px',
+                  border: '1px solid rgba(255, 255, 255, 0.12)',
+                  backgroundColor: '#05070a',
+                  overflow: 'hidden'
+                }}>
+                  <img
+                    src="/previews/visual_mode_preview.png"
+                    alt="Visual Mode Preview"
+                    style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                  />
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <div style={{
+                        width: '16px',
+                        height: '16px',
+                        borderRadius: '50%',
+                        border: uiModeState === 'visual' ? '1.5px solid #ffffff' : '1.5px solid rgba(255, 255, 255, 0.3)',
+                        backgroundColor: uiModeState === 'visual' ? '#ffffff' : 'transparent',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                      }}>
+                        {uiModeState === 'visual' && (
+                          <div style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#0a0a0c' }} />
+                        )}
+                      </div>
+                      <span style={{ fontWeight: 600, fontSize: '14px', color: '#ffffff' }}>
+                        Visual Mode
+                      </span>
+                      {uiModeState === 'visual' && (
+                        <span style={{ fontSize: '10px', color: 'rgba(255, 255, 255, 0.6)', backgroundColor: 'rgba(255, 255, 255, 0.08)', padding: '1px 6px', borderRadius: '4px' }}>
+                          Active
+                        </span>
+                      )}
+                    </div>
+
+                    <span style={{
+                      fontSize: '10.5px',
+                      fontWeight: 500,
+                      padding: '2px 8px',
+                      borderRadius: '4px',
+                      backgroundColor: 'rgba(255, 255, 255, 0.06)',
+                      color: 'rgba(255, 255, 255, 0.65)',
+                      border: '1px solid rgba(255, 255, 255, 0.12)'
+                    }}>
+                      Classic Controls
+                    </span>
+                  </div>
+
+                  <span style={{ fontSize: '12px', color: 'rgba(255, 255, 255, 0.65)', lineHeight: 1.5, paddingLeft: '24px' }}>
+                    Traditional GUI workflow with persistent controls. Action buttons stay always visible for splits, tabs, and workflows. Full multi-pane, tab & AI support.
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Feature parity callout */}
+            <div style={{
+              padding: '14px 18px',
+              borderRadius: '8px',
+              backgroundColor: 'rgba(255, 255, 255, 0.02)',
+              border: '1px solid rgba(255, 255, 255, 0.07)',
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: '12px'
+            }}>
+              <ShieldCheck size={16} style={{ color: 'rgba(255, 255, 255, 0.7)', marginTop: '2px', flexShrink: 0 }} />
+              <div style={{ fontSize: '11.5px', color: 'rgba(255, 255, 255, 0.65)', lineHeight: 1.5 }}>
+                <strong style={{ color: 'rgba(255, 255, 255, 0.9)' }}>Full Feature Parity:</strong> Both modes share 100% of features including arbitrary horizontal & vertical splits (<code style={{ color: '#ffffff', backgroundColor: 'rgba(255, 255, 255, 0.07)', padding: '1px 4px', borderRadius: '3px' }}>Cmd+D</code> / <code style={{ color: '#ffffff', backgroundColor: 'rgba(255, 255, 255, 0.07)', padding: '1px 4px', borderRadius: '3px' }}>Cmd+Shift+D</code>), workflow recording, command history search (<code style={{ color: '#ffffff', backgroundColor: 'rgba(255, 255, 255, 0.07)', padding: '1px 4px', borderRadius: '3px' }}>Ctrl+R</code>), and local/cloud AI agents.
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* TAB 4: GENERAL & ONBOARDING */}
+        {mainTab === 'general' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+            {/* Onboarding Wizard Launcher Card */}
+            <div style={{
+              padding: '18px 20px',
+              borderRadius: '10px',
+              backgroundColor: 'rgba(255, 255, 255, 0.025)',
+              border: '1px solid rgba(255, 255, 255, 0.08)',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              gap: '20px'
+            }}>
+              <div style={{ display: 'flex', gap: '14px', alignItems: 'center' }}>
+                <div style={{
+                  width: '36px',
+                  height: '36px',
+                  borderRadius: '8px',
+                  backgroundColor: 'rgba(255, 255, 255, 0.06)',
+                  border: '1px solid rgba(255, 255, 255, 0.12)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#ffffff',
+                  flexShrink: 0
+                }}>
+                  <Compass size={18} />
+                </div>
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: '13.5px', color: '#ffffff' }}>
+                    Setup & Onboarding Wizard
+                  </div>
+                  <div style={{ fontSize: '12px', color: 'rgba(255, 255, 255, 0.6)', marginTop: '3px', lineHeight: 1.45 }}>
+                    Re-run the initial welcome setup wizard to reconfigure experience profiles and desktop integrations with interactive previews.
+                  </div>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  if (onLaunchOnboarding) {
+                    onLaunchOnboarding();
+                  } else {
+                    if (onClose) onClose();
+                    window.dispatchEvent(new CustomEvent('sentinel:open-onboarding'));
+                  }
+                }}
+                style={{
+                  padding: '8px 18px',
+                  borderRadius: '6px',
+                  border: '1px solid #ffffff',
+                  backgroundColor: '#ffffff',
+                  color: '#090b10',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}
+              >
+                <ExternalLink size={13} />
+                <span>Launch Wizard</span>
+              </button>
+            </div>
+
+            {/* Environment Diagnostics Card */}
+            <div style={{
+              padding: '18px 20px',
+              borderRadius: '10px',
+              backgroundColor: 'rgba(255, 255, 255, 0.025)',
+              border: '1px solid rgba(255, 255, 255, 0.08)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '14px'
+            }}>
+              <div style={{ fontWeight: 600, fontSize: '13.5px', color: '#ffffff' }}>
+                System Environment & Shell Diagnostics
+              </div>
+
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: '1fr 1fr',
+                gap: '12px',
+                fontSize: '12px'
+              }}>
+                <div style={{
+                  padding: '10px 14px',
+                  borderRadius: '6px',
+                  backgroundColor: 'rgba(0, 0, 0, 0.3)',
+                  border: '1px solid rgba(255, 255, 255, 0.06)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '3px'
+                }}>
+                  <span style={{ fontSize: '10.5px', color: 'rgba(255, 255, 255, 0.45)', textTransform: 'uppercase' }}>Target Platform</span>
+                  <span style={{ fontWeight: 500, color: '#ffffff' }}>{isLinux() ? 'Linux (XDG / Freedesktop Standard)' : 'macOS (Darwin / Cocoa)'}</span>
+                </div>
+
+                <div style={{
+                  padding: '10px 14px',
+                  borderRadius: '6px',
+                  backgroundColor: 'rgba(0, 0, 0, 0.3)',
+                  border: '1px solid rgba(255, 255, 255, 0.06)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '3px'
+                }}>
+                  <span style={{ fontSize: '10.5px', color: 'rgba(255, 255, 255, 0.45)', textTransform: 'uppercase' }}>Active Shell</span>
+                  <span style={{ fontWeight: 500, color: '#ffffff', fontFamily: 'monospace' }}>
+                    {typeof process !== 'undefined' && process.env?.SHELL ? process.env.SHELL : '/bin/bash'}
+                  </span>
+                </div>
+
+                <div style={{
+                  padding: '10px 14px',
+                  borderRadius: '6px',
+                  backgroundColor: 'rgba(0, 0, 0, 0.3)',
+                  border: '1px solid rgba(255, 255, 255, 0.06)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '3px'
+                }}>
+                  <span style={{ fontSize: '10.5px', color: 'rgba(255, 255, 255, 0.45)', textTransform: 'uppercase' }}>Configuration Directory</span>
+                  <span style={{ fontWeight: 500, color: '#ffffff', fontFamily: 'monospace' }}>
+                    {isLinux() ? '~/.config/sentinel/' : '~/Library/Application Support/Sentinel Terminal/'}
+                  </span>
+                </div>
+
+                <div style={{
+                  padding: '10px 14px',
+                  borderRadius: '6px',
+                  backgroundColor: 'rgba(0, 0, 0, 0.3)',
+                  border: '1px solid rgba(255, 255, 255, 0.06)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '3px'
+                }}>
+                  <span style={{ fontSize: '10.5px', color: 'rgba(255, 255, 255, 0.45)', textTransform: 'uppercase' }}>CLI Launcher Target</span>
+                  <span style={{ fontWeight: 500, color: '#ffffff', fontFamily: 'monospace' }}>
+                    {isLinux() ? '~/.local/bin/sentinel' : '/usr/local/bin/sentinel'}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Reset Preferences Card */}
+            <div style={{
+              padding: '16px 20px',
+              borderRadius: '10px',
+              backgroundColor: 'rgba(255, 255, 255, 0.015)',
+              border: '1px solid rgba(255, 255, 255, 0.06)',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center'
+            }}>
+              <div>
+                <div style={{ fontWeight: 600, fontSize: '13px', color: 'rgba(255, 255, 255, 0.9)' }}>
+                  Reset First-Run Flags
+                </div>
+                <div style={{ fontSize: '11.5px', color: 'rgba(255, 255, 255, 0.5)', marginTop: '2px' }}>
+                  Causes the welcome setup wizard and help callouts to trigger on the next application launch.
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  localStorage.removeItem('sentinel_onboarded');
+                  localStorage.removeItem('sentinel_zen_tip_shown');
+                  setGeneralMessage('✓ First-run flags cleared. Onboarding will trigger on next restart.');
+                  setTimeout(() => setGeneralMessage(null), 3500);
+                }}
+                style={{
+                  padding: '6px 14px',
+                  borderRadius: '6px',
+                  border: '1px solid rgba(255, 255, 255, 0.15)',
+                  backgroundColor: 'rgba(255, 255, 255, 0.04)',
+                  color: 'rgba(255, 255, 255, 0.85)',
+                  fontSize: '11.5px',
+                  fontWeight: 500,
+                  cursor: 'pointer'
+                }}
+              >
+                Reset Flags
+              </button>
+            </div>
+
+            {generalMessage && (
+              <div style={{
+                padding: '11px 16px',
+                borderRadius: '8px',
+                backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                border: '1px solid rgba(255, 255, 255, 0.18)',
+                color: '#ffffff',
+                fontSize: '12px'
+              }}>
+                {generalMessage}
+              </div>
+            )}
           </div>
         )}
 
