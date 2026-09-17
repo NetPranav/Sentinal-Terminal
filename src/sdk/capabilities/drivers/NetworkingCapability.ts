@@ -146,7 +146,7 @@ export class NetworkingCapability extends BaseCapabilityDriver<NetDriverInput, a
               let msg = `Available Free Ports for Web Development:\n`;
               freeWeb.slice(0, reqCount === 1 ? 4 : reqCount).forEach(p => {
                 const label = p === 3000 ? 'React / Next.js default' : p === 5173 ? 'Vite default' : p === 8080 ? 'HTTP alternate' : p === 8000 ? 'Python / Django default' : 'General Web';
-                msg += `  • Port ${p} (${label}) — Available ✅\n`;
+                msg += `  • Port ${p} (${label}) — Available [OK]\n`;
               });
               if (occupiedWeb.length > 0) {
                 msg += `\nOccupied Ports in Range: ${occupiedWeb.join(', ')} (in use)`;
@@ -156,7 +156,7 @@ export class NetworkingCapability extends BaseCapabilityDriver<NetDriverInput, a
               let msg = `Active Listening Ports:\n${stdout.trim()}\n\nRecommended Free Web Ports:\n`;
               freeWeb.slice(0, 4).forEach(p => {
                 const label = p === 3000 ? 'React/Next' : p === 5173 ? 'Vite' : p === 8080 ? 'HTTP' : 'Web';
-                msg += `  • Port ${p} (${label}) — Available ✅\n`;
+                msg += `  • Port ${p} (${label}) — Available [OK]\n`;
               });
               stdout = msg;
             }

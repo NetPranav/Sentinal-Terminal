@@ -6,7 +6,11 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "build:app": "tauri build --bundles app && mkdir -p build && rm -rf \"build/Sentinel Terminal.app\" && cp -R \"src-tauri/target/release/bundle/macos/Sentinel Terminal.app\" build/ && rm -rf \"/Applications/Sentinel Terminal.app\" && cp -R \"src-tauri/target/release/bundle/macos/Sentinel Terminal.app\" /Applications/",
+    "bundle:linux": "tauri build",
+    "bundle:deb": "tauri build --bundles deb",
+    "bundle:rpm": "tauri build --bundles rpm",
+    "bundle:appimage": "tauri build --bundles appimage",
+    "check:triple": "npm test && npm run build && cargo check --manifest-path src-tauri/Cargo.toml",
     "preview": "vite preview",
     "tauri": "tauri",
     "test": "vitest run",

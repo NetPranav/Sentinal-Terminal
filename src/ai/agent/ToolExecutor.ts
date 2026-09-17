@@ -12,6 +12,7 @@ import { ExecutionEngine, ExecutionPreviewPlan } from '../../domain/security/Exe
 import { PermissionManager } from '../../domain/security/PermissionManager';
 import { PolicyEngine } from '../../domain/security/PolicyEngine';
 import { SecurityEngine } from '../../domain/security/SecurityEngine';
+import { CommandSafetyGuardian } from '../../domain/security/CommandSafetyGuardian';
 
 export interface ToolExecutionResult {
   success: boolean;
@@ -61,6 +62,17 @@ export class ToolExecutor {
     onAskPermission?: (plan: ExecutionPreviewPlan) => Promise<boolean>,
     timeoutMs?: number
   ): Promise<ToolExecutionResult> {
+    // Intercept catastrophic commands before capability dispatch
+    if (params?.command && typeof params.command === 'string') {
+      const safety = CommandSafetyGuardian.getInstance().evaluate(params.command);
+      if (safety.isBlocked) {
+        return {
+          success: false,
+          error: `${safety.capabilityRefusal}\n\nConsequence Analysis:\n${safety.consequenceExplanation}${safety.safeAlternative ? `\n\nSafe Alternative: ${safety.safeAlternative}` : ''}`
+        };
+      }
+    }
+
     const effectiveTimeout = timeoutMs ?? ToolExecutor.resolveAdaptiveTimeout(toolId);
     let timeoutHandle: any = null;
     try {

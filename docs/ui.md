@@ -169,9 +169,11 @@ Sentinel utilizes a dual-font architecture:
 - Dark graphite cards displaying recorded command steps, exit codes, and execution parameters.
 - Replay console with step-by-step verification and stdout inspector.
 
-### E. AI Architecture & Local Model Settings (`AiSettingsPage.tsx`)
-- Centered layout (`840px` maximum width) with zero neon accents.
-- Embedded local inference engine status, port binding, and model architecture metrics.
+### E. AI Architecture & Multi-Model Settings (`AiSettingsPage.tsx`)
+- Centered layout (`840px` maximum width) adhering strictly to the grayscale design system.
+- Dual-tab navigation:
+  1. **Local Engine & Hardware Tiers**: Displays detected CPU cores, RAM, and GPU specs with an automatic hardware tier badge (`Budget`, `Balanced`, `Performance`, `Workstation`), recommended local models with `Optimal` tags, memory footprints, and one-click download buttons.
+  2. **Cloud API Keys & External Providers**: Zero-local-footprint inference configuration supporting OpenAI, Anthropic, Groq, DeepSeek, OpenRouter, and Custom Endpoints, complete with masked API key inputs and interactive "Test Connection" verification probes.
 - Flat monochrome action buttons (`background: rgba(255, 255, 255, 0.08)`, border `rgba(255, 255, 255, 0.14)`).
 
 ---
@@ -196,3 +198,36 @@ Sentinel utilizes a dual-font architecture:
   - **Zen Mode**: Hides all secondary buttons, port indicators, and auxiliary controls for maximum terminal buffer focus.
   - **Visual Mode**: Reveals graphical workspace management buttons, port inspection triggers, and workflow tools.
 - **Keyboard-First Design**: 100% of modals, split management, search tools, and workflows can be accessed, navigated, and dismissed entirely via standard keyboard shortcuts without requiring mouse movement.
+
+---
+
+## 8. Strict No-Emoji Policy & Terminal Glyph Design System
+
+Sentinel strictly enforces a **Zero-Emoji Policy** across the entire application interface, including React DOM components, modals, toasts, status telemetry, and CLI/terminal stdout/stderr banners:
+
+### Core Rules
+- **No Consumer Emojis**: Emojis such as `🛡️`, `📖`, `💡`, `⛔`, `⚠️`, `🚀`, `🔥`, `📁`, `📄`, or `✅` are completely forbidden.
+- **Developer-Centric Glyph Architecture**: Replace consumer emojis with high-precision monospace glyphs, ANSI styling, and box-drawing characters:
+  - **Critical / Security Block**: `[!]` with bold red ANSI (`\x1b[1;31m`) or `✕` in white/red.
+  - **Information / Diagnostics**: `[i]` with cyan ANSI (`\x1b[1;36m`) or `::` token.
+  - **Success / Safe Alternative**: `[+]` with green ANSI (`\x1b[1;32m`) or `✓` in crisp white.
+  - **Policy / System Notice**: `[#]` with muted gray ANSI (`\x1b[1;30m`).
+  - **Navigation / Pointers**: `->` or `›` or `•`.
+  - **Filesystem Entries**: Clean text badges like `[DIR]` and `[FILE]` instead of folder/file icons.
+  - **Hardware / Battery**: `[AC]` (charging) and `[BAT]` (discharging).
+- **Terminal Refusal Banners**: Box-drawing characters (`┌`, `─`, `┐`, `│`, `└`, `┘`) must be used for framing with uniform padding and zero emoji jitter.
+
+---
+
+## 9. Onboarding Skeletons & Zen Mode Help Callout
+
+### A. Terminal Experience Skeletons (`InstallerWizard.tsx`)
+During the first-time setup onboarding flow, users choose between **Zen Mode** and **Visual Mode**. Rather than generic descriptions or colorful illustrations, Sentinel presents realistic, live wireframe skeletons:
+- **Zen Mode Wireframe Skeleton**: Demonstrates the minimal workspace—showing a single terminal prompt, tab header noting hidden controls on rest, and a clean status line without auxiliary action buttons.
+- **Visual Mode Wireframe Skeleton**: Demonstrates the multi-pane development workspace—showing split panes (`npm run dev` alongside `htop`), active action pills (`Find`, `Split`), and the highlighted `[Workflows]` button in the status bar.
+
+### B. Post-Onboarding Zen Mode Keybind Guidance (`ZenModeHelpCallout.tsx`)
+When a user selects Zen Mode, an unobtrusive floating callout appears after onboarding completion:
+- Directly explains that all controls remain fully accessible via keyboard shortcuts.
+- Prominently highlights the `[F1 help]` button in the bottom status bar with a high-contrast white border.
+- Informs the user of the toggle shortcut: `Ctrl+Shift+Z` to seamlessly switch between Zen Mode and Visual Mode at any moment.

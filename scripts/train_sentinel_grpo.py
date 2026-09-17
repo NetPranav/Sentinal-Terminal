@@ -78,13 +78,21 @@ def extract_command(completion: str) -> Optional[str]:
 
     return None
 
+def get_system_shell() -> str:
+    """Returns available shell for Linux/POSIX (prefers bash or sh over missing zsh)."""
+    for candidate in ["/bin/bash", "/usr/bin/bash", "/bin/sh", "/bin/zsh"]:
+        if os.path.exists(candidate):
+            return candidate
+    return "/bin/sh"
+
 def to_safe_predicate(command: str) -> Tuple[str, bool]:
     """Transforms potentially mutating commands into 100% safe predicates for RL reward scoring."""
     cmd = command.strip()
+    shell = get_system_shell()
 
     # High risk destructive operations
     if re.search(r"\b(rm\s+-rf\s+/|mkfs|dd\s+if=|sudo\b|shutdown|reboot)\b", cmd, re.IGNORECASE):
-        return ("/bin/zsh -n -c 'exit 1'", True)
+        return (f"{shell} -n -c 'exit 1'", True)
 
     # Process kill commands: kill -0 checks PID existence without killing
     kill_match = re.match(r"^\s*kill\s+(?:-[a-zA-Z0-9]+\s+)*(\d+)\s*$", cmd, re.IGNORECASE)
@@ -111,19 +119,20 @@ def to_safe_predicate(command: str) -> Tuple[str, bool]:
     if re.match(r"^\s*git\s+(commit|push|merge|rebase|reset)\b", cmd, re.IGNORECASE):
         return ("git status --porcelain", True)
 
-    # Mutating command fallback: pure syntax verification via zsh -n
+    # Mutating command fallback: pure syntax verification via shell -n
     if re.search(r"\b(mv|touch|mkdir|chmod|chown|npm\s+install|brew\s+install)\b", cmd, re.IGNORECASE):
         escaped = cmd.replace("'", "'\\''")
-        return (f"/bin/zsh -n -c '{escaped}'", True)
+        return (f"{shell} -n -c '{escaped}'", True)
 
     return (cmd, False)
 
 def execute_in_shadow_sandbox(command: str, timeout_sec: float = 1.5) -> Tuple[int, str, str]:
     """Executes safe command in ephemeral subshell."""
     safe_cmd, _ = to_safe_predicate(command)
+    shell = get_system_shell()
     try:
         res = subprocess.run(
-            ["/bin/zsh", "-lc", safe_cmd],
+            [shell, "-c", safe_cmd],
             capture_output=True,
             text=True,
             timeout=timeout_sec
@@ -177,20 +186,99 @@ def compute_safety_penalty(completion: str) -> float:
         return -5.0
     return 0.0
 
+def compute_decomposition_reward(completion: str) -> float:
+    """
+    Decomposition-correctness reward (Phase 0.75.5):
+    Evaluates the structural quality of multi-step plan decomposition
+    independently from shell execution outcome.
+
+    Rewards:
+      +0.4  JSON contains 'steps' array with ≥2 entries
+      +0.3  Each step has 'precondition_check' field
+      +0.2  Steps reference 'depends_on' for DAG ordering
+      +0.1  Steps include 'if_precondition_true'/'if_precondition_false' branching
+      -0.3  Steps array present but malformed (empty, non-list, missing commands)
+    """
+    clean = re.sub(r"<think>[\s\S]*?</think>", "", completion).strip()
+    clean = re.sub(r"^```(?:json)?\s*", "", clean)
+    clean = re.sub(r"\s*```$", "", clean).strip()
+
+    try:
+        obj = json.loads(clean)
+    except Exception:
+        return 0.0  # Not JSON — decomposition reward is N/A
+
+    steps = None
+    if "steps" in obj:
+        steps = obj["steps"]
+    elif "suggestedSteps" in obj:
+        steps = obj["suggestedSteps"]
+
+    if steps is None:
+        # Single-step commands don't need decomposition — neutral
+        return 0.0
+
+    if not isinstance(steps, list) or len(steps) == 0:
+        return -0.3  # Malformed steps array
+
+    reward = 0.0
+
+    # Multi-step structure bonus
+    if len(steps) >= 2:
+        reward += 0.4
+
+    has_precondition = 0
+    has_depends = 0
+    has_branching = 0
+    has_command = 0
+
+    for step in steps:
+        if not isinstance(step, dict):
+            continue
+        if step.get("precondition_check"):
+            has_precondition += 1
+        if step.get("depends_on") is not None:
+            has_depends += 1
+        if step.get("if_precondition_true") or step.get("if_precondition_false"):
+            has_branching += 1
+        if step.get("command") or step.get("action"):
+            has_command += 1
+
+    # All steps must have a command/action
+    if has_command == 0:
+        return -0.3
+
+    # Precondition coverage (at least one step with precondition check)
+    if has_precondition > 0:
+        reward += 0.3
+
+    # DAG dependency ordering
+    if has_depends > 0:
+        reward += 0.2
+
+    # Conditional branching
+    if has_branching > 0:
+        reward += 0.1
+
+    return round(reward, 3)
+
+
 def compute_total_reward(prompt: str, completion: str) -> Dict[str, float]:
     """Computes composite reward breakdown."""
     r_exec = compute_execution_reward(prompt, completion)
     r_format = compute_format_reward(completion)
     r_refusal = compute_refusal_penalty(completion)
     r_safety = compute_safety_penalty(completion)
-    total = r_exec + r_format + r_refusal + r_safety
+    r_decomp = compute_decomposition_reward(completion)
+    total = r_exec + r_format + r_refusal + r_safety + r_decomp
 
     return {
         "total": round(total, 3),
         "exec": round(r_exec, 3),
         "format": round(r_format, 3),
         "refusal": round(r_refusal, 3),
-        "safety": round(r_safety, 3)
+        "safety": round(r_safety, 3),
+        "decomposition": round(r_decomp, 3)
     }
 
 # ==============================================================================
@@ -259,6 +347,46 @@ def run_reward_self_tests():
     assert advantages[1] < 0, f"Expected failing candidate advantage < 0, got {advantages[1]}"
     assert advantages[2] < 0, f"Expected refusal candidate advantage < 0, got {advantages[2]}"
     print(f"✓ Group Advantage calculation verified: Rewards={group_rewards} -> Advantages={advantages}")
+
+    # 6. Test decomposition-correctness reward for well-structured multi-step plan
+    decomp_comp = json.dumps({
+        "action": "execute",
+        "command": "which nvim && nvim",
+        "explanation": "Check and open neovim",
+        "steps": [
+            {
+                "action": "check",
+                "command": "which nvim",
+                "precondition_check": "which nvim",
+                "if_precondition_true": "skip",
+                "if_precondition_false": "install",
+                "depends_on": []
+            },
+            {
+                "action": "execute",
+                "command": "nvim",
+                "depends_on": [0]
+            }
+        ]
+    })
+    r_decomp = compute_total_reward("ensure nvim is installed then open it", decomp_comp)
+    assert r_decomp["decomposition"] >= 0.9, f"Expected decomposition >= 0.9, got {r_decomp['decomposition']}"
+    print(f"✓ Decomposition-correctness reward verified: decomposition={r_decomp['decomposition']}")
+
+    # 7. Test decomposition penalty for malformed steps array
+    bad_decomp = json.dumps({
+        "action": "execute",
+        "command": "echo hello",
+        "steps": []
+    })
+    r_bad_decomp = compute_decomposition_reward(bad_decomp)
+    assert r_bad_decomp == -0.3, f"Expected decomposition -0.3 for empty steps, got {r_bad_decomp}"
+    print(f"✓ Malformed decomposition penalty verified: decomposition={r_bad_decomp}")
+
+    # 8. Test decomposition neutral for single-step commands (no steps key)
+    r_neutral_decomp = compute_decomposition_reward(valid_comp)
+    assert r_neutral_decomp == 0.0, f"Expected decomposition 0.0 for single-step, got {r_neutral_decomp}"
+    print(f"✓ Single-step decomposition neutral verified: decomposition={r_neutral_decomp}")
 
     print("\n✅ All Reward Oracle and Group Advantage tests PASSED!")
     return True

@@ -354,7 +354,7 @@ function formatBatteryStatus(data: any): string {
   const pct = data.percentage ?? data.batteryLevel;
   const status = data.status || (data.isCharging ? 'Charging' : (data.noBattery ? 'AC Power' : 'Discharging'));
   const source = data.powerSource ? ` (${data.powerSource})` : '';
-  const icon = data.isCharging ? '⚡' : '🔋';
+  const icon = data.isCharging ? '[AC]' : '[BAT]';
   return `\r\n  ${C.boldCyan}${icon} Battery:${C.reset} ${C.boldGreen}${pct}%${C.reset} — ${status}${source}\r\n`;
 }
 

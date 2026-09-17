@@ -9,16 +9,16 @@ import { SessionManager } from "./domain/SessionManager";
 import { InstallerWizard } from "./ui/components/InstallerWizard";
 import { UrlSchemeHandler } from "./domain/integration/UrlSchemeHandler";
 import { SessionPersistenceEngine } from "./domain/session/SessionPersistenceEngine";
-import { WorkspaceSwitcherModal } from "./ui/components/WorkspaceSwitcherModal";
-import { ProcessPortManagerDrawer } from "./ui/components/ProcessPortManagerDrawer";
 import { WorkflowManagerDrawer } from "./ui/components/WorkflowManagerDrawer";
 import { HistorySearchModal } from "./ui/components/HistorySearchModal";
 import { PluginMarketplaceModal } from "./ui/components/PluginMarketplaceModal";
 import { EmbeddedModelManagerModal } from "./ui/components/EmbeddedModelManagerModal";
 import { KeyboardShortcutsModal } from "./ui/components/KeyboardShortcutsModal";
+import { ZenModeHelpCallout } from "./ui/components/ZenModeHelpCallout";
 import { AuditLogger } from "./domain/security/AuditLogger";
 import { DotfileSyncEngine } from "./domain/rice/DotfileSyncEngine";
 import { EmbeddedEngineManager } from "./ai/models/EmbeddedEngineManager";
+import { SystemKnowledgeScanner } from "./domain/knowledge/SystemKnowledgeScanner";
 import { invoke } from "@tauri-apps/api/core";
 import { 
   Terminal, 
@@ -104,14 +104,22 @@ function App() {
     return initialSession?.panePaths || {};
   });
   const [showThemeModal, setShowThemeModal] = useState(false);
-  const [showWorkspaceSwitcher, setShowWorkspaceSwitcher] = useState(false);
-  const [showPortManager, setShowPortManager] = useState(false);
   const [showWorkflowManager, setShowWorkflowManager] = useState(false);
   const [showHistorySearch, setShowHistorySearch] = useState(false);
   const [showPluginMarketplace, setShowPluginMarketplace] = useState(false);
   const [showEmbeddedModal, setShowEmbeddedModal] = useState(false);
+  const [showZenCallout, setShowZenCallout] = useState<boolean>(() => {
+    if (typeof window !== 'undefined' && window.location && window.location.search.includes('capture_mode=')) {
+      return false;
+    }
+    return !localStorage.getItem('sentinel_zen_tip_shown') && !!localStorage.getItem('sentinel_onboarded') && localStorage.getItem('sentinel_ui_mode') === 'zen';
+  });
   const [selectedThemeId, setSelectedThemeId] = useState<string>('classic-dark');
   const [uiMode, setUiMode] = useState<'zen' | 'visual'>(() => {
+    if (typeof window !== 'undefined' && window.location) {
+      if (window.location.search.includes('capture_mode=zen')) return 'zen';
+      if (window.location.search.includes('capture_mode=visual')) return 'visual';
+    }
     return (localStorage.getItem('sentinel_ui_mode') as 'zen' | 'visual') || 'zen';
   });
   const [showHelpModal, setShowHelpModal] = useState<boolean>(false);
@@ -145,10 +153,19 @@ function App() {
   const [transparency, setTransparency] = useState<number>(0.82);
   const [blurLevel, setBlurLevel] = useState<number>(20);
   const [activeShellMenuPaneId, setActiveShellMenuPaneId] = useState<string | null>(null);
-  const [showWizard, setShowWizard] = useState<boolean>(() => !localStorage.getItem('sentinel_onboarded'));
+  const [showWizard, setShowWizard] = useState<boolean>(() => {
+    if (typeof window !== 'undefined' && window.location) {
+      if (window.location.search.includes('capture_mode=')) return false;
+      if (window.location.search.includes('onboarding')) return true;
+    }
+    return !localStorage.getItem('sentinel_onboarded');
+  });
   const [detectedShell, setDetectedShell] = useState<string>(() => isLinux() ? 'bash' : 'zsh');
 
   useEffect(() => {
+    if (typeof window !== 'undefined') {
+      (window as any).openOnboarding = () => setShowWizard(true);
+    }
     const detect = async () => {
       try {
         const shell = await invoke<string>('get_default_shell');
@@ -161,6 +178,7 @@ function App() {
       }
     };
     detect();
+    SystemKnowledgeScanner.getInstance().scan().catch(() => {});
   }, []);
 
   // Close shell action menu on outside click or Escape
@@ -184,27 +202,6 @@ function App() {
       window.removeEventListener('keydown', handleEscape);
     };
   }, [activeShellMenuPaneId]);
-
-  const handleWorkspaceSelect = (targetPath: string, action: 'navigate' | 'new-tab', setupScript?: string) => {
-    if (action === 'new-tab') {
-      addTab(targetPath);
-      if (setupScript && activeTerminal && activeTerminal.sessionId) {
-        setTimeout(() => {
-          SessionManager.getInstance().write(activeTerminal.sessionId!, `source "${setupScript}"\r`);
-        }, 150);
-      }
-    } else {
-      if (activeTerminal && activeTerminal.sessionId) {
-        setPanePaths(prev => ({ ...prev, [activeTerminal.id]: targetPath }));
-        SessionManager.getInstance().write(activeTerminal.sessionId, `cd "${targetPath}"\r`);
-        if (setupScript) {
-          setTimeout(() => {
-            SessionManager.getInstance().write(activeTerminal.sessionId!, `source "${setupScript}"\r`);
-          }, 150);
-        }
-      }
-    }
-  };
 
   // Auto-persist session tabs, splits, and paths across app reloads and crashes
   useEffect(() => {
@@ -559,19 +556,9 @@ function App() {
           setShowHelpModal(prev => !prev);
           return;
         }
-        if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key && e.key.toLowerCase() === 'o') {
-          e.preventDefault();
-          setShowWorkspaceSwitcher(prev => !prev);
-          return;
-        }
         if ((e.metaKey || e.ctrlKey) && e.shiftKey && !e.altKey && e.key && e.key.toLowerCase() === 'p') {
           e.preventDefault();
           setCommandPaletteOpen(prev => !prev);
-          return;
-        }
-        if ((e.metaKey || e.ctrlKey) && e.altKey && e.key && e.key.toLowerCase() === 'p') {
-          e.preventDefault();
-          setShowPortManager(prev => !prev);
           return;
         }
         if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key && e.key.toLowerCase() === 'w') {
@@ -621,6 +608,11 @@ function App() {
           if (activeTerminal && activeTerminal.sessionId) {
             SessionManager.getInstance().write(activeTerminal.sessionId, 'clear && printf "\\033c"\r');
           }
+          return;
+        }
+        if (e.key === 'Escape' && showAiSettings) {
+          e.preventDefault();
+          setShowAiSettings(false);
           return;
         }
         if ((e.metaKey || e.ctrlKey) && e.key === ',') {
@@ -678,140 +670,32 @@ function App() {
             zIndex: activeShellMenuPaneId === node.data.id ? 100 : undefined,
           }}
         >
-          <div className="pane-header-controls">
-            <span style={{ display: 'flex', alignItems: 'center', gap: '6px', opacity: 0.85, fontSize: '11px', fontWeight: 500 }}>
-              <Folder size={12} style={{ opacity: 0.75, flexShrink: 0 }} />
-              <span>{formatDisplayPath(panePaths[node.data.id] || '~')} — -${detectedShell}</span>
-            </span>
-            <div 
-              className={`${uiMode === 'zen' ? "pane-action-buttons-zen" : "pane-action-buttons"} ${activeShellMenuPaneId === node.data.id ? 'menu-active' : ''}`}
-              style={{
-                opacity: (uiMode === 'zen' && activeShellMenuPaneId === node.data.id) ? 1 : undefined,
-                pointerEvents: (uiMode === 'zen' && activeShellMenuPaneId === node.data.id) ? 'auto' : undefined,
-              }}
-            >
-              <div className="shell-menu-container" style={{ position: 'relative', display: 'inline-block', zIndex: 60 }}>
-                <button 
-                  className="shell-btn"
-                  onClick={(e) => { e.stopPropagation(); setActiveShellMenuPaneId(activeShellMenuPaneId === node.data.id ? null : node.data.id); setShowThemeModal(false); }}
-                  title="Shell Session & Workspace Actions"
-                  style={{
-                    background: activeShellMenuPaneId === node.data.id ? 'var(--sentinel-hover, rgba(255, 255, 255, 0.15))' : 'transparent',
-                    borderColor: activeShellMenuPaneId === node.data.id ? 'var(--sentinel-border-active, rgba(255, 255, 255, 0.35))' : 'var(--sentinel-border, rgba(255, 255, 255, 0.1))',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '4px'
-                  }}
-                >
-                  <Terminal size={11} />
-                  <span>Shell</span>
-                  <ChevronDown size={10} style={{ opacity: 0.6 }} />
-                </button>
-                {activeShellMenuPaneId === node.data.id && (
-                  <div 
-                    className="shell-dropdown-menu"
-                    onClick={(e) => e.stopPropagation()}
-                    style={{
-                      position: 'absolute',
-                      top: '100%',
-                      right: 0,
-                      marginTop: '6px',
-                      width: '240px',
-                      backgroundColor: '#16171a',
-                      background: 'var(--sentinel-modal-bg, #16171a)',
-                      border: '1px solid var(--sentinel-border-active, rgba(255, 255, 255, 0.18))',
-                      borderRadius: '8px',
-                      boxShadow: '0 16px 36px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(255, 255, 255, 0.05)',
-                      padding: '5px 0',
-                      zIndex: 10000,
-                      color: 'var(--sentinel-fg, #ffffff)',
-                      fontSize: '12px'
-                    }}
-                  >
-                    {[
-                      { label: 'New Terminal Tab', icon: <Plus size={12} />, shortcut: formatShortcut('t'), action: () => addTab() },
-                      { label: 'Split Vertically (Side by side)', icon: <Columns2 size={12} />, shortcut: formatShortcut('d'), action: () => splitPane(node.data.id, 'vertical') },
-                      { label: 'Split Horizontally (Stacked)', icon: <Rows2 size={12} />, shortcut: formatShortcut('d', true), action: () => splitPane(node.data.id, 'horizontal') },
-                      { type: 'divider' },
-                      { label: 'Clear Scrollback & Screen', icon: <Eraser size={12} />, shortcut: formatShortcut('k'), action: () => { if (node.data.sessionId) SessionManager.getInstance().write(node.data.sessionId, 'clear\r'); } },
-                      { label: 'Reset Shell Session', icon: <RotateCcw size={12} />, shortcut: formatShortcut('r'), action: () => { if (node.data.sessionId) SessionManager.getInstance().write(node.data.sessionId, 'clear && printf "\\033c"\r'); } },
-                      { type: 'divider' },
-                      { label: 'AI Command Palette & Prompt', icon: <Sparkles size={12} />, shortcut: formatShortcut('p', true), action: () => setCommandPaletteOpen(true) },
-                      { label: 'Zero-Trust AI Security & Profile', icon: <ShieldCheck size={12} />, shortcut: formatShortcut(','), action: () => setShowAiSettings(true) },
-                      { label: isLinux() ? 'Linux Integration & Setup Wizard...' : 'macOS Integration & Setup Wizard...', icon: <Compass size={12} />, shortcut: formatShortcut('i'), action: () => setShowWizard(true) },
-                      { type: 'divider' },
-                      { label: 'Close Pane / Tab', icon: <Trash2 size={12} />, shortcut: formatShortcut('w'), action: () => {
-                        if (!isRoot) closePane(node.data.id);
-                        else if (tabs.length > 1) closeTab(activeTabId, { stopPropagation: () => {} } as any);
-                      }, disabled: isRoot && tabs.length === 1 }
-                    ].map((item, idx) => {
-                      if ('type' in item && item.type === 'divider') {
-                        return <div key={idx} style={{ height: '1px', background: 'var(--sentinel-border, rgba(255, 255, 255, 0.08))', margin: '4px 6px' }} />;
-                      }
-                      const menuItem = item as { label: string; icon?: React.ReactNode; shortcut: string; action: () => void; disabled?: boolean };
-                      return (
-                        <div
-                          key={idx}
-                          onClick={() => { if (!menuItem.disabled) { menuItem.action(); setActiveShellMenuPaneId(null); } }}
-                          style={{
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            alignItems: 'center',
-                            margin: '1px 5px',
-                            padding: '6px 10px',
-                            borderRadius: '5px',
-                            cursor: menuItem.disabled ? 'default' : 'pointer',
-                            opacity: menuItem.disabled ? 0.35 : 0.9,
-                            transition: 'background-color 0.15s ease',
-                          }}
-                          onMouseEnter={(e) => { if (!menuItem.disabled) (e.currentTarget as HTMLElement).style.backgroundColor = 'var(--sentinel-hover, rgba(255, 255, 255, 0.08))'; }}
-                          onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.backgroundColor = 'transparent'; }}
-                        >
-                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
-                            {menuItem.icon && <span style={{ opacity: 0.7, display: 'flex', alignItems: 'center' }}>{menuItem.icon}</span>}
-                            <span>{menuItem.label}</span>
-                          </span>
-                          <span style={{ fontSize: '11px', opacity: 0.5, fontFamily: 'monospace' }}>{menuItem.shortcut}</span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
+          {!isRoot && (
+            <div className="pane-header-controls pane-header-compact">
+              <span style={{ display: 'flex', alignItems: 'center', gap: '6px', opacity: 0.85, fontSize: '11px', fontWeight: 500 }}>
+                <Folder size={11} style={{ opacity: 0.75, flexShrink: 0 }} />
+                <span>{formatDisplayPath(panePaths[node.data.id] || '~')} — -${detectedShell}</span>
+              </span>
               <button 
-                onClick={(e) => { 
-                  e.stopPropagation(); 
-                  window.dispatchEvent(new CustomEvent('sentinel:toggle-search')); 
-                }} 
-                title="Search Terminal Buffer (Ctrl+Shift+F)"
-                style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                className="pane-close-btn" 
+                onClick={(e) => { e.stopPropagation(); closePane(node.data.id); }} 
+                title="Close Split Pane (Ctrl+W)"
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: 'inherit',
+                  cursor: 'pointer',
+                  opacity: 0.65,
+                  display: 'flex',
+                  alignItems: 'center',
+                  padding: '2px 4px',
+                  borderRadius: '3px'
+                }}
               >
-                <Search size={11} />
-                <span>Find</span>
+                <X size={11} />
               </button>
-              <button 
-                onClick={(e) => { e.stopPropagation(); splitPane(node.data.id, 'vertical'); }} 
-                title="Split Vertically (Side by side)"
-                style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}
-              >
-                <Columns2 size={11} />
-                <span>Split V</span>
-              </button>
-              <button 
-                onClick={(e) => { e.stopPropagation(); splitPane(node.data.id, 'horizontal'); }} 
-                title="Split Horizontally (Stacked)"
-                style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}
-              >
-                <Rows2 size={11} />
-                <span>Split H</span>
-              </button>
-              {!isRoot && (
-                <button className="pane-close-btn" onClick={(e) => { e.stopPropagation(); closePane(node.data.id); }} title="Close Pane">
-                  <X size={11} />
-                </button>
-              )}
             </div>
-          </div>
+          )}
           <div style={{ flex: 1, position: 'relative', overflow: 'hidden', padding: '6px', zIndex: 1 }}>
             <TerminalView 
               key={node.data.id}
@@ -942,6 +826,137 @@ function App() {
             <Plus size={13} />
           </button>
         </div>
+
+        {/* Master Active Terminal Pane Actions Strip */}
+        {activeTerminal && (
+          <div 
+            className={`tabs-actions ${uiMode === 'zen' ? 'tabs-actions-zen' : ''} ${activeShellMenuPaneId === activeTerminal.id ? 'menu-active' : ''}`}
+            style={{
+              opacity: (uiMode === 'zen' && activeShellMenuPaneId === activeTerminal.id) ? 1 : undefined,
+              pointerEvents: (uiMode === 'zen' && activeShellMenuPaneId === activeTerminal.id) ? 'auto' : undefined,
+            }}
+          >
+            <div className="shell-menu-container" style={{ position: 'relative', display: 'inline-block', zIndex: 60 }}>
+              <button 
+                className="shell-btn"
+                onClick={(e) => { 
+                  e.stopPropagation(); 
+                  setActiveShellMenuPaneId(activeShellMenuPaneId === activeTerminal.id ? null : activeTerminal.id); 
+                  setShowThemeModal(false); 
+                }}
+                title="Shell Session & Workspace Actions"
+                style={{
+                  background: activeShellMenuPaneId === activeTerminal.id ? 'var(--sentinel-hover, rgba(255, 255, 255, 0.15))' : 'transparent',
+                  borderColor: activeShellMenuPaneId === activeTerminal.id ? 'var(--sentinel-border-active, rgba(255, 255, 255, 0.35))' : 'var(--sentinel-border, rgba(255, 255, 255, 0.1))',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px'
+                }}
+              >
+                <Terminal size={11} />
+                <span>Shell</span>
+                <ChevronDown size={10} style={{ opacity: 0.6 }} />
+              </button>
+              {activeShellMenuPaneId === activeTerminal.id && (
+                <div 
+                  className="shell-dropdown-menu"
+                  onClick={(e) => e.stopPropagation()}
+                  style={{
+                    position: 'absolute',
+                    top: '100%',
+                    right: 0,
+                    marginTop: '6px',
+                    width: '240px',
+                    backgroundColor: '#16171a',
+                    background: 'var(--sentinel-modal-bg, #16171a)',
+                    border: '1px solid var(--sentinel-border-active, rgba(255, 255, 255, 0.18))',
+                    borderRadius: '8px',
+                    boxShadow: '0 16px 36px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(255, 255, 255, 0.05)',
+                    padding: '5px 0',
+                    zIndex: 10000,
+                    color: 'var(--sentinel-fg, #ffffff)',
+                    fontSize: '12px'
+                  }}
+                >
+                  {[
+                    { label: 'New Terminal Tab', icon: <Plus size={12} />, shortcut: formatShortcut('t'), action: () => addTab() },
+                    { label: 'Split Vertically (Side by side)', icon: <Columns2 size={12} />, shortcut: formatShortcut('d'), action: () => splitPane(activeTerminal.id, 'vertical') },
+                    { label: 'Split Horizontally (Stacked)', icon: <Rows2 size={12} />, shortcut: formatShortcut('d', true), action: () => splitPane(activeTerminal.id, 'horizontal') },
+                    { type: 'divider' },
+                    { label: 'Clear Scrollback & Screen', icon: <Eraser size={12} />, shortcut: formatShortcut('k'), action: () => { if (activeTerminal.sessionId) SessionManager.getInstance().write(activeTerminal.sessionId, 'clear\r'); } },
+                    { label: 'Reset Shell Session', icon: <RotateCcw size={12} />, shortcut: formatShortcut('r'), action: () => { if (activeTerminal.sessionId) SessionManager.getInstance().write(activeTerminal.sessionId, 'clear && printf "\\033c"\r'); } },
+                    { type: 'divider' },
+                    { label: 'AI Command Palette & Prompt', icon: <Sparkles size={12} />, shortcut: formatShortcut('p', true), action: () => setCommandPaletteOpen(true) },
+                    { label: 'Zero-Trust AI Security & Profile', icon: <ShieldCheck size={12} />, shortcut: formatShortcut(','), action: () => setShowAiSettings(true) },
+                    { label: isLinux() ? 'Linux Integration & Setup Wizard...' : 'macOS Integration & Setup Wizard...', icon: <Compass size={12} />, shortcut: formatShortcut('i'), action: () => setShowWizard(true) },
+                    { type: 'divider' },
+                    { label: 'Close Pane / Tab', icon: <Trash2 size={12} />, shortcut: formatShortcut('w'), action: () => {
+                      if (activeTab && activeTab.rootPane.type === 'split') closePane(activeTerminal.id);
+                      else if (tabs.length > 1) closeTab(activeTabId, { stopPropagation: () => {} } as any);
+                    }, disabled: (!activeTab || activeTab.rootPane.type !== 'split') && tabs.length === 1 }
+                  ].map((item, idx) => {
+                    if ('type' in item && item.type === 'divider') {
+                      return <div key={idx} style={{ height: '1px', background: 'var(--sentinel-border, rgba(255, 255, 255, 0.08))', margin: '4px 6px' }} />;
+                    }
+                    const menuItem = item as { label: string; icon?: React.ReactNode; shortcut: string; action: () => void; disabled?: boolean };
+                    return (
+                      <div
+                        key={idx}
+                        onClick={() => { if (!menuItem.disabled) { menuItem.action(); setActiveShellMenuPaneId(null); } }}
+                        style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          margin: '1px 5px',
+                          padding: '6px 10px',
+                          borderRadius: '5px',
+                          cursor: menuItem.disabled ? 'default' : 'pointer',
+                          opacity: menuItem.disabled ? 0.35 : 0.9,
+                          transition: 'background-color 0.15s ease',
+                        }}
+                        onMouseEnter={(e) => { if (!menuItem.disabled) (e.currentTarget as HTMLElement).style.backgroundColor = 'var(--sentinel-hover, rgba(255, 255, 255, 0.08))'; }}
+                        onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.backgroundColor = 'transparent'; }}
+                      >
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                          {menuItem.icon && <span style={{ opacity: 0.7, display: 'flex', alignItems: 'center' }}>{menuItem.icon}</span>}
+                          <span>{menuItem.label}</span>
+                        </span>
+                        <span style={{ fontSize: '11px', opacity: 0.5, fontFamily: 'monospace' }}>{menuItem.shortcut}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+            <button 
+              onClick={(e) => { 
+                e.stopPropagation(); 
+                window.dispatchEvent(new CustomEvent('sentinel:toggle-search')); 
+              }} 
+              title="Search Terminal Buffer (Ctrl+Shift+F)"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+            >
+              <Search size={11} />
+              <span>Find</span>
+            </button>
+            <button 
+              onClick={(e) => { e.stopPropagation(); splitPane(activeTerminal.id, 'vertical'); }} 
+              title="Split Vertically (Ctrl+D)"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+            >
+              <Columns2 size={11} />
+              <span>Split V</span>
+            </button>
+            <button 
+              onClick={(e) => { e.stopPropagation(); splitPane(activeTerminal.id, 'horizontal'); }} 
+              title="Split Horizontally (Ctrl+Shift+D)"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+            >
+              <Rows2 size={11} />
+              <span>Split H</span>
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Classic Minimalist Workspace Appearance Modal */}
@@ -1114,22 +1129,11 @@ function App() {
         currentShell={detectedShell}
         currentPath={currentDisplayPath}
         onNavigate={handleStatusBarNavigate}
-        onOpenWorkspaces={() => setShowWorkspaceSwitcher(true)}
-        onOpenPorts={() => setShowPortManager(true)}
         onOpenWorkflows={() => setShowWorkflowManager(true)}
         onOpenHelp={() => setShowHelpModal(true)}
         onOpenAiSettings={() => setShowAiSettings(true)}
         uiMode={uiMode}
-      />
-      <WorkspaceSwitcherModal 
-        isOpen={showWorkspaceSwitcher}
-        onClose={() => setShowWorkspaceSwitcher(false)}
-        onSelect={handleWorkspaceSelect}
-        currentCwd={currentDisplayPath}
-      />
-      <ProcessPortManagerDrawer 
-        isOpen={showPortManager}
-        onClose={() => setShowPortManager(false)}
+        highlightHelp={showZenCallout}
       />
       <WorkflowManagerDrawer 
         isOpen={showWorkflowManager}
@@ -1169,8 +1173,6 @@ function App() {
           else if (actionId === 'command_palette') setCommandPaletteOpen(true);
           else if (actionId === 'workflow_manager') setShowWorkflowManager(true);
           else if (actionId === 'ai_settings') setShowAiSettings(true);
-          else if (actionId === 'workspace_switcher') setShowWorkspaceSwitcher(true);
-          else if (actionId === 'port_manager') setShowPortManager(true);
         }}
       />
       <CommandPalette 
@@ -1182,16 +1184,17 @@ function App() {
           { id: 'open_embedded_ai', name: 'Sentinel Embedded AI (Qwen 2.5 3B)', description: 'Manage self-contained local model — Zero Ollama required' },
           { id: 'open_ai_settings', name: 'Open AI Settings', description: 'Configure local AI models (Ollama, Qwen)' },
           { id: 'personalize', name: 'Personalize UI', description: 'Open color theme and glassmorphic appearance customization' },
-          { id: 'workspace_switcher', name: 'Switch Workspace (Cmd+O)', description: 'Jump to ROS, Node, Python, Rust, or Docker projects' },
-          { id: 'port_manager', name: 'Active Ports & Processes (Ctrl+Alt+P)', description: 'Inspect and free listening network ports' },
           { id: 'workflow_manager', name: 'Workflow & Macro Manager (Cmd+Shift+W)', description: 'View, edit, reorder and replay deterministic zero-token multi-stage workflows' },
           { id: 'history_search', name: 'Command History (Ctrl+R)', description: 'Search previous commands ranked by frequency and recency' },
           { id: 'plugin_marketplace', name: 'Plugin Marketplace (Cmd+Shift+X)', description: 'Browse and hot-reload community extensions, tools, and themes' },
+          { id: 'open_onboarding', name: 'Welcome: Setup & Onboarding Wizard', description: 'Re-run initial terminal experience setup, mode selection, and system integrations' },
           { id: 'export_audit_log', name: 'Export Cryptographic Audit Log', description: 'Generate SOC 2 / ISO 27001 tamper-evident signed audit trail' },
           { id: 'export_rice_profile', name: 'Export Rice & AI Profile', description: 'Backup custom themes, aliases, and learned AI patterns' }
         ]}
         onExecuteCapability={async (id) => {
-          if (id === 'toggle_ui_mode') {
+          if (id === 'open_onboarding') {
+            setShowWizard(true);
+          } else if (id === 'toggle_ui_mode') {
             handleToggleUiMode(uiMode === 'zen' ? 'visual' : 'zen');
           } else if (id === 'keyboard_shortcuts') {
             setShowHelpModal(true);
@@ -1201,10 +1204,6 @@ function App() {
             setShowAiSettings(true);
           } else if (id === 'personalize') {
             setShowThemeModal(true);
-          } else if (id === 'workspace_switcher') {
-            setShowWorkspaceSwitcher(true);
-          } else if (id === 'port_manager') {
-            setShowPortManager(true);
           } else if (id === 'workflow_manager') {
             setShowWorkflowManager(true);
           } else if (id === 'history_search') {
@@ -1227,14 +1226,27 @@ function App() {
         }}
       />
       {showAiSettings && (
-        <div style={{ position: 'absolute', top: '40px', bottom: '28px', left: 0, right: 0, zIndex: 9000 }}>
+        <div style={{ position: 'fixed', inset: 0, zIndex: 9999, backgroundColor: 'var(--sentinel-bg, #0b0d17)' }}>
           <AiSettingsPage onClose={() => setShowAiSettings(false)} />
         </div>
       )}
       <InstallerWizard 
         isOpen={showWizard} 
-        onClose={() => setShowWizard(false)} 
+        onClose={() => {
+          setShowWizard(false);
+          const currentMode = localStorage.getItem('sentinel_ui_mode') || uiMode;
+          if (currentMode === 'zen' && !localStorage.getItem('sentinel_zen_tip_shown')) {
+            setShowZenCallout(true);
+          }
+        }} 
         onSelectUiMode={handleToggleUiMode}
+      />
+      <ZenModeHelpCallout 
+        isOpen={showZenCallout}
+        onDismiss={() => {
+          setShowZenCallout(false);
+          localStorage.setItem('sentinel_zen_tip_shown', 'true');
+        }}
       />
     </div>
   );

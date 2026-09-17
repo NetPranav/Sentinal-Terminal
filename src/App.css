@@ -75,7 +75,8 @@ body {
   display: flex;
   align-items: center;
   gap: 4px;
-  width: 100%;
+  flex: 1 1 auto;
+  min-width: 0;
   overflow-x: auto;
   height: 100%;
   padding: 0 4px;
@@ -328,6 +329,64 @@ body {
   background: rgba(255, 59, 48, 0.15) !important;
   border-color: #ff3b30 !important;
   color: #ff3b30 !important;
+}
+
+/* Unified Top Header Bar Action Controls */
+.tabs-actions,
+.tabs-actions-zen {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: auto;
+  padding-left: 10px;
+  -webkit-app-region: no-drag;
+  flex-shrink: 0;
+  z-index: 250;
+}
+
+/* Zen Mode: top bar action buttons stay hidden until top header hover */
+.tabs-actions-zen {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.18s ease-in-out;
+}
+
+.tabs-bar:hover .tabs-actions-zen,
+.tabs-actions-zen:hover,
+.tabs-actions-zen:focus-within,
+.tabs-actions-zen.menu-active {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.tabs-actions button,
+.tabs-actions-zen button {
+  background: transparent;
+  border: 1px solid var(--sentinel-border, rgba(255, 255, 255, 0.08));
+  color: var(--sentinel-fg, rgba(255, 255, 255, 0.7));
+  font-size: 11px;
+  border-radius: 4px;
+  padding: 2px 7px;
+  height: 24px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.tabs-actions button:hover,
+.tabs-actions-zen button:hover {
+  background: var(--sentinel-hover, rgba(255, 255, 255, 0.12));
+  border-color: var(--sentinel-border-active, rgba(255, 255, 255, 0.3));
+  color: #ffffff;
+}
+
+.pane-header-compact {
+  padding: 2px 8px;
+  background: var(--sentinel-hover, rgba(255, 255, 255, 0.02));
+  border-bottom: 1px solid var(--sentinel-border, rgba(255, 255, 255, 0.06));
 }
 
 /* Personalize Button & Hover Effects */

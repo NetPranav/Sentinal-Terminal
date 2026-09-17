@@ -1,4 +1,6 @@
 import { writeTextFile, readTextFile, mkdir, exists } from '@tauri-apps/plugin-fs';
+import { invoke } from '@tauri-apps/api/core';
+import { isLinux } from '../../shared/platform';
 
 export interface IntegrationStatus {
   cliInstalled: boolean;
@@ -23,11 +25,11 @@ const getDirname = (p: string): string => {
   return parts.join('/') || '/';
 };
 
-const getHomeDir = (): string => {
+export const getHomeDir = (): string => {
   if (typeof process !== 'undefined' && process.env?.HOME) {
     return process.env.HOME;
   }
-  return '/Users/pranav'; // Standard developer fallback in browser webview environment
+  return '/home/user';
 };
 
 export class InstallerService {
@@ -43,31 +45,101 @@ export class InstallerService {
   }
 
   /**
-   * Install the 'sentinel' command line executable to target binary folder (default: /usr/local/bin/sentinel).
+   * Helper to safely get the current user's home directory across Tauri and Node/Vitest runtimes.
    */
-  public async installCli(cliSourceContent?: string, targetPath = '/usr/local/bin/sentinel'): Promise<{ success: boolean; error?: string }> {
+  public async getResolvedHomeDir(): Promise<string> {
+    if (typeof process !== 'undefined' && process.env?.HOME) {
+      return process.env.HOME;
+    }
     try {
-      const dir = getDirname(targetPath);
+      const res = await invoke<{ stdout: string }>('execute_command', {
+        command: 'sh',
+        args: ['-c', 'echo $HOME']
+      });
+      if (res?.stdout?.trim()) return res.stdout.trim();
+    } catch {
+      // Fallback
+    }
+    return getHomeDir();
+  }
+
+  /**
+   * Install the 'sentinel' command line executable to target binary folder.
+   * On Linux, defaults to rootless `~/.local/bin/sentinel` with fallback to `/usr/local/bin/sentinel`.
+   */
+  public async installCli(cliSourceContent?: string, targetPath?: string): Promise<{ success: boolean; error?: string }> {
+    const home = await this.getResolvedHomeDir();
+    const finalTargetPath = targetPath || (isLinux()
+      ? joinPath(home, '.local', 'bin', 'sentinel')
+      : '/usr/local/bin/sentinel');
+
+    try {
+      const dir = getDirname(finalTargetPath);
       const dirExists = await exists(dir);
       if (!dirExists) {
         await mkdir(dir, { recursive: true });
       }
 
-      const scriptContent = cliSourceContent || `#!/usr/bin/env bash
-# Sentinel Terminal CLI Launcher
+      const scriptContent = cliSourceContent || (isLinux()
+        ? `#!/usr/bin/env bash
+# Sentinel Terminal CLI Launcher (Linux)
+APP_BIN="sentinel-terminal"
+target="$1"
+if [ -z "$target" ]; then target="."; fi
+
+if [ "$target" == "--new-tab" ]; then
+  if command -v xdg-open >/dev/null 2>&1; then
+    xdg-open "sentinel://new-tab?path=$(pwd)" 2>/dev/null || "$APP_BIN" --new-tab 2>/dev/null || true
+  else
+    "$APP_BIN" --new-tab 2>/dev/null || true
+  fi
+  exit 0
+fi
+
+if [ "$target" == "--split" ]; then
+  if command -v xdg-open >/dev/null 2>&1; then
+    xdg-open "sentinel://split?path=$(pwd)" 2>/dev/null || "$APP_BIN" --split 2>/dev/null || true
+  else
+    "$APP_BIN" --split 2>/dev/null || true
+  fi
+  exit 0
+fi
+
+resolved_path=$(cd "$target" 2>/dev/null && pwd || echo "$target")
+if command -v xdg-open >/dev/null 2>&1; then
+  xdg-open "sentinel://open?path=$resolved_path" 2>/dev/null || "$APP_BIN" "$resolved_path" 2>/dev/null || sentinel "$resolved_path" 2>/dev/null || true
+else
+  "$APP_BIN" "$resolved_path" 2>/dev/null || sentinel "$resolved_path" 2>/dev/null || true
+fi
+`
+        : `#!/usr/bin/env bash
+# Sentinel Terminal CLI Launcher (macOS)
 APP_NAME="Sentinel Terminal"
 target="$1"
 if [ -z "$target" ]; then target="."; fi
 if [ "$target" == "--new-tab" ]; then open "sentinel://new-tab?path=$(pwd)"; exit 0; fi
 if [ "$target" == "--split" ]; then open "sentinel://split?path=$(pwd)"; exit 0; fi
 open "sentinel://open?path=$(cd "$target" 2>/dev/null && pwd || echo "$target")" 2>/dev/null || open -a "$APP_NAME" "$target"
-`;
+`);
 
-      await writeTextFile(targetPath, scriptContent);
+      await writeTextFile(finalTargetPath, scriptContent);
+
+      // Apply executable permission on Linux
+      if (isLinux()) {
+        try {
+          await invoke('execute_command', {
+            command: 'chmod',
+            args: ['+x', finalTargetPath]
+          });
+        } catch {
+          // Non-fatal if running in mocked environment
+        }
+      }
+
       return { success: true };
     } catch (e: any) {
-      if ((e?.code === 'EACCES' || String(e).includes('permission denied')) && targetPath.startsWith('/usr/local/bin')) {
-        const fallbackPath = joinPath(getHomeDir(), '.local', 'bin', 'sentinel');
+      if ((e?.code === 'EACCES' || String(e).includes('permission denied')) && finalTargetPath.startsWith('/usr/local/bin')) {
+        const fallbackPath = joinPath(home, '.local', 'bin', 'sentinel');
         return this.installCli(cliSourceContent, fallbackPath);
       }
       return { success: false, error: e?.message || String(e) };
@@ -75,10 +147,46 @@ open "sentinel://open?path=$(cd "$target" 2>/dev/null && pwd || echo "$target")"
   }
 
   /**
-   * Enable macOS Finder Quick Action service ("Open in Sentinel").
+   * Enable Linux File Manager / macOS Finder context action ("Open in Sentinel").
    */
   public async enableFinderIntegration(targetServicesDir?: string): Promise<{ success: boolean; workflowPath: string; error?: string }> {
-    const servicesDir = targetServicesDir || joinPath(getHomeDir(), 'Library', 'Services');
+    const home = await this.getResolvedHomeDir();
+
+    if (isLinux()) {
+      const scriptDir = targetServicesDir || joinPath(home, '.local', 'share', 'nautilus', 'scripts');
+      const scriptPath = joinPath(scriptDir, 'Open in Sentinel Terminal');
+      try {
+        if (!(await exists(scriptDir))) {
+          await mkdir(scriptDir, { recursive: true });
+        }
+        const scriptContent = `#!/usr/bin/env bash
+target="\${NAUTILUS_SCRIPT_SELECTED_FILE_PATHS:-\$PWD}"
+target=\$(echo "\$target" | head -n 1)
+if [ -z "\$target" ] || [ ! -d "\$target" ]; then target="\$PWD"; fi
+command -v sentinel-terminal >/dev/null 2>&1 && sentinel-terminal "\$target" & || command -v sentinel >/dev/null 2>&1 && sentinel "\$target" &
+`;
+        await writeTextFile(scriptPath, scriptContent);
+        try {
+          await invoke('execute_command', { command: 'chmod', args: ['+x', scriptPath] });
+        } catch {}
+
+        // Also install Nemo script if folder exists
+        const nemoDir = joinPath(home, '.local', 'share', 'nemo', 'scripts');
+        try {
+          if (await exists(joinPath(home, '.local', 'share', 'nemo'))) {
+            if (!(await exists(nemoDir))) await mkdir(nemoDir, { recursive: true });
+            await writeTextFile(joinPath(nemoDir, 'Open in Sentinel Terminal'), scriptContent);
+          }
+        } catch {}
+
+        return { success: true, workflowPath: scriptPath };
+      } catch (e: any) {
+        return { success: false, workflowPath: scriptPath, error: e?.message || String(e) };
+      }
+    }
+
+    // macOS Finder Quick Action Workflow
+    const servicesDir = targetServicesDir || joinPath(home, 'Library', 'Services');
     const workflowPath = joinPath(servicesDir, 'Open in Sentinel.workflow');
 
     try {
@@ -143,16 +251,18 @@ open "sentinel://open?path=$(cd "$target" 2>/dev/null && pwd || echo "$target")"
         try {
           const content = await readTextFile(settingsPath);
           config = JSON.parse(content);
-        } catch (err) {
+        } catch {
           config = {};
         }
       }
 
-      if (!config['terminal.integrated.profiles.osx']) {
-        config['terminal.integrated.profiles.osx'] = {};
+      const profileKey = isLinux() ? 'terminal.integrated.profiles.linux' : 'terminal.integrated.profiles.osx';
+
+      if (!config[profileKey]) {
+        config[profileKey] = {};
       }
 
-      config['terminal.integrated.profiles.osx'][profileTitle] = {
+      config[profileKey][profileTitle] = {
         path: appPath,
         icon: 'terminal',
         overrideName: true
@@ -169,44 +279,72 @@ open "sentinel://open?path=$(cd "$target" 2>/dev/null && pwd || echo "$target")"
    * Configure VS Code integrated terminal profile.
    */
   public async configureVsCodeIntegration(mockSettingsPath?: string): Promise<{ success: boolean; error?: string }> {
-    const settingsPath = mockSettingsPath || joinPath(getHomeDir(), 'Library', 'Application Support', 'Code', 'User', 'settings.json');
-    return this.updateIdeSettings(settingsPath, 'Sentinel Terminal', '/Applications/Sentinel Terminal.app/Contents/MacOS/Sentinel Terminal');
+    const home = await this.getResolvedHomeDir();
+    const settingsPath = mockSettingsPath || (isLinux()
+      ? joinPath(home, '.config', 'Code', 'User', 'settings.json')
+      : joinPath(home, 'Library', 'Application Support', 'Code', 'User', 'settings.json'));
+
+    const binPath = isLinux() ? 'sentinel' : '/Applications/Sentinel Terminal.app/Contents/MacOS/Sentinel Terminal';
+    return this.updateIdeSettings(settingsPath, 'Sentinel Terminal', binPath);
   }
 
   /**
    * Configure Cursor IDE integrated terminal profile.
    */
   public async configureCursorIntegration(mockSettingsPath?: string): Promise<{ success: boolean; error?: string }> {
-    const settingsPath = mockSettingsPath || joinPath(getHomeDir(), 'Library', 'Application Support', 'Cursor', 'User', 'settings.json');
-    return this.updateIdeSettings(settingsPath, 'Sentinel Terminal', '/Applications/Sentinel Terminal.app/Contents/MacOS/Sentinel Terminal');
+    const home = await this.getResolvedHomeDir();
+    const settingsPath = mockSettingsPath || (isLinux()
+      ? joinPath(home, '.config', 'Cursor', 'User', 'settings.json')
+      : joinPath(home, 'Library', 'Application Support', 'Cursor', 'User', 'settings.json'));
+
+    const binPath = isLinux() ? 'sentinel' : '/Applications/Sentinel Terminal.app/Contents/MacOS/Sentinel Terminal';
+    return this.updateIdeSettings(settingsPath, 'Sentinel Terminal', binPath);
   }
 
   /**
-   * Check status of all system integrations.
+   * Check status of all system integrations across Linux and macOS.
    */
   public async checkStatus(opts?: { cliPath?: string; servicesDir?: string; vscodePath?: string; cursorPath?: string }): Promise<IntegrationStatus> {
-    const cliPath = opts?.cliPath || '/usr/local/bin/sentinel';
-    const servicesDir = opts?.servicesDir || joinPath(getHomeDir(), 'Library', 'Services', 'Open in Sentinel.workflow');
-    const vscodePath = opts?.vscodePath || joinPath(getHomeDir(), 'Library', 'Application Support', 'Code', 'User', 'settings.json');
-    const cursorPath = opts?.cursorPath || joinPath(getHomeDir(), 'Library', 'Application Support', 'Cursor', 'User', 'settings.json');
+    const home = await this.getResolvedHomeDir();
 
-    const cliInstalled = (await exists(cliPath)) || (await exists(joinPath(getHomeDir(), '.local', 'bin', 'sentinel')));
-    const finderEnabled = await exists(servicesDir);
-    
+    const cliPath = opts?.cliPath || (isLinux() ? joinPath(home, '.local', 'bin', 'sentinel') : '/usr/local/bin/sentinel');
+    const servicesDir = opts?.servicesDir || (isLinux()
+      ? joinPath(home, '.local', 'share', 'nautilus', 'scripts', 'Open in Sentinel Terminal')
+      : joinPath(home, 'Library', 'Services', 'Open in Sentinel.workflow'));
+
+    const vscodePath = opts?.vscodePath || (isLinux()
+      ? joinPath(home, '.config', 'Code', 'User', 'settings.json')
+      : joinPath(home, 'Library', 'Application Support', 'Code', 'User', 'settings.json'));
+
+    const cursorPath = opts?.cursorPath || (isLinux()
+      ? joinPath(home, '.config', 'Cursor', 'User', 'settings.json')
+      : joinPath(home, 'Library', 'Application Support', 'Cursor', 'User', 'settings.json'));
+
+    const cliInstalled = (await exists(cliPath))
+      || (await exists(joinPath(home, '.local', 'bin', 'sentinel')))
+      || (await exists('/usr/local/bin/sentinel'))
+      || (await exists('/usr/bin/sentinel-terminal'))
+      || (await exists('/usr/bin/sentinel'));
+
+    const finderEnabled = (await exists(servicesDir))
+      || (await exists(joinPath(home, '.local', 'share', 'applications', 'com.pranav.sentinel-terminal.desktop')));
+
+    const profileKey = isLinux() ? 'terminal.integrated.profiles.linux' : 'terminal.integrated.profiles.osx';
+
     let vscodeConfigured = false;
     if (await exists(vscodePath)) {
       try {
         const data = JSON.parse(await readTextFile(vscodePath));
-        vscodeConfigured = !!data['terminal.integrated.profiles.osx']?.['Sentinel Terminal'];
-      } catch (e) {}
+        vscodeConfigured = !!(data[profileKey]?.['Sentinel Terminal'] || data['terminal.integrated.profiles.linux']?.['Sentinel Terminal'] || data['terminal.integrated.profiles.osx']?.['Sentinel Terminal']);
+      } catch {}
     }
 
     let cursorConfigured = false;
     if (await exists(cursorPath)) {
       try {
         const data = JSON.parse(await readTextFile(cursorPath));
-        cursorConfigured = !!data['terminal.integrated.profiles.osx']?.['Sentinel Terminal'];
-      } catch (e) {}
+        cursorConfigured = !!(data[profileKey]?.['Sentinel Terminal'] || data['terminal.integrated.profiles.linux']?.['Sentinel Terminal'] || data['terminal.integrated.profiles.osx']?.['Sentinel Terminal']);
+      } catch {}
     }
 
     return { cliInstalled, finderEnabled, vscodeConfigured, cursorConfigured };

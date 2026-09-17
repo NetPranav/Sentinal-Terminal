@@ -21,30 +21,28 @@ export interface StatusBarProps {
   currentShell?: string;
   currentPath?: string;
   onNavigate?: (path: string, cmdToRun: string) => void;
-  onOpenPorts?: () => void;
   onOpenWorkflows?: () => void;
-  onOpenWorkspaces?: () => void;
   onOpenHelp?: () => void;
   onOpenAiSettings?: () => void;
   uiMode?: 'zen' | 'visual';
   memoryUsage?: number;
   cpuUsage?: number;
   currentProfile?: string;
+  highlightHelp?: boolean;
 }
 
 export const StatusBar: React.FC<StatusBarProps> = ({ 
   currentShell, 
   currentPath = '~',
   onNavigate,
-  onOpenPorts,
   onOpenWorkflows,
-  onOpenWorkspaces,
   onOpenHelp,
   onOpenAiSettings,
   uiMode = 'zen',
   memoryUsage: initialMemory = 3174,
   cpuUsage: initialCpu = 18,
-  currentProfile = 'Developer'
+  currentProfile = 'Developer',
+  highlightHelp = false
 }) => {
   const displayShell = currentShell || (isLinux() ? 'bash' : 'zsh');
   const [memoryUsage, setMemoryUsage] = useState(initialMemory);
@@ -208,73 +206,27 @@ export const StatusBar: React.FC<StatusBarProps> = ({
       {/* Right section: System stats, Clock, UTF-8, and Help button */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexShrink: 0 }}>
         {/* Visual Mode extended tool buttons */}
-        {uiMode === 'visual' && (
+        {uiMode === 'visual' && onOpenWorkflows && (
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', borderRight: '1px solid rgba(255, 255, 255, 0.08)', paddingRight: '10px' }}>
-            {onOpenWorkspaces && (
-              <button
-                onClick={onOpenWorkspaces}
-                style={{
-                  background: 'rgba(255, 255, 255, 0.04)',
-                  border: '1px solid rgba(255, 255, 255, 0.08)',
-                  borderRadius: '4px',
-                  padding: '2px 6px',
-                  color: 'rgba(255, 255, 255, 0.8)',
-                  fontSize: '10px',
-                  cursor: 'pointer',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '4px'
-                }}
-                title={`Switch Workspace (${getShortcutModifier()}+O)`}
-              >
-                <FolderGit2 size={11} />
-                <span>Projects</span>
-              </button>
-            )}
-
-            {onOpenPorts && (
-              <button
-                onClick={onOpenPorts}
-                style={{
-                  background: 'rgba(255, 255, 255, 0.04)',
-                  border: '1px solid rgba(255, 255, 255, 0.08)',
-                  borderRadius: '4px',
-                  padding: '2px 6px',
-                  color: 'rgba(255, 255, 255, 0.8)',
-                  fontSize: '10px',
-                  cursor: 'pointer',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '4px'
-                }}
-                title="Inspect Listening Ports (Ctrl+Alt+P)"
-              >
-                <Radio size={11} />
-                <span>Ports</span>
-              </button>
-            )}
-
-            {onOpenWorkflows && (
-              <button
-                onClick={onOpenWorkflows}
-                style={{
-                  background: 'rgba(255, 255, 255, 0.04)',
-                  border: '1px solid rgba(255, 255, 255, 0.08)',
-                  borderRadius: '4px',
-                  padding: '2px 6px',
-                  color: 'rgba(255, 255, 255, 0.8)',
-                  fontSize: '10px',
-                  cursor: 'pointer',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '4px'
-                }}
-                title="Workflow & Macro Manager"
-              >
-                <GitBranch size={11} style={{ color: 'rgba(255, 255, 255, 0.7)' }} />
-                <span>Workflows</span>
-              </button>
-            )}
+            <button
+              onClick={onOpenWorkflows}
+              style={{
+                background: 'rgba(255, 255, 255, 0.04)',
+                border: '1px solid rgba(255, 255, 255, 0.08)',
+                borderRadius: '4px',
+                padding: '2px 6px',
+                color: 'rgba(255, 255, 255, 0.8)',
+                fontSize: '10px',
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px'
+              }}
+              title="Workflow & Macro Manager"
+            >
+              <GitBranch size={11} style={{ color: 'rgba(255, 255, 255, 0.7)' }} />
+              <span>Workflows</span>
+            </button>
           </div>
         )}
 
@@ -360,13 +312,15 @@ export const StatusBar: React.FC<StatusBarProps> = ({
         <button
           onClick={onOpenHelp}
           style={{
-            background: 'rgba(255, 255, 255, 0.05)',
-            border: '1px solid rgba(255, 255, 255, 0.12)',
+            background: highlightHelp ? 'rgba(255, 255, 255, 0.18)' : 'rgba(255, 255, 255, 0.05)',
+            border: highlightHelp ? '1px solid rgba(255, 255, 255, 0.65)' : '1px solid rgba(255, 255, 255, 0.12)',
+            boxShadow: highlightHelp ? '0 0 0 1px rgba(255, 255, 255, 0.25)' : 'none',
             borderRadius: '4px',
             padding: '1px 7px',
-            color: 'rgba(255, 255, 255, 0.8)',
+            color: highlightHelp ? '#ffffff' : 'rgba(255, 255, 255, 0.8)',
             fontSize: '11px',
             fontFamily: 'inherit',
+            fontWeight: highlightHelp ? 600 : 400,
             cursor: 'pointer',
             display: 'inline-flex',
             alignItems: 'center',

@@ -437,12 +437,12 @@ export class ApplicationCapability extends BaseCapabilityDriver<AppDriverInput, 
           await invoke('execute_command', { command: 'brew', args });
           return { success: true, data: { installed: true, package: pkgInfo.name, isCask: pkgInfo.isCask, reinstalled: isReinstall }, commandExecuted: `brew ${args.join(' ')}`, rollbackPayload: { action: 'uninstall', package: pkgInfo.name } };
         } else {
-          // Linux (Arch / Debian / Fedora / Flatpak)
+          // Linux (Arch / Debian / Fedora / openSUSE / Flatpak)
           if (!isReinstall) {
             try {
               const checkRes = await invoke<{ code: number }>('execute_command', {
                 command: 'sh',
-                args: ['-c', `which "${target.toLowerCase()}" >/dev/null 2>&1 || (which pacman >/dev/null 2>&1 && pacman -Q "${target.toLowerCase()}" >/dev/null 2>&1) || (which dpkg-query >/dev/null 2>&1 && dpkg-query -W -f='\${Status}' "${target.toLowerCase()}" 2>/dev/null | grep -q "ok installed")`]
+                args: ['-c', `which "${target.toLowerCase()}" >/dev/null 2>&1 || (which pacman >/dev/null 2>&1 && pacman -Q "${target.toLowerCase()}" >/dev/null 2>&1) || (which dpkg-query >/dev/null 2>&1 && dpkg-query -W -f='\${Status}' "${target.toLowerCase()}" 2>/dev/null | grep -q "ok installed") || (which zypper >/dev/null 2>&1 && rpm -q "${target.toLowerCase()}" >/dev/null 2>&1)`]
               });
               if (checkRes.code === 0) {
                 return {
@@ -460,13 +460,13 @@ export class ApplicationCapability extends BaseCapabilityDriver<AppDriverInput, 
           } else {
             try {
               const unCmd = 'sh';
-              const unArgs = ['-c', `which pacman >/dev/null 2>&1 && sudo pacman -R --noconfirm "${target}" || which apt-get >/dev/null 2>&1 && sudo apt-get remove -y "${target}" || which dnf >/dev/null 2>&1 && sudo dnf remove -y "${target}"`];
+              const unArgs = ['-c', `which pacman >/dev/null 2>&1 && sudo pacman -R --noconfirm "${target}" || which apt-get >/dev/null 2>&1 && sudo apt-get remove -y "${target}" || which dnf >/dev/null 2>&1 && sudo dnf remove -y "${target}" || which zypper >/dev/null 2>&1 && sudo zypper remove -y "${target}"`];
               await invoke('execute_command', { command: unCmd, args: unArgs });
             } catch { /* ignore removal error */ }
           }
 
           const cmd = 'sh';
-          const args = ['-c', `which pacman >/dev/null 2>&1 && sudo pacman -S --noconfirm "${target}" || which apt-get >/dev/null 2>&1 && sudo apt-get install -y "${target}" || which dnf >/dev/null 2>&1 && sudo dnf install -y "${target}" || which flatpak >/dev/null 2>&1 && flatpak install -y "${target}"`];
+          const args = ['-c', `which pacman >/dev/null 2>&1 && sudo pacman -S --noconfirm "${target}" || which apt-get >/dev/null 2>&1 && sudo apt-get install -y "${target}" || which dnf >/dev/null 2>&1 && sudo dnf install -y "${target}" || which zypper >/dev/null 2>&1 && sudo zypper install -y "${target}" || which flatpak >/dev/null 2>&1 && flatpak install -y "${target}"`];
           await invoke('execute_command', { command: cmd, args });
           return { success: true, data: { installed: true, package: target, reinstalled: isReinstall }, commandExecuted: `${cmd} ${args.join(' ')}`, rollbackPayload: { action: 'uninstall', package: target } };
         }
@@ -480,7 +480,7 @@ export class ApplicationCapability extends BaseCapabilityDriver<AppDriverInput, 
           return { success: true, data: { uninstalled: true, package: pkgInfo.name, isCask: pkgInfo.isCask }, commandExecuted: `brew ${args.join(' ')}` };
         } else {
           const cmd = 'sh';
-          const args = ['-c', `which pacman >/dev/null 2>&1 && sudo pacman -R --noconfirm "${target}" || which apt-get >/dev/null 2>&1 && sudo apt-get remove -y "${target}" || which dnf >/dev/null 2>&1 && sudo dnf remove -y "${target}"`];
+          const args = ['-c', `which pacman >/dev/null 2>&1 && sudo pacman -R --noconfirm "${target}" || which apt-get >/dev/null 2>&1 && sudo apt-get remove -y "${target}" || which dnf >/dev/null 2>&1 && sudo dnf remove -y "${target}" || which zypper >/dev/null 2>&1 && sudo zypper remove -y "${target}"`];
           await invoke('execute_command', { command: cmd, args });
           return { success: true, data: { uninstalled: true, package: target }, commandExecuted: `${cmd} ${args.join(' ')}` };
         }

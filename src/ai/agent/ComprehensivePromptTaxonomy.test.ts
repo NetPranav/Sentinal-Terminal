@@ -326,7 +326,8 @@ describe('Comprehensive Prompt Taxonomy & Feature Routing Test Suite', () => {
       const res = await agent.run(prompt, { os: 'linux', cwd: '/home/test' });
       expect(res.success).toBe(true);
       expect(res.steps.length).toBe(2);
-      expect(mockToolExecutor.execute).toHaveBeenCalledTimes(2);
+      // Phase 0.75: Precondition check (test -f Cargo.toml) runs before cargo build stage
+      expect(mockToolExecutor.execute).toHaveBeenCalledTimes(3);
     });
   });
 

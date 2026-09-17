@@ -1,7 +1,7 @@
 # Sentinel Terminal: Master Technical Roadmap & Capability Inventory
 
 > **Document Version:** 6.0.0 (Linux Edition — Restructured)  
-> **Target OS:** Linux (Arch Linux, Hyprland, Wayland, X11, Systemd)  
+> **Target OS:** Linux (Ubuntu, Debian, Fedora, Arch Linux, openSUSE, Linux Mint | Wayland & X11 | Systemd)  
 > **Status:** Active Production Development  
 > **Repository:** `NetPranav/Sentinal-Terminal` (Branch: `linux-v2-update`)  
 > **Revision note:** v4.0.0 kept the historical changelog, capability inventory, and 450-prompt QA benchmark spec from v3.0.0 intact while rewriting Sections 4, 5, and 7 — the actual planning content — reordered by dependency and risk, with effort estimates and exit criteria tied to the benchmark suite. v4.1.0 removes vision-based UI automation (screenshot → vision-language model → semantic click) from Phase 2's scope entirely; plain screenshot capture is kept. v5.0.0 adds a second independent engineering review on top of v4.1's Phase 0.5 hardening: eight new problem/fix pairs (items 13–20, Phase 0.5 subsection C) covering security gaps the first review didn't touch — indirect prompt injection, secret leakage into persisted logs, locale-dependent parsing, supply-chain integrity of downloaded binaries/models, GPU OOM handling, hung interactive commands, context-window overflow, and obfuscated-command bypass of the AST parser — plus five new backlog features (F9–F13) and three new cross-cutting risks (Section 5, items 6–8). **v6.0.0 adds Phase 0.75 (AI Model Intelligence — Intent/Coder Split, Latency & Continuous Learning Pipeline)**, inserted between Phase 0.5 and Phase 1: a dedicated, code-audited treatment of the model-accuracy gap the previous revisions never covered — splitting intent classification from code generation into two independently sized and versioned models, closing the reward-attribution gap in the existing GRPO training script, fixing the confirmed unconditional-reinstall bug in `ApplicationCapability.ts`, expanding the heuristic fast-path to remove unnecessary LLM round-trips, and introducing a replay-buffer-gated continuous learning process with an explicit model versioning/rollback scheme (none of which existed in any form before this revision). Three new risks (Section 5, items 9–11), backlog cross-references, and an updated Execution Timeline follow from it. See the change log at the very end for a full diff summary.
@@ -19,7 +19,7 @@
    - [Phase 1: Multi-Stage Workflow & Macro Recording Engine](#phase-1-multi-stage-workflow--macro-recording-engine)
    - [Phase 2: Linux Desktop & System UI Automation](#phase-2-linux-desktop--system-ui-automation)
    - [Phase 3: Terminal Ecosystem & Wayland Rice Integration](#phase-3-terminal-ecosystem--wayland-rice-integration)
-   - [Phase 4: Production Hardening & Release](#phase-4-production-hardening--release)
+   - [Phase 4: Production Hardening & Multi-Distribution Linux Release](#phase-4-production-hardening--multi-distribution-linux-release)
    - [New Feature Backlog (Not Yet Scheduled)](#new-feature-backlog-not-yet-scheduled)
 5. [Risks, Dependencies & Open Questions](#5-risks-dependencies--open-questions)
 6. [Master Domain Benchmark: Detailed Prompts, Verification & Fix Harness](#6-master-domain-benchmark-detailed-prompts-verification--fix-harness)
@@ -154,16 +154,32 @@ Sentinel's codebase is composed of six deep subsystems:
 - **IP Address Discovery**: Instant extraction of local network interface IP (`ip -br addr`) and WAN public IP (`api.ipify.org`).
 - **Wi-Fi & Bluetooth**: Lists available wireless SSIDs via `nmcli`, scans Bluetooth devices via `bluetoothctl`, and toggles adapter power states.
 
-### 5. Developer & Rice Automation
-- **Git Workflows**: Native repository status, branch listings, log history, and staged diff summaries.
-- **Linux Rice & Dotfiles (`DotfileManager.ts`, `DotfileSyncEngine.ts`)**:
-  - Inspects and modifies configuration files for Hyprland (`hyprland.conf`), Waybar, Kitty, Alacritty, Tmux, Rofi, and Neovim.
-  - Toggles autostart applications in Hyprland (`exec-once`).
-- **Systemd Daemon Control**: Queries status, starts, stops, restarts, enables, and disables systemd services for both system and `--user` scopes.
-- **Demonstration & Continuous Learning (`DemonstrationLearningEngine.ts`, `EpisodicMemoryEngine.ts`)**:
-  - `/learn <trigger> -> <command>` records custom workflows into `~/.sentinel/learned_patterns.json`.
-  - Automatically records human demonstrations when the AI fails and the user demonstrates the correct command.
-  - Episodic memory retrieves similar past successful actions and injects them as dynamic few-shots into new prompts.
+### 6. Deep System Knowledge Scanner & Persistent Profile (`SystemKnowledgeScanner.ts`)
+- **8-Domain Host Audit**: Runs on startup to collect desktop applications (`.desktop`), developer toolchains (`node`, `python`, `rustc`, `docker`), physical hardware (GPU, CPU cores, RAM, battery), storage layout and snapshots (`btrfs`, `zfs`, `snapper`), user shells and dotfiles, network interfaces, and desktop session type (`Wayland` vs `X11`).
+- **Persistence & Caching**: Cached to `~/.sentinel/knowledge/system_profile.json` and mirrored in memory for zero-latency lookup.
+- **Dynamic Context Injection**: Enriches the LLM system prompt via `SystemPrompt.ts` with real-time system context.
+
+### 7. 8-Category Dangerous Command Guardian & Technical Consequence Explainer (`CommandSafetyGuardian.ts`)
+- **Catastrophic Threat Vectors**: Identifies and permanently blocks 8 critical destruction patterns (root deletion, block device zeroing, partition formatting, permission lockouts, fork bombs, UEFI wipes, glibc removal, and obfuscated base64 pipes).
+- **Capability Refusal Assertion**: Formally states: *"Sentinel does not have the capability to execute '[command]'."*
+- **Technical Consequence Analysis**: Breaks down the exact kernel panic, inode loss, or firmware damage, and provides safe alternatives.
+- **Dual Interception**: Intercepts terminal keystrokes before reaching PTY (`TerminalView.tsx`) and AI tool invocations before execution (`ToolExecutor.ts`).
+- **Strict No-Emoji Terminal Banner**: Formats refusal banners using clean box-drawing characters and monospace tokens (`[!]`, `[i]`, `[+]`, `[#]`).
+
+### 8. Multi-Model Management, Hardware Recommendations & Cloud API Keys (`ModelRecommendationEngine.ts`, `CloudApiProvider.ts`)
+- **Hardware-Adaptive Tiers**: Recommends optimal local model tiers based on host specs: Budget (<6GB), Balanced (6-12GB), Performance (12-24GB), and Workstation (>24GB).
+- **Cloud API Key Providers**: Provides zero-local-footprint inference for OpenAI, Anthropic, Groq, DeepSeek, OpenRouter, and Custom Endpoints.
+- **Interactive Connection Probe**: Sends real-time 1-token test probes to confirm API key validity and network connectivity before activation.
+
+### 9. Intelligent Natural Language Directory Navigation (`DirectoryNavigationEngine.ts`)
+- **Fuzzy Typo Correction**: Uses Levenshtein distance to detect folder name typos in natural language navigation queries and prompts with interactive disambiguation.
+- **Missing Directory Creation**: Prompts to create absent directories and executes `mkdir -p` followed by automatic PTY navigation upon confirmation.
+
+### 10. Streamlined UI & Strict Zero-Emoji Policy
+- **Onboarding Experience**: Faithful wireframe terminal skeletons for Zen Mode and Visual Mode in `InstallerWizard.tsx`.
+- **Zen Mode Keybind Guidance**: Floating callout (`ZenModeHelpCallout.tsx`) highlighting `[F1 help]` and `Ctrl+Shift+Z`.
+- **Conversational Ports & Projects**: Eliminated separate floating drawers in favor of natural language queries (`> show open ports`, `> cd to <project>`).
+- **Zero-Emoji Architecture**: Total prohibition of consumer emojis across all UI surfaces, status badges, and CLI banners (`docs/ui.md`).
 
 ---
 
@@ -418,16 +434,43 @@ Each phase below includes an effort estimate, exit criteria tied back to Section
 
 ---
 
-### Phase 4: Production Hardening & Release
-*(Release Milestone)*
+### Phase 4: Production Hardening & Multi-Distribution Linux Release
+*(Release Milestone — Universal Linux Distribution Support)*
 
 **Goal:**
-- Offline packaging for Arch Linux (AUR `PKGBUILD`).
-- Performance optimization on low-power Intel/AMD CPUs.
+Transform Sentinel from a local development environment into a battle-tested, production-ready distribution package that installs and operates seamlessly across all major Linux distributions (Ubuntu, Debian, Fedora, Arch Linux, openSUSE, Linux Mint) under both Wayland and X11, maintaining cold-boot readiness under 1.5 seconds.
+
+#### Key Deliverables:
+
+1. **Multi-Distribution Packaging & Bundling (Tauri v2)**:
+   - **Universal AppImage**: Self-contained, portable single-binary bundle with runtime assets; executes immediately on any modern Linux distribution without installation or library mismatches.
+   - **Debian / Ubuntu Native Package (`.deb`)**: Native package targeting Ubuntu 22.04/24.04 LTS, Debian 11/12, and Linux Mint with exact system library dependencies (`libwebkit2gtk-4.1-0`, `libappindicator3-1`, `openssl`).
+   - **Fedora / Enterprise Linux Native Package (`.rpm`)**: Native RPM package targeting Fedora 38–41, RHEL 9+, CentOS Stream, and openSUSE (`webkit2gtk4.1`, `openssl`).
+   - **Arch Linux AUR Package (`PKGBUILD`)**: Clean binary (`sentinel-terminal-bin`) and source recipes with desktop database and mime updates.
+   - **Modernized Linux Build Scripts**: Purge legacy macOS scripts in `package.json` (`build:app`) and introduce dedicated distribution bundling targets: `npm run bundle:linux`, `npm run bundle:deb`, `npm run bundle:rpm`, `npm run bundle:appimage`.
+   - **Desktop Environment Integration**: Validated XDG-compliant `.desktop` specification, mime associations, and multi-resolution icons (32x32, 128x128, 512x512, scalable SVG) for GNOME App Grid, KDE Kickoff, Rofi, and Waybar.
+
+2. **Cross-Distro System Capability Hardening**:
+   - **Multi-Package-Manager Parity**: Ensure `ApplicationCapability.ts` and system inspection utilities dynamically detect and dispatch commands across `apt-get` (Debian/Ubuntu/Mint), `dnf` (Fedora/RHEL), `pacman` (Arch/Manjaro), and `zypper` (openSUSE).
+   - **Display Server & Desktop Agnostic Stability**: Guarantee robust WebGL canvas rendering, DPI scaling, and font metric handling across GNOME Wayland/X11, KDE Plasma Wayland/X11, wlroots (Sway/Hyprland), and XFCE/Cinnamon.
+   - **Init System & Container/WSL Fallback**: Gracefully handle systemd service management queries while providing fallback telemetry when running inside containerized, chroot, or WSL2 environments where PID 1 is not systemd.
+
+3. **Performance Optimization & Latency Hardening**:
+   - **Cold-Boot Budget (< 1.5s)**: Profile and streamline frontend bundle loading and Rust PTY initialization to ensure an interactive shell prompt is ready in under 1.5 seconds on modest hardware.
+   - **Asynchronous AI Engine Warm-Up**: Ensure embedded `llama-server` boots in the background without blocking the UI rendering thread or delaying initial terminal availability.
+   - **Idle Footprint Optimization**: Audit memory and CPU utilization to maintain an idle memory footprint under 150MB RAM (GUI + Rust backend) when the AI engine is idle.
+
+4. **Production Quality Gate & Multi-Distro Smoke Testing**:
+   - **Triple-Pass CI Quality Gate**: Automated, zero-error execution of `npx vitest run` (100% test pass across all suites), `cargo check` / `cargo clippy`, and `npm run build`.
+   - **Headless Container Smoke Matrix**: Docker-based verification across clean environments (Ubuntu 24.04, Fedora 40, Debian 12, Arch Linux) testing binary execution, shared library resolution, and PTY allocation.
 
 **Effort estimate:** M (~2–3 weeks).
 
-**Exit criteria:** Cold-boot < 1.5s on low-power hardware, plus clean `npx vitest run` / `cargo check` / `npm run build` triple-pass on a fresh Arch install.
+**Exit criteria:**
+- Successful artifact generation for `.AppImage`, `.deb`, `.rpm`, and Arch `PKGBUILD`.
+- Cold-boot to interactive PTY prompt in < 1.5s on standard hardware.
+- Clean `npx vitest run` (100% passing) and `npm run build` + `cargo check` passes with zero errors or unhandled warnings.
+- Verified successful installation and clean startup across Ubuntu/Debian, Fedora, and Arch Linux target environments.
 
 ---
 
@@ -1029,7 +1072,7 @@ This suite contains **450 domain-classified prompts** (50 prompts across each of
 ├─────────────────┼───────────────────────────────────────────────────────────────┤
 │ Phase 3         │ Terminal Ecosystem & Rice Integration (1–2 wks, parallel)     │
 ├─────────────────┼───────────────────────────────────────────────────────────────┤
-│ Phase 4         │ Production Hardening & Release (2–3 wks)                      │
+│ Phase 4         │ Production Hardening & Multi-Distro Release (2–3 wks)         │
 └─────────────────┴───────────────────────────────────────────────────────────────┘
 ```
 

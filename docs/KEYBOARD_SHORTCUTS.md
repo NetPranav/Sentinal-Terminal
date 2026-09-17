@@ -9,12 +9,12 @@ Sentinel is engineered for rapid keyboard-first navigation and efficient control
 | Action | Linux / Windows Shortcut | macOS Shortcut | Description |
 | :--- | :--- | :--- | :--- |
 | **Open Command Palette** | `Ctrl + Shift + P` | `Cmd + Shift + P` | Launches the interactive prompt and capability search palette. |
-| **Inspect Listening Ports** | `Ctrl + Alt + P` | `Ctrl + Option + P` | Opens the Ports & Process Inspector drawer to monitor and kill listening processes. |
-| **Workspace & Project Switcher**| `Ctrl + O` | `Cmd + O` | Scans and switches between Git, Rust, Node, and ROS2 workspaces. |
+| **AI Settings & Model Manager** | `Ctrl + ,` | `Cmd + ,` | Opens AI Settings modal (Local Model Tiers & Cloud API Keys). |
 | **Fuzzy History Search** | `Ctrl + R` | `Ctrl + R` | Interactive fuzzy search across past command history with instant paste-to-terminal. |
 | **Terminal Find / Search** | `Ctrl + F` | `Cmd + F` | Opens floating terminal search bar overlay with match counters. |
 | **Toggle Zen / Visual Mode** | `Ctrl + Shift + Z` | `Cmd + Shift + Z` | Switches between distraction-free Zen mode and full Visual Mode with quick buttons. |
 | **Keyboard Shortcuts & Help** | `F1` or `Ctrl + ?` | `F1` or `Cmd + ?` | Opens the interactive Keyboard Shortcuts & Help modal overlay. |
+| **Inspect Ports / Switch Dirs** | `>` prompt in terminal | `>` prompt in terminal | Ask AI directly: `> show open ports` or `> cd to <project>`. |
 
 ---
 

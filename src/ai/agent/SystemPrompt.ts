@@ -8,6 +8,7 @@
 import { ToolRegistryState } from '../../tools/loader/ToolLoader';
 import { DynamicToolPruner } from './DynamicToolPruner';
 import { EpisodicMemoryEngine } from '../../domain/learning/EpisodicMemoryEngine';
+import { SystemKnowledgeScanner } from '../../domain/knowledge/SystemKnowledgeScanner';
 
 export interface ToolSpec {
   id: string;
@@ -280,8 +281,8 @@ User: system info
 User: check git status and branches
 {"action": "execute", "command": "git status --short && git branch -v", "explanation": "Inspect working tree status and active git branches"}
 
-User: open zen browser and /home/overxpowered/padhai_in_linux/Projects/ folder in vscode in 5th workspace
-{"action": "execute", "command": "(hyprctl dispatch workspace 5 >/dev/null 2>&1 || true) && zen-browser & code /home/overxpowered/padhai_in_linux/Projects/ &", "explanation": "Switch to workspace 5 and launch Zen Browser and open Projects folder in VS Code"}
+User: open zen browser and my project folder in code
+{"action": "execute", "command": "zen-browser & code . &", "explanation": "Launch Zen Browser and open current directory in VS Code"}
 
 User: what can you do
 {"action": "done", "summary": "I am Sentinel AI, your autonomous terminal copilot. I can inspect listening ports, monitor CPU/memory, search files, automate git workflows, and run terminal commands."}`;
@@ -339,6 +340,15 @@ When done / answering a conversational greeting or purely conceptual question:
 {"action": "done", "summary": "<your clear, helpful answer>"}
 
 ${examples}`;
+
+  try {
+    const sysProfileSummary = SystemKnowledgeScanner.getInstance().getQuickSummary();
+    if (sysProfileSummary) {
+      prompt += '\n\n' + sysProfileSummary;
+    }
+  } catch {
+    // Non-blocking
+  }
 
   if (goal) {
     try {

@@ -11,6 +11,9 @@ Sentinel is an autonomous, AI-native terminal engineered for modern developers, 
   - `> take me to my rust project` ➔ Resolves directory and automatically navigates.
   - `> find all docker volumes created this week` ➔ Scans and formats volume listings.
   - `> write a python script in /tmp/netmon.py that monitors network speeds, then test run it` ➔ Executes multi-step generation, permission setting, and execution.
+- **Deep System Knowledge Scanner**: Automatically scans 8 Linux system dimensions on startup (desktop apps, developer runtimes, GPU/CPU/RAM specs, filesystem mounts/snapshots, dotfiles, network topology, system services, and desktop session) and persistently caches it to `~/.sentinel/knowledge/system_profile.json` to accelerate prompt reasoning.
+- **Fuzzy Directory Navigation Engine**: Seamless directory switching via `> cd <name>` or `> switch pwd to <folder>`. Detects typos with fuzzy matching and offers interactive disambiguation or automatic directory creation if the folder does not exist.
+- **Multi-Model Architecture & Hardware Tiers**: Automatically recommends optimal local model tiers (`Budget <6GB`, `Balanced 6-12GB`, `Performance 12-24GB`, `Workstation >24GB`) and provides instant Cloud API Key integration for OpenAI, Anthropic, Groq, DeepSeek, OpenRouter, and custom endpoints with zero local memory overhead.
 - **Real-Time Prompt Progress Bar**: The bottom status bar features a live progress indicator displaying completion percentage (e.g. `45%`), active stage label (`Thinking...`, `Planning...`, `Running: ...`, `Verifying...`), remaining time countdown (`~1.8s`), and a sleek 36px micro-progress track.
 - **In-Loop Auto-Heal**: When commands fail, Sentinel analyzes `stderr` and offers instant remediation pills. Press `Tab` or type `>fix` / `>heal` to automatically diagnose and recover (e.g., terminating conflicting processes on occupied ports).
 - **Session Undo Log & Rollback**: Ask `>what did you just do` to inspect the action log, or `>undo last step` to roll back destructive filesystem or git operations.
@@ -46,17 +49,13 @@ Sentinel is an autonomous, AI-native terminal engineered for modern developers, 
 
 ---
 
-## 4. Developer Productivity Overlays
+## 4. Streamlined Developer Productivity & Overlays
 
 - **Global Command Palette (`Ctrl+Shift+P` / `Cmd+Shift+P`)**: Fast, unified launcher to search tools, trigger capabilities, and execute workflows without leaving the keyboard.
-- **Listening Ports & Process Inspector (`Ctrl+Alt+P`)**:
-  - Real-time display of all listening TCP/UDP ports, bound addresses, process names, and PIDs.
-  - One-click process termination and port freeing.
+- **Conversational Port & Workspace Management**:
+  - Dedicated drawer modals for ports and workspace switching have been replaced by native conversational requests in the terminal (e.g. `> show listening ports`, `> kill process on port 3000`, `> switch to sentinal`), eliminating redundant UI chrome and cognitive clutter.
 - **Fuzzy Command History Search (`Ctrl+R`)**:
   - Intercepts raw shell reverse-search to provide an interactive, visual fuzzy search modal across entire command histories.
-- **Workspace & Project Switcher (`Ctrl+O`)**:
-  - Automatically scans active directories for Git repositories, Node.js packages, Rust crates, Python environments, and ROS2 workspaces.
-  - Instant one-click folder navigation with repository branch status badges.
 - **Terminal Search Bar Overlay (`Ctrl+F`)**:
   - Floating search bar with real-time match counter (`3 of 12`), previous/next navigation, and shortcut toggles for **Case Sensitivity (`Alt+C`)**, **Whole Word (`Alt+W`)**, and **Regex Mode (`Alt+R`)**.
 
@@ -68,6 +67,7 @@ Sentinel is an autonomous, AI-native terminal engineered for modern developers, 
   - Elimination of oversaturated neon glows and distracting colors in favor of high-contrast monochrome elegance.
   - Deep obsidian backgrounds (`#0A0A0C`), subtle hairline borders (`rgba(255, 255, 255, 0.08)`), and crisp white typographic hierarchy.
   - Cross-referenced in detail in [`docs/ui.md`](file:///docs/ui.md).
+- **Strict No-Emoji Policy**: Zero consumer emojis across DOM components, toasts, and CLI terminal buffers. Replaced with precision monospace glyphs (`[!]`, `[i]`, `[+]`, `[#]`, `•`, `✓`, `✕`).
 - **Zen Mode vs. Visual Mode (`Ctrl+Shift+Z`)**:
   - **Zen Mode**: Distraction-free terminal view hiding auxiliary badges and buttons.
   - **Visual Mode**: Displays graphical buttons in the status bar for Projects, Ports, and Workflows.
@@ -75,9 +75,13 @@ Sentinel is an autonomous, AI-native terminal engineered for modern developers, 
 
 ---
 
-## 6. Zero-Trust Security & Safe Execution Sandboxing
+## 6. Zero-Trust Security & 8-Category Command Safety Guardian
 
-- **Categorical Policy Engine**: Classifies operations into `SAFE`, `CONFIRMATION_REQUIRED`, `ADMIN_REQUIRED`, and `BLOCKED` categories.
-- **Non-Blocking Consent Queue**: Displays clear, interactive security modals for destructive commands before execution can proceed.
-- **AST Shell Verification (`ShellAstParser.ts`)**: Parses all generated shell commands through an abstract syntax tree validator to block obfuscated attacks (`eval`, `base64 -d | bash`).
+- **8-Category Command Safety Guardian (`CommandSafetyGuardian.ts`)**: Permanently refuses catastrophic system commands (root deletion, raw disk zeroing, partition formatting, permission lockouts, fork bombs, UEFI wipes, glibc removal, and obfuscated base64 pipes).
+- **Explicit Capability Refusal**: Outputs an ANSI refusal banner asserting:
+  `"Sentinel does not have the capability to execute '[command]'."`
+  along with comprehensive consequence explanations and safe alternative suggestions.
+- **Dual-Layer Interception**: Blocks commands at both the terminal keyboard level before reaching the PTY buffer and at the AI agent loop level before invoking tools.
+- **Categorical Policy Engine**: Classifies operations into `SAFE`, `CONFIRMATION_REQUIRED`, `ADMIN_REQUIRED`, and `PERMANENTLY_REFUSED`.
+- **Non-Blocking Consent Queue**: Displays clear, interactive security modals for sensitive operations.
 - **Secret Redaction**: Automatically sanitizes API tokens, SSH keys, and passwords before persisting logs or displaying output.

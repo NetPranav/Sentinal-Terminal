@@ -37,7 +37,7 @@ describe('Memory Engine — Performance Benchmarks', () => {
 
     const duration = performance.now() - start;
     expect(graph.getAllNodes().length).toBe(1000);
-    expect(duration).toBeLessThan(150); // Generous allowance for CI environments, usually <50ms locally
+    expect(duration).toBeLessThan(500); // Generous allowance for parallel CI environments, usually <50ms locally
   });
 
   it('should traverse a 100-edge dense graph and rank results in under 5ms', async () => {

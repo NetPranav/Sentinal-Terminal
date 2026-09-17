@@ -201,7 +201,7 @@ export class FilesystemSDKCapability extends BaseCapabilityDriver<FsDriverInput,
             stdout = `Directory Contents (${targetPath}):\r\n  (Directory is completely empty on disk — 0 folders, 0 files)`;
           } else {
             stdout = `Directory Contents (${targetPath}):\r\n` +
-              entries.map(e => `  ${e.isDirectory ? '📁' : '📄'} ${e.name}`).join('\r\n');
+              entries.map(e => `  ${e.isDirectory ? '[DIR]' : '[FILE]'} ${e.name}`).join('\r\n');
           }
           return { success: true, data: { entries, stdout }, commandExecuted: `fs.readDir("${resolvedPath}")` };
         }

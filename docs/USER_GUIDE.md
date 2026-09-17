@@ -82,8 +82,8 @@ Click **Workflows** in the status bar (in Visual Mode) to inspect saved workflow
 ## 5. Developer Modals & Quick Launchers
 
 - **Command Palette (`Ctrl+Shift+P` / `Cmd+Shift+P`)**: Search capabilities, run tools, or jump to settings without touching the mouse.
-- **Listening Ports & Process Inspector (`Ctrl+Alt+P`)**: View all active listening TCP/UDP ports, bound addresses, and process IDs. Terminate stuck servers with 1 click.
-- **Workspace Switcher (`Ctrl+O`)**: Instantly index and jump between Git repositories, Rust crates, Node.js packages, and ROS2 workspaces.
+- **Conversational Port & Project Management**:
+  - Ask Sentinel directly in the terminal to inspect ports or change projects: `> what ports are open`, `> free port 3000`, or `> cd to sentinal`.
 - **Fuzzy History Search (`Ctrl+R`)**: Search your entire bash/zsh command history with interactive fuzzy matching and instant execution.
 - **Terminal Search Overlay (`Ctrl+F`)**: Search terminal scrollback buffers with **Case Sensitive (`Alt+C`)**, **Whole Word (`Alt+W`)**, and **Regex (`Alt+R`)** toggles.
 - **Keyboard Shortcuts & Help (`F1`)**: View the complete reference of keybindings and application controls.
@@ -97,3 +97,40 @@ Click **Workflows** in the status bar (in Visual Mode) to inspect saved workflow
 - **Zen Mode vs. Visual Mode (`Ctrl+Shift+Z`)**:
   - **Zen Mode**: Hides all status bar buttons and auxiliary badges for distraction-free coding.
   - **Visual Mode**: Displays quick action buttons for Projects, Ports, and Workflows.
+  - On first completing onboarding in Zen Mode, a temporary callout guides you on how to access controls via `Ctrl+Shift+Z` and highlights `[F1 help]`.
+
+---
+
+## 7. Dangerous Command Guardian & Consequence Explanations
+
+Sentinel protects your workstation from catastrophic and irreversible command accidents:
+- **Automatic Interception**: If a dangerous command (such as `rm -rf /`, zeroing a drive `dd of=/dev/sda`, formatting partitions `mkfs.ext4`, locking permissions `chmod 000 /`, or running a fork bomb) is entered, Sentinel intercepts execution before it reaches the shell.
+- **Capability Refusal**: Sentinel informs you that it does not have the capability to run destructive operations:
+  ```text
+  ✕ Capability Statement: Sentinel does not have the capability to execute '[command]'.
+  ```
+- **Consequence Breakdown**: Sentinel explains in detail what kernel panics, data wipeouts, or filesystem ruins would occur, and suggests safe alternatives (such as `ncdu /` or package manager cache cleaning).
+- **Strict No-Emoji Styling**: All security banners use clean, developer-focused ASCII/Unicode monospace glyphs (`[!]`, `[i]`, `[+]`, `[#]`) matching the matte grayscale interface.
+
+---
+
+## 8. Multi-Model Architecture & Cloud API Keys
+
+In the AI Settings modal (press `Ctrl+,` or click `AI: Ready` in the status bar):
+- **Local Engine & Hardware Tiers**: Sentinel detects your physical CPU cores, RAM, and GPU to categorize your hardware into a tier (`Budget`, `Balanced`, `Performance`, or `Workstation`) and highlights recommended local models with an `Optimal` badge.
+- **Cloud API Keys (Zero Local Footprint)**: If you prefer not to run a local model or have a low-spec machine, switch to the "Cloud API Keys & External Providers" tab. You can configure:
+  - OpenAI (`gpt-4o`, `gpt-4o-mini`)
+  - Anthropic (`claude-3-5-sonnet`)
+  - Groq (`llama-3.3-70b-versatile`)
+  - DeepSeek (`deepseek-chat`)
+  - OpenRouter or Custom OpenAI-Compatible endpoints
+- **Live Connection Testing**: Click "Test Connection" next to any API key to send an instant 1-token probe and verify connectivity before activating the provider.
+
+---
+
+## 9. Intelligent Natural Language Directory Navigation
+
+You do not need to memorize exact directory paths:
+- Simply type `> cd <name>` or `> switch pwd to <folder>`.
+- **Fuzzy Match Correction**: If you make a typo (e.g. `> cd sentinl`), Sentinel detects candidate matches using Levenshtein distance and offers an interactive disambiguation menu.
+- **Automatic Directory Creation**: If the target folder does not exist, Sentinel asks if you would like it to create the directory, then creates and navigates to it upon confirmation.

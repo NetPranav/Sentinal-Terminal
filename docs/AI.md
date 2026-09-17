@@ -67,12 +67,57 @@ When target files, robotics nodes, or build targets are not in the current direc
 ### C. In-Loop Self-Healing & Failure Classification
 When an automated command fails:
 - **Failure Classification**: `FailureClassifier.ts` analyzes `stderr`, exit codes, and output patterns to distinguish between missing binaries, incorrect flags, environment misconfigurations, and physical device disconnections.
-- **Automated Sub-Phases**: Sentinel injects dynamic remediation steps (e.g. `Phase 2.1: Terminate process on port 3000`) and automatically retries.
-- **Physical Action Confirmation**: If human intervention is required (e.g., plugging in a USB drive or powering on hardware), Sentinel enters `AwaitingPhysicalConfirmation`, prompts the user, and resumes upon confirmation.
+### D. Fuzzy Directory Navigation & Automatic Creation Engine (`DirectoryNavigationEngine.ts`)
+When the user prompts to switch directories (e.g. `> switch pwd to backend` or `> cd to my project`):
+- **Deep Workspace Indexing**: Scans user projects and directories up to 3 levels deep across `~`, `~/Projects`, `~/workspace`, and custom roots.
+- **Exact & Substring Matching**: Immediately resolves matches if an exact or unique partial folder name is found.
+- **Fuzzy "Did You Mean" Correction**: If the requested folder name contains a typo or spelling error (e.g. `sentinl` instead of `sentinal`), uses Levenshtein distance to detect candidates and prompts the user with an interactive disambiguation menu.
+- **Automatic Creation Confirmation**: If the target folder does not exist on disk, Sentinel detects the absence, asks the user if they would like Sentinel to create the folder, and upon confirmation executes `mkdir -p` and automatically navigates the PTY.
 
 ---
 
-## 4. Continuous Learning & Memory Engines
+## 4. Deep System Knowledge Scanner & Persistent Profile
+
+### A. Non-Blocking 8-Domain Environmental Audit (`SystemKnowledgeScanner.ts`)
+On startup, Sentinel executes an asynchronous background audit to build a comprehensive, structured snapshot of the host operating system:
+1. **Desktop Applications**: Parses `.desktop` files from `/usr/share/applications`, `~/.local/share/applications`, Flatpak, and Snap to index installed GUI applications and binary launch triggers.
+2. **Developer Toolchains**: Detects installed compilers and runtimes (`node`, `python3`, `rustc`/`cargo`, `gcc`, `go`, `docker`, `podman`).
+3. **Hardware Acceleration & Compute**: Discovers GPU model (NVIDIA CUDA VRAM, AMD ROCm), physical CPU cores, total/available RAM, and power state.
+4. **Storage & Snapshot Layout**: Maps mounted filesystems (`btrfs`, `ext4`, `zfs`), available disk capacity, and detects snapshot tools (`snapper`, `timeshift`).
+5. **Shells & User Dotfiles**: Identifies `/etc/shells`, active dotfiles (`~/.bashrc`, `~/.zshrc`, `~/.config/fish/config.fish`, `~/.config/hypr/hyprland.conf`), and Starship prompts.
+6. **Network Topology**: Audits default routes, active network interfaces, Wi-Fi SSID, and active VPNs (`Tailscale`, `WireGuard`).
+7. **System Services & Ports**: Audits init system (`systemd`), active developer daemons (`postgresql`, `redis`, `docker`), and listening TCP ports.
+8. **Desktop Session & Audio**: Identifies display server (`Wayland` vs `X11`), compositor (`Hyprland`, `KDE`, `GNOME`), and audio subsystem (`PipeWire` vs `PulseAudio`).
+
+### B. Persistent Profile Caching & Prompt Injection
+- **Persistence**: Saved to `~/.sentinel/knowledge/system_profile.json` and mirrored in `localStorage`.
+- **System Prompt Enrichment (`SystemPrompt.ts`)**: Injects a compact, token-optimized summary into the AI context window, allowing Sentinel to answer queries like *"open my browser"*, *"how much disk space is free"*, or *"what ports are open"* without running exploratory shell commands.
+
+---
+
+## 5. Multi-Model Architecture & Hardware Tier Recommendations
+
+### A. Hardware-Adaptive Model Recommendations (`ModelRecommendationEngine.ts`)
+Sentinel inspects physical CPU cores, RAM, and GPU VRAM to categorize the host machine into one of four hardware tiers and suggest the ideal local model:
+- **Budget Tier (< 6 GB RAM)**: Recommends ultra-lightweight models (e.g. `Qwen 2.5 Coder 1.5B (Q4_K_M)` requiring ~1.2 GB RAM) or Cloud API providers to prevent host memory exhaustion.
+- **Balanced Tier (6 GB - 12 GB RAM)**: Recommends `Qwen 2.5 Coder 3B Instruct (Q4_K_M)` (~2.5 GB RAM) as the optimal sweet spot for local reasoning, tool orchestration, and responsiveness.
+- **Performance Tier (12 GB - 24 GB RAM)**: Recommends `Qwen 2.5 Coder 7B Instruct` or `DeepSeek Coder 6.7B` for advanced multi-file synthesis and complex bash scripting.
+- **Workstation Tier (> 24 GB RAM / High VRAM)**: Recommends `Qwen 2.5 Coder 14B` or `DeepSeek Coder V2 Lite` for heavy autonomous software engineering.
+
+### B. Cloud API Providers & Zero Local Footprint (`CloudApiProvider.ts`)
+For developers who prefer zero local CPU/RAM overhead or who require frontier cloud intelligence:
+- **Supported Providers**:
+  - **OpenAI**: `gpt-4o`, `gpt-4o-mini`, `o3-mini`
+  - **Anthropic**: `claude-3-5-sonnet`, `claude-3-5-haiku`
+  - **Groq**: `llama-3.3-70b-versatile`, `qwen-2.5-coder-32b` (Ultra-low latency LPU inference)
+  - **DeepSeek**: `deepseek-chat`, `deepseek-coder`
+  - **OpenRouter**: Access to unified open-source and proprietary models
+  - **Custom OpenAI-Compatible**: Custom `baseUrl`, `modelId`, and `apiKey` (e.g., vLLM, LocalAI, enterprise gateways)
+- **Live Connection Verification**: Interactive "Test Connection" button sends a 1-token probe to confirm endpoint accessibility and key validity in real time before activating the provider.
+
+---
+
+## 6. Continuous Learning & Memory Engines
 
 ### A. Episodic Memory Engine (`EpisodicMemoryEngine.ts`)
 - Stores execution trajectories, intent embeddings, and user corrections in localized storage (`~/.sentinel/memory/`).
@@ -95,9 +140,10 @@ When an automated command fails:
 
 ---
 
-## 5. Security & Guardrails
+## 7. Security & 8-Category Command Safety Guardian
 
-- **Categorical Policy Engine**: Categorizes actions into `SAFE`, `CONFIRMATION_REQUIRED`, `ADMIN_REQUIRED`, and `BLOCKED` (replacing scalar risk scores).
-- **Asynchronous Consent Queue**: High-risk operations (e.g., `rm -rf`, disk formatting, service kills) are routed through a non-blocking UI confirmation modal before execution.
-- **AST Shell Validation**: All model-generated shell commands are parsed by `ShellAstParser.ts` prior to execution to catch hidden subshells, command injection, or obfuscated payloads (`eval`, `base64 -d | bash`).
-- **Secret Redaction**: Redacts API keys, tokens, and passwords prior to writing traces to disk or terminal logs.
+- **Command Safety Guardian (`CommandSafetyGuardian.ts`)**: Permanently blocks destructive operations across 8 threat vectors (root deletion, raw disk zeroing, partition wipes, permission lockouts, fork bombs, UEFI wipes, glibc removal, and obfuscated base64 pipes).
+- **Explicit Capability Refusal**: Asserts that Sentinel does not have the capability to execute dangerous commands, outputting an ANSI refusal banner with full consequence analysis and safe alternatives.
+- **Asynchronous Consent Queue**: Non-destructive sensitive operations require explicit user approval via a non-blocking modal.
+- **AST Shell Validation**: Model-generated commands are parsed by `ShellAstParser.ts` prior to execution.
+- **Secret Redaction**: Sanitizes API keys, tokens, and passwords prior to writing traces to disk or terminal buffers.

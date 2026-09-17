@@ -4,16 +4,66 @@ Allowing an autonomous AI agent to interact with your operating system requires 
 
 ---
 
-## 1. Categorical Policy Engine
+## 1. Categorical Policy Engine & Command Safety Guardian (`CommandSafetyGuardian.ts`)
 
-Sentinel evaluates all proposed tool actions against a categorical safety policy (replacing legacy scalar 0–100 risk scoring):
+Sentinel evaluates all proposed operations—both interactive terminal keystrokes and autonomous AI tool executions—against a categorical safety policy and a deep AST security engine:
 
 | Policy Tier | Behavior | Example Operations |
 | :--- | :--- | :--- |
 | **`SAFE`** | Executes immediately without interruption | Reading system diagnostics, listing files, checking network connections, inspecting ports |
 | **`CONFIRMATION_REQUIRED`** | Pauses execution and requires explicit interactive user confirmation | Modifying configuration files, creating directories, terminating user applications, running build scripts |
 | **`ADMIN_REQUIRED`** | Strictly requires user confirmation and root/sudo password authentication | Installing systemd daemons, modifying `/etc/`, altering network interfaces, kernel driver actions |
-| **`BLOCKED`** | Hard-blocked; cannot be executed under any circumstances | Obfuscated dynamic execution (`eval`, `base64 -d \| bash`), fork-bombs, direct drive wipes (`dd if=/dev/zero of=/dev/sd*`) |
+| **`PERMANENTLY_REFUSED`** | Hard-blocked at the keyboard and agent loop; Sentinel asserts lack of capability | Root deletion, block device zeroing, partition wipes, permission lockouts, fork bombs, UEFI wipes, glibc sabotage |
+
+### The 8 Catastrophic Threat Vectors
+
+1. **Root Filesystem & Core Hierarchy Destruction**:
+   - Matches: `rm -rf /`, `rm -rf /*`, `rm -rf --no-preserve-root /`, `rm -rf /boot`, `/etc`, `/usr`, `/lib`, `/bin`, `rm -rf ~`, `rm -rf $HOME`, `find / -delete`.
+2. **Raw Disk & Block Device Overwriting**:
+   - Matches: `dd if=/dev/zero of=/dev/sd*`, `dd if=/dev/urandom of=/dev/nvme*`, direct device redirection `> /dev/sda`, `cat /dev/zero > /dev/nvme0n1`.
+3. **Filesystem Formatting & Storage Wiping**:
+   - Matches: `mkfs.ext4 /dev/sd*`, `mkfs.btrfs -f /dev/nvme*`, `wipefs -a /dev/sd*`, `blkdiscard /dev/nvme*`.
+4. **Permission & Ownership Lockouts**:
+   - Matches: `chmod -R 000 /`, `chmod -R 777 /`, `chown -R nobody /`, `chmod -x /bin/chmod`, `chmod -x /lib/ld-linux*`.
+5. **Denial-of-Service, Fork Bombs & Kernel Panics**:
+   - Matches: `:(){ :|:& };:`, `while true; do bash & done`, `echo c > /proc/sysrq-trigger`, `echo b > /proc/sysrq-trigger`.
+6. **UEFI NVRAM & Firmware Ruin**:
+   - Matches: `rm -rf /sys/firmware/efi/efivars/*`, `rm -rf /boot/efi/*`, `efibootmgr -B`.
+7. **Critical Package & C Standard Library Sabotage**:
+   - Matches: `pacman -Rdd glibc`, `apt-get purge libc6`, `rpm -e --nodeps glibc`, `rm -f /lib64/ld-linux*.so*`.
+8. **Host Network Isolation & Obfuscated Pipelines**:
+   - Matches: `iptables -F && iptables -P INPUT DROP`, `ip link delete lo`, `curl ... | base64 -d | bash`, `echo <base64> | base64 -d | sh`.
+
+### Capability Refusal & Impact Analysis Architecture
+
+When a blocked command is detected:
+1. **Explicit Capability Limitation**: The terminal responds that Sentinel does not have the capability to execute the command:
+   ```text
+   ✕ Capability Statement: Sentinel does not have the capability to execute '[command]'.
+   ```
+2. **Consequence & Impact Analysis**: Sentinel explains the exact technical destruction that would occur if the command were executed (e.g. recursive inode deletion, loss of the C standard library, kernel panic, or irrecoverable UEFI NVRAM bricking).
+3. **Safe Alternative**: Sentinel suggests safe, non-destructive commands (e.g. `pacman -Sc`, `apt clean`, `ncdu /`).
+4. **Dual-Layer Interception**:
+   - **Terminal View Interception (`TerminalView.tsx`)**: Intercepts the Enter keypress before the command is written to the PTY. The pending buffer is cleared, and an ANSI refusal banner is output directly to the terminal without invoking the shell.
+   - **AI Agent Tool Interception (`ToolExecutor.ts`)**: Evaluates all commands proposed by the LLM or planner before execution. Destructive commands are blocked, returning the refusal and technical consequence back to the agent loop.
+5. **Strict No-Emoji Banner Styling**:
+   ```text
+   ┌──────────────────────────────────────────────────────────────────────────┐
+   │ [!] SENTINEL SECURITY GUARDIAN — ACTION PERMANENTLY REFUSED              │
+   └──────────────────────────────────────────────────────────────────────────┘
+   ✕ Capability Statement: Sentinel does not have the capability to execute 'rm -rf /'.
+     • Attempted Command : rm -rf /
+     • Threat Category   : ROOT_DESTRUCTION (Target: Root Filesystem (/))
+
+   [i] Consequence & Impact Analysis:
+     If executed, this command would recursively and permanently delete all files starting from the root directory (/), including the C standard library, shared drivers, running process binaries, and device nodes.
+     The Linux kernel would immediately panic, all running applications would crash, and the operating system would be rendered completely and permanently unbootable, necessitating a full drive reformat and OS reinstallation.
+
+   [+] Safe Alternative:
+     To safely clean disk space, remove cached packages with your package manager (e.g. pacman -Sc or apt clean), or inspect disk usage with: ncdu /
+
+   [#] Policy: Sentinel strictly refuses all commands that cause irreversible destruction of the host OS.
+   ```
 
 ---
 

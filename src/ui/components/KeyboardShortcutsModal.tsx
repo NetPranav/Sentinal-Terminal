@@ -90,10 +90,8 @@ export const KeyboardShortcutsModal: React.FC<KeyboardShortcutsModalProps> = ({
     { id: 'workflow_manager', name: 'Workflow & Macro Manager', description: 'Deterministic zero-token multi-stage workflows', category: 'ai', keys: [`${mod}+Shift+W`], icon: <Zap size={14} /> },
     { id: 'ai_settings', name: 'AI Security & Profiles', description: 'Manage local LLM models and security constraints', category: 'ai', keys: [`${mod}+,`], icon: <ShieldCheck size={14} /> },
 
-    // Workspace & Tools
-    { id: 'workspace_switcher', name: 'Workspace Switcher', description: 'Jump to project, workspace, ROS, or package directory', category: 'tools', keys: [`${mod}+O`], icon: <FolderGit2 size={14} /> },
-    { id: 'port_manager', name: 'Active Ports & Processes', description: 'Inspect and terminate listening ports', category: 'tools', keys: [`${mod}+Alt+P`], icon: <Radio size={14} /> },
-    { id: 'toggle_help', name: 'Keyboard Shortcuts & Help', description: 'Display this interactive cheat sheet', category: 'tools', keys: ['F1', `${mod}+?`], icon: <Sliders size={14} /> },
+    // General & Help
+    { id: 'toggle_help', name: 'Keyboard Shortcuts & Help', description: 'Display this interactive cheat sheet', category: 'tools', keys: ['F1', `${mod}+/`, `${mod}+?`], icon: <Sliders size={14} /> },
   ];
 
   const categories = [
@@ -101,7 +99,7 @@ export const KeyboardShortcutsModal: React.FC<KeyboardShortcutsModalProps> = ({
     { key: 'splits', label: 'Splits & Layouts' },
     { key: 'terminal', label: 'Terminal & Buffer' },
     { key: 'ai', label: 'AI & Automation' },
-    { key: 'tools', label: 'Workspace & Tools' },
+    { key: 'tools', label: 'General & Help' },
   ];
 
   const filtered = shortcuts.filter(s => {

@@ -322,4 +322,86 @@ describe('SentinelSerlCoordinator — End-to-End Orchestrator', () => {
       expect(coordinator['isStarted']).toBe(false);
     });
   });
+
+  describe('9. Replay Buffer for Nightly Training (Phase 0.75.10)', () => {
+    it('builds mixed batch with fresh pairs and historical replay', async () => {
+      // Add some pairs to DPO engine
+      await dpoEngine.addPair({
+        prompt: 'historical prompt 1',
+        chosen: 'git status',
+        rejected: 'echo no',
+      });
+      await dpoEngine.addPair({
+        prompt: 'historical prompt 2',
+        chosen: 'ls -la',
+        rejected: 'echo fail',
+      });
+
+      const freshPairs = [
+        {
+          id: 'fresh-1',
+          prompt: 'fresh prompt 1',
+          chosen: 'docker ps',
+          rejected: 'echo cant',
+          source: 'reflexion' as const,
+          timestamp: Date.now(),
+        },
+      ];
+
+      const batch = coordinator.buildReplayBatch(freshPairs);
+      expect(batch.length).toBeGreaterThanOrEqual(2);
+      expect(batch.some(p => p.prompt === 'fresh prompt 1')).toBe(true);
+      expect(batch.some(p => p.prompt.startsWith('historical prompt'))).toBe(true);
+
+      const jsonl = coordinator.exportReplayBatchAsJsonl(freshPairs);
+      expect(jsonl).toContain('fresh prompt 1');
+      expect(jsonl).toContain('docker ps');
+    });
+  });
+
+  describe('10. Automated Regression Gate (Phase 0.75.11)', () => {
+    it('passes regression gate when tool test cases are structurally valid', async () => {
+      const gateResult = await coordinator.runRegressionGate('/tmp/test_adapter.gguf', 0.80);
+      expect(gateResult.passed).toBe(true);
+      expect(gateResult.accuracy).toBeGreaterThanOrEqual(0.80);
+      expect(gateResult.totalCases).toBeGreaterThan(0);
+    });
+
+    it('blocks promotion and returns failure when gate fails', async () => {
+      // Run distillation with impossible threshold (1.01 = 101%)
+      const res = await coordinator.triggerDistillationAndHotReload({
+        dryRun: true,
+        regressionThreshold: 1.01,
+      });
+      expect(res.success).toBe(false);
+      expect(res.error).toContain('Regression gate failed');
+      expect(res.regressionGate).toBeDefined();
+      expect(res.regressionGate!.passed).toBe(false);
+    });
+  });
+
+  describe('11. Model Manifest & Rollback Integration (Phase 0.75.12)', () => {
+    it('integrates with ModelManifestManager and exposes manifest manager instance', () => {
+      const manifestMgr = coordinator.getManifestManager();
+      expect(manifestMgr).toBeDefined();
+      expect(manifestMgr.getActiveVersion('coder')).toBeDefined();
+      expect(manifestMgr.getActiveVersion('intent')).toBeDefined();
+    });
+
+    it('handles rollback gracefully when no older adapter version exists', async () => {
+      const res = await coordinator.handleModelRollback('intent');
+      expect(res.success).toBe(false);
+      expect(res.error).toContain('No previous intent adapter version available');
+    });
+
+    it('rolls back successfully to previous version when registered', async () => {
+      const manifestMgr = coordinator.getManifestManager();
+      manifestMgr.registerVersion('coder', '/tmp/c1.gguf', { version: 'sentinel-coder-v2.1.0', passedRegressionGate: true });
+      manifestMgr.registerVersion('coder', '/tmp/c2.gguf', { version: 'sentinel-coder-v2.2.0', passedRegressionGate: true });
+
+      const res = await coordinator.handleModelRollback('coder');
+      expect(res.success).toBe(true);
+      expect(res.rolledBackTo).toBe('sentinel-coder-v2.1.0');
+    });
+  });
 });

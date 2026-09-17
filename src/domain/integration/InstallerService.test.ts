@@ -18,31 +18,35 @@ vi.mock('@tauri-apps/plugin-fs', () => ({
   })
 }));
 
-describe('InstallerService', () => {
+vi.mock('@tauri-apps/api/core', () => ({
+  invoke: vi.fn(async () => ({ stdout: '/home/testuser' }))
+}));
+
+describe('InstallerService (Linux & Cross-Platform)', () => {
   const installer = InstallerService.getInstance();
-  const cliTarget = '/usr/local/bin/sentinel';
-  const servicesDir = '/Library/Services';
-  const vscodeSettings = '/Code/settings.json';
-  const cursorSettings = '/Cursor/settings.json';
+  const cliTarget = '/home/testuser/.local/bin/sentinel';
+  const servicesDir = '/home/testuser/.local/share/nautilus/scripts';
+  const vscodeSettings = '/home/testuser/.config/Code/User/settings.json';
+  const cursorSettings = '/home/testuser/.config/Cursor/User/settings.json';
 
   beforeEach(() => {
     for (const k in mockStore) delete mockStore[k];
   });
 
-  it('installs the sentinel command line executable to binary target directory', async () => {
+  it('installs the sentinel command line executable to Linux target directory', async () => {
     const res = await installer.installCli('#!/bin/bash\necho "test"', cliTarget);
     expect(res.success).toBe(true);
     expect(mockStore[cliTarget]).toContain('echo "test"');
   });
 
-  it('generates the Finder Quick Action Open in Sentinel workflow service', async () => {
+  it('generates Linux file manager Open in Sentinel script', async () => {
     const res = await installer.enableFinderIntegration(servicesDir);
     expect(res.success).toBe(true);
-    expect(mockStore[`${servicesDir}/Open in Sentinel.workflow/Contents/Info.plist`]).toBeDefined();
-    expect(mockStore[`${servicesDir}/Open in Sentinel.workflow/Contents/document.wflow`]).toContain('sentinel://open');
+    expect(mockStore[`${servicesDir}/Open in Sentinel Terminal`]).toBeDefined();
+    expect(mockStore[`${servicesDir}/Open in Sentinel Terminal`]).toContain('sentinel-terminal');
   });
 
-  it('injects Sentinel Terminal profile into VS Code settings.json cleanly', async () => {
+  it('injects Sentinel Terminal profile into VS Code settings.json cleanly for Linux', async () => {
     mockStore[vscodeSettings] = JSON.stringify({ "editor.fontSize": 14 });
 
     const res = await installer.configureVsCodeIntegration(vscodeSettings);
@@ -50,15 +54,16 @@ describe('InstallerService', () => {
 
     const saved = JSON.parse(mockStore[vscodeSettings]);
     expect(saved['editor.fontSize']).toBe(14);
-    expect(saved['terminal.integrated.profiles.osx']['Sentinel Terminal'].path).toContain('Sentinel Terminal.app');
+    expect(saved['terminal.integrated.profiles.linux']['Sentinel Terminal'].path).toBe('sentinel');
   });
 
-  it('injects Sentinel Terminal profile into Cursor IDE settings.json', async () => {
+  it('injects Sentinel Terminal profile into Cursor IDE settings.json for Linux', async () => {
     const res = await installer.configureCursorIntegration(cursorSettings);
     expect(res.success).toBe(true);
 
     const saved = JSON.parse(mockStore[cursorSettings]);
-    expect(saved['terminal.integrated.profiles.osx']['Sentinel Terminal']).toBeDefined();
+    expect(saved['terminal.integrated.profiles.linux']['Sentinel Terminal']).toBeDefined();
+    expect(saved['terminal.integrated.profiles.linux']['Sentinel Terminal'].path).toBe('sentinel');
   });
 
   it('accurately verifies status of all desktop integration components', async () => {
@@ -67,7 +72,7 @@ describe('InstallerService', () => {
 
     const status = await installer.checkStatus({
       cliPath: cliTarget,
-      servicesDir: `${servicesDir}/Open in Sentinel.workflow`,
+      servicesDir: `${servicesDir}/Open in Sentinel Terminal`,
       vscodePath: vscodeSettings,
       cursorPath: cursorSettings
     });

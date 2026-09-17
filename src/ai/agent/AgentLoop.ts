@@ -64,7 +64,8 @@ import { DeterministicReplayEngine } from '../../workflows/engine/DeterministicR
 import { MultistagePromptDecomposer } from '../../workflows/engine/MultistagePromptDecomposer';
 import { DiskWorkflowStorage } from '../../workflows/storage/DiskWorkflowStorage';
 import { SavedWorkflowDefinition } from '../../workflows/models/WorkflowTypes';
-export { AdaptivePlanEngine, ToolParameterValidator, DynamicToolPruner, DemonstrationLearningEngine, ErrorDiagnosticsEngine, ShadowPtySimulator, ShellAstParser, WorkflowRecorder, DeterministicReplayEngine, MultistagePromptDecomposer, DiskWorkflowStorage };
+import { DirectoryNavigationEngine } from './DirectoryNavigationEngine';
+export { AdaptivePlanEngine, ToolParameterValidator, DynamicToolPruner, DemonstrationLearningEngine, ErrorDiagnosticsEngine, ShadowPtySimulator, ShellAstParser, WorkflowRecorder, DeterministicReplayEngine, MultistagePromptDecomposer, DiskWorkflowStorage, DirectoryNavigationEngine };
 export type { AgentPlan, PlanPhase, PhaseStatus };
 
 interface LLMResponse {
@@ -1078,6 +1079,7 @@ export class AgentLoop {
   private authorizationHandler?: AgentAuthorizationHandler;
   private conversationHistory: { role: string; content: string }[] = [];
   private pendingClarification?: PendingClarification;
+  private pendingDirectoryAction?: { type: 'create_and_cd' | 'switch_to_candidate'; targetPath: string };
   private shadowSimulator: ShadowPtySimulator;
 
   private static readonly MAX_STEPS = 8;
@@ -1196,11 +1198,12 @@ export class AgentLoop {
 
   /** True while the next terminal entry should be treated as an answer for the agent. */
   public hasPendingQuestion(): boolean {
-    return this.pendingClarification !== undefined;
+    return this.pendingClarification !== undefined || this.pendingDirectoryAction !== undefined;
   }
 
   public cancelPendingQuestion(): void {
     this.pendingClarification = undefined;
+    this.pendingDirectoryAction = undefined;
   }
 
   private emit(event: AgentEvent): void {
@@ -1298,6 +1301,67 @@ export class AgentLoop {
     }
 
     const answer = goal.trim();
+
+    // Check if this was a response to a pending directory confirmation / typo question
+    if (this.pendingDirectoryAction && answer) {
+      const pending = this.pendingDirectoryAction;
+      this.pendingDirectoryAction = undefined;
+
+      if (/^(?:yes|y|sure|ok|create|create\s+it|confirm|proceed)$/i.test(answer)) {
+        if (pending.type === 'create_and_cd') {
+          const createCmd = `mkdir -p "${pending.targetPath}"`;
+          const toolRes = await this.toolExecutor.execute('shell.execute', {
+            command: createCmd,
+            explanation: `Create directory ${pending.targetPath}`
+          }, context.cwd);
+
+          this.emit({
+            type: 'tool_done',
+            message: `✓ Created directory and navigated to ${pending.targetPath}`
+          });
+          this.emit({
+            type: 'done',
+            message: `Navigated to ${pending.targetPath}`
+          });
+
+          return {
+            success: true,
+            summary: `Created and navigated to ${pending.targetPath}`,
+            steps: [{
+              tool: 'shell.execute',
+              params: { command: createCmd },
+              result: toolRes
+            }],
+            cdPath: pending.targetPath
+          };
+        } else if (pending.type === 'switch_to_candidate') {
+          this.emit({
+            type: 'tool_done',
+            message: `✓ Switched working directory to ${pending.targetPath}`
+          });
+          this.emit({
+            type: 'done',
+            message: `Navigated to ${pending.targetPath}`
+          });
+
+          return {
+            success: true,
+            summary: `Navigated to ${pending.targetPath}`,
+            steps: [{
+              tool: 'filesystem.cd',
+              params: { path: pending.targetPath },
+              result: { success: true, data: { path: pending.targetPath } }
+            }],
+            cdPath: pending.targetPath
+          };
+        }
+      } else if (/^(?:no|n|cancel|nevermind)$/i.test(answer)) {
+        const msg = "Directory navigation cancelled.";
+        this.emit({ type: 'done', message: msg });
+        return { success: true, summary: msg, steps: [] };
+      }
+    }
+
     if (this.pendingClarification && answer) {
       const pending = this.pendingClarification;
       this.pendingClarification = undefined;
@@ -1330,6 +1394,66 @@ export class AgentLoop {
       }
 
       goal = `${pending.goal}\nUser clarification: ${answer}`;
+    }
+
+    // Smart Directory Navigation & Fuzzy Matching ("Did you mean?", "Ask to create")
+    const navEngine = DirectoryNavigationEngine.getInstance();
+    const navResult = await navEngine.resolve(goal, context.cwd);
+    if (navResult.type !== 'none') {
+      if (navResult.type === 'exact' && navResult.cdPath) {
+        this.emit({
+          type: 'tool_done',
+          message: `✓ Switched working directory to ${navResult.cdPath}`
+        });
+        this.emit({
+          type: 'done',
+          message: `Navigated to ${navResult.cdPath}`
+        });
+        return {
+          success: true,
+          summary: `Navigated to ${navResult.cdPath}`,
+          steps: [{
+            tool: 'filesystem.cd',
+            params: { path: navResult.cdPath },
+            result: { success: true, data: { path: navResult.cdPath } }
+          }],
+          cdPath: navResult.cdPath
+        };
+      }
+
+      if (navResult.type === 'did_you_mean') {
+        this.pendingDirectoryAction = {
+          type: 'switch_to_candidate',
+          targetPath: navResult.cdPath!
+        };
+        this.emit({
+          type: 'question',
+          message: navResult.question!
+        });
+        return {
+          success: false,
+          summary: navResult.question!,
+          steps: [],
+          awaitingInput: true
+        };
+      }
+
+      if (navResult.type === 'not_found') {
+        this.pendingDirectoryAction = {
+          type: 'create_and_cd',
+          targetPath: navResult.cdPath!
+        };
+        this.emit({
+          type: 'question',
+          message: navResult.question!
+        });
+        return {
+          success: false,
+          summary: navResult.question!,
+          steps: [],
+          awaitingInput: true
+        };
+      }
     }
 
     // Conversational greetings & status fast paths (works instantly offline)
@@ -1404,7 +1528,7 @@ export class AgentLoop {
     if (learnedMatch.matched && learnedMatch.interpolatedCommand) {
       this.emit({
         type: 'thinking',
-        message: `💡 Using learned workflow: ${learnedMatch.interpolatedCommand}`
+        message: `:: Using learned workflow: ${learnedMatch.interpolatedCommand}`
       });
 
       const params = {
@@ -1445,7 +1569,7 @@ export class AgentLoop {
     } catch {
       isAIAvailable = false;
     }
-    if (!isAIAvailable && typeof process !== 'undefined' && process.env.NODE_ENV !== 'test') {
+    if (!isAIAvailable && typeof process !== 'undefined' && process.env.NODE_ENV !== 'test' && process.env.SENTINEL_BENCHMARK !== 'true') {
       try {
         const embeddedMgr = EmbeddedEngineManager.getInstance();
         if (await embeddedMgr.checkModelExists()) {
@@ -1469,7 +1593,7 @@ export class AgentLoop {
         if (tldrMatch && tldrMatch.confidence >= 0.88) {
           this.emit({
             type: 'thinking',
-            message: `⚡ Using Ground-Truth CLI Recipe (${Math.round(tldrMatch.confidence * 100)}% confidence): ${tldrMatch.example.description}`
+            message: `:: Using Ground-Truth CLI Recipe (${Math.round(tldrMatch.confidence * 100)}% confidence): ${tldrMatch.example.description}`
           });
 
           const params = {
@@ -1868,8 +1992,8 @@ export class AgentLoop {
 
       const guidanceMsg = 
         `Local AI model is not running yet.\n\n` +
-        `⚡ Option 1 (No Ollama needed): Type ">setup-ai" or open Command Palette (Cmd+Shift+P) > "Sentinel Embedded AI" to 1-click download Qwen 2.5 Coder 3B.\n` +
-        `🔌 Option 2 (External Ollama): Start Ollama in your terminal: 'ollama run qwen2.5-coder:3b'`;
+        `• Option 1 (No Ollama needed): Type ">setup-ai" or open Command Palette (Cmd+Shift+P) > "Sentinel Embedded AI" to 1-click download Qwen 2.5 Coder 3B.\n` +
+        `• Option 2 (External Ollama): Start Ollama in your terminal: 'ollama run qwen2.5-coder:3b'`;
 
       this.emit({ type: 'error', message: guidanceMsg });
       return {
@@ -2291,7 +2415,7 @@ export class AgentLoop {
             if (diagnosis.remediation?.params?.command) {
               this.emit({
                 type: 'thinking',
-                message: `⚡ Instant Deterministic Remediation: ${diagnosis.remediation.title} → \`${diagnosis.remediation.params.command}\``
+                message: `:: Instant Deterministic Remediation: ${diagnosis.remediation.title} → \`${diagnosis.remediation.params.command}\``
               });
             }
 
