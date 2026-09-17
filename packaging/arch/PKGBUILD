@@ -1,48 +1,48 @@
-# Maintainer: Sentinel Terminal Contributors <support@sentinel-terminal.org>
+# Maintainer: Sentinel Terminal Contributors
 pkgname=sentinel-terminal-bin
 pkgver=2.0.0
 pkgrel=1
 pkgdesc="Autonomous AI-Native Linux Terminal Copilot"
 arch=('x86_64')
-url="https://github.com/NetPranav/Sentinal-Terminal"
-license=('MIT')
+license=('Apache-2.0')
 depends=(
     'webkit2gtk-4.1'
     'gtk3'
     'openssl'
-    'libappindicator-gtk3'
+    'glib2'
+    'cairo'
+    'pango'
 )
 optdepends=(
-    'networkmanager: Wi-Fi network inspection and interface management'
-    'bluez: Bluetooth device discovery and connectivity'
-    'ollama: External AI reasoning model provider'
+    'vte3: Enhanced terminal capability support'
+    'curl: Network diagnostic features'
 )
 provides=('sentinel-terminal')
 conflicts=('sentinel-terminal')
+source=(
+    "sentinel-terminal"
+    "sentinel-terminal.desktop"
+    "icon.png"
+    "128x128.png"
+    "32x32.png"
+)
+sha256sums=(
+    'SKIP'
+    'SKIP'
+    'SKIP'
+    'SKIP'
+    'SKIP'
+)
 
 package() {
-    # Binary installation (tauri-app built from release profile)
-    if [ -f "${srcdir}/sentinel-terminal" ]; then
-        install -Dm755 "${srcdir}/sentinel-terminal" "${pkgdir}/usr/bin/sentinel-terminal"
-    else
-        install -Dm755 "${srcdir}/tauri-app" "${pkgdir}/usr/bin/sentinel-terminal"
-    fi
+    # Install binary
+    install -Dm755 "${srcdir}/sentinel-terminal" "${pkgdir}/usr/bin/sentinel-terminal"
 
-    # Desktop entry installation
-    install -Dm644 "${srcdir}/com.pranav.sentinel-terminal.desktop" \
-        "${pkgdir}/usr/share/applications/com.pranav.sentinel-terminal.desktop"
+    # Install desktop entry
+    install -Dm644 "${srcdir}/sentinel-terminal.desktop" "${pkgdir}/usr/share/applications/sentinel-terminal.desktop"
 
-    # Application icons installation
-    if [ -f "${srcdir}/icons/32x32.png" ]; then
-        install -Dm644 "${srcdir}/icons/32x32.png" \
-            "${pkgdir}/usr/share/icons/hicolor/32x32/apps/sentinel-terminal.png"
-    fi
-    if [ -f "${srcdir}/icons/128x128.png" ]; then
-        install -Dm644 "${srcdir}/icons/128x128.png" \
-            "${pkgdir}/usr/share/icons/hicolor/128x128/apps/sentinel-terminal.png"
-    fi
-    if [ -f "${srcdir}/icons/icon.png" ]; then
-        install -Dm644 "${srcdir}/icons/icon.png" \
-            "${pkgdir}/usr/share/icons/hicolor/512x512/apps/sentinel-terminal.png"
-    fi
+    # Install icons
+    install -Dm644 "${srcdir}/icon.png" "${pkgdir}/usr/share/icons/hicolor/512x512/apps/sentinel-terminal.png"
+    install -Dm644 "${srcdir}/128x128.png" "${pkgdir}/usr/share/icons/hicolor/128x128/apps/sentinel-terminal.png"
+    install -Dm644 "${srcdir}/32x32.png" "${pkgdir}/usr/share/icons/hicolor/32x32/apps/sentinel-terminal.png"
 }

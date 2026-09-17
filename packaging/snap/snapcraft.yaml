@@ -1,0 +1,52 @@
+name: sentinel-terminal
+base: core24
+version: '2.0.0'
+summary: Autonomous AI-Native Linux Terminal Copilot
+description: |
+  Sentinel Terminal is a high-performance AI-native Linux terminal emulator featuring
+  embedded llama-server orchestration, deterministic multi-stage workflow replay,
+  autonomous terminal actions with shadow PTY simulation, and native system diagnostics.
+
+grade: stable
+confinement: classic
+
+apps:
+  sentinel-terminal:
+    command: usr/bin/sentinel-terminal
+    desktop: usr/share/applications/sentinel-terminal.desktop
+    extensions: [gnome]
+    plugs:
+      - home
+      - network
+      - network-bind
+      - desktop
+      - desktop-legacy
+      - x11
+      - wayland
+      - opengl
+      - system-observe
+
+parts:
+  sentinel-terminal:
+    plugin: dump
+    source: ../../src-tauri/target/release/
+    stage:
+      - sentinel-terminal
+    organize:
+      sentinel-terminal: usr/bin/sentinel-terminal
+
+  desktop:
+    plugin: dump
+    source: ../arch/
+    stage:
+      - sentinel-terminal.desktop
+    organize:
+      sentinel-terminal.desktop: usr/share/applications/sentinel-terminal.desktop
+
+  icons:
+    plugin: dump
+    source: ../../src-tauri/icons/
+    stage:
+      - icon.png
+    organize:
+      icon.png: usr/share/icons/hicolor/512x512/apps/sentinel-terminal.png

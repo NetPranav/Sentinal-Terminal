@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=Sentinel Terminal
+Comment=Autonomous AI-Native Linux Terminal Copilot
+Exec=sentinel-terminal
+Icon=sentinel-terminal
+Terminal=false
+Type=Application
+Categories=Development;System;TerminalEmulator;
+StartupWMClass=sentinel-terminal
+Keywords=terminal;shell;copilot;prompt;pty;ai;
