@@ -14,6 +14,7 @@ import {
   SavedWorkflowDefinition,
   CURRENT_WORKFLOW_SCHEMA_VERSION
 } from '../models/WorkflowTypes';
+import { CrossPlatformCommandAdapter } from './CrossPlatformCommandAdapter';
 
 export interface DecomposedStage {
   id: string;
@@ -29,6 +30,11 @@ export interface DecomposedStage {
   precondition_check?: string;
   if_precondition_true?: 'skip' | 'continue' | 'abort';
   if_precondition_false?: 'install' | 'continue' | 'abort' | 'skip';
+  platformCommands?: {
+    linux?: string;
+    macos?: string;
+    windows?: string;
+  };
 }
 
 export interface DecomposedWorkflowPlan {
@@ -267,7 +273,12 @@ export class MultistagePromptDecomposer {
       validationCriteria: s.expectedOutputValidator,
       precondition_check: s.precondition_check,
       if_precondition_true: s.if_precondition_true,
-      if_precondition_false: s.if_precondition_false
+      if_precondition_false: s.if_precondition_false,
+      platformCommands: s.platformCommands || {
+        linux: CrossPlatformCommandAdapter.getInstance().translateCommand(s.inferredCommand, 'linux'),
+        macos: CrossPlatformCommandAdapter.getInstance().translateCommand(s.inferredCommand, 'macos'),
+        windows: CrossPlatformCommandAdapter.getInstance().translateCommand(s.inferredCommand, 'windows')
+      }
     }));
 
     return {

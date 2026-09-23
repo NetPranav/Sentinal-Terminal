@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { InstallerService, IntegrationStatus } from '../../domain/integration/InstallerService';
-import { Terminal, Folder, Code2, Check, ExternalLink } from 'lucide-react';
+import { Terminal, Folder, Code2, Check, ExternalLink, Cpu, Download, CheckCircle2, Sparkles, AlertCircle, X, ArrowRight } from 'lucide-react';
 import { isLinux } from '../../shared/platform';
+import { EmbeddedEngineManager, DownloadProgress } from '../../ai/models/EmbeddedEngineManager';
 
 interface InstallerWizardProps {
   isOpen: boolean;
@@ -22,13 +23,62 @@ export const InstallerWizard: React.FC<InstallerWizardProps> = ({ isOpen, onClos
   const [loading, setLoading] = useState<boolean>(false);
   const [message, setMessage] = useState<string | null>(null);
 
+  // Phase: AI Model Setup in Onboarding
+  const [modelDownloaded, setModelDownloaded] = useState<boolean>(false);
+  const [downloadingModel, setDownloadingModel] = useState<boolean>(false);
+  const [modelProgress, setModelProgress] = useState<DownloadProgress | null>(null);
+  const [modelError, setModelError] = useState<string | null>(null);
+  const [skippedModelDownload, setSkippedModelDownload] = useState<boolean>(false);
+
   const installer = InstallerService.getInstance();
 
   useEffect(() => {
     if (isOpen) {
       refreshStatus();
+      checkModelStatus();
     }
   }, [isOpen]);
+
+  const checkModelStatus = async () => {
+    try {
+      const s = await EmbeddedEngineManager.getInstance().getStatus();
+      setModelDownloaded(s.modelDownloaded);
+    } catch {
+      // Non-fatal
+    }
+  };
+
+  const handleStartDownloadModel = async () => {
+    setDownloadingModel(true);
+    setModelError(null);
+    setSkippedModelDownload(false);
+    try {
+      const ok = await EmbeddedEngineManager.getInstance().downloadRecommendedModel((p) => {
+        setModelProgress(p);
+      });
+      if (ok) {
+        setModelDownloaded(true);
+        setMessage('✓ Local AI model (Qwen 2.5 Coder 3B) downloaded and ready!');
+      } else {
+        setModelError('Download failed or was interrupted.');
+      }
+    } catch (err: any) {
+      setModelError(err?.message || 'Failed to download AI model');
+    } finally {
+      setDownloadingModel(false);
+    }
+  };
+
+  const handleCancelDownloadModel = async () => {
+    await EmbeddedEngineManager.getInstance().cancelDownload();
+    setDownloadingModel(false);
+    setModelProgress(null);
+    setModelError('Download cancelled.');
+  };
+
+  const handleSkipModel = () => {
+    setSkippedModelDownload(true);
+  };
 
   const refreshStatus = async () => {
     try {
@@ -606,6 +656,228 @@ export const InstallerWizard: React.FC<InstallerWizardProps> = ({ isOpen, onClos
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+
+        {/* Section 3: Local AI Model Setup (Optional) */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ fontSize: '11px', fontWeight: 600, color: 'rgba(255, 255, 255, 0.7)', textTransform: 'uppercase', letterSpacing: '0.6px' }}>
+              Local AI Model Setup (Optional)
+            </div>
+            <span style={{ fontSize: '11px', color: 'rgba(255, 255, 255, 0.45)' }}>
+              100% Private • On-Device Inference • Zero API Costs
+            </span>
+          </div>
+
+          <div style={{
+            padding: '18px 20px',
+            backgroundColor: 'rgba(255, 255, 255, 0.025)',
+            border: '1px solid rgba(255, 255, 255, 0.09)',
+            borderRadius: '12px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '14px',
+            boxSizing: 'border-box'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '16px' }}>
+              <div style={{ display: 'flex', gap: '12px' }}>
+                <div style={{
+                  width: '34px',
+                  height: '34px',
+                  borderRadius: '8px',
+                  backgroundColor: 'rgba(255, 255, 255, 0.06)',
+                  border: '1px solid rgba(255, 255, 255, 0.12)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#ffffff',
+                  flexShrink: 0
+                }}>
+                  <Cpu size={18} />
+                </div>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                    <span style={{ fontWeight: 600, fontSize: '14px', color: '#ffffff' }}>
+                      Sentinel Embedded AI (Qwen 2.5 Coder 3B Instruct)
+                    </span>
+                    <span style={{
+                      fontSize: '10px',
+                      fontWeight: 600,
+                      padding: '2px 7px',
+                      borderRadius: '4px',
+                      backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                      color: 'rgba(255, 255, 255, 0.9)',
+                      border: '1px solid rgba(255, 255, 255, 0.15)'
+                    }}>
+                      ~1.96 GB GGUF
+                    </span>
+                    <span style={{
+                      fontSize: '10px',
+                      fontWeight: 500,
+                      padding: '2px 7px',
+                      borderRadius: '4px',
+                      backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                      color: 'rgba(255, 255, 255, 0.65)'
+                    }}>
+                      Metal / Vulkan / CPU
+                    </span>
+                  </div>
+                  <div style={{ fontSize: '12px', color: 'rgba(255, 255, 255, 0.65)', lineHeight: 1.5, maxWidth: '780px' }}>
+                    Enables autonomous command generation, intent resolution, error remediation, and natural language terminal control. Runs entirely on your hardware with no network telemetry or external servers.
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                {modelDownloaded ? (
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '6px 14px',
+                    borderRadius: '6px',
+                    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+                    border: '1px solid rgba(255, 255, 255, 0.25)',
+                    color: '#ffffff',
+                    fontSize: '12px',
+                    fontWeight: 600
+                  }}>
+                    <Check size={14} />
+                    <span>Downloaded & Ready</span>
+                  </div>
+                ) : downloadingModel ? (
+                  <button
+                    onClick={handleCancelDownloadModel}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      padding: '6px 14px',
+                      borderRadius: '6px',
+                      border: '1px solid rgba(255, 255, 255, 0.2)',
+                      backgroundColor: 'rgba(255, 255, 255, 0.06)',
+                      color: 'rgba(255, 255, 255, 0.85)',
+                      fontSize: '12px',
+                      fontWeight: 600,
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <X size={14} />
+                    <span>Cancel</span>
+                  </button>
+                ) : (
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <button
+                      onClick={handleSkipModel}
+                      style={{
+                        padding: '6px 12px',
+                        borderRadius: '6px',
+                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                        backgroundColor: 'transparent',
+                        color: 'rgba(255, 255, 255, 0.65)',
+                        fontSize: '12px',
+                        fontWeight: 500,
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease'
+                      }}
+                      onMouseEnter={(e) => { e.currentTarget.style.color = '#ffffff'; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.color = 'rgba(255, 255, 255, 0.65)'; }}
+                    >
+                      {skippedModelDownload ? '✓ Download Skipped' : 'Download Later / Use Cloud API'}
+                    </button>
+
+                    <button
+                      onClick={handleStartDownloadModel}
+                      disabled={loading || downloadingModel}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        padding: '6px 16px',
+                        borderRadius: '6px',
+                        border: '1px solid #ffffff',
+                        backgroundColor: '#ffffff',
+                        color: '#090b10',
+                        fontSize: '12px',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        transition: 'opacity 0.15s ease'
+                      }}
+                      onMouseEnter={(e) => { e.currentTarget.style.opacity = '0.9'; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.opacity = '1'; }}
+                    >
+                      <Download size={13} strokeWidth={2.5} />
+                      <span>Download Model (~1.9 GB)</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Live Download Progress Bar */}
+            {downloadingModel && (
+              <div style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '6px',
+                paddingTop: '6px',
+                borderTop: '1px solid rgba(255, 255, 255, 0.05)'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: 'rgba(255, 255, 255, 0.65)' }}>
+                  <span>Downloading Qwen 2.5 Coder 3B GGUF to ~/.sentinel/models/...</span>
+                  <span>
+                    {modelProgress?.percent ? `${modelProgress.percent}%` : 'Starting...'} 
+                    {modelProgress ? ` • ${((modelProgress.downloadedBytes || 0) / (1024 * 1024)).toFixed(0)} / ${((modelProgress.totalBytes || 2104932800) / (1024 * 1024)).toFixed(0)} MB` : ''}
+                    {modelProgress?.speed ? ` • ${modelProgress.speed}` : ''}
+                  </span>
+                </div>
+                <div style={{
+                  width: '100%',
+                  height: '6px',
+                  borderRadius: '3px',
+                  backgroundColor: 'rgba(255, 255, 255, 0.08)',
+                  overflow: 'hidden'
+                }}>
+                  <div style={{
+                    width: `${modelProgress?.percent || 0}%`,
+                    height: '100%',
+                    backgroundColor: '#ffffff',
+                    transition: 'width 0.2s ease'
+                  }} />
+                </div>
+              </div>
+            )}
+
+            {/* Error or Skip Notes */}
+            {modelError && (
+              <div style={{
+                fontSize: '11.5px',
+                color: 'rgba(255, 255, 255, 0.8)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '6px 10px',
+                borderRadius: '6px',
+                backgroundColor: 'rgba(255, 255, 255, 0.04)',
+                border: '1px solid rgba(255, 255, 255, 0.12)'
+              }}>
+                <AlertCircle size={13} />
+                <span>{modelError}</span>
+              </div>
+            )}
+
+            {skippedModelDownload && !modelDownloaded && !downloadingModel && (
+              <div style={{
+                fontSize: '11.5px',
+                color: 'rgba(255, 255, 255, 0.6)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px'
+              }}>
+                <span>• Model download skipped for now. When you run a prompt requiring AI interception, Sentinel will guide you on downloading or setting up Cloud API keys (Groq, OpenAI, Anthropic).</span>
+              </div>
+            )}
           </div>
         </div>
 

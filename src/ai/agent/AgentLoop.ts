@@ -1172,7 +1172,7 @@ export class AgentLoop {
   ) {
     this.toolExecutor = new ToolExecutor();
     this.toolSpecs = buildToolSpecs(registry);
-    this.modelManager = customModelManager || new ModelManager();
+    this.modelManager = customModelManager || ModelManager.getInstance();
     this.shadowSimulator = customShadowSimulator || new ShadowPtySimulator();
   }
 
@@ -1991,14 +1991,21 @@ export class AgentLoop {
       if (fallbackResult) return await this.executeFallback(fallbackResult, context);
 
       const guidanceMsg = 
-        `Local AI model is not running yet.\n\n` +
-        `• Option 1 (No Ollama needed): Type ">setup-ai" or open Command Palette (Cmd+Shift+P) > "Sentinel Embedded AI" to 1-click download Qwen 2.5 Coder 3B.\n` +
-        `• Option 2 (External Ollama): Start Ollama in your terminal: 'ollama run qwen2.5-coder:3b'`;
+        `No AI Model or API Configured.\n\n` +
+        `Sentinel requires an active AI model or API backend to intercept and run prompts.\n\n` +
+        `• Option 1 (Embedded Local Model - Recommended):\n` +
+        `  Download Qwen 2.5 Coder 3B Instruct (~1.96 GB) for 100% private, offline inference with zero API fees.\n` +
+        `  Type ">setup-ai" or press Command Palette (Ctrl+Shift+P) > "Sentinel Embedded AI" to start 1-click download.\n\n` +
+        `• Option 2 (Zero Local Download - Cloud API):\n` +
+        `  Connect an API key (Groq, OpenAI, Anthropic, DeepSeek, OpenRouter, or Custom OpenAI-compatible endpoint).\n` +
+        `  Open Settings (Ctrl+,) > AI Models > Cloud API Keys to activate your service.\n\n` +
+        `• Option 3 (External Ollama):\n` +
+        `  Start Ollama in your terminal: 'ollama run qwen2.5-coder:3b'`;
 
       this.emit({ type: 'error', message: guidanceMsg });
       return {
         success: false,
-        summary: 'Local AI model not running yet. Use >setup-ai or start Ollama.',
+        summary: 'No AI model or API configured. Type >setup-ai to download local model or configure Cloud API in Settings.',
         steps: []
       };
     }

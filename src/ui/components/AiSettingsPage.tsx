@@ -29,6 +29,7 @@ import { EmbeddedModelManagerModal } from './EmbeddedModelManagerModal';
 import { EmbeddedEngineManager, EmbeddedStatus } from '../../ai/models/EmbeddedEngineManager';
 import { ModelRecommendationEngine, TierRecommendationResult } from '../../ai/management/ModelRecommendationEngine';
 import { CloudApiProvider, CloudServiceId, CloudKeyConfig, CLOUD_CATALOG } from '../../ai/provider/CloudApiProvider';
+import { ModelManager, ActiveModelInfo } from '../../ai/management/ModelManager';
 import { InstallerService, IntegrationStatus } from '../../domain/integration/InstallerService';
 import { isLinux } from '../../shared/platform';
 
@@ -60,6 +61,11 @@ export const AiSettingsPage: React.FC<AiSettingsPageProps> = ({
   const [embeddedStatus, setEmbeddedStatus] = useState<EmbeddedStatus | null>(null);
   const [autoStart, setAutoStart] = useState<boolean>(() => localStorage.getItem('sentinel_autostart_ai') !== 'false');
   const [engineActionLoading, setEngineActionLoading] = useState(false);
+
+  // Active AI Provider Selection State
+  const [activeProviderId, setActiveProviderId] = useState<string>(() => ModelManager.getInstance().getActiveProviderId());
+  const [activeModelInfo, setActiveModelInfo] = useState<ActiveModelInfo>(() => ModelManager.getInstance().getActiveModel());
+  const [selectedOllamaModel, setSelectedOllamaModel] = useState<string>('');
 
   // Recommendation Engine State
   const [recommendation, setRecommendation] = useState<TierRecommendationResult | null>(null);
@@ -97,6 +103,21 @@ export const AiSettingsPage: React.FC<AiSettingsPageProps> = ({
   const cloudProvider = CloudApiProvider.getInstance();
   const installer = InstallerService.getInstance();
 
+  const refreshActiveAiInfo = () => {
+    const mm = ModelManager.getInstance();
+    setActiveProviderId(mm.getActiveProviderId());
+    setActiveModelInfo(mm.getActiveModel());
+  };
+
+  const handleSwitchActiveProvider = async (provId: string, modelId?: string) => {
+    const mm = ModelManager.getInstance();
+    await mm.setActiveProviderId(provId, modelId);
+    refreshActiveAiInfo();
+    const name = provId === 'embedded' ? 'Sentinel Embedded (Qwen 2.5 Coder 3B)' : provId === 'cloud_api' ? 'Cloud API' : `Local Ollama (${modelId || 'default'})`;
+    setSaveSuccessMsg(`✓ Active AI execution engine set to ${name}!`);
+    setTimeout(() => setSaveSuccessMsg(null), 3000);
+  };
+
   useEffect(() => {
     if (initialTab) {
       setMainTab(initialTab);
@@ -115,6 +136,11 @@ export const AiSettingsPage: React.FC<AiSettingsPageProps> = ({
     loadRecommendations();
     loadCloudConfigState(selectedCloudService);
     refreshIntegrations();
+    refreshActiveAiInfo();
+
+    const handleAiChanged = () => refreshActiveAiInfo();
+    window.addEventListener('sentinel:ai-status-changed', handleAiChanged);
+    return () => window.removeEventListener('sentinel:ai-status-changed', handleAiChanged);
   }, []);
 
   const refreshIntegrations = async () => {
@@ -262,6 +288,8 @@ export const AiSettingsPage: React.FC<AiSettingsPageProps> = ({
       all[selectedCloudService] = updated;
       cloudProvider.saveConfig(updated);
       setCloudConfigs(all);
+      ModelManager.getInstance().setActiveProviderId('cloud_api', updated.modelId);
+      refreshActiveAiInfo();
     } else {
       cloudProvider.saveConfig(updated);
       setCloudConfigs(cloudProvider.getSavedConfigs());
@@ -522,6 +550,248 @@ export const AiSettingsPage: React.FC<AiSettingsPageProps> = ({
         {/* TAB 1: AI MODELS & ARCHITECTURE */}
         {mainTab === 'ai' && (
           <>
+            {/* PROMINENT ACTIVE AI MODEL & PROVIDER SELECTOR */}
+            <div style={{
+              backgroundColor: 'rgba(255, 255, 255, 0.03)',
+              border: '1px solid rgba(255, 255, 255, 0.12)',
+              borderRadius: '12px',
+              padding: '20px 22px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '16px'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Sparkles size={16} />
+                    <h2 style={{ fontSize: '15px', fontWeight: 600, color: '#ffffff', margin: 0 }}>
+                      Active AI Execution Model & Provider
+                    </h2>
+                  </div>
+                  <p style={{ margin: '4px 0 0', fontSize: '12px', color: 'rgba(255, 255, 255, 0.6)' }}>
+                    Select the active model or API backend used to execute terminal prompts (<code style={{ background: 'rgba(255, 255, 255, 0.08)', padding: '1px 5px', borderRadius: '3px' }}>&gt; ...</code>) and autonomous workflows.
+                  </p>
+                </div>
+
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  padding: '5px 12px',
+                  borderRadius: '6px',
+                  backgroundColor: 'rgba(255, 255, 255, 0.08)',
+                  border: '1px solid rgba(255, 255, 255, 0.2)',
+                  fontSize: '11.5px',
+                  fontWeight: 600,
+                  color: '#ffffff'
+                }}>
+                  <Check size={13} strokeWidth={2.5} />
+                  <span>Currently Active: {activeProviderId === 'embedded' ? 'Embedded Local Model (Qwen 2.5 3B)' : activeProviderId === 'cloud_api' ? `Cloud API (${cloudProvider.getActiveConfig()?.displayName || 'Active Service'})` : `Local Ollama (${activeModelInfo.displayName || activeModelInfo.modelId})`}</span>
+                </div>
+              </div>
+
+              {/* 3-Column Provider Selector */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}>
+                {/* Option 1: Embedded Engine */}
+                <div
+                  onClick={() => handleSwitchActiveProvider('embedded', 'sentinel-embedded')}
+                  style={{
+                    padding: '14px 16px',
+                    borderRadius: '10px',
+                    border: activeProviderId === 'embedded' ? '1.5px solid #ffffff' : '1px solid rgba(255, 255, 255, 0.1)',
+                    backgroundColor: activeProviderId === 'embedded' ? 'rgba(255, 255, 255, 0.08)' : 'rgba(255, 255, 255, 0.02)',
+                    boxShadow: activeProviderId === 'embedded' ? '0 0 0 1px #ffffff' : 'none',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between',
+                    gap: '10px',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <Cpu size={14} />
+                        <span style={{ fontWeight: 600, fontSize: '13px', color: '#ffffff' }}>
+                          Sentinel Embedded
+                        </span>
+                      </div>
+                      {activeProviderId === 'embedded' && (
+                        <span style={{ fontSize: '10px', fontWeight: 600, padding: '1px 6px', borderRadius: '4px', background: '#ffffff', color: '#090b10' }}>
+                          Active
+                        </span>
+                      )}
+                    </div>
+                    <span style={{ fontSize: '11.5px', color: 'rgba(255, 255, 255, 0.6)', lineHeight: 1.4 }}>
+                      Qwen 2.5 Coder 3B Instruct. Bundled local inference via embedded llama.cpp. No setup or API keys required.
+                    </span>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: '8px', borderTop: '1px solid rgba(255, 255, 255, 0.05)', fontSize: '10.5px' }}>
+                    <span style={{ color: embeddedStatus?.modelDownloaded ? '#ffffff' : 'rgba(255, 255, 255, 0.5)' }}>
+                      {embeddedStatus?.modelDownloaded ? (embeddedStatus.isRunning ? '● Engine Running' : '✓ Model Downloaded') : '○ Model Not Downloaded'}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); setShowEmbeddedModal(true); }}
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        color: 'rgba(255, 255, 255, 0.8)',
+                        fontSize: '10.5px',
+                        cursor: 'pointer',
+                        padding: 0,
+                        textDecoration: 'underline'
+                      }}
+                    >
+                      Manage Model
+                    </button>
+                  </div>
+                </div>
+
+                {/* Option 2: Local Ollama */}
+                <div
+                  onClick={() => {
+                    const targetModel = selectedOllamaModel || (models.length > 0 ? models[0].name : 'qwen2.5-coder:3b');
+                    handleSwitchActiveProvider('ollama', targetModel);
+                  }}
+                  style={{
+                    padding: '14px 16px',
+                    borderRadius: '10px',
+                    border: activeProviderId === 'ollama' ? '1.5px solid #ffffff' : '1px solid rgba(255, 255, 255, 0.1)',
+                    backgroundColor: activeProviderId === 'ollama' ? 'rgba(255, 255, 255, 0.08)' : 'rgba(255, 255, 255, 0.02)',
+                    boxShadow: activeProviderId === 'ollama' ? '0 0 0 1px #ffffff' : 'none',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between',
+                    gap: '10px',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <Server size={14} />
+                        <span style={{ fontWeight: 600, fontSize: '13px', color: '#ffffff' }}>
+                          Local Ollama
+                        </span>
+                      </div>
+                      {activeProviderId === 'ollama' && (
+                        <span style={{ fontSize: '10px', fontWeight: 600, padding: '1px 6px', borderRadius: '4px', background: '#ffffff', color: '#090b10' }}>
+                          Active
+                        </span>
+                      )}
+                    </div>
+                    <span style={{ fontSize: '11.5px', color: 'rgba(255, 255, 255, 0.6)', lineHeight: 1.4 }}>
+                      Custom external daemon on localhost:11434. Uses any model pulled through the Ollama CLI.
+                    </span>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', paddingTop: '8px', borderTop: '1px solid rgba(255, 255, 255, 0.05)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '10.5px' }}>
+                      <span style={{ color: ollamaHealthy ? '#ffffff' : 'rgba(255, 255, 255, 0.45)' }}>
+                        {ollamaHealthy ? `● Online (${models.length} models)` : '○ Daemon Offline'}
+                      </span>
+                    </div>
+                    {models.length > 0 && (
+                      <select
+                        value={activeProviderId === 'ollama' ? (activeModelInfo.modelId || models[0].name) : (selectedOllamaModel || models[0].name)}
+                        onChange={(e) => {
+                          e.stopPropagation();
+                          setSelectedOllamaModel(e.target.value);
+                          handleSwitchActiveProvider('ollama', e.target.value);
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                        style={{
+                          width: '100%',
+                          padding: '3px 6px',
+                          borderRadius: '4px',
+                          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                          border: '1px solid rgba(255, 255, 255, 0.15)',
+                          color: '#ffffff',
+                          fontSize: '11px',
+                          fontFamily: 'monospace'
+                        }}
+                      >
+                        {models.map(m => (
+                          <option key={m.name} value={m.name} style={{ backgroundColor: '#090b10', color: '#ffffff' }}>
+                            {m.name} {m.size ? `(${(m.size / (1024 * 1024 * 1024)).toFixed(1)} GB)` : ''}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
+                </div>
+
+                {/* Option 3: Cloud API Provider */}
+                <div
+                  onClick={() => {
+                    const cfg = cloudProvider.getActiveConfig();
+                    if (cfg) {
+                      handleSwitchActiveProvider('cloud_api', cfg.modelId);
+                    } else {
+                      setActiveTab('cloud');
+                    }
+                  }}
+                  style={{
+                    padding: '14px 16px',
+                    borderRadius: '10px',
+                    border: activeProviderId === 'cloud_api' ? '1.5px solid #ffffff' : '1px solid rgba(255, 255, 255, 0.1)',
+                    backgroundColor: activeProviderId === 'cloud_api' ? 'rgba(255, 255, 255, 0.08)' : 'rgba(255, 255, 255, 0.02)',
+                    boxShadow: activeProviderId === 'cloud_api' ? '0 0 0 1px #ffffff' : 'none',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between',
+                    gap: '10px',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <Key size={14} />
+                        <span style={{ fontWeight: 600, fontSize: '13px', color: '#ffffff' }}>
+                          Cloud API Services
+                        </span>
+                      </div>
+                      {activeProviderId === 'cloud_api' && (
+                        <span style={{ fontSize: '10px', fontWeight: 600, padding: '1px 6px', borderRadius: '4px', background: '#ffffff', color: '#090b10' }}>
+                          Active
+                        </span>
+                      )}
+                    </div>
+                    <span style={{ fontSize: '11.5px', color: 'rgba(255, 255, 255, 0.6)', lineHeight: 1.4 }}>
+                      Fast external cloud LLMs: Groq, OpenAI, Anthropic, DeepSeek, OpenRouter, or Custom API. Zero local RAM usage.
+                    </span>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: '8px', borderTop: '1px solid rgba(255, 255, 255, 0.05)', fontSize: '10.5px' }}>
+                    <span style={{ color: cloudProvider.getActiveConfig() ? '#ffffff' : 'rgba(255, 255, 255, 0.5)' }}>
+                      {cloudProvider.getActiveConfig() ? `✓ ${cloudProvider.getActiveConfig()?.displayName || 'Configured'}` : '○ No Key Configured'}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); setActiveTab('cloud'); }}
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        color: 'rgba(255, 255, 255, 0.8)',
+                        fontSize: '10.5px',
+                        cursor: 'pointer',
+                        padding: 0,
+                        textDecoration: 'underline'
+                      }}
+                    >
+                      Configure Keys
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             {/* Secondary Navigation Tabs for AI */}
             <div style={{ display: 'flex', gap: '8px', borderBottom: '1px solid rgba(255, 255, 255, 0.06)', paddingBottom: '8px' }}>
               <button

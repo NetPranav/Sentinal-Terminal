@@ -17,6 +17,7 @@ import {
 import { DiskWorkflowStorage } from '../storage/DiskWorkflowStorage';
 import { SecurityEngine, RiskAnalysisResult } from '../../domain/security/SecurityEngine';
 import { UndoLog } from '../../domain/session/UndoLog';
+import { CrossPlatformCommandAdapter } from './CrossPlatformCommandAdapter';
 import { invoke } from '@tauri-apps/api/core';
 
 export interface ReplayOptions {
@@ -229,8 +230,9 @@ export class DeterministicReplayEngine {
       const step = workflow.steps[i];
       const stepStart = performance.now();
 
-      // Parameter substitution in command & cwd
-      const expandedCommand = this.substituteParameters(step.command, resolvedParams);
+      // Cross-platform command resolution and parameter substitution
+      const resolvedCommand = CrossPlatformCommandAdapter.getInstance().resolveStepCommand(step);
+      const expandedCommand = this.substituteParameters(resolvedCommand, resolvedParams);
       const expandedCwd = step.cwd ? this.substituteParameters(step.cwd, resolvedParams) : undefined;
 
       // Categorical Security Analysis
@@ -259,13 +261,15 @@ export class DeterministicReplayEngine {
 
       // Precondition Check (Phase 0.75 Task 0.75.2)
       if (step.precondition_check) {
-        options.onLog?.(`[ReplayEngine] Evaluating precondition for step "${step.name}": ${step.precondition_check}`);
+        const resolvedPre = CrossPlatformCommandAdapter.getInstance().translateCommand(step.precondition_check);
+        const expandedPre = this.substituteParameters(resolvedPre, resolvedParams);
+        options.onLog?.(`[ReplayEngine] Evaluating precondition for step "${step.name}": ${expandedPre}`);
         let preOutput: { code: number; stdout: string; stderr: string };
         try {
           if (options.executor) {
-            preOutput = await options.executor(step.precondition_check, expandedCwd);
+            preOutput = await options.executor(expandedPre, expandedCwd);
           } else {
-            preOutput = await this.defaultExecute(step.precondition_check, expandedCwd);
+            preOutput = await this.defaultExecute(expandedPre, expandedCwd);
           }
         } catch {
           preOutput = { code: 1, stdout: '', stderr: 'Precondition evaluation failed' };
@@ -502,46 +506,14 @@ export class DeterministicReplayEngine {
     binary: string,
     executor?: (cmd: string) => Promise<{ code: number }>
   ): Promise<boolean> {
-    if (typeof process !== 'undefined' && process.env.NODE_ENV === 'test') {
-      return true;
-    }
-    const cmd = `which "${binary}" >/dev/null 2>&1 || command -v "${binary}" >/dev/null 2>&1`;
-    try {
-      if (executor) {
-        const res = await executor(cmd);
-        return res.code === 0;
-      }
-      const res = await invoke<{ code: number }>('execute_command', {
-        command: 'sh',
-        args: ['-c', cmd]
-      });
-      return res.code === 0;
-    } catch {
-      return false;
-    }
+    return CrossPlatformCommandAdapter.getInstance().checkBinaryExists(binary, executor);
   }
 
   private async checkPathExists(
     pathToCheck: string,
     executor?: (cmd: string) => Promise<{ code: number }>
   ): Promise<boolean> {
-    if (typeof process !== 'undefined' && process.env.NODE_ENV === 'test') {
-      return true;
-    }
-    const cmd = `test -e "${pathToCheck}"`;
-    try {
-      if (executor) {
-        const res = await executor(cmd);
-        return res.code === 0;
-      }
-      const res = await invoke<{ code: number }>('execute_command', {
-        command: 'sh',
-        args: ['-c', cmd]
-      });
-      return res.code === 0;
-    } catch {
-      return false;
-    }
+    return CrossPlatformCommandAdapter.getInstance().checkPathExists(pathToCheck, executor);
   }
 
   private async defaultExecute(
@@ -553,10 +525,10 @@ export class DeterministicReplayEngine {
     }
 
     try {
-      const fullCmd = cwd ? `cd "${cwd}" && ${command}` : command;
+      const invocation = CrossPlatformCommandAdapter.getInstance().getShellInvocation(command, cwd);
       const res = await invoke<{ code: number; stdout: string; stderr: string }>('execute_command', {
-        command: 'sh',
-        args: ['-c', fullCmd]
+        command: invocation.command,
+        args: invocation.args
       });
       return {
         code: res.code ?? 0,

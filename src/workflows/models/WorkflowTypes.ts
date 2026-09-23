@@ -332,6 +332,13 @@ export interface WorkflowStepDefinition {
   readonly precondition_check?: string;
   readonly if_precondition_true?: 'skip' | 'continue' | 'abort';
   readonly if_precondition_false?: 'install' | 'continue' | 'abort' | 'skip';
+  // Cross-Platform workflow support: optional platform-specific command variants
+  readonly platformCommands?: {
+    readonly linux?: string;
+    readonly macos?: string;
+    readonly windows?: string;
+    readonly distroOverrides?: Record<string, string>;
+  };
 }
 
 export interface SavedWorkflowDefinition {

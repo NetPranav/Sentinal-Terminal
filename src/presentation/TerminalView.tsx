@@ -605,7 +605,7 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
                   PtyOutputObserver.getInstance().clearRemediation();
                   PromptProgressManager.getInstance().startPrompt(`Auto-Heal: ${rem.actionTitle}`);
                   try {
-                    const res = await agentLoop.run(`fix error: ${rem.actionTitle}`, { os: getPlatform() === 'linux' ? 'linux' : 'mac', cwd: currentPath || '~' });
+                    const res = await agentLoop.run(`fix error: ${rem.actionTitle}`, { os: getPlatform(), cwd: currentPath || '~' });
                     PromptProgressManager.getInstance().completePrompt(res.success, res.summary);
                   } catch (err: any) {
                     PromptProgressManager.getInstance().completePrompt(false, err?.message);
@@ -718,7 +718,7 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
                 });
 
                 // Run the agent loop
-                agentLoop.run(aiGoal, { os: getPlatform() === 'linux' ? 'linux' : 'mac', cwd: currentPath || '~' }).then(result => {
+                agentLoop.run(aiGoal, { os: getPlatform(), cwd: currentPath || '~' }).then(result => {
                   PromptProgressManager.getInstance().completePrompt(result.success, result.summary);
                   if (!result.success) {
                     lastUnresolvedGoalRef.current = { goal: aiGoal, timestamp: Date.now() };

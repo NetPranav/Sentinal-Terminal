@@ -13,6 +13,7 @@
 import { ModelProvider, ModelMetadata } from '../provider/Provider';
 import { EmbeddedProvider } from '../provider/EmbeddedProvider';
 import { OllamaProvider } from '../provider/OllamaProvider';
+import { CloudApiProvider } from '../provider/CloudApiProvider';
 
 export interface CandidateModelSpec {
   id: string;
@@ -39,6 +40,17 @@ export interface ActiveModelInfo {
 }
 
 export class ModelManager {
+  private static instance?: ModelManager;
+  public static readonly PREF_PROVIDER_KEY = 'sentinel_active_ai_provider';
+  public static readonly PREF_MODEL_KEY = 'sentinel_active_ai_model';
+
+  public static getInstance(): ModelManager {
+    if (!ModelManager.instance) {
+      ModelManager.instance = new ModelManager();
+    }
+    return ModelManager.instance;
+  }
+
   private providers: ModelProvider[] = [];
   private activeProvider?: ModelProvider;
   private activeModelInfo?: ActiveModelInfo;
@@ -161,15 +173,43 @@ export class ModelManager {
   };
 
   constructor(customProviders?: ModelProvider[]) {
-    // Provider priority: Embedded (bundled llama.cpp) first, fallback to Ollama runtime
-    this.providers = customProviders || [new EmbeddedProvider(), new OllamaProvider()];
+    // Provider priority: Embedded (bundled llama.cpp), Ollama runtime, and Cloud API Provider
+    this.providers = customProviders || [new EmbeddedProvider(), new OllamaProvider(), CloudApiProvider.getInstance()];
   }
 
   /**
    * Initialize ModelManager: discover available providers and models, score them, and select the best candidate.
-   * Automatically downloads a high-performance lightweight model if none exist locally.
+   * Restores user preference if previously saved in settings.
    */
   public async initialize(onDownloadProgress?: (percent: number, status: string) => void): Promise<ActiveModelInfo> {
+    // 1. Check if user has an explicit saved provider preference
+    const savedProviderId = typeof localStorage !== 'undefined' ? localStorage.getItem(ModelManager.PREF_PROVIDER_KEY) : null;
+    const savedModelId = typeof localStorage !== 'undefined' ? localStorage.getItem(ModelManager.PREF_MODEL_KEY) : null;
+
+    if (savedProviderId) {
+      const match = this.providers.find(p => p.providerId === savedProviderId);
+      if (match && (await match.isAvailable())) {
+        this.activeProvider = match;
+        let displayName = savedModelId || match.providerName;
+        if (savedProviderId === 'cloud_api') {
+          const cfg = CloudApiProvider.getInstance().getActiveConfig();
+          if (cfg) displayName = `${cfg.displayName || cfg.serviceId} (${cfg.modelId || 'default'})`;
+        } else if (savedProviderId === 'embedded') {
+          displayName = 'Sentinel Embedded Model (Qwen2.5-3B)';
+        }
+        this.setActiveModel({
+          providerId: match.providerId,
+          modelId: savedModelId || 'default',
+          displayName,
+          score: 100,
+          sizeBytes: 0,
+          isReady: true,
+          lastVerified: Date.now()
+        });
+        return this.activeModelInfo!;
+      }
+    }
+
     const availableProviders: ModelProvider[] = [];
     for (const provider of this.providers) {
       if (await provider.isAvailable()) {
@@ -178,7 +218,7 @@ export class ModelManager {
     }
 
     if (availableProviders.length === 0) {
-      // Offline or local servers booting up; default to Ollama Provider as targeted active handler
+      // Offline or local servers booting up; default to Embedded Provider as targeted active handler
       this.activeProvider = this.providers[0];
     } else {
       this.activeProvider = availableProviders[0];
@@ -240,6 +280,55 @@ export class ModelManager {
     });
 
     return this.activeModelInfo!;
+  }
+
+  public getProviders(): ModelProvider[] {
+    return [...this.providers];
+  }
+
+  public getActiveProviderId(): string {
+    return this.getActiveProvider().providerId;
+  }
+
+  public async setActiveProviderId(providerId: string, modelId?: string): Promise<boolean> {
+    const prov = this.providers.find(p => p.providerId === providerId);
+    if (!prov) return false;
+
+    this.activeProvider = prov;
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(ModelManager.PREF_PROVIDER_KEY, providerId);
+      if (modelId) {
+        localStorage.setItem(ModelManager.PREF_MODEL_KEY, modelId);
+      }
+    }
+
+    let displayName = modelId || prov.providerName;
+    if (providerId === 'embedded') {
+      displayName = 'Sentinel Embedded Model (Qwen2.5-3B)';
+    } else if (providerId === 'cloud_api') {
+      const activeCfg = CloudApiProvider.getInstance().getActiveConfig();
+      if (activeCfg) {
+        displayName = `${activeCfg.displayName || activeCfg.serviceId} (${activeCfg.modelId || 'default'})`;
+      }
+    } else if (modelId) {
+      const spec = this.matchCatalogSpec(modelId);
+      displayName = spec?.name || modelId;
+    }
+
+    this.setActiveModel({
+      providerId: prov.providerId,
+      modelId: modelId || 'default',
+      displayName,
+      score: 100,
+      sizeBytes: 0,
+      isReady: true,
+      lastVerified: Date.now()
+    });
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('sentinel:ai-status-changed'));
+    }
+    return true;
   }
 
   private matchCatalogSpec(modelId: string): CandidateModelSpec | undefined {
