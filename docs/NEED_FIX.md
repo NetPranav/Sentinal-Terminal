@@ -440,6 +440,8 @@ When typing an AI prompt starting with `>` (or typing any command) in the termin
 ### 9.1 Problem Statement
 When a user enters a multi-step or long prompt (e.g. `> Create a temporary testing workspace...`) that wraps across multiple terminal rows, moving the cursor backwards into the text using Left/Right arrow keys and subsequently pressing Up Arrow (`↑`) does not move the cursor to the line above in the prompt. Instead, the underlying shell triggers `previous-history`, obliterating the draft prompt and replacing it with the last executed shell command from history (e.g., `git status` or `ls`).
 
+**Status: RESOLVED & VERIFIED** (Full resolution log in [FIXED.md](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/docs/FIXED.md#issue-9-arrow-key-in-buffer-line-navigation-vs-history-ingestion-in-long-prompts))
+
 ### 9.2 Code Locations
 - [src/presentation/TerminalView.tsx](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/presentation/TerminalView.tsx#L481-L509) (`term.onData` key routing)
 - [src/presentation/TerminalView.tsx](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/presentation/TerminalView.tsx#L280-L330) (`attachCustomKeyEventHandler`)
@@ -557,7 +559,7 @@ When closing a terminal tab (or closing a split pane), the shell prompt (`userna
 | **6. Sentinel CLI Launcher** | `InstallerService.ts`, `packaging/` | Bug Fix & Safety | Medium | Needs Fix |
 | **7. Workflows Onboarding Selection** | `InstallerWizard.tsx`, `DiskWorkflowStorage.ts`, `StarterWorkflows.ts` | New Feature | Medium | Needs Fix |
 | **8. Clipboard Paste on Prompt Entry** | `TerminalView.tsx`, `src/utils/clipboard.ts` | Bug Fix | Low-Medium | **Resolved** (`224a50e`) |
-| **9. Arrow Key In-Buffer Navigation** | `TerminalView.tsx`, `PtyStateTracker.ts` | Architecture & UX | Medium | Needs Fix |
+| **9. Arrow Key In-Buffer Navigation** | `TerminalView.tsx`, `PromptNavigationEngine.ts` | Architecture & UX | Medium | **Resolved** |
 | **10. Tab Close Button Visibility** | `App.tsx`, `App.css` | UI Polish | Low | Needs Fix |
 | **11. Tab Close Canvas Scaling Glitch** | `TerminalView.tsx`, `App.tsx` | UI Bug Fix | Low-Medium | Needs Fix |
 

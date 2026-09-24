@@ -23,6 +23,7 @@ import { ThemeManager } from '../ui/theme/ThemeManager';
 import { ConsentQueue } from '../domain/security/ConsentQueue';
 import { CommandSafetyGuardian } from '../domain/security/CommandSafetyGuardian';
 import { PtyStateTracker } from '../domain/terminal/PtyStateTracker';
+import { PromptNavigationEngine, BufferLineInfo } from '../domain/terminal/PromptNavigationEngine';
 import { ShellAdapter } from '../domain/shell/ShellAdapter';
 import { isLinux, getPlatform } from '../shared/platform';
 import { 
@@ -187,6 +188,7 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
   const agentLoopRef = useRef<AgentLoop | null>(null);
   const ptyTrackerRef = useRef<PtyStateTracker>(new PtyStateTracker());
   const lastUnresolvedGoalRef = useRef<{ goal: string; timestamp: number } | null>(null);
+  const hasNavigatedCursorInLineRef = useRef<boolean>(false);
 
   const handleExecuteRemediation = async (rem: RemediationPrompt) => {
     setActiveRemediation(null);
@@ -376,6 +378,73 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
         return false;
       }
 
+      // Track horizontal cursor navigation inside prompt/command line
+      if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+        if (event.type === 'keydown') {
+          hasNavigatedCursorInLineRef.current = true;
+        }
+        return true;
+      }
+
+      // Reset horizontal navigation flag on Enter or line-clearing shortcuts
+      if (event.key === 'Enter' || (isCmdOrCtrl && (k === 'c' || k === 'u'))) {
+        if (event.type === 'keydown') {
+          hasNavigatedCursorInLineRef.current = false;
+        }
+        return true;
+      }
+
+      // Issue 9: In-buffer vertical line navigation vs shell history cycling
+      if (!isCmdOrCtrl && (event.key === 'ArrowUp' || event.key === 'ArrowDown')) {
+        const direction = event.key === 'ArrowUp' ? 'up' : 'down';
+        const buffer = term.buffer.active;
+        const totalBufferLines = buffer.length;
+        const currentAbsoluteY = buffer.baseY + buffer.cursorY;
+        const startExtractIdx = Math.max(0, currentAbsoluteY - 20);
+        const endExtractIdx = Math.min(totalBufferLines - 1, currentAbsoluteY + 20);
+        const lines: BufferLineInfo[] = [];
+
+        for (let idx = startExtractIdx; idx <= endExtractIdx; idx++) {
+          const l = buffer.getLine(idx);
+          if (l) {
+            lines.push({
+              text: l.translateToString(true),
+              isWrapped: Boolean(l.isWrapped),
+            });
+          }
+        }
+
+        const relativeCursorY = currentAbsoluteY - startExtractIdx;
+
+        const decision = PromptNavigationEngine.evaluateNavigation({
+          direction,
+          cursorX: buffer.cursorX,
+          cursorY: relativeCursorY,
+          cols: term.cols,
+          lines,
+          hasNavigatedCursorInLine: hasNavigatedCursorInLineRef.current,
+          isAlternateBuffer: ptyTrackerRef.current.isAlternateBuffer() || term.buffer.active.type === 'alternate',
+        });
+
+        if (decision.handled) {
+          if (event.type === 'keydown' && decision.payload) {
+            event.preventDefault();
+            event.stopPropagation();
+            const activeSessionId = sessionIdRef.current || sessionId;
+            if (activeSessionId) {
+              SessionManager.getInstance().write(activeSessionId, decision.payload);
+            }
+          }
+          return false;
+        }
+
+        // Allow shell history cycling when not handled
+        if (event.type === 'keydown') {
+          hasNavigatedCursorInLineRef.current = false;
+        }
+        return true;
+      }
+
       if (!isCmdOrCtrl) return true;
 
       // Ctrl+Shift+F: Toggle In-Buffer Search
@@ -548,6 +617,10 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
         term.onData(async (data) => {
           if (!currentSessionId) return;
           SentinelSerlCoordinator.getInstance().markActivity();
+
+          if (data.includes('\r') || data === '\n' || data === '\x03') {
+            hasNavigatedCursorInLineRef.current = false;
+          }
 
           // Handle Tab completion or Right Arrow completion
           if (data === '\t' || data === '\x1b[C') {

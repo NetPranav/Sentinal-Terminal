@@ -166,3 +166,51 @@ When typing an AI prompt starting with `>` (or entering any shell command) in th
 - [`src/utils/clipboard.ts`](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/utils/clipboard.ts): Unified clipboard read/write engine and terminal paste payload formatter.
 - [`src/utils/__tests__/clipboard.test.ts`](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/utils/__tests__/clipboard.test.ts): Unit tests for clipboard utilities.
 - [`src/presentation/TerminalView.tsx`](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/presentation/TerminalView.tsx): Replaced stale closure paste with ref-synchronized handler, integrated native clipboard reading, expanded Linux shortcut support (`Shift+Insert`, `Ctrl+Insert`), and unified context menu handling.
+
+---
+
+## Issue 9: Arrow Key In-Buffer Line Navigation vs. History Ingestion in Long Prompts
+
+### 9.1 Problem Statement
+When a user drafts or edits a multi-step prompt (e.g. `> Create a temporary testing workspace...`) that wraps across multiple terminal rows, or navigates horizontally within a prompt or command using the Left/Right arrow keys, pressing the Up Arrow (`↑`) key previously sent `\x1b[A` directly to the underlying PTY. GNU Readline in Bash/Zsh interprets `\x1b[A` as `previous-history`, obliterating the drafted prompt and replacing it with the last run command from shell history (e.g., `git status` or `ls`).
+
+### 9.2 Resolution Status
+- **Status:** Resolved & Verified
+- **Validation:** 100% test pass rate across unit test suite ([`src/domain/terminal/PromptNavigationEngine.test.ts`](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/domain/terminal/PromptNavigationEngine.test.ts) - 12/12 tests), full project test suite (193 test files, 1,386 tests), and production bundle build (`npm run build`).
+
+### 9.3 Technical Root Causes
+1. **GNU Readline Single-Line Buffer Ingestion Model:**
+   - GNU Readline and standard shell line editors operate on logical command strings rather than terminal-aware 2D grid coordinates.
+   - When a long command or prompt wraps across multiple physical terminal rows, Readline treats `\x1b[A` strictly as `previous-history`. It possesses no native concept that pressing Up Arrow from row 2 or 3 of a wrapped line should visually move the cursor up to the row above.
+2. **Direct Unchecked Forwarding of Arrow Escape Sequences:**
+   - In `TerminalView.tsx`, `term.onData` forwarded all unhandled keystrokes directly to `SessionManager.write(sessionId, data)`.
+   - When Up or Down arrow was pressed during prompt drafting or in-line editing, the escape codes `\x1b[A` and `\x1b[B` were dispatched directly to the PTY, wiping user-composed prompts without warning.
+3. **Absence of In-Line Horizontal Navigation State Tracking:**
+   - The terminal had no tracking mechanism to detect whether the user had intentionally moved their cursor backward into a command using Left Arrow (`ArrowLeft`) to inspect or modify arguments.
+   - Pressing Up Arrow while positioned in the middle of a command invariably destroyed the command buffer instead of navigating within the text.
+
+### 9.4 Implemented Architecture & Remediation
+1. **PromptNavigationEngine (`src/domain/terminal/PromptNavigationEngine.ts`):**
+   - Implemented `getPromptRowRange()` using xterm.js buffer line continuation flags (`line.isWrapped`) to compute the multi-row boundaries of the current logical command prompt:
+     - Identifies `startRow`, `endRow`, `totalRows`, and `currentRowOffset`.
+   - Implemented `evaluateNavigation()` to make deterministic decisions:
+     - **Multi-Row Prompts (`totalRows > 1`):**
+       - If on lower rows (`currentRowOffset > 0`), sends `\x1b[D`.repeat(cols) to move Readline's cursor point backward by exactly one terminal column width, shifting the cursor visually UP by one row without touching shell history.
+       - If on top row (`currentRowOffset === 0`), sends `\x01` (`beginning-of-line` / Ctrl+A) to jump to the prompt start.
+       - If on upper rows moving down (`currentRowOffset < totalRows - 1`), sends `\x1b[C`.repeat(cols) to move visually DOWN by one row.
+       - If on bottom row moving down (`currentRowOffset === totalRows - 1`), sends `\x05` (`end-of-line` / Ctrl+E) to jump to the prompt end.
+     - **Single-Row Prompts (`totalRows === 1`):**
+       - If the user navigated horizontally (`hasNavigatedCursorInLine === true` or `cursorX < endOfTextCol`) or is composing an AI prompt (`>`), Up arrow moves to the beginning of the text (`\x01`) and Down arrow moves to the end (`\x05`), preventing history erasure.
+       - If at an empty prompt (`trimmedInput.length === 0`) or at the end of an unedited normal shell command, passes `\x1b[A` / `\x1b[B` through to Readline for standard history cycling.
+2. **Horizontal Navigation State Tracking in `TerminalView.tsx`:**
+   - Added `hasNavigatedCursorInLineRef` to record when `ArrowLeft` or `ArrowRight` is pressed within the active line.
+   - Automatically resets `hasNavigatedCursorInLineRef` to `false` on `Enter`, `Ctrl+C` (`\x03`), `Ctrl+U`, or when normal history cycling occurs at an empty prompt.
+3. **Alternate Screen Buffer Guard:**
+   - Intercepts are automatically bypassed when `ptyTrackerRef.current.isAlternateBuffer()` or `term.buffer.active.type === 'alternate'` is active (e.g. `vim`, `nano`, `htop`, `less`), ensuring full-screen interactive TUIs receive raw arrow keys without interference.
+4. **Comprehensive Automated Test Suite (`PromptNavigationEngine.test.ts`):**
+   - 12 comprehensive unit tests validating single-row boundary calculation, multi-row wrapped prompt detection, visual line-up offset calculation, top-line Ctrl+A guard, bottom-line Ctrl+E guard, empty prompt history pass-through, alternate buffer bypass, horizontal cursor navigation protection, AI prompt protection, and standard shell command redirect pass-through.
+
+### 9.5 Touched Components & Files
+- [`src/domain/terminal/PromptNavigationEngine.ts`](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/domain/terminal/PromptNavigationEngine.ts): Smart prompt boundary detection and arrow navigation evaluation engine.
+- [`src/domain/terminal/PromptNavigationEngine.test.ts`](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/domain/terminal/PromptNavigationEngine.test.ts): Unit tests covering all 12 navigation scenarios.
+- [`src/presentation/TerminalView.tsx`](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/presentation/TerminalView.tsx): Integrated `PromptNavigationEngine`, added `hasNavigatedCursorInLineRef` tracking, alternate buffer detection, and input reset handlers.
