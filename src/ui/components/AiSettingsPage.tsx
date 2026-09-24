@@ -1255,7 +1255,7 @@ export const AiSettingsPage: React.FC<AiSettingsPageProps> = ({
                       type="text"
                       value={customUrlInput}
                       onChange={(e) => setCustomUrlInput(e.target.value)}
-                      placeholder="http://localhost:8000/v1/chat/completions"
+                      placeholder="https://integrate.api.nvidia.com/v1"
                       style={{
                         padding: '8px 12px',
                         borderRadius: '6px',
@@ -1266,6 +1266,9 @@ export const AiSettingsPage: React.FC<AiSettingsPageProps> = ({
                         outline: 'none'
                       }}
                     />
+                    <span style={{ fontSize: '10.5px', color: 'rgba(255, 255, 255, 0.4)' }}>
+                      e.g. https://integrate.api.nvidia.com/v1 (Sentinel automatically appends /chat/completions)
+                    </span>
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                     <label style={{ fontSize: '11.5px', color: 'rgba(255, 255, 255, 0.6)', fontWeight: 500 }}>
@@ -1275,7 +1278,7 @@ export const AiSettingsPage: React.FC<AiSettingsPageProps> = ({
                       type="text"
                       value={customModelInput}
                       onChange={(e) => setCustomModelInput(e.target.value)}
-                      placeholder="e.g. meta-llama/Llama-3-70b-chat"
+                      placeholder="e.g. nvidia/nemotron-3-ultra-550b-a55b"
                       style={{
                         padding: '8px 12px',
                         borderRadius: '6px',
@@ -1286,6 +1289,9 @@ export const AiSettingsPage: React.FC<AiSettingsPageProps> = ({
                         outline: 'none'
                       }}
                     />
+                    <span style={{ fontSize: '10.5px', color: 'rgba(255, 255, 255, 0.4)' }}>
+                      Exact model name from your provider catalog
+                    </span>
                   </div>
                 </div>
               )}

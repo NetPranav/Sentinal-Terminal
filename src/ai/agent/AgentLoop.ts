@@ -1300,6 +1300,89 @@ export class AgentLoop {
       return result;
     }
 
+    // Generic Workflow Save Directive (Deterministic, zero AI inference)
+    const saveRequest = MultistagePromptDecomposer.getInstance().parseScopedWorkflowSave(goal);
+    if (saveRequest) {
+      const { workflowName: name, maxSteps } = saveRequest;
+      const recorder = WorkflowRecorder.getInstance();
+      const saved = await recorder.saveFromUndoLog(name, context.sessionId || 'default', maxSteps);
+      const summary = `Workflow file written to disk: Saved ${saved.steps.length} step(s) to ~/.sentinel/workflows/${name}.json (schemaVersion: 1)`;
+      this.emit({ type: 'done', message: summary });
+      return {
+        success: true,
+        summary,
+        steps: [{
+          tool: 'workflow.save',
+          params: { name, maxSteps },
+          result: { success: true, data: saved }
+        }]
+      };
+    }
+
+    // Generic Workflow Run Directive (Deterministic, zero AI inference)
+    const runMatch = goal.match(/^run\s+workflow\s+([a-zA-Z0-9_\-]+)(?:\s+(.+))?$/i);
+    if (runMatch) {
+      const name = runMatch[1].trim();
+      const flagStr = runMatch[2] || '';
+      const replayEngine = DeterministicReplayEngine.getInstance();
+      const overrides = replayEngine.parseCliOverrides(flagStr);
+
+      this.emit({ type: 'thinking', message: `Replaying workflow "${name}" deterministically (zero AI inference)...` });
+
+      const replayResult = await replayEngine.replay(name, {
+        sessionId: context.sessionId,
+        parameters: overrides,
+        autoApprove: true,
+        executor: async (cmd: string, cwd?: string) => {
+          const res = await this.toolExecutor.execute(
+            'shell.execute',
+            { command: cmd, cwd: cwd || context.cwd },
+            cwd || context.cwd,
+            this.authorizationHandler
+          );
+          return {
+            code: res.success ? (res.data?.code ?? 0) : 1,
+            stdout: res.data?.stdout || '',
+            stderr: res.data?.stderr || (res.success ? '' : 'Execution failed')
+          };
+        },
+        onStepStart: (step, idx, total) => {
+          this.emit({ type: 'tool_start', message: `Step ${idx + 1}/${total}: ${step.name} (${step.command})` });
+        },
+        onStepDone: (step, res) => {
+          this.emit({
+            type: res.status === 'completed' ? 'tool_done' : 'error',
+            message: `Step ${step.name}: ${res.status}`
+          });
+        }
+      });
+
+      const summary = replayResult.success
+        ? `Deterministic instant execution: Executed ${replayResult.stepsExecuted} steps of workflow "${name}" with zero LLM inference tokens.`
+        : `Workflow execution failed: ${replayResult.error}`;
+
+      this.emit({
+        type: replayResult.success ? 'done' : 'error',
+        message: summary
+      });
+
+      return {
+        success: replayResult.success,
+        summary,
+        steps: replayResult.stepResults.map(r => ({
+          tool: 'shell.execute',
+          params: { command: r.command },
+          result: { success: r.status === 'completed', stdout: r.stdout, stderr: r.stderr }
+        }))
+      };
+    }
+
+    // Direct Multi-stage Workflow Execution (when prompt matches DAG decomposer)
+    const multistageDecomposer = MultistagePromptDecomposer.getInstance();
+    if (multistageDecomposer.isMultistagePrompt(goal)) {
+      return await this.executeMultistageWorkflow(goal, context);
+    }
+
     const answer = goal.trim();
 
     // Check if this was a response to a pending directory confirmation / typo question
@@ -1759,113 +1842,124 @@ export class AgentLoop {
     // Offline / Direct Multi-stage Workflow Execution (when prompt matches DAG decomposer)
     const decomposer = MultistagePromptDecomposer.getInstance();
     if (decomposer.isMultistagePrompt(goal)) {
-      const plan = decomposer.decompose(goal, { cwd: context.cwd, os: context.os });
-      this.emit({ type: 'thinking', message: `Executing decomposed multi-stage workflow "${plan.name}" (${plan.stages.length} stages)...` });
-      const steps: AgentResult['steps'] = [];
-      let allSuccess = true;
-
-      for (let i = 0; i < plan.stages.length; i++) {
-        const stage = plan.stages[i];
-
-        // 1. Evaluate Precondition Check if defined (Phase 0.75 Task 0.75.2)
-        if (stage.precondition_check) {
-          this.emit({ type: 'thinking', message: `Evaluating precondition for stage "${stage.name}": ${stage.precondition_check}` });
-          const preResult = await this.toolExecutor.execute(
-            'shell.execute',
-            { command: stage.precondition_check, explanation: `Precondition check for ${stage.name}` },
-            stage.cwd || context.cwd,
-            this.authorizationHandler
-          );
-
-          const prePassed = preResult.success && (preResult.data?.code === 0 || preResult.data?.code === undefined);
-
-          if (prePassed) {
-            if (stage.if_precondition_true === 'skip') {
-              this.emit({ type: 'tool_done', message: `✓ Precondition satisfied for ${stage.name}. Skipping redundant step.` });
-              steps.push({
-                tool: 'shell.execute',
-                params: { command: stage.precondition_check, explanation: `Precondition satisfied: skip ${stage.name}` },
-                result: { success: true, data: { stdout: `Precondition satisfied (${stage.precondition_check}): ${stage.name} skipped.`, code: 0 } }
-              });
-              continue;
-            } else if (stage.if_precondition_true === 'abort') {
-              allSuccess = false;
-              this.emit({ type: 'error', message: `Precondition triggered abort for stage "${stage.name}".` });
-              break;
-            }
-          } else {
-            if (stage.if_precondition_false === 'abort') {
-              allSuccess = false;
-              this.emit({ type: 'error', message: `Precondition check failed for stage "${stage.name}": ${stage.precondition_check}. Aborting.` });
-              break;
-            } else if (stage.if_precondition_false === 'skip') {
-              this.emit({ type: 'thinking', message: `Precondition unsatisfied for ${stage.name}. Skipping step.` });
-              continue;
-            }
-            // If 'install' or 'continue', proceed with execution
-          }
-        }
-
-        // 2. Step-Level Routing & Dynamic Tool Pruning (Phase 0.75 Task 0.75.3)
-        const prunedTools = DynamicToolPruner.prune(this.toolSpecs, stage.rawPrompt, { maxTools: 5 });
-
-        // If stage is an un-synthesized natural language step, route to coder model with pruned tools
-        if (stage.inferredCommand === stage.rawPrompt && !/^(?:sudo\s+)?[a-zA-Z0-9_\-\.\/]+(?:\s+.*)?$/.test(stage.inferredCommand.trim())) {
-          this.emit({ type: 'tool_start', message: `Stage ${i + 1}/${plan.stages.length}: ${stage.name} (dispatching to coder model with ${prunedTools.length} domain tools)` });
-          const stageResult = await this.runLLMLoop(
-            stage.rawPrompt,
-            { ...context, cwd: stage.cwd || context.cwd },
-            { toolSubset: prunedTools, stageContext: stage.precondition_check ? `Precondition check: ${stage.precondition_check}` : undefined }
-          );
-
-          if (stageResult.steps) {
-            steps.push(...stageResult.steps);
-          }
-          if (!stageResult.success) {
-            allSuccess = false;
-            this.emit({ type: 'error', message: `Stage failed: ${stage.name}` });
-            break;
-          } else {
-            this.emit({ type: 'tool_done', message: `✓ ${stage.name}` });
-          }
-        } else {
-          // Direct execution of synthesized command
-          this.emit({ type: 'tool_start', message: `Stage ${i + 1}/${plan.stages.length}: ${stage.name} (${stage.inferredCommand})` });
-          const result = await this.toolExecutor.execute(
-            'shell.execute',
-            { command: stage.inferredCommand, explanation: stage.name },
-            stage.cwd || context.cwd,
-            this.authorizationHandler
-          );
-          steps.push({
-            tool: 'shell.execute',
-            params: { command: stage.inferredCommand, explanation: stage.name },
-            result
-          });
-          if (!result.success) {
-            allSuccess = false;
-            this.emit({ type: 'error', message: `Stage failed: ${stage.name}` });
-            break;
-          } else {
-            this.emit({ type: 'tool_done', message: `✓ ${stage.name}` });
-          }
-        }
-      }
-
-      const summary = allSuccess
-        ? `Successfully executed ${steps.length} stage(s) of decomposed workflow "${plan.name}".`
-        : `Decomposed workflow "${plan.name}" failed during execution.`;
-
-      this.emit({ type: allSuccess ? 'done' : 'error', message: summary });
-
-      return {
-        success: allSuccess,
-        summary,
-        steps
-      };
+      return await this.executeMultistageWorkflow(goal, context);
     }
 
     return null;
+  }
+
+  /**
+   * Executes a decomposed multi-stage workflow DAG with precondition checking and step synthesis.
+   */
+  private async executeMultistageWorkflow(
+    goal: string,
+    context: { os: string; cwd: string; sessionId?: string }
+  ): Promise<AgentResult> {
+    const decomposer = MultistagePromptDecomposer.getInstance();
+    const plan = decomposer.decompose(goal, { cwd: context.cwd, os: context.os });
+    this.emit({ type: 'thinking', message: `Executing decomposed multi-stage workflow "${plan.name}" (${plan.stages.length} stages)...` });
+    const steps: AgentResult['steps'] = [];
+    let allSuccess = true;
+
+    for (let i = 0; i < plan.stages.length; i++) {
+      const stage = plan.stages[i];
+
+      // 1. Evaluate Precondition Check if defined (Phase 0.75 Task 0.75.2)
+      if (stage.precondition_check) {
+        this.emit({ type: 'thinking', message: `Evaluating precondition for stage "${stage.name}": ${stage.precondition_check}` });
+        const preResult = await this.toolExecutor.execute(
+          'shell.execute',
+          { command: stage.precondition_check, explanation: `Precondition check for ${stage.name}` },
+          stage.cwd || context.cwd,
+          this.authorizationHandler
+        );
+
+        const prePassed = preResult.success && (preResult.data?.code === 0 || preResult.data?.code === undefined);
+
+        if (prePassed) {
+          if (stage.if_precondition_true === 'skip') {
+            this.emit({ type: 'tool_done', message: `✓ Precondition satisfied for ${stage.name}. Skipping redundant step.` });
+            steps.push({
+              tool: 'shell.execute',
+              params: { command: stage.precondition_check, explanation: `Precondition satisfied: skip ${stage.name}` },
+              result: { success: true, data: { stdout: `Precondition satisfied (${stage.precondition_check}): ${stage.name} skipped.`, code: 0 } }
+            });
+            continue;
+          } else if (stage.if_precondition_true === 'abort') {
+            allSuccess = false;
+            this.emit({ type: 'error', message: `Precondition triggered abort for stage "${stage.name}".` });
+            break;
+          }
+        } else {
+          if (stage.if_precondition_false === 'abort') {
+            allSuccess = false;
+            this.emit({ type: 'error', message: `Precondition check failed for stage "${stage.name}": ${stage.precondition_check}. Aborting.` });
+            break;
+          } else if (stage.if_precondition_false === 'skip') {
+            this.emit({ type: 'thinking', message: `Precondition unsatisfied for ${stage.name}. Skipping step.` });
+            continue;
+          }
+          // If 'install' or 'continue', proceed with execution
+        }
+      }
+
+      // 2. Step-Level Routing & Dynamic Tool Pruning (Phase 0.75 Task 0.75.3)
+      const prunedTools = DynamicToolPruner.prune(this.toolSpecs, stage.rawPrompt, { maxTools: 5 });
+
+      // If stage is an un-synthesized natural language step, route to coder model with pruned tools
+      if (stage.inferredCommand === stage.rawPrompt && !/^(?:sudo\s+)?[a-zA-Z0-9_\-\.\/]+(?:\s+.*)?$/.test(stage.inferredCommand.trim())) {
+        this.emit({ type: 'tool_start', message: `Stage ${i + 1}/${plan.stages.length}: ${stage.name} (dispatching to coder model with ${prunedTools.length} domain tools)` });
+        const stageResult = await this.runLLMLoop(
+          stage.rawPrompt,
+          { ...context, cwd: stage.cwd || context.cwd },
+          { toolSubset: prunedTools, stageContext: stage.precondition_check ? `Precondition check: ${stage.precondition_check}` : undefined }
+        );
+
+        if (stageResult.steps) {
+          steps.push(...stageResult.steps);
+        }
+        if (!stageResult.success) {
+          allSuccess = false;
+          this.emit({ type: 'error', message: `Stage failed: ${stage.name}` });
+          break;
+        } else {
+          this.emit({ type: 'tool_done', message: `✓ ${stage.name}` });
+        }
+      } else {
+        // Direct execution of synthesized command
+        this.emit({ type: 'tool_start', message: `Stage ${i + 1}/${plan.stages.length}: ${stage.name} (${stage.inferredCommand})` });
+        const result = await this.toolExecutor.execute(
+          'shell.execute',
+          { command: stage.inferredCommand, explanation: stage.name },
+          stage.cwd || context.cwd,
+          this.authorizationHandler
+        );
+        steps.push({
+          tool: 'shell.execute',
+          params: { command: stage.inferredCommand, explanation: stage.name },
+          result
+        });
+        if (!result.success) {
+          allSuccess = false;
+          this.emit({ type: 'error', message: `Stage failed: ${stage.name}` });
+          break;
+        } else {
+          this.emit({ type: 'tool_done', message: `✓ ${stage.name}` });
+        }
+      }
+    }
+
+    const summary = allSuccess
+      ? `Successfully executed ${steps.length} stage(s) of decomposed workflow "${plan.name}".`
+      : `Decomposed workflow "${plan.name}" failed during execution.`;
+
+    this.emit({ type: allSuccess ? 'done' : 'error', message: summary });
+
+    return {
+      success: allSuccess,
+      summary,
+      steps
+    };
   }
 
   /**

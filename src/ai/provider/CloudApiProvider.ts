@@ -69,6 +69,80 @@ export const CLOUD_CATALOG: Record<CloudServiceId, { name: string; defaultUrl: s
   }
 };
 
+/**
+ * Normalizes user-provided or default URLs into full API endpoint paths.
+ * Automatically appends /chat/completions (for OpenAI-compatible endpoints)
+ * or /messages (for Anthropic) if the user provides a base URL (e.g. https://integrate.api.nvidia.com/v1).
+ */
+export function normalizeEndpointUrl(serviceId: CloudServiceId, rawUrl?: string): string {
+  const catalog = CLOUD_CATALOG[serviceId];
+  let url = (rawUrl || '').trim();
+  if (!url) {
+    return catalog.defaultUrl;
+  }
+
+  // Remove trailing slashes
+  url = url.replace(/\/+$/, '');
+
+  if (serviceId === 'anthropic') {
+    if (url.endsWith('/messages')) return url;
+    return `${url}/messages`;
+  }
+
+  // OpenAI-compatible endpoints (openai, groq, deepseek, openrouter, custom/nvidia)
+  if (url.endsWith('/chat/completions')) {
+    return url;
+  }
+
+  if (url.endsWith('/v1')) {
+    return `${url}/chat/completions`;
+  }
+
+  if (url.includes('nvidia.com')) {
+    return `${url}/v1/chat/completions`;
+  }
+
+  return `${url}/chat/completions`;
+}
+
+/**
+ * Universal fetch that routes via Tauri's native reqwest client when available,
+ * completely bypassing browser CORS restrictions and WebKit 'Load failed' errors.
+ */
+export async function httpFetch(url: string, init?: RequestInit): Promise<Response> {
+  if (typeof window !== 'undefined' && ((window as any).__TAURI_INTERNALS__ || (window as any).__TAURI__)) {
+    try {
+      const { fetch: tauriFetch } = await import('@tauri-apps/plugin-http');
+      return await tauriFetch(url, init);
+    } catch (err) {
+      console.warn('[CloudApiProvider] Tauri HTTP plugin fallback to native fetch:', err);
+    }
+  }
+  return await fetch(url, init);
+}
+
+/**
+ * Extracts a meaningful error message from varied LLM API responses (OpenAI, Anthropic, NVIDIA, FastAPI).
+ */
+async function extractErrorMessage(res: Response): Promise<string> {
+  try {
+    const data = await res.json();
+    if (data) {
+      if (typeof data.error === 'string') return data.error;
+      if (data.error?.message) return data.error.message;
+      if (typeof data.detail === 'string') return data.detail;
+      if (Array.isArray(data.detail)) return data.detail.map((d: any) => d.msg || JSON.stringify(d)).join(', ');
+      if (data.title && data.detail) return `${data.title}: ${data.detail}`;
+      if (data.message) return data.message;
+      if (data.title) return data.title;
+    }
+  } catch {
+    const text = await res.text().catch(() => '');
+    if (text) return text.slice(0, 200);
+  }
+  return `HTTP ${res.status}: ${res.statusText || 'Request failed'}`;
+}
+
 export class CloudApiProvider implements ModelProvider {
   public readonly providerId = 'cloud_api';
   public readonly providerName = 'Cloud API Provider';
@@ -154,15 +228,14 @@ export class CloudApiProvider implements ModelProvider {
     customUrl?: string,
     customModel?: string
   ): Promise<{ success: boolean; latencyMs?: number; error?: string }> {
-    const catalog = CLOUD_CATALOG[serviceId];
-    const url = customUrl || catalog.defaultUrl;
-    const model = customModel || catalog.defaultModel;
+    const url = normalizeEndpointUrl(serviceId, customUrl);
+    const model = customModel?.trim() || CLOUD_CATALOG[serviceId].defaultModel;
 
     const start = performance.now();
 
     try {
       if (serviceId === 'anthropic') {
-        const res = await fetch(url, {
+        const res = await httpFetch(url, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -171,21 +244,21 @@ export class CloudApiProvider implements ModelProvider {
           },
           body: JSON.stringify({
             model,
-            max_tokens: 5,
+            max_tokens: 16,
             messages: [{ role: 'user', content: 'ping' }]
           })
         });
 
         const latencyMs = Math.round(performance.now() - start);
         if (!res.ok) {
-          const errData = await res.json().catch(() => ({}));
-          return { success: false, error: errData.error?.message || `HTTP ${res.status}: ${res.statusText}` };
+          const errMessage = await extractErrorMessage(res);
+          return { success: false, error: errMessage };
         }
         return { success: true, latencyMs };
       }
 
-      // Standard OpenAI-compatible format (OpenAI, Groq, DeepSeek, OpenRouter, Custom)
-      const res = await fetch(url, {
+      // Standard OpenAI-compatible format (OpenAI, Groq, DeepSeek, OpenRouter, NVIDIA, Custom)
+      const res = await httpFetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -193,15 +266,15 @@ export class CloudApiProvider implements ModelProvider {
         },
         body: JSON.stringify({
           model,
-          max_tokens: 5,
+          max_tokens: 16,
           messages: [{ role: 'user', content: 'ping' }]
         })
       });
 
       const latencyMs = Math.round(performance.now() - start);
       if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        return { success: false, error: errData.error?.message || `HTTP ${res.status}: ${res.statusText}` };
+        const errMessage = await extractErrorMessage(res);
+        return { success: false, error: errMessage };
       }
       return { success: true, latencyMs };
     } catch (err: any) {
@@ -250,7 +323,7 @@ export class CloudApiProvider implements ModelProvider {
     }
 
     const start = performance.now();
-    const url = active.baseUrl || CLOUD_CATALOG[active.serviceId].defaultUrl;
+    const url = normalizeEndpointUrl(active.serviceId, active.baseUrl);
     const model = modelId || active.modelId || CLOUD_CATALOG[active.serviceId].defaultModel;
 
     // Messages formatting
@@ -270,7 +343,7 @@ export class CloudApiProvider implements ModelProvider {
       };
       if (systemMsg) body.system = systemMsg;
 
-      const res = await fetch(url, {
+      const res = await httpFetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -282,8 +355,8 @@ export class CloudApiProvider implements ModelProvider {
 
       const latencyMs = Math.round(performance.now() - start);
       if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error?.message || `Anthropic error: ${res.statusText}`);
+        const errMessage = await extractErrorMessage(res);
+        throw new Error(errMessage);
       }
 
       const json = await res.json();
@@ -300,26 +373,43 @@ export class CloudApiProvider implements ModelProvider {
       };
     }
 
-    // Standard OpenAI-compatible
-    const res = await fetch(url, {
+    // Standard OpenAI-compatible execution
+    const requestBody: any = {
+      model,
+      messages,
+      temperature: options?.temperature ?? 0.2,
+      max_tokens: options?.maxTokens || 1024
+    };
+    if (options?.format === 'json') {
+      requestBody.response_format = { type: 'json_object' };
+    }
+
+    let res = await httpFetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${active.apiKey.trim()}`
       },
-      body: JSON.stringify({
-        model,
-        messages,
-        temperature: options?.temperature ?? 0.2,
-        max_tokens: options?.maxTokens || 1024,
-        response_format: options?.format === 'json' ? { type: 'json_object' } : undefined
-      })
+      body: JSON.stringify(requestBody)
     });
+
+    // If endpoint rejects response_format (e.g. 400 Bad Request on some models), retry once without it
+    if (!res.ok && res.status === 400 && requestBody.response_format) {
+      delete requestBody.response_format;
+      res = await httpFetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${active.apiKey.trim()}`
+        },
+        body: JSON.stringify(requestBody)
+      });
+    }
 
     const latencyMs = Math.round(performance.now() - start);
     if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.error?.message || `Cloud API error: ${res.statusText}`);
+      const errMessage = await extractErrorMessage(res);
+      throw new Error(errMessage);
     }
 
     const json = await res.json();
