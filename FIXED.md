@@ -126,7 +126,7 @@ When typing an AI prompt starting with `>` (or entering any shell command) in th
 
 ### 8.2 Resolution Status
 - **Status:** Resolved & Verified
-- **Commit:** `Pending`
+- **Commit:** `224a50e` (`fix(terminal): resolve clipboard paste failure on prompt entry with native clipboard integration and ref sync`)
 - **Validation:** 100% test pass rate across unit test suite ([`src/utils/__tests__/clipboard.test.ts`](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/utils/__tests__/clipboard.test.ts)), full test suite (192 test files, 1,374 tests), and production bundle build.
 
 ### 8.3 Technical Root Causes
