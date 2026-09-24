@@ -12,6 +12,8 @@
 
 import { spawnSync } from 'node:child_process';
 import * as os from 'node:os';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 
 export interface CommandExecutionRecord {
   command: string;
@@ -237,6 +239,40 @@ export class NodeTauriBridge {
 
       case 'get_app_binary_path': {
         return process.execPath;
+      }
+
+      case 'write_system_file': {
+        const filePath = (payload as any)?.path;
+        const contents = (payload as any)?.contents ?? '';
+        if (filePath) {
+          const dir = path.dirname(filePath);
+          if (!fs.existsSync(dir)) {
+            fs.mkdirSync(dir, { recursive: true });
+          }
+          fs.writeFileSync(filePath, contents, 'utf-8');
+        }
+        return null;
+      }
+
+      case 'create_system_dir': {
+        const dirPath = (payload as any)?.path;
+        if (dirPath && !fs.existsSync(dirPath)) {
+          fs.mkdirSync(dirPath, { recursive: true });
+        }
+        return null;
+      }
+
+      case 'read_system_file': {
+        const filePath = (payload as any)?.path;
+        if (filePath && fs.existsSync(filePath)) {
+          return fs.readFileSync(filePath, 'utf-8');
+        }
+        throw new Error(`File not found: ${filePath}`);
+      }
+
+      case 'check_path_exists': {
+        const checkPath = (payload as any)?.path;
+        return checkPath ? fs.existsSync(checkPath) : false;
       }
 
       default:

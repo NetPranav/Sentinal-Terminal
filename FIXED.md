@@ -367,6 +367,10 @@ Selecting the onboarding option "Linux Desktop / File Manager Actions" previousl
    - `App.tsx` never queried `get_launch_args` during initial mount. `panePaths` initialized to `{}`, defaulting all initial terminal panes to `'~'`.
 3. **Missing `file://` URI Support in URL Scheme Handler**:
    - Standard FreeDesktop desktop entries with `%U` supply arguments as `file://` URIs (e.g. `file:///home/user/project`), which [`UrlSchemeHandler.ts`](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/domain/integration/UrlSchemeHandler.ts) previously treated as `noop`.
+4. **Tauri v2 Plugin-FS Scope Sandboxing Block (`forbidden path`)**:
+   - Tauri v2 enforces strict permission scopes for `@tauri-apps/plugin-fs` via `src-tauri/capabilities/default.json`.
+   - The default capability file lacked global and `$HOME` filesystem scopes for write/mkdir operations, granting only default app-data scopes.
+   - When users clicked "Enable" in the UI, `mkdir` and `writeTextFile` attempts against `~/.local/share/nautilus/scripts` were blocked at the Tauri IPC boundary, throwing `Error: forbidden path: /home/user/.local/share/nautilus/scripts`.
 
 ### 4.4 Implemented Architecture & Remediation
 1. **Multi-File Manager Desktop Integrations**:
@@ -376,18 +380,26 @@ Selecting the onboarding option "Linux Desktop / File Manager Actions" previousl
      - **MATE Caja**: `~/.local/share/caja/scripts/Open in Sentinel Terminal`
      - **KDE Dolphin**: `~/.local/share/kio/servicemenus/sentinel_open.desktop` and legacy `~/.local/share/kservices5/ServiceMenus/sentinel_open.desktop` (`ServiceTypes=KonqPopupMenu/Plugin,inode/directory`, `Exec=sentinel "%f"`, `X-KDE-Priority=TopLevel`)
      - **XFCE Thunar**: Injects custom action into `~/.config/Thunar/uca.xml` for folder patterns `*` with `<command>sentinel %f</command>`.
-2. **Universal FreeDesktop Desktop Entry**:
+2. **Dual-Layer Filesystem Permission & Native Fallback Architecture**:
+   - **Tauri IPC Scope Resolution**: Updated [`src-tauri/capabilities/default.json`](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src-tauri/capabilities/default.json) with `fs:allow-home-read-recursive`, `fs:allow-home-write-recursive`, and an explicit `fs:scope` configuration allowing `$HOME/**`, `$HOME/**/*`, and root paths.
+   - **Native Rust Host Fallbacks**: Implemented `write_system_file`, `create_system_dir`, `read_system_file`, and `check_path_exists` in [`src-tauri/src/process_cmds.rs`](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src-tauri/src/process_cmds.rs) and registered them in [`src-tauri/src/lib.rs`](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src-tauri/src/lib.rs).
+   - **Resilient Frontend Helpers**: Created `safeExists()`, `safeMkdir()`, `safeWriteTextFile()`, and `safeReadTextFile()` in [`InstallerService.ts`](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/domain/integration/InstallerService.ts). If `@tauri-apps/plugin-fs` is restricted by webview security sandboxing on any environment, the operation automatically and seamlessly falls back to the native Rust commands.
+3. **Universal FreeDesktop Desktop Entry**:
    - Installed `~/.local/share/applications/sentinel-terminal.desktop` with `Exec=sentinel-terminal %U`, `MimeType=inode/directory;x-scheme-handler/sentinel;`, and `Actions=NewWindow;`.
    - Executed non-fatal `update-desktop-database` and `xdg-mime default` registrations.
-3. **Startup Launch Argument Processing in `App.tsx`**:
+4. **Startup Launch Argument Processing in `App.tsx`**:
    - Added startup `useEffect` in [`App.tsx`](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/App.tsx) consuming `get_launch_args`.
    - Filters flags, parses paths and URIs, sets `panePaths` for the initial pane (`tab_initial`), and transitions already-spawned sessions via `cd <path>`.
    - Automatically opens separate tabs for additional folder paths.
-4. **Enhanced URI Protocol Parsing**:
+5. **Enhanced URI Protocol Parsing**:
    - Updated [`UrlSchemeHandler.ts`](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/domain/integration/UrlSchemeHandler.ts) to parse `file://` URIs and extract clean decoded paths.
 
 ### 4.5 Touched Components & Files
-- [`src/domain/integration/InstallerService.ts`](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/domain/integration/InstallerService.ts): Multi-file manager actions (Nautilus, Nemo, Caja, Dolphin, Thunar) and FreeDesktop desktop file installer.
+- [`src-tauri/capabilities/default.json`](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src-tauri/capabilities/default.json): Expanded filesystem permissions and scope configuration.
+- [`src-tauri/src/process_cmds.rs`](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src-tauri/src/process_cmds.rs): Native commands for `write_system_file`, `create_system_dir`, `read_system_file`, and `check_path_exists`.
+- [`src-tauri/src/lib.rs`](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src-tauri/src/lib.rs): Registered native system file commands in `generate_handler!`.
+- [`src/domain/integration/InstallerService.ts`](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/domain/integration/InstallerService.ts): Safe filesystem helpers (`safeExists`, `safeMkdir`, `safeWriteTextFile`, `safeReadTextFile`) and multi-file manager integrations.
+- [`src/infrastructure/execution/NodeTauriBridge.ts`](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/infrastructure/execution/NodeTauriBridge.ts): Node.js IPC emulation for system file commands.
 - [`src/App.tsx`](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/App.tsx): Startup argument processing, pane path binding, and race-free session directory navigation.
 - [`src/domain/integration/UrlSchemeHandler.ts`](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/domain/integration/UrlSchemeHandler.ts): Support for `file://` URIs.
 - [`src/ui/components/InstallerWizard.tsx`](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/ui/components/InstallerWizard.tsx): Updated integration cards and badges.

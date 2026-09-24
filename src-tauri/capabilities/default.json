@@ -19,6 +19,19 @@
     "fs:allow-mkdir",
     "fs:allow-remove",
     "fs:allow-read-dir",
+    "fs:allow-home-read-recursive",
+    "fs:allow-home-write-recursive",
+    {
+      "identifier": "fs:scope",
+      "allow": [
+        "$HOME/**",
+        "$HOME/**/*",
+        "/home/**",
+        "/home/**/*",
+        "**",
+        "**/*"
+      ]
+    },
     "os:default",
     "os:allow-os-type",
     "os:allow-platform",

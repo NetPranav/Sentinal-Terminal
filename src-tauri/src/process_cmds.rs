@@ -129,6 +129,36 @@ pub fn get_app_binary_path() -> Result<String, String> {
         .map_err(|e| e.to_string())
 }
 
+#[tauri::command]
+pub fn write_system_file(path: String, contents: String) -> Result<(), String> {
+    let p = std::path::Path::new(&path);
+    if let Some(parent) = p.parent() {
+        if !parent.exists() {
+            std::fs::create_dir_all(parent)
+                .map_err(|e| format!("Failed to create parent directories for {}: {}", path, e))?;
+        }
+    }
+    std::fs::write(&path, contents)
+        .map_err(|e| format!("Failed to write to {}: {}", path, e))
+}
+
+#[tauri::command]
+pub fn create_system_dir(path: String) -> Result<(), String> {
+    std::fs::create_dir_all(&path)
+        .map_err(|e| format!("Failed to create directory {}: {}", path, e))
+}
+
+#[tauri::command]
+pub fn read_system_file(path: String) -> Result<String, String> {
+    std::fs::read_to_string(&path)
+        .map_err(|e| format!("Failed to read {}: {}", path, e))
+}
+
+#[tauri::command]
+pub fn check_path_exists(path: String) -> bool {
+    std::path::Path::new(&path).exists()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

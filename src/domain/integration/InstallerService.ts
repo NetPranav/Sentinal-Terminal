@@ -33,6 +33,54 @@ export const getHomeDir = (): string => {
   return '/home/user';
 };
 
+export const safeExists = async (p: string): Promise<boolean> => {
+  try {
+    return await exists(p);
+  } catch {
+    try {
+      return await invoke<boolean>('check_path_exists', { path: p });
+    } catch {
+      return false;
+    }
+  }
+};
+
+export const safeMkdir = async (p: string, options?: { recursive?: boolean }): Promise<void> => {
+  try {
+    await mkdir(p, options);
+  } catch (e: any) {
+    try {
+      await invoke('create_system_dir', { path: p });
+    } catch (err2: any) {
+      throw new Error(e?.message || err2?.message || String(err2));
+    }
+  }
+};
+
+export const safeWriteTextFile = async (p: string, contents: string): Promise<void> => {
+  try {
+    await writeTextFile(p, contents);
+  } catch (e: any) {
+    try {
+      await invoke('write_system_file', { path: p, contents });
+    } catch (err2: any) {
+      throw new Error(e?.message || err2?.message || String(err2));
+    }
+  }
+};
+
+export const safeReadTextFile = async (p: string): Promise<string> => {
+  try {
+    return await readTextFile(p);
+  } catch (e: any) {
+    try {
+      return await invoke<string>('read_system_file', { path: p });
+    } catch (err2: any) {
+      throw new Error(e?.message || err2?.message || String(err2));
+    }
+  }
+};
+
 export class InstallerService {
   private static instance: InstallerService;
 
@@ -105,8 +153,8 @@ export class InstallerService {
     const shellWrapperPath = joinPath(home, '.local', 'bin', 'sentinel-shell');
     try {
       const binDir = getDirname(shellWrapperPath);
-      if (!(await exists(binDir))) {
-        await mkdir(binDir, { recursive: true });
+      if (!(await safeExists(binDir))) {
+        await safeMkdir(binDir, { recursive: true });
       }
 
       const script = `#!/usr/bin/env bash
@@ -131,7 +179,7 @@ fi
 
 exec "$USER_SHELL" "$@"
 `;
-      await writeTextFile(shellWrapperPath, script);
+      await safeWriteTextFile(shellWrapperPath, script);
       try {
         await invoke('execute_command', {
           command: 'chmod',
@@ -149,8 +197,8 @@ exec "$USER_SHELL" "$@"
     const desktopPath = joinPath(home, '.local', 'share', 'applications', 'sentinel-terminal.desktop');
     try {
       const appsDir = getDirname(desktopPath);
-      if (!(await exists(appsDir))) {
-        await mkdir(appsDir, { recursive: true });
+      if (!(await safeExists(appsDir))) {
+        await safeMkdir(appsDir, { recursive: true });
       }
 
       const desktopContent = `[Desktop Entry]
@@ -172,7 +220,7 @@ Actions=NewWindow;
 Name=Open New Window
 Exec=sentinel-terminal
 `;
-      await writeTextFile(desktopPath, desktopContent);
+      await safeWriteTextFile(desktopPath, desktopContent);
 
       // Register MIME handlers if tools are present
       try {
@@ -203,9 +251,9 @@ Exec=sentinel-terminal
 
     try {
       const dir = getDirname(finalTargetPath);
-      const dirExists = await exists(dir);
+      const dirExists = await safeExists(dir);
       if (!dirExists) {
-        await mkdir(dir, { recursive: true });
+        await safeMkdir(dir, { recursive: true });
       }
 
       let detectedAppBin = 'sentinel-terminal';
@@ -295,7 +343,7 @@ if [ "$target" == "--split" ]; then open "sentinel://split?path=$(pwd)"; exit 0;
 open "sentinel://open?path=$(cd "$target" 2>/dev/null && pwd || echo "$target")" 2>/dev/null || open -a "$APP_NAME" "$target"
 `);
 
-      await writeTextFile(finalTargetPath, scriptContent);
+      await safeWriteTextFile(finalTargetPath, scriptContent);
 
       // Apply executable permission on Linux
       if (isLinux()) {
@@ -333,8 +381,8 @@ open "sentinel://open?path=$(cd "$target" 2>/dev/null && pwd || echo "$target")"
       const scriptDir = targetServicesDir || joinPath(home, '.local', 'share', 'nautilus', 'scripts');
       const scriptPath = joinPath(scriptDir, 'Open in Sentinel Terminal');
       try {
-        if (!(await exists(scriptDir))) {
-          await mkdir(scriptDir, { recursive: true });
+        if (!(await safeExists(scriptDir))) {
+          await safeMkdir(scriptDir, { recursive: true });
         }
         const scriptContent = `#!/usr/bin/env bash
 target="\${NAUTILUS_SCRIPT_SELECTED_FILE_PATHS:-\${NEMO_SCRIPT_SELECTED_FILE_PATHS:-\${CAJA_SCRIPT_SELECTED_FILE_PATHS:-\$PWD}}}"
@@ -352,7 +400,7 @@ elif [ -x "/usr/bin/sentinel-terminal" ]; then
   /usr/bin/sentinel-terminal "\$target" &
 fi
 `;
-        await writeTextFile(scriptPath, scriptContent);
+        await safeWriteTextFile(scriptPath, scriptContent);
         try {
           await invoke('execute_command', { command: 'chmod', args: ['+x', scriptPath] });
         } catch {}
@@ -360,8 +408,8 @@ fi
         // 1. Cinnamon Nemo script
         const nemoDir = joinPath(home, '.local', 'share', 'nemo', 'scripts');
         try {
-          if (!(await exists(nemoDir))) await mkdir(nemoDir, { recursive: true });
-          await writeTextFile(joinPath(nemoDir, 'Open in Sentinel Terminal'), scriptContent);
+          if (!(await safeExists(nemoDir))) await safeMkdir(nemoDir, { recursive: true });
+          await safeWriteTextFile(joinPath(nemoDir, 'Open in Sentinel Terminal'), scriptContent);
           try {
             await invoke('execute_command', { command: 'chmod', args: ['+x', joinPath(nemoDir, 'Open in Sentinel Terminal')] });
           } catch {}
@@ -370,8 +418,8 @@ fi
         // 2. MATE Caja script
         const cajaDir = joinPath(home, '.local', 'share', 'caja', 'scripts');
         try {
-          if (!(await exists(cajaDir))) await mkdir(cajaDir, { recursive: true });
-          await writeTextFile(joinPath(cajaDir, 'Open in Sentinel Terminal'), scriptContent);
+          if (!(await safeExists(cajaDir))) await safeMkdir(cajaDir, { recursive: true });
+          await safeWriteTextFile(joinPath(cajaDir, 'Open in Sentinel Terminal'), scriptContent);
           try {
             await invoke('execute_command', { command: 'chmod', args: ['+x', joinPath(cajaDir, 'Open in Sentinel Terminal')] });
           } catch {}
@@ -392,27 +440,27 @@ Exec=sentinel "%f"
 `;
         const kioDir = joinPath(home, '.local', 'share', 'kio', 'servicemenus');
         try {
-          if (!(await exists(kioDir))) await mkdir(kioDir, { recursive: true });
-          await writeTextFile(joinPath(kioDir, 'sentinel_open.desktop'), dolphinMenuContent);
+          if (!(await safeExists(kioDir))) await safeMkdir(kioDir, { recursive: true });
+          await safeWriteTextFile(joinPath(kioDir, 'sentinel_open.desktop'), dolphinMenuContent);
         } catch {}
 
         const kservices5Dir = joinPath(home, '.local', 'share', 'kservices5', 'ServiceMenus');
         try {
-          if (!(await exists(kservices5Dir))) await mkdir(kservices5Dir, { recursive: true });
-          await writeTextFile(joinPath(kservices5Dir, 'sentinel_open.desktop'), dolphinMenuContent);
+          if (!(await safeExists(kservices5Dir))) await safeMkdir(kservices5Dir, { recursive: true });
+          await safeWriteTextFile(joinPath(kservices5Dir, 'sentinel_open.desktop'), dolphinMenuContent);
         } catch {}
 
         // 4. XFCE Thunar Custom Actions (uca.xml)
         const thunarDir = joinPath(home, '.config', 'Thunar');
         const ucaPath = joinPath(thunarDir, 'uca.xml');
         try {
-          if (!(await exists(thunarDir))) {
-            await mkdir(thunarDir, { recursive: true });
+          if (!(await safeExists(thunarDir))) {
+            await safeMkdir(thunarDir, { recursive: true });
           }
           let ucaXml = '';
-          if (await exists(ucaPath)) {
+          if (await safeExists(ucaPath)) {
             try {
-              ucaXml = await readTextFile(ucaPath);
+              ucaXml = await safeReadTextFile(ucaPath);
             } catch {
               ucaXml = '';
             }
@@ -425,7 +473,7 @@ Exec=sentinel "%f"
             } else {
               ucaXml = `<?xml version="1.0" encoding="UTF-8"?>\n<actions>${thunarAction}</actions>\n`;
             }
-            await writeTextFile(ucaPath, ucaXml);
+            await safeWriteTextFile(ucaPath, ucaXml);
           }
         } catch {}
 
@@ -443,13 +491,13 @@ Exec=sentinel "%f"
     const workflowPath = joinPath(servicesDir, 'Open in Sentinel.workflow');
 
     try {
-      if (!(await exists(servicesDir))) {
-        await mkdir(servicesDir, { recursive: true });
+      if (!(await safeExists(servicesDir))) {
+        await safeMkdir(servicesDir, { recursive: true });
       }
 
       const contentsDir = joinPath(workflowPath, 'Contents');
-      if (!(await exists(contentsDir))) {
-        await mkdir(contentsDir, { recursive: true });
+      if (!(await safeExists(contentsDir))) {
+        await safeMkdir(contentsDir, { recursive: true });
       }
 
       const infoPlistContent = `<?xml version="1.0" encoding="UTF-8"?>
@@ -478,10 +526,10 @@ Exec=sentinel "%f"
   </array>
 </dict>
 </plist>`;
-      await writeTextFile(joinPath(contentsDir, 'Info.plist'), infoPlistContent);
+      await safeWriteTextFile(joinPath(contentsDir, 'Info.plist'), infoPlistContent);
 
       const documentStub = `open "sentinel://open?path=$1"`;
-      await writeTextFile(joinPath(contentsDir, 'document.wflow'), documentStub);
+      await safeWriteTextFile(joinPath(contentsDir, 'document.wflow'), documentStub);
 
       return { success: true, workflowPath };
     } catch (e: any) {
@@ -495,14 +543,14 @@ Exec=sentinel "%f"
   private async updateIdeSettings(settingsPath: string, profileTitle: string, appPath: string): Promise<{ success: boolean; error?: string }> {
     try {
       const dir = getDirname(settingsPath);
-      if (!(await exists(dir))) {
-        await mkdir(dir, { recursive: true });
+      if (!(await safeExists(dir))) {
+        await safeMkdir(dir, { recursive: true });
       }
 
       let config: any = {};
-      if (await exists(settingsPath)) {
+      if (await safeExists(settingsPath)) {
         try {
-          const content = await readTextFile(settingsPath);
+          const content = await safeReadTextFile(settingsPath);
           config = JSON.parse(content);
         } catch {
           config = {};
@@ -526,7 +574,7 @@ Exec=sentinel "%f"
         config['terminal.external.linuxExec'] = 'sentinel-terminal';
       }
 
-      await writeTextFile(settingsPath, JSON.stringify(config, null, 2));
+      await safeWriteTextFile(settingsPath, JSON.stringify(config, null, 2));
       return { success: true };
     } catch (e: any) {
       return { success: false, error: e?.message || String(e) };
@@ -548,7 +596,7 @@ Exec=sentinel "%f"
         binPath = joinPath(home, '.local', 'bin', 'sentinel-shell');
       } else {
         const sysWrapper = '/usr/bin/sentinel-shell';
-        binPath = (await exists(sysWrapper)) ? sysWrapper : await this.ensureSentinelShellWrapper(home);
+        binPath = (await safeExists(sysWrapper)) ? sysWrapper : await this.ensureSentinelShellWrapper(home);
       }
     }
 
@@ -570,7 +618,7 @@ Exec=sentinel "%f"
         binPath = joinPath(home, '.local', 'bin', 'sentinel-shell');
       } else {
         const sysWrapper = '/usr/bin/sentinel-shell';
-        binPath = (await exists(sysWrapper)) ? sysWrapper : await this.ensureSentinelShellWrapper(home);
+        binPath = (await safeExists(sysWrapper)) ? sysWrapper : await this.ensureSentinelShellWrapper(home);
       }
     }
 
@@ -596,32 +644,32 @@ Exec=sentinel "%f"
       ? joinPath(home, '.config', 'Cursor', 'User', 'settings.json')
       : joinPath(home, 'Library', 'Application Support', 'Cursor', 'User', 'settings.json'));
 
-    const cliInstalled = (await exists(cliPath))
-      || (await exists(joinPath(home, '.local', 'bin', 'sentinel')))
-      || (await exists('/usr/local/bin/sentinel'))
-      || (await exists('/usr/bin/sentinel-terminal'))
-      || (await exists('/usr/bin/sentinel'));
+    const cliInstalled = (await safeExists(cliPath))
+      || (await safeExists(joinPath(home, '.local', 'bin', 'sentinel')))
+      || (await safeExists('/usr/local/bin/sentinel'))
+      || (await safeExists('/usr/bin/sentinel-terminal'))
+      || (await safeExists('/usr/bin/sentinel'));
 
-    const finderEnabled = (await exists(servicesDir))
-      || (await exists(joinPath(home, '.local', 'share', 'kio', 'servicemenus', 'sentinel_open.desktop')))
-      || (await exists(joinPath(home, '.local', 'share', 'applications', 'sentinel-terminal.desktop')))
-      || (await exists(joinPath(home, '.local', 'share', 'applications', 'com.pranav.sentinel-terminal.desktop')));
+    const finderEnabled = (await safeExists(servicesDir))
+      || (await safeExists(joinPath(home, '.local', 'share', 'kio', 'servicemenus', 'sentinel_open.desktop')))
+      || (await safeExists(joinPath(home, '.local', 'share', 'applications', 'sentinel-terminal.desktop')))
+      || (await safeExists(joinPath(home, '.local', 'share', 'applications', 'com.pranav.sentinel-terminal.desktop')));
 
     const profileKey = isLinux() ? 'terminal.integrated.profiles.linux' : 'terminal.integrated.profiles.osx';
 
     let vscodeConfigured = false;
-    if (await exists(vscodePath)) {
+    if (await safeExists(vscodePath)) {
       try {
-        const data = JSON.parse(await readTextFile(vscodePath));
+        const data = JSON.parse(await safeReadTextFile(vscodePath));
         const profiles = data[profileKey] || data['terminal.integrated.profiles.linux'] || data['terminal.integrated.profiles.osx'] || {};
         vscodeConfigured = !!(profiles['Sentinel Shell'] || profiles['Sentinel Terminal']);
       } catch {}
     }
 
     let cursorConfigured = false;
-    if (await exists(cursorPath)) {
+    if (await safeExists(cursorPath)) {
       try {
-        const data = JSON.parse(await readTextFile(cursorPath));
+        const data = JSON.parse(await safeReadTextFile(cursorPath));
         const profiles = data[profileKey] || data['terminal.integrated.profiles.linux'] || data['terminal.integrated.profiles.osx'] || {};
         cursorConfigured = !!(profiles['Sentinel Shell'] || profiles['Sentinel Terminal']);
       } catch {}
