@@ -20,10 +20,13 @@ This document provides technical root-cause analyses, architectural impact asses
 ### 1.1 Problem Statement
 When attaching an API key (OpenAI, Groq, Anthropic, DeepSeek, OpenRouter, or Custom) and clicking **"Test Connection"**, the request frequently fails with a red error badge for the first 2-3 attempts before succeeding on the 3rd or 4th attempt. This misleads users into believing their API key or base URL is invalid.
 
+**Status: RESOLVED & VERIFIED** (Commit: `5daff74`)
+
 ### 1.2 Code Locations
 - [src/ui/components/AiSettingsPage.tsx](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/ui/components/AiSettingsPage.tsx#L249-L269) (`handleTestConnection`)
 - [src/ai/provider/CloudApiProvider.ts](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/ai/provider/CloudApiProvider.ts#L77-L122) (`normalizeEndpointUrl`, `httpFetch`)
 - [src/ai/provider/CloudApiProvider.ts](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/ai/provider/CloudApiProvider.ts#L225-L283) (`testConnection`)
+- [src/ai/provider/CloudApiProvider.test.ts](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/ai/provider/CloudApiProvider.test.ts) (Automated test coverage)
 
 ### 1.3 Technical Root Causes
 1. **Zero-Retry Single-Shot Network Probe:**
@@ -43,18 +46,20 @@ When attaching an API key (OpenAI, Groq, Anthropic, DeepSeek, OpenRouter, or Cus
 4. **Dynamic Import Latency in Tauri HTTP Client:**
    - In `httpFetch()`, `await import('@tauri-apps/plugin-http')` is executed dynamically on the initial call. In WebKit GTK environments, the first invocation can experience IPC registration delay or race against native fetch CORS preflight options.
 
-### 1.4 Proposed Remediation
-1. **Built-in Auto-Retry with Exponential Backoff:**
-   - Modify `CloudApiProvider.testConnection()` to execute up to 3 automatic attempts with 500ms and 1000ms backoff before declaring failure to the UI.
-   - If attempt 1 fails due to a network reset, timeout, or transient 429/502/503/504 error, retry transparently.
+### 1.4 Implemented Resolution
+1. **Built-in Auto-Retry with Progressive Backoff:**
+   - [CloudApiProvider.ts](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/ai/provider/CloudApiProvider.ts) executes up to 3 automatic attempts with progressive backoff (350ms, 700ms) before reporting failure to the UI.
+   - Fast abort on non-retryable 401 Unauthorized / 403 Forbidden errors (verified API key errors return immediately).
 2. **Robust URL Normalization:**
-   - Ensure `normalizeEndpointUrl` correctly inserts `/v1/chat/completions` for OpenAI, Groq, DeepSeek, and OpenRouter endpoints when the user enters the root domain without `/v1`.
-3. **Request Timeout Budget:**
-   - Enforce an 8,000ms `AbortSignal.timeout` per retry attempt so requests fail fast and retry cleanly instead of hanging.
-4. **Lightweight Fallback Probe:**
-   - For OpenAI-compatible endpoints, if a chat completion probe fails due to model availability, fallback to probe `GET /v1/models` using the same bearer token to confirm API key validity independently of chat models.
+   - Expanded `normalizeEndpointUrl` to handle root domains for OpenAI (`api.openai.com`), Groq (`api.groq.com`, `api.groq.com/openai`), OpenRouter (`openrouter.ai`, `openrouter.ai/api`), Anthropic (`api.anthropic.com`), and DeepSeek.
+3. **8-Second Timeout Budget per Probe:**
+   - Enforced an 8,000ms `AbortController` timeout budget per attempt.
+4. **Reasoning Model Payload Adaptation:**
+   - Automatically adapts payloads for `o1`, `o3-mini`, and reasoning models to use `max_completion_tokens` instead of `max_tokens`, with fallback probe on `/models`.
 5. **UI State Indication:**
-   - In [AiSettingsPage.tsx](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/ui/components/AiSettingsPage.tsx), update `testingConnection` to show "Verifying connection..." during active retry attempts.
+   - Added rotating spinner indicator and "Verifying Connection..." label during active verification.
+6. **Cached Dynamic Imports:**
+   - Cached `@tauri-apps/plugin-http` import to eliminate repeated IPC module resolution latency.
 
 ---
 
@@ -369,15 +374,15 @@ Users should have an onboarding screen option allowing them to select which star
 
 ## Summary Matrix of Required Changes
 
-| Item | Primary Components | Type | Complexity | Priority |
+| Item | Primary Components | Type | Complexity | Status |
 |---|---|---|---|---|
-| **1. Cloud API Connection Test** | `CloudApiProvider.ts`, `AiSettingsPage.tsx` | Bug Fix & Resilience | Low-Medium | High |
-| **2. Multi-Step Workflow Failure** | `AdaptivePlanEngine.ts`, `ShellSDKCapability.ts`, `IntentModel.ts` | Bug Fix & Architecture | Medium-High | High |
-| **3. Persistent HUD Overlay** | `TerminalView.tsx`, `AiSettingsPage.tsx` | UI Bug Fix & Settings | Low-Medium | High |
-| **4. Linux File Manager Actions** | `InstallerService.ts`, `App.tsx`, `TerminalView.tsx` | Feature & Bug Fix | Medium | Medium-High |
-| **5. IDE Profiles Integration** | `InstallerService.ts`, `InstallerWizard.tsx` | Refactor & Reliability | Medium | Medium |
-| **6. Sentinel CLI Launcher** | `InstallerService.ts`, `packaging/` | Bug Fix & Safety | Medium | Medium-High |
-| **7. Workflows Onboarding Selection** | `InstallerWizard.tsx`, `DiskWorkflowStorage.ts`, `StarterWorkflows.ts` | New Feature | Medium | Medium |
+| **1. Cloud API Connection Test** | `CloudApiProvider.ts`, `AiSettingsPage.tsx` | Bug Fix & Resilience | Low-Medium | **Resolved** (`5daff74`) |
+| **2. Multi-Step Workflow Failure** | `AdaptivePlanEngine.ts`, `ShellSDKCapability.ts`, `IntentModel.ts` | Bug Fix & Architecture | Medium-High | Needs Fix |
+| **3. Persistent HUD Overlay** | `TerminalView.tsx`, `AiSettingsPage.tsx` | UI Bug Fix & Settings | Low-Medium | Needs Fix |
+| **4. Linux File Manager Actions** | `InstallerService.ts`, `App.tsx`, `TerminalView.tsx` | Feature & Bug Fix | Medium | Needs Fix |
+| **5. IDE Profiles Integration** | `InstallerService.ts`, `InstallerWizard.tsx` | Refactor & Reliability | Medium | Needs Fix |
+| **6. Sentinel CLI Launcher** | `InstallerService.ts`, `packaging/` | Bug Fix & Safety | Medium | Needs Fix |
+| **7. Workflows Onboarding Selection** | `InstallerWizard.tsx`, `DiskWorkflowStorage.ts`, `StarterWorkflows.ts` | New Feature | Medium | Needs Fix |
 
 ---
 *Document generated for pair-programming reference following repository guidelines (Zero Emojis, Grayscale Standards, Full Screens).*
