@@ -1,0 +1,383 @@
+# Sentinel Terminal — Analysis & Fix Roadmap (NEED_FIX.md)
+
+This document provides technical root-cause analyses, architectural impact assessments, and remediation plans for seven issues identified across the AI connection test, workflow planner, notification overlay, desktop integrations, CLI launcher, and starter workflows.
+
+---
+
+## Table of Contents
+1. [Issue 1: Cloud API "Test Connection" Transient Failures](#issue-1-cloud-api-test-connection-transient-failures)
+2. [Issue 2: Workflow Plan Failure on Complex Multi-Step Prompt](#issue-2-workflow-plan-failure-on-complex-multi-step-prompt)
+3. [Issue 3: Persistent Execution Plan HUD Notification Overlay](#issue-3-persistent-execution-plan-hud-notification-overlay)
+4. [Issue 4: Linux Desktop / File Manager Context Actions Integration](#issue-4-linux-desktop--file-manager-context-actions-integration)
+5. [Issue 5: VS Code & Cursor IDE Profiles Usability](#issue-5-vs-code--cursor-ide-profiles-usability)
+6. [Issue 6: Sentinel CLI Launcher Installation & Execution](#issue-6-sentinel-cli-launcher-installation--execution)
+7. [Issue 7: Workflows Section Cleanup & Onboarding Selection](#issue-7-workflows-section-cleanup--onboarding-selection)
+
+---
+
+## Issue 1: Cloud API "Test Connection" Transient Failures
+
+### 1.1 Problem Statement
+When attaching an API key (OpenAI, Groq, Anthropic, DeepSeek, OpenRouter, or Custom) and clicking **"Test Connection"**, the request frequently fails with a red error badge for the first 2-3 attempts before succeeding on the 3rd or 4th attempt. This misleads users into believing their API key or base URL is invalid.
+
+### 1.2 Code Locations
+- [src/ui/components/AiSettingsPage.tsx](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/ui/components/AiSettingsPage.tsx#L249-L269) (`handleTestConnection`)
+- [src/ai/provider/CloudApiProvider.ts](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/ai/provider/CloudApiProvider.ts#L77-L122) (`normalizeEndpointUrl`, `httpFetch`)
+- [src/ai/provider/CloudApiProvider.ts](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/ai/provider/CloudApiProvider.ts#L225-L283) (`testConnection`)
+
+### 1.3 Technical Root Causes
+1. **Zero-Retry Single-Shot Network Probe:**
+   - In [CloudApiProvider.ts](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/ai/provider/CloudApiProvider.ts#L225), `testConnection()` executes a single, un-retried HTTP POST request.
+   - Initial connections to cloud endpoints encounter cold TCP/TLS handshakes, DNS resolution latency, proxy route establishment, or transient server-side cold starts (e.g. Groq/OpenRouter rate limiter spikes, 429 concurrency blips, 502/503/504 gateway timeouts).
+   - Any single transient error immediately surfaces as an error in the UI. When the user clicks the button again after 2-3 seconds, the socket/TLS session is warm and DNS is cached, leading to a delayed success.
+2. **Missing Request Timeout Budget:**
+   - `httpFetch()` lacks an explicit `AbortSignal.timeout(...)`. If an initial probe request encounters socket contention, it may either stall or abort abruptly with an uncaught `TypeError: Failed to fetch`.
+3. **URL Normalization Defects for Provider Base URLs:**
+   - In `normalizeEndpointUrl()`:
+     ```typescript
+     if (url.endsWith('/v1')) return `${url}/chat/completions`;
+     if (url.includes('nvidia.com')) return `${url}/v1/chat/completions`;
+     return `${url}/chat/completions`;
+     ```
+   - If a user inputs standard base URLs such as `https://api.openai.com` or `https://api.deepseek.com` (without `/v1`), the function incorrectly outputs `https://api.openai.com/chat/completions` (omitting `/v1/`), returning HTTP 404 until the user modifies the URL or re-enters it.
+4. **Dynamic Import Latency in Tauri HTTP Client:**
+   - In `httpFetch()`, `await import('@tauri-apps/plugin-http')` is executed dynamically on the initial call. In WebKit GTK environments, the first invocation can experience IPC registration delay or race against native fetch CORS preflight options.
+
+### 1.4 Proposed Remediation
+1. **Built-in Auto-Retry with Exponential Backoff:**
+   - Modify `CloudApiProvider.testConnection()` to execute up to 3 automatic attempts with 500ms and 1000ms backoff before declaring failure to the UI.
+   - If attempt 1 fails due to a network reset, timeout, or transient 429/502/503/504 error, retry transparently.
+2. **Robust URL Normalization:**
+   - Ensure `normalizeEndpointUrl` correctly inserts `/v1/chat/completions` for OpenAI, Groq, DeepSeek, and OpenRouter endpoints when the user enters the root domain without `/v1`.
+3. **Request Timeout Budget:**
+   - Enforce an 8,000ms `AbortSignal.timeout` per retry attempt so requests fail fast and retry cleanly instead of hanging.
+4. **Lightweight Fallback Probe:**
+   - For OpenAI-compatible endpoints, if a chat completion probe fails due to model availability, fallback to probe `GET /v1/models` using the same bearer token to confirm API key validity independently of chat models.
+5. **UI State Indication:**
+   - In [AiSettingsPage.tsx](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/ui/components/AiSettingsPage.tsx), update `testingConnection` to show "Verifying connection..." during active retry attempts.
+
+---
+
+## Issue 2: Workflow Plan Failure on Complex Multi-Step Prompt
+
+### 2.1 Problem Statement
+When executing the prompt:
+```
+Create a temporary testing workspace at /tmp/sentinel-workflow-test.
+
+Inside it:
+1. Create a directory called project.
+2. Inside project create three files: frontend.txt, backend.txt, and README.md.
+3. Put "Frontend module" inside frontend.txt.
+4. Put "Backend module" inside backend.txt.
+5. Put "Sentinel Workflow Test" inside README.md.
+6. Finally list the project directory and display the contents of all three files.
+
+After successfully completing all of these steps, save the verified execution as a workflow named workflow-basic-test.
+```
+Execution failed with:
+- Intent routed: `workflow.run (98% confidence, 12ms CPU tier)`
+- Terminal error: `✗ Workflow plan failed: Command string required for shell.execute; Command string required for shell.execute`
+- No directories or files were created, and the workflow was not saved.
+
+### 2.2 Code Locations
+- [src/sdk/capabilities/drivers/ShellSDKCapability.ts](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/sdk/capabilities/drivers/ShellSDKCapability.ts#L41-L43) (`Command string required for shell.execute`)
+- [src/ai/agent/AdaptivePlanEngine.ts](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/ai/agent/AdaptivePlanEngine.ts#L112-L139) (`createPlan`)
+- [src/ai/agent/AdaptivePlanEngine.ts](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/ai/agent/AdaptivePlanEngine.ts#L255-L310) (`executeSinglePhase`)
+- [src/ai/agent/AdaptivePlanEngine.ts](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/ai/agent/AdaptivePlanEngine.ts#L848-L896) (`resolveShellCommandForPhase`)
+- [src/ai/agent/AdaptivePlanEngine.ts](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/ai/agent/AdaptivePlanEngine.ts#L898-L936) (`buildPhasePlanningPrompt`, `parsePlanResponse`)
+- [src/ai/models/IntentModel.ts](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/ai/models/IntentModel.ts#L274-L277) (`classifyHeuristic` workflow regex)
+- [src/ai/agent/AgentLoop.ts](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/ai/agent/AgentLoop.ts#L2110-L2160) (`requiresExecutionPlan`)
+
+### 2.3 Technical Root Causes
+1. **Flawed LLM Planning Prompt and Schema in `AdaptivePlanEngine`:**
+   - In `buildPhasePlanningPrompt()`:
+     ```
+     Break the user request into 2 to 5 clear, sequential execution phases.
+     Return ONLY one valid JSON object formatted as:
+     {
+       "summary": "Brief description of overall goal",
+       "phases": [
+         { "id": "1", "title": "Phase title", "tool": "optional.tool.id" },
+         { "id": "2", "title": "Phase title", "tool": "optional.tool.id" }
+       ]
+     }
+     ```
+   - The planning prompt asks the model to emit only `id`, `title`, and `tool`. It provides **no schema or instruction to include shell commands or tool parameters**.
+   - It artificially clamps planning to 2-5 phases, forcing a 6-step prompt to be compressed into two vague phases:
+     - Phase 1: `Create the workspace directory`
+     - Phase 2: `Verify the workspace exists and is accessible`
+   - `maxTokens` was capped at 350, truncating responses on compound instructions.
+2. **Missing Command in `shell.execute` Driver Invocation:**
+   - In `executeSinglePhase()`:
+     ```typescript
+     if (!phase.tool || (phase.tool === 'shell.execute' && !phase.params?.command)) {
+       const resolvedCmd = this.resolveShellCommandForPhase(phase.title, goal, options.cwd, options.os);
+       if (resolvedCmd) {
+         phase.tool = 'shell.execute';
+         phase.params = { command: resolvedCmd, explanation: phase.title };
+       }
+     }
+     ```
+   - `resolveShellCommandForPhase()` attempts regex matching on `phase.title`:
+     `phaseTitle.match(/(?:directory|folder|mkdir|at|to)\s+['"]?([~/a-z0-9_.-]+)['"]?/i)`
+   - For `"Create the workspace directory"`, `directory` is at the end of the string with no trailing argument. The regex match fails (`null`), and the target `/tmp/sentinel-workflow-test` is in `goal`, not `phase.title`.
+   - Because `resolvedCmd` evaluates to `null`, `phase.params` remains `{}`.
+   - `options.toolExecutor.execute('shell.execute', {})` is called with an empty command object.
+   - [ShellSDKCapability.ts:42](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/sdk/capabilities/drivers/ShellSDKCapability.ts#L42) returns:
+     `{ success: false, error: { code: 'MISSING_SHELL_CMD', message: 'Command string required for shell.execute' } }`
+   - This failure occurs for both Phase 1 and Phase 2, producing:
+     `✗ Workflow plan failed: Command string required for shell.execute; Command string required for shell.execute`.
+3. **Keyword Overlap in Intent Classification:**
+   - [IntentModel.ts:275](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/ai/models/IntentModel.ts#L275) checks:
+     `if (/\b(?:workflow|save\s+workflow|run\s+workflow)\b/i.test(clean))`
+   - Because the user ended their instruction with "save the verified execution as a workflow", the regex routed the prompt to the `workflow` domain rather than `developer` / multi-step workspace execution.
+4. **Missing Workflow Auto-Save on Completion:**
+   - Sentinel lacks a post-execution hook to automatically capture and serialize successful multi-step executions to `~/.sentinel/workflows/<name>.json` when the prompt requests saving upon completion.
+
+### 2.4 Proposed Remediation
+1. **Structured Phase Planning Contract:**
+   - Update `buildPhasePlanningPrompt()` to require the model to emit explicit bash command lines for each phase:
+     `{ "id": "1", "title": "...", "tool": "shell.execute", "params": { "command": "mkdir -p /tmp/sentinel-workflow-test/project" } }`
+   - Increase `maxTokens` from 350 to 1,024 to accommodate detailed multi-phase plans.
+2. **Context-Aware Command Fallback:**
+   - In `resolveShellCommandForPhase()`, if `phase.title` lacks an explicit target path, parse the overall `goal` to extract path arguments (e.g. `/tmp/sentinel-workflow-test`).
+   - If `phase.tool === 'shell.execute'` and `params.command` is missing, use a fallback LLM synthesis call to generate the exact bash command line rather than invoking `ShellSDKCapability` with an empty object.
+3. **Compound Intent Disambiguation:**
+   - In `IntentModel.ts`, refine the workflow rule so that instructions containing verbs like `create`, `mkdir`, `put`, `echo`, `write` alongside "save as a workflow" are classified as compound procedural execution with post-save hooks.
+4. **Post-Execution Workflow Persistence:**
+   - Add a completion listener in `AgentLoop.ts`: if the prompt includes `save ... as a workflow named <id>`, take the executed steps upon success and invoke `DiskWorkflowStorage.getInstance().saveWorkflow(...)`.
+
+---
+
+## Issue 3: Persistent Execution Plan HUD Notification Overlay
+
+### 3.1 Problem Statement
+When a workflow plan fails (or finishes), a floating HUD card remains stuck on the top-right corner of the terminal window indefinitely. The card:
+1. Does not auto-dismiss or vanish after a timeout.
+2. Has no manual close/dismiss button (`X`).
+3. Lacks configuration options in Settings to adjust timing or disable floating notifications.
+4. Uses saturated purple colors (`#d8b4fe`, `rgba(192, 132, 252, 0.28)`), violating the project's strict grayscale / matte-dark design standard.
+
+### 3.2 Code Locations
+- [src/presentation/TerminalView.tsx](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/presentation/TerminalView.tsx#L896-L991) (Execution Plan `<details>` overlay)
+- [src/presentation/TerminalView.tsx](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/presentation/TerminalView.tsx#L700-L706) (Agent event handler `done` vs `error`)
+- [src/ui/components/AiSettingsPage.tsx](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/ui/components/AiSettingsPage.tsx) (Settings page)
+
+### 3.3 Technical Root Causes
+1. **Unconditional State Persistence on Error:**
+   - In `TerminalView.tsx`:
+     ```typescript
+     } else if (event.type === 'done') {
+       setIsPlanOpen(false);
+       PromptProgressManager.getInstance().completePrompt(true, event.message);
+     } else if (event.type === 'error') {
+       PromptProgressManager.getInstance().completePrompt(false, event.message);
+     }
+     ```
+   - On `error`, neither `setIsPlanOpen(false)` nor `setLatestPlan(null)` is called. The `latestPlan` state variable remains populated indefinitely.
+2. **Missing Manual Dismiss Button:**
+   - The `<details>` HUD card has no dismiss action. Clicking the summary merely toggles collapse, leaving the summary bar on screen permanently.
+3. **No Auto-Dismiss Timer:**
+   - There is no `setTimeout` to clear `latestPlan` after a completion or failure event.
+4. **Missing Settings Options:**
+   - No preference exists in `localStorage` or `AiSettingsPage.tsx` to configure notification durations (e.g. 5s, 10s, 30s, or disabled).
+5. **Violation of Grayscale Aesthetic Standards:**
+   - The card uses purple accent tones (`#d8b4fe`, `rgba(192, 132, 252, 0.28)`), in conflict with AGENTS.md Rule 3.
+
+### 3.4 Proposed Remediation
+1. **Dismiss Button in HUD Header:**
+   - Add a monochrome `X` button (`lucide-react`) in the HUD summary row to immediately set `setLatestPlan(null)`.
+2. **Configurable Auto-Dismiss Timer:**
+   - Set an auto-dismiss timer on both `done` and `error` events (default: 8 seconds).
+   - Clear any pending dismiss timer if a new plan begins.
+3. **Settings Page Preferences:**
+   - In `AiSettingsPage.tsx` under a new or existing "Preferences / Notifications" section, add:
+     - `Plan Notification Duration`: Options `5s`, `10s`, `15s`, `Persistent`, `Disabled`.
+     - Persist setting in `localStorage` (`sentinel_hud_plan_duration`) and dispatch updates via CustomEvent.
+4. **Refactor to Grayscale Aesthetic:**
+   - Replace purple styling with matte dark borders (`rgba(255, 255, 255, 0.12)`), solid dark background (`rgba(12, 13, 18, 0.95)`), and muted white typographical status glyphs (`✓`, `✗`, `•`).
+
+---
+
+## Issue 4: Linux Desktop / File Manager Context Actions Integration
+
+### 4.1 Problem Statement
+On the onboarding screen, the option titled **"Linux Desktop / File Manager Actions"** claims:
+> "Registers desktop context menu actions with your graphical file manager (GNOME Nautilus, Nemo, Dolphin, Thunar). Right-click any folder or desktop workspace to spawn Sentinel there."
+
+We need to ensure this option functions across graphical file managers and that clicking "Open in Sentinel" launches the terminal directly within the selected target directory.
+
+### 4.2 Code Locations
+- [src/domain/integration/InstallerService.ts](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/domain/integration/InstallerService.ts#L152-L186) (`enableFinderIntegration`)
+- [src/ui/components/InstallerWizard.tsx](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/ui/components/InstallerWizard.tsx#L520-L577) (Onboarding option)
+- [src/presentation/TerminalView.tsx](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/presentation/TerminalView.tsx#L344-L352) (`createSession`)
+- [src/App.tsx](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/App.tsx#L104-L106), [src/App.tsx](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/App.tsx#L705) (`panePaths` initialization)
+- [src-tauri/src/process_cmds.rs](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src-tauri/src/process_cmds.rs#L120-L123) (`get_launch_args`)
+- [packaging/desktop/com.pranav.sentinel-terminal.desktop](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/packaging/desktop/com.pranav.sentinel-terminal.desktop)
+
+### 4.3 Technical Root Causes
+1. **Incomplete File Manager Coverage:**
+   - Currently, `enableFinderIntegration()` on Linux only creates scripts in:
+     - `~/.local/share/nautilus/scripts/Open in Sentinel Terminal`
+     - `~/.local/share/nemo/scripts/Open in Sentinel Terminal`
+   - It **does not install actions for Dolphin (KDE Plasma)** (`~/.local/share/kio/servicemenus/sentinel.desktop` or `~/.local/share/kservices5/ServiceMenus/`).
+   - It **does not install actions for Thunar (XFCE)** (`~/.config/Thunar/uca.xml`).
+   - It **does not register the FreeDesktop MIME action** in `~/.local/share/applications/sentinel.desktop` for `inode/directory`.
+2. **Application Ignores CLI Launch Path on Startup:**
+   - Even if the file manager executes `sentinel-terminal "/path/to/folder"`, `App.tsx` on startup never calls `invoke('get_launch_args')`.
+   - `panePaths` defaults to `~`, meaning the app always starts in the home directory rather than the folder passed via CLI arguments.
+3. **Hardcoded Binary Reference in Script:**
+   - The launcher script relies on `command -v sentinel-terminal || command -v sentinel`. If the binary is running as a localized executable or AppImage not in the user's `$PATH`, execution fails silently.
+
+### 4.4 Proposed Remediation
+1. **Multi-File Manager Registration in `InstallerService.ts`:**
+   - **GNOME Nautilus & Nemo:** Maintain scripts in `~/.local/share/nautilus/scripts/` and `~/.local/share/nemo/scripts/`.
+   - **KDE Dolphin:** Create `~/.local/share/kio/servicemenus/sentinel_open.desktop` with `ServiceTypes=inode/directory` and `Exec=sentinel "%f"`.
+   - **XFCE Thunar:** Register custom action in `~/.config/Thunar/uca.xml` for folder patterns `*`.
+   - **FreeDesktop Universal:** Write `~/.local/share/applications/sentinel-terminal.desktop` with `MimeType=inode/directory;x-scheme-handler/sentinel;` and execute `update-desktop-database ~/.local/share/applications` if installed.
+2. **Startup Argument Processing in `App.tsx`:**
+   - In `App.tsx`, invoke `get_launch_args` during initial mount.
+   - If an argument matches an existing directory path or a URL (`sentinel://open?path=...`), set the initial pane path of the first terminal pane to that directory.
+3. **Dynamic Binary Path Resolution:**
+   - Have the Tauri backend expose the current executable path via `std::env::current_exe()` so the launcher script points directly to the active binary.
+
+---
+
+## Issue 5: VS Code & Cursor IDE Profiles Usability
+
+### 5.1 Problem Statement
+The onboarding screen includes:
+> "VS Code & Cursor IDE Profiles — Safely registers sentinel under `terminal.integrated.profiles.linux` in your IDE settings. Switch to Sentinel inside your editor's terminal dropdown."
+
+We need to ensure this option is functional, reliable, and provides a proper shell environment inside the editor.
+
+### 5.2 Code Locations
+- [src/domain/integration/InstallerService.ts](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/domain/integration/InstallerService.ts#L242-L302) (`updateIdeSettings`, `configureVsCodeIntegration`, `configureCursorIntegration`)
+- [src/ui/components/InstallerWizard.tsx](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/ui/components/InstallerWizard.tsx#L580-L640)
+
+### 5.3 Technical Root Causes
+1. **VS Code Integrated Terminals Expect a Shell / PTY Executable, Not a GUI Window:**
+   - `updateIdeSettings()` currently writes:
+     ```json
+     "terminal.integrated.profiles.linux": {
+       "Sentinel Terminal": {
+         "path": "sentinel",
+         "icon": "terminal",
+         "overrideName": true
+       }
+     }
+     ```
+   - When a user selects a terminal profile in VS Code or Cursor, the IDE spawns the binary inside the embedded terminal pane using `node-pty`.
+   - If `sentinel` points to a GUI window launcher (which spawns Tauri), launching it inside VS Code's terminal pane either crashes the PTY, fails with a WebKit/display error, or spawns a detached external window while the embedded tab sits blank.
+2. **Non-Absolute Path Dependency:**
+   - `"path": "sentinel"` assumes `sentinel` is accessible in the environment PATH of the process running VS Code. When VS Code is launched from a desktop environment (GNOME Dash / systemd user session), `~/.local/bin` is frequently omitted from PATH, causing VS Code to throw `The terminal process failed to launch: Path does not exist`.
+3. **Missing Shell Mode / Subshell Script:**
+   - To function properly as an integrated terminal profile, Sentinel needs to provide an interactive CLI shell wrapper (e.g. running `bash` with Sentinel's AI CLI prompt hooks pre-loaded) rather than attempting to render a full Tauri window inside VS Code.
+
+### 5.4 Proposed Remediation
+1. **Absolute Binary / Wrapper Path:**
+   - In `updateIdeSettings()`, write the absolute path to the executable (e.g. `/home/<user>/.local/bin/sentinel`) rather than the bare command name `sentinel`.
+2. **Terminal Shell Wrapper Mode:**
+   - Provide a dedicated shell profile script `~/.local/bin/sentinel-shell` that spawns the user's default shell (`bash`/`zsh`) with the Sentinel CLI environment and aliases pre-configured.
+   - For users who want the external window, configure `terminal.external.linuxExec` to point to Sentinel Terminal.
+3. **Verification in `InstallerWizard.tsx`:**
+   - Verify whether VS Code or Cursor settings directories exist prior to configuring, and provide clear user feedback if the editor configuration was applied successfully.
+
+---
+
+## Issue 6: Sentinel CLI Launcher Installation & Execution
+
+### 6.1 Problem Statement
+The onboarding screen allows users to install the Sentinel command-line launcher (`sentinel`). We must ensure that the installation succeeds, the binary is placed in PATH, and the command functions properly without errors or recursive loops.
+
+### 6.2 Code Locations
+- [src/domain/integration/InstallerService.ts](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/domain/integration/InstallerService.ts#L70-L145) (`installCli`)
+- [src/ui/components/InstallerWizard.tsx](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/ui/components/InstallerWizard.tsx#L418-L515)
+- [packaging/desktop/com.pranav.sentinel-terminal.desktop](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/packaging/desktop/com.pranav.sentinel-terminal.desktop)
+
+### 6.3 Technical Root Causes
+1. **Dangerous Recursive Fallback Loop in Launcher Script:**
+   - In `InstallerService.ts:110-112`:
+     ```bash
+     resolved_path=$(cd "$target" 2>/dev/null && pwd || echo "$target")
+     if command -v xdg-open >/dev/null 2>&1; then
+       xdg-open "sentinel://open?path=$resolved_path" 2>/dev/null || "$APP_BIN" "$resolved_path" 2>/dev/null || sentinel "$resolved_path" 2>/dev/null || true
+     else
+       "$APP_BIN" "$resolved_path" 2>/dev/null || sentinel "$resolved_path" 2>/dev/null || true
+     fi
+     ```
+   - If `xdg-open` fails and `APP_BIN` ("sentinel-terminal") is not found in PATH, the script calls `sentinel "$resolved_path"`.
+   - Because the script itself is named `sentinel`, it executes itself recursively until the shell process limit or stack overflows!
+2. **Missing Desktop Scheme Registration:**
+   - The script attempts `xdg-open "sentinel://open?path=..."`. However, `com.pranav.sentinel-terminal.desktop` is never installed to `~/.local/share/applications/` during CLI installation. Therefore, `xdg-open` fails on fresh installations.
+3. **Hardcoded `$APP_BIN` Assumption:**
+   - `$APP_BIN` is hardcoded to `"sentinel-terminal"`. If the user is running the AppImage, Flatpak, or a development build, `sentinel-terminal` is not in `$PATH`.
+4. **`~/.local/bin` PATH Presence:**
+   - In standard Ubuntu/Debian/Arch installations, `~/.local/bin` is only in PATH if the directory existed when the login shell was created. If `~/.local/bin` was newly created by Sentinel, subsequent commands in active shells will fail with `command not found: sentinel`.
+
+### 6.4 Proposed Remediation
+1. **Eliminate Recursive Fallback:**
+   - Remove `|| sentinel "$resolved_path"` from the launcher script.
+2. **Resolve Real Binary Path on Installation:**
+   - In `InstallerService.ts:installCli()`, obtain the actual path of the running executable via Tauri backend and bake it directly into `APP_BIN`.
+3. **Install Desktop Entry with Scheme Handler:**
+   - When installing the CLI, also copy/write `com.pranav.sentinel-terminal.desktop` into `~/.local/share/applications/` and register the `x-scheme-handler/sentinel` MIME type.
+4. **PATH Check & User Guidance:**
+   - Verify whether `~/.local/bin` is present in the current PATH. If not, notify the user in the onboarding UI and offer to append `export PATH="$HOME/.local/bin:$PATH"` to their shell configuration (`~/.bashrc` / `~/.zshrc`).
+
+---
+
+## Issue 7: Workflows Section Cleanup & Onboarding Selection
+
+### 7.1 Problem Statement
+When opening the Workflows drawer in the terminal, users see 17 pre-existing workflows stored in `~/.sentinel/workflows/` (e.g. `desktop-reset.json`, `cargo-build.json`, `dry-run-pipeline.json`, `db-sync.json`, etc.). Many of these are incomplete stubs left behind from benchmark and CLI test runs.
+Users should have an onboarding screen option allowing them to select which starter workflows they want to keep; only the chosen workflows should be installed and displayed.
+
+### 7.2 Code Locations
+- Current disk workflows: `~/.sentinel/workflows/*.json` (17 files on disk)
+- [src/workflows/storage/DiskWorkflowStorage.ts](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/workflows/storage/DiskWorkflowStorage.ts)
+- [src/ui/components/WorkflowManagerDrawer.tsx](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/ui/components/WorkflowManagerDrawer.tsx)
+- [src/ui/components/InstallerWizard.tsx](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/ui/components/InstallerWizard.tsx)
+
+### 7.3 Technical Root Causes
+1. **Test and Benchmark Artifact Pollution:**
+   - Test suites and taxonomy benchmark scripts generated dummy JSON files directly in `~/.sentinel/workflows/` with minimal content like `{"name": "desktop-reset"}`.
+   - Sentinel's `DiskWorkflowStorage` reads all `.json` files in that folder, cluttering the drawer with non-functional workflows.
+2. **Lack of a Curated Starter Workflow Catalog:**
+   - Sentinel lacks a clean, predefined catalog of high-value Linux starter workflows (e.g., Git commits, system health checks, Docker maintenance, port diagnostics).
+3. **No Onboarding Selection Step:**
+   - `InstallerWizard.tsx` does not currently include a workflow selection step to allow users to pick what starter templates they want installed.
+
+### 7.4 Proposed Remediation
+1. **Define Curated Starter Workflow Catalog:**
+   - Create a structured starter workflows library in `src/workflows/templates/StarterWorkflows.ts`:
+     - **Git Quick Sync:** `git status`, stage changes, commit with message, push.
+     - **System Diagnostics:** CPU, RAM, disk, and failed systemd service audit.
+     - **Network & Open Ports:** Scan listening ports (`ss -tulpn`) and test connectivity.
+     - **Docker Environment Prune:** Inspect running containers and safely clean unused images.
+     - **Workspace Clean & Rebuild:** Clean node_modules/target and trigger build.
+2. **Add Starter Workflows Step to Onboarding Wizard:**
+   - Add a "Starter Workflows" section in `InstallerWizard.tsx`:
+     - Displays selectable cards for each curated starter workflow with description and step count.
+     - Provides quick-actions: "Select All", "Recommended (Git + Diagnostics)", or "Start Blank".
+     - Includes a checkbox: "Clean existing test workflows from workspace".
+3. **Batch Seed & Purge in `DiskWorkflowStorage.ts`:**
+   - Add method `initializeStarterWorkflows(selectedWorkflowIds: string[], purgeExisting: boolean)` to clear obsolete test stubs and write only the user-approved workflows with valid `schemaVersion: 1`.
+
+---
+
+## Summary Matrix of Required Changes
+
+| Item | Primary Components | Type | Complexity | Priority |
+|---|---|---|---|---|
+| **1. Cloud API Connection Test** | `CloudApiProvider.ts`, `AiSettingsPage.tsx` | Bug Fix & Resilience | Low-Medium | High |
+| **2. Multi-Step Workflow Failure** | `AdaptivePlanEngine.ts`, `ShellSDKCapability.ts`, `IntentModel.ts` | Bug Fix & Architecture | Medium-High | High |
+| **3. Persistent HUD Overlay** | `TerminalView.tsx`, `AiSettingsPage.tsx` | UI Bug Fix & Settings | Low-Medium | High |
+| **4. Linux File Manager Actions** | `InstallerService.ts`, `App.tsx`, `TerminalView.tsx` | Feature & Bug Fix | Medium | Medium-High |
+| **5. IDE Profiles Integration** | `InstallerService.ts`, `InstallerWizard.tsx` | Refactor & Reliability | Medium | Medium |
+| **6. Sentinel CLI Launcher** | `InstallerService.ts`, `packaging/` | Bug Fix & Safety | Medium | Medium-High |
+| **7. Workflows Onboarding Selection** | `InstallerWizard.tsx`, `DiskWorkflowStorage.ts`, `StarterWorkflows.ts` | New Feature | Medium | Medium |
+
+---
+*Document generated for pair-programming reference following repository guidelines (Zero Emojis, Grayscale Standards, Full Screens).*
