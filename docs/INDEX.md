@@ -12,6 +12,8 @@ Welcome to the comprehensive documentation for **Sentinel Terminal**. This direc
 | **[`rules.md`](file:///docs/rules.md)** | Core development rules and assistant behavioral constraints: mandatory git commits on completion, Strict No-Emoji Policy, grayscale aesthetics, and user-space integrations. |
 | **[`FEATURES.md`](file:///docs/FEATURES.md)** | Complete feature overview: embedded AI, knowledge scanner, 8-category safety guardian, and macro recording. |
 | **[`KEYBOARD_SHORTCUTS.md`](file:///docs/KEYBOARD_SHORTCUTS.md)** | Complete keybinding cheat-sheet: AI settings, split navigation, search toggles, and tab shortcuts. |
+| **[`WORKFLOWS.md`](file:///docs/WORKFLOWS.md)** | Complete specification of the workflow & macro engine: natural language recording, zero-token deterministic replay, parameter injection, cross-platform adapters, and three-tier declarative DAGs. |
+| **[`WORKFLOW_FOLDER.md`](file:///docs/WORKFLOW_FOLDER.md)** | Comprehensive technical reference for the workflow folders (`src/workflows/` and `src/domain/workflow/`): file inventory, models, compilers, scheduler, registry, validator, and test suites. |
 | **[`FAQ.md`](file:///docs/FAQ.md)** | Answers to common questions regarding offline AI, cloud API keys, security guardrails, and shell compatibility. |
 | **[`TROUBLESHOOTING.md`](file:///docs/TROUBLESHOOTING.md)** | Resolution steps for embedded llama-server, port discovery, GPU VRAM, and Wayland permissions. |
 
