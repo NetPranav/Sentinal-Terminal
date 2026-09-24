@@ -22,6 +22,9 @@ mkdir -p "${BUNDLE_DIR}"
 
 # Stage sources
 cp "${REPO_ROOT}/src-tauri/target/release/sentinel-terminal" "${BUILD_DIR}/"
+cp "${SCRIPT_DIR}/sentinel" "${BUILD_DIR}/"
+cp "${SCRIPT_DIR}/sentinel-shell" "${BUILD_DIR}/"
+cp "${SCRIPT_DIR}/sentinel_open.desktop" "${BUILD_DIR}/"
 cp "${SCRIPT_DIR}/sentinel-terminal.desktop" "${BUILD_DIR}/"
 cp "${REPO_ROOT}/src-tauri/icons/icon.png" "${BUILD_DIR}/icon.png"
 cp "${REPO_ROOT}/src-tauri/icons/128x128.png" "${BUILD_DIR}/128x128.png"
@@ -33,10 +36,12 @@ cd "${BUILD_DIR}"
 makepkg -f --nodeps
 
 # Copy result to bundle directory
-PKG_FILE=$(find "${BUILD_DIR}" -name "*.pkg.tar.zst" -type f | head -n 1)
-if [ -n "${PKG_FILE}" ]; then
-    cp "${PKG_FILE}" "${BUNDLE_DIR}/"
-    echo "Pacman package created: ${BUNDLE_DIR}/$(basename "${PKG_FILE}")"
+PKG_FILES=$(find "${BUILD_DIR}" -name "*.pkg.tar.zst" -type f)
+if [ -n "${PKG_FILES}" ]; then
+    cp ${PKG_FILES} "${BUNDLE_DIR}/"
+    for f in ${PKG_FILES}; do
+        echo "Pacman package created: ${BUNDLE_DIR}/$(basename "${f}")"
+    done
 else
     echo "ERROR: Failed to find generated .pkg.tar.zst"
     exit 1

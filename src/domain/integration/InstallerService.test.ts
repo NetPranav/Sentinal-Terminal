@@ -19,7 +19,13 @@ vi.mock('@tauri-apps/plugin-fs', () => ({
 }));
 
 vi.mock('@tauri-apps/api/core', () => ({
-  invoke: vi.fn(async () => ({ stdout: '/home/testuser' }))
+  invoke: vi.fn(async (cmd: string, args?: any) => {
+    if (cmd === 'get_app_binary_path') return '/usr/bin/sentinel-terminal';
+    if (cmd === 'execute_command' && args?.command === 'sh' && args?.args?.includes('echo $PATH')) {
+      return { stdout: '/home/testuser/.local/bin:/usr/local/bin:/usr/bin:/bin' };
+    }
+    return { stdout: '/home/testuser' };
+  })
 }));
 
 describe('InstallerService (Linux & Cross-Platform)', () => {
@@ -33,20 +39,54 @@ describe('InstallerService (Linux & Cross-Platform)', () => {
     for (const k in mockStore) delete mockStore[k];
   });
 
-  it('installs the sentinel command line executable to Linux target directory', async () => {
-    const res = await installer.installCli('#!/bin/bash\necho "test"', cliTarget);
+  it('installs the sentinel command line executable without recursive loops and registers desktop entries', async () => {
+    const res = await installer.installCli(undefined, cliTarget);
     expect(res.success).toBe(true);
-    expect(mockStore[cliTarget]).toContain('echo "test"');
+
+    const script = mockStore[cliTarget];
+    expect(script).toBeDefined();
+    // Verify recursion elimination: must not call sentinel on failure
+    expect(script).not.toContain('|| sentinel "$resolved_path"');
+    expect(script).toContain('APP_BIN');
+    expect(script).toContain('--help');
+    expect(script).toContain('--version');
+
+    // Verify sentinel-shell wrapper is generated
+    const shellWrapper = mockStore['/home/testuser/.local/bin/sentinel-shell'];
+    expect(shellWrapper).toBeDefined();
+    expect(shellWrapper).toContain('SENTINEL_IDE_INTEGRATED=1');
+
+    // Verify desktop entry with directory and scheme handler
+    const desktopEntry = mockStore['/home/testuser/.local/share/applications/sentinel-terminal.desktop'];
+    expect(desktopEntry).toBeDefined();
+    expect(desktopEntry).toContain('MimeType=inode/directory;x-scheme-handler/sentinel;');
   });
 
-  it('generates Linux file manager Open in Sentinel script', async () => {
+  it('generates multi-file manager context actions for Nautilus, Dolphin, and Thunar', async () => {
+    // Seed existing Thunar uca.xml
+    mockStore['/home/testuser/.config/Thunar/uca.xml'] = '<?xml version="1.0" encoding="UTF-8"?>\n<actions>\n</actions>';
+
     const res = await installer.enableFinderIntegration(servicesDir);
     expect(res.success).toBe(true);
+
+    // 1. Nautilus script
     expect(mockStore[`${servicesDir}/Open in Sentinel Terminal`]).toBeDefined();
-    expect(mockStore[`${servicesDir}/Open in Sentinel Terminal`]).toContain('sentinel-terminal');
+    expect(mockStore[`${servicesDir}/Open in Sentinel Terminal`]).toContain('sentinel');
+
+    // 2. Dolphin KIO service menu
+    const dolphinMenu = mockStore['/home/testuser/.local/share/kio/servicemenus/sentinel_open.desktop'];
+    expect(dolphinMenu).toBeDefined();
+    expect(dolphinMenu).toContain('ServiceTypes=KonqPopupMenu/Plugin,inode/directory');
+    expect(dolphinMenu).toContain('Exec=sentinel "%f"');
+
+    // 3. Thunar Custom Action
+    const thunarXml = mockStore['/home/testuser/.config/Thunar/uca.xml'];
+    expect(thunarXml).toBeDefined();
+    expect(thunarXml).toContain('sentinel-open-terminal');
+    expect(thunarXml).toContain('<command>sentinel %f</command>');
   });
 
-  it('injects Sentinel Terminal profile into VS Code settings.json cleanly for Linux', async () => {
+  it('injects Sentinel Shell profile and external exec into VS Code settings.json cleanly for Linux', async () => {
     mockStore[vscodeSettings] = JSON.stringify({ "editor.fontSize": 14 });
 
     const res = await installer.configureVsCodeIntegration(vscodeSettings);
@@ -54,20 +94,23 @@ describe('InstallerService (Linux & Cross-Platform)', () => {
 
     const saved = JSON.parse(mockStore[vscodeSettings]);
     expect(saved['editor.fontSize']).toBe(14);
-    expect(saved['terminal.integrated.profiles.linux']['Sentinel Terminal'].path).toBe('sentinel');
+    expect(saved['terminal.integrated.profiles.linux']['Sentinel Shell']).toBeDefined();
+    expect(saved['terminal.integrated.profiles.linux']['Sentinel Shell'].path).toContain('sentinel-shell');
+    expect(saved['terminal.external.linuxExec']).toBe('sentinel-terminal');
   });
 
-  it('injects Sentinel Terminal profile into Cursor IDE settings.json for Linux', async () => {
+  it('injects Sentinel Shell profile into Cursor IDE settings.json for Linux', async () => {
     const res = await installer.configureCursorIntegration(cursorSettings);
     expect(res.success).toBe(true);
 
     const saved = JSON.parse(mockStore[cursorSettings]);
-    expect(saved['terminal.integrated.profiles.linux']['Sentinel Terminal']).toBeDefined();
-    expect(saved['terminal.integrated.profiles.linux']['Sentinel Terminal'].path).toBe('sentinel');
+    expect(saved['terminal.integrated.profiles.linux']['Sentinel Shell']).toBeDefined();
+    expect(saved['terminal.integrated.profiles.linux']['Sentinel Shell'].path).toContain('sentinel-shell');
+    expect(saved['terminal.external.linuxExec']).toBe('sentinel-terminal');
   });
 
-  it('accurately verifies status of all desktop integration components', async () => {
-    await installer.installCli('echo "cli"', cliTarget);
+  it('accurately verifies status of all desktop integration components including PATH', async () => {
+    await installer.installCli(undefined, cliTarget);
     await installer.configureVsCodeIntegration(vscodeSettings);
 
     const status = await installer.checkStatus({
@@ -78,8 +121,9 @@ describe('InstallerService (Linux & Cross-Platform)', () => {
     });
 
     expect(status.cliInstalled).toBe(true);
-    expect(status.finderEnabled).toBe(false);
+    expect(status.finderEnabled).toBe(true);
     expect(status.vscodeConfigured).toBe(true);
     expect(status.cursorConfigured).toBe(false);
+    expect(status.localBinInPath).toBe(true);
   });
 });

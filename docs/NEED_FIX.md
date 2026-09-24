@@ -226,6 +226,8 @@ On the onboarding screen, the option titled **"Linux Desktop / File Manager Acti
 
 We need to ensure this option functions across graphical file managers and that clicking "Open in Sentinel" launches the terminal directly within the selected target directory.
 
+**Status: RESOLVED & VERIFIED** (Full resolution log in [FIXED.md](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/docs/FIXED.md#issue-4-linux-desktop--file-manager-context-actions-integration))
+
 ### 4.2 Code Locations
 - [src/domain/integration/InstallerService.ts](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/domain/integration/InstallerService.ts#L152-L186) (`enableFinderIntegration`)
 - [src/ui/components/InstallerWizard.tsx](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/ui/components/InstallerWizard.tsx#L520-L577) (Onboarding option)
@@ -270,6 +272,8 @@ The onboarding screen includes:
 
 We need to ensure this option is functional, reliable, and provides a proper shell environment inside the editor.
 
+**Status: RESOLVED & VERIFIED** (Full resolution log in [FIXED.md](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/docs/FIXED.md#issue-5-vs-code--cursor-ide-profiles-usability))
+
 ### 5.2 Code Locations
 - [src/domain/integration/InstallerService.ts](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/domain/integration/InstallerService.ts#L242-L302) (`updateIdeSettings`, `configureVsCodeIntegration`, `configureCursorIntegration`)
 - [src/ui/components/InstallerWizard.tsx](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/ui/components/InstallerWizard.tsx#L580-L640)
@@ -308,6 +312,8 @@ We need to ensure this option is functional, reliable, and provides a proper she
 
 ### 6.1 Problem Statement
 The onboarding screen allows users to install the Sentinel command-line launcher (`sentinel`). We must ensure that the installation succeeds, the binary is placed in PATH, and the command functions properly without errors or recursive loops.
+
+**Status: RESOLVED & VERIFIED** (Full resolution log in [FIXED.md](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/docs/FIXED.md#issue-6-sentinel-cli-launcher-installation--execution))
 
 ### 6.2 Code Locations
 - [src/domain/integration/InstallerService.ts](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/domain/integration/InstallerService.ts#L70-L145) (`installCli`)

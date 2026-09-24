@@ -28,7 +28,22 @@ export class UrlSchemeHandler {
       return { type: 'noop', rawUrl: input };
     }
 
-    // Handle raw filesystem paths passed via Finder Quick Actions or open -a commands
+    // Handle file:// protocol passed by FreeDesktop file managers
+    if (cleanInput.startsWith('file://')) {
+      try {
+        const fileUrl = new URL(cleanInput);
+        const resolvedPath = decodeURIComponent(fileUrl.pathname);
+        if (resolvedPath) {
+          return {
+            type: 'open',
+            path: resolvedPath,
+            rawUrl: cleanInput,
+          };
+        }
+      } catch {}
+    }
+
+    // Handle raw filesystem paths passed via Finder Quick Actions, CLI, or open -a commands
     if (cleanInput.startsWith('/') || cleanInput.startsWith('~/') || cleanInput.startsWith('./') || cleanInput.startsWith('../')) {
       return {
         type: 'open',

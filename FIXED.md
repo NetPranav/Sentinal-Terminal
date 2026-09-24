@@ -11,7 +11,9 @@ This document tracks verified resolutions, architectural implementations, touche
 4. [Issue 8: Clipboard Paste Failure on Prompt Entry (Ctrl+Shift+V / Ctrl+V)](#issue-8-clipboard-paste-failure-on-prompt-entry-ctrlshiftv--ctrlv)
 5. [Issue 9: Arrow Key In-Buffer Line Navigation vs. History Ingestion in Long Prompts](#issue-9-arrow-key-in-buffer-line-navigation-vs-history-ingestion-in-long-prompts)
 6. [Issue 10: Diminutive Tab Close Button Hit-Target and Sub-Pixel Dot Artifact](#issue-10-diminutive-tab-close-button-hit-target-and-sub-pixel-dot-artifact)
-7. [Issue 11: Prompt Abnormally Magnifying / Canvas Scaling Glitch on Tab Close](#issue-11-prompt-abnormally-magnifying--canvas-scaling-glitch-on-tab-close)
+8. [Issue 4: Linux Desktop / File Manager Context Actions Integration](#issue-4-linux-desktop--file-manager-context-actions-integration)
+9. [Issue 5: VS Code & Cursor IDE Profiles Usability](#issue-5-vs-code--cursor-ide-profiles-usability)
+10. [Issue 6: Sentinel CLI Launcher Installation & Execution](#issue-6-sentinel-cli-launcher-installation--execution)
 
 ---
 
@@ -343,4 +345,144 @@ When closing a terminal tab (or split pane), the shell prompt (`username@hostnam
 - [`src/App.tsx`](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/App.tsx): Replaced `display: none` with absolute positioning and visibility toggling for tab containers, and updated `closeTab` index selection.
 - [`src/presentation/TerminalView.tsx`](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/presentation/TerminalView.tsx): Removed 50ms refit delay; added immediate synchronous + rAF `fitAddon.fit()` and visibility styling.
 - [`src/App.css`](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/App.css): Enforced crisp canvas rendering styles.
+
+---
+
+## Issue 4: Linux Desktop / File Manager Context Actions Integration
+
+### 4.1 Problem Statement
+Selecting the onboarding option "Linux Desktop / File Manager Actions" previously only created scripts for Nautilus and Nemo. It did not support **KDE Dolphin**, **XFCE Thunar**, **MATE Caja**, or universal FreeDesktop directory MIME actions. Furthermore, when launched with a folder path argument via CLI (`sentinel <path>`) or file manager actions, Sentinel Terminal ignored the argument on initial mount and spawned at `~`.
+
+### 4.2 Resolution Status
+- **Status:** Resolved & Verified
+- **Validation:** 100% test pass rate across unit test suite ([`InstallerService.test.ts`](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/domain/integration/InstallerService.test.ts), [`UrlSchemeHandler.test.ts`](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/domain/integration/UrlSchemeHandler.test.ts)) and full workspace build.
+
+### 4.3 Technical Root Causes
+1. **Limited File Manager Coverage**:
+   - `enableFinderIntegration()` only targeted `~/.local/share/nautilus/scripts/` and `~/.local/share/nemo/scripts/`.
+   - Lacked KDE Dolphin KIO service menus (`~/.local/share/kio/servicemenus/` and `~/.local/share/kservices5/ServiceMenus/`).
+   - Lacked XFCE Thunar custom actions (`~/.config/Thunar/uca.xml`).
+   - Lacked FreeDesktop universal folder MIME type (`inode/directory`).
+2. **Startup CLI Argument Void in `App.tsx`**:
+   - `App.tsx` never queried `get_launch_args` during initial mount. `panePaths` initialized to `{}`, defaulting all initial terminal panes to `'~'`.
+3. **Missing `file://` URI Support in URL Scheme Handler**:
+   - Standard FreeDesktop desktop entries with `%U` supply arguments as `file://` URIs (e.g. `file:///home/user/project`), which [`UrlSchemeHandler.ts`](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/domain/integration/UrlSchemeHandler.ts) previously treated as `noop`.
+
+### 4.4 Implemented Architecture & Remediation
+1. **Multi-File Manager Desktop Integrations**:
+   - In [`InstallerService.ts`](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/domain/integration/InstallerService.ts), expanded `enableFinderIntegration()` to register context actions across:
+     - **GNOME Nautilus**: `~/.local/share/nautilus/scripts/Open in Sentinel Terminal`
+     - **Cinnamon Nemo**: `~/.local/share/nemo/scripts/Open in Sentinel Terminal`
+     - **MATE Caja**: `~/.local/share/caja/scripts/Open in Sentinel Terminal`
+     - **KDE Dolphin**: `~/.local/share/kio/servicemenus/sentinel_open.desktop` and legacy `~/.local/share/kservices5/ServiceMenus/sentinel_open.desktop` (`ServiceTypes=KonqPopupMenu/Plugin,inode/directory`, `Exec=sentinel "%f"`, `X-KDE-Priority=TopLevel`)
+     - **XFCE Thunar**: Injects custom action into `~/.config/Thunar/uca.xml` for folder patterns `*` with `<command>sentinel %f</command>`.
+2. **Universal FreeDesktop Desktop Entry**:
+   - Installed `~/.local/share/applications/sentinel-terminal.desktop` with `Exec=sentinel-terminal %U`, `MimeType=inode/directory;x-scheme-handler/sentinel;`, and `Actions=NewWindow;`.
+   - Executed non-fatal `update-desktop-database` and `xdg-mime default` registrations.
+3. **Startup Launch Argument Processing in `App.tsx`**:
+   - Added startup `useEffect` in [`App.tsx`](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/App.tsx) consuming `get_launch_args`.
+   - Filters flags, parses paths and URIs, sets `panePaths` for the initial pane (`tab_initial`), and transitions already-spawned sessions via `cd <path>`.
+   - Automatically opens separate tabs for additional folder paths.
+4. **Enhanced URI Protocol Parsing**:
+   - Updated [`UrlSchemeHandler.ts`](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/domain/integration/UrlSchemeHandler.ts) to parse `file://` URIs and extract clean decoded paths.
+
+### 4.5 Touched Components & Files
+- [`src/domain/integration/InstallerService.ts`](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/domain/integration/InstallerService.ts): Multi-file manager actions (Nautilus, Nemo, Caja, Dolphin, Thunar) and FreeDesktop desktop file installer.
+- [`src/App.tsx`](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/App.tsx): Startup argument processing, pane path binding, and race-free session directory navigation.
+- [`src/domain/integration/UrlSchemeHandler.ts`](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/domain/integration/UrlSchemeHandler.ts): Support for `file://` URIs.
+- [`src/ui/components/InstallerWizard.tsx`](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/ui/components/InstallerWizard.tsx): Updated integration cards and badges.
+- [`src/domain/integration/InstallerService.test.ts`](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/domain/integration/InstallerService.test.ts): Unit tests verifying multi-file manager script and desktop file creation.
+- [`src/domain/integration/UrlSchemeHandler.test.ts`](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/domain/integration/UrlSchemeHandler.test.ts): Unit tests for `file://` URI decoding.
+
+---
+
+## Issue 5: VS Code & Cursor IDE Profiles Usability
+
+### 5.1 Problem Statement
+Configuring Sentinel Terminal inside VS Code and Cursor wrote `"path": "sentinel"` into `terminal.integrated.profiles.linux`. Selecting this profile inside the editor either failed to launch with `Path does not exist` (when `~/.local/bin` was missing from the desktop environment PATH) or attempted to launch a detached WebKit/GTK GUI window, causing `node-pty` crashes and leaving embedded terminal tabs frozen.
+
+### 5.2 Resolution Status
+- **Status:** Resolved & Verified
+- **Validation:** 100% test pass rate across unit test suite ([`InstallerService.test.ts`](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/domain/integration/InstallerService.test.ts)) and full workspace build.
+
+### 5.3 Technical Root Causes
+1. **PTY Stream Process vs. GUI Desktop Window**:
+   - `terminal.integrated.profiles.linux` in VS Code and Cursor is managed by `node-pty`. It requires an interactive shell process communicating over stdin/stdout/stderr, not a graphical window binary.
+2. **Missing `~/.local/bin` in GUI PATH**:
+   - Desktop application launchers (systemd user session, GNOME Dash, KDE Kickoff) frequently omit `~/.local/bin` from GUI PATH. Bare command names like `"path": "sentinel"` fail to resolve.
+3. **External Terminal Shortcut Missing**:
+   - VS Code provides `terminal.external.linuxExec` for launching standalone terminal emulators via `Ctrl+Shift+C`, which was previously unconfigured.
+
+### 5.4 Implemented Architecture & Remediation
+1. **Dedicated IDE Shell Wrapper Script (`sentinel-shell`)**:
+   - Created `sentinel-shell` wrapper installed to `~/.local/bin/sentinel-shell` (and `/usr/bin/sentinel-shell` in packages):
+     - Adds `~/.local/bin` to `PATH` if omitted from the session.
+     - Exports `SENTINEL_IDE_INTEGRATED=1` and `TERMINAL_EMULATOR="SentinelTerminal"`.
+     - Sources `~/.sentinel/env` if present.
+     - Seamlessly replaces process via `exec "$USER_SHELL" "$@"`, honoring user's shell preference (`fish`, `zsh`, `bash`) with zero overhead and full PTY support.
+2. **Absolute Path Binding in IDE Configuration**:
+   - In [`InstallerService.ts`](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/domain/integration/InstallerService.ts), `updateIdeSettings()` binds `"Sentinel Shell"` to the resolved absolute path (`/usr/bin/sentinel-shell` or `~/.local/bin/sentinel-shell`).
+3. **External Terminal Integration**:
+   - Sets `"terminal.external.linuxExec": "sentinel-terminal"` in editor settings, allowing `Ctrl+Shift+C` ("Open New External Terminal") to launch a full Sentinel Terminal GUI window in the workspace.
+4. **Enhanced Status Checks**:
+   - Updated `checkStatus()` to verify both `"Sentinel Shell"` and legacy profile keys across VS Code and Cursor.
+
+### 5.5 Touched Components & Files
+- [`src/domain/integration/InstallerService.ts`](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/domain/integration/InstallerService.ts): `ensureSentinelShellWrapper()`, absolute wrapper path resolution, and `terminal.external.linuxExec` configuration.
+- [`src/ui/components/InstallerWizard.tsx`](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/ui/components/InstallerWizard.tsx): Updated IDE profile card details and badges.
+- [`src/domain/integration/InstallerService.test.ts`](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/domain/integration/InstallerService.test.ts): Unit tests verifying absolute path profile injection and external terminal configuration.
+
+---
+
+## Issue 6: Sentinel CLI Launcher Installation & Execution
+
+### 6.1 Problem Statement
+The onboarding CLI launcher installation generated a script at `~/.local/bin/sentinel` containing a recursive fallback loop (`|| sentinel "$resolved_path"`). When the binary was not in PATH, the script invoked itself infinitely, exhausting processes and freezing the shell. Additionally, the binary name was hardcoded, foreground execution blocked terminals, and the desktop URL scheme handler was not installed.
+
+### 6.2 Resolution Status
+- **Status:** Resolved & Verified
+- **Validation:** 100% test pass rate across unit test suite ([`InstallerService.test.ts`](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/domain/integration/InstallerService.test.ts)), full workspace build, and Arch Linux pacman package rebuild (`sentinel-terminal-bin-2.0.0-2-x86_64.pkg.tar.zst`).
+
+### 6.3 Technical Root Causes
+1. **Unbounded Recursion**:
+   - In `InstallerService.ts`, `"$APP_BIN" "$resolved_path" 2>/dev/null || sentinel "$resolved_path"` called `sentinel` when `APP_BIN` failed, creating an infinite recursive loop.
+2. **Static Binary Hardcoding**:
+   - `APP_BIN="sentinel-terminal"` failed when running from localized builds, custom prefixes, or AppImages.
+3. **Foreground Blocking**:
+   - Direct execution in terminals blocked the prompt instead of disowning to background.
+4. **Arch Package Omission**:
+   - Previous Arch pacman package `sentinel-terminal-bin-2.0.0-1` only packaged `usr/bin/sentinel-terminal`. It omitted `/usr/bin/sentinel` (CLI launcher), `/usr/bin/sentinel-shell` (IDE wrapper), Dolphin service menus, and proper desktop MIME types.
+
+### 6.4 Implemented Architecture & Remediation
+1. **Complete Recursion Elimination**:
+   - Removed `|| sentinel "$resolved_path"` from the launcher script template.
+2. **Hierarchical Binary Resolution**:
+   - Script scans candidate paths in order: detected binary via `get_app_binary_path`, `command -v sentinel-terminal`, `/usr/bin/sentinel-terminal`, `/usr/local/bin/sentinel-terminal`, `~/.local/bin/sentinel-terminal`, `$APPIMAGE`, and sibling binary.
+   - Added native Rust command `get_app_binary_path` in [`src-tauri/src/process_cmds.rs`](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src-tauri/src/process_cmds.rs).
+3. **Background Disowning & Pass-Through**:
+   - Direct pass-through for CLI flags (`--help`, `-h`, `--version`, `-v`, `--new-tab`, `--split`).
+   - Resolves target files to containing directory (`if [ -f "$target" ]; then target="$(dirname "$target")"; fi`).
+   - Disowns background execution (`"$APP_BIN" "$resolved_path" >/dev/null 2>&1 &; exit 0`) so user prompts return immediately.
+4. **Desktop Entry & URL Scheme Registration**:
+   - Added `ensureDesktopEntry()` in [`InstallerService.ts`](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/domain/integration/InstallerService.ts) creating `sentinel-terminal.desktop` with `inode/directory;x-scheme-handler/sentinel;`.
+   - Added `isLocalBinInPath()` to guide users in onboarding wizard if `~/.local/bin` is missing from `$PATH`.
+5. **Arch Linux Package Release (`2.0.0-2`)**:
+   - Updated [`PKGBUILD`](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/packaging/arch/PKGBUILD) and [`build-pacman.sh`](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/packaging/arch/build-pacman.sh).
+   - Packaged `/usr/bin/sentinel` (755), `/usr/bin/sentinel-shell` (755), `/usr/bin/sentinel-terminal` (755), `/usr/share/applications/sentinel-terminal.desktop` (644), and `/usr/share/kio/servicemenus/sentinel_open.desktop` (644).
+   - Validated package archive generation: `sentinel-terminal-bin-2.0.0-2-x86_64.pkg.tar.zst` verified via `tar -tvf`.
+
+### 6.5 Touched Components & Files
+- [`src/domain/integration/InstallerService.ts`](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/domain/integration/InstallerService.ts): Recursion-free launcher template, multi-tier binary resolution, desktop scheme handler, and PATH detection.
+- [`src-tauri/src/process_cmds.rs`](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src-tauri/src/process_cmds.rs): Added `get_app_binary_path` Rust command.
+- [`src-tauri/src/lib.rs`](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src-tauri/src/lib.rs): Registered `get_app_binary_path` in `invoke_handler`.
+- [`src/infrastructure/execution/NodeTauriBridge.ts`](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/infrastructure/execution/NodeTauriBridge.ts): Stubbed `get_app_binary_path`.
+- [`packaging/arch/PKGBUILD`](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/packaging/arch/PKGBUILD): Updated to release 2 with CLI launcher, shell wrapper, and Dolphin service menu.
+- [`packaging/arch/.SRCINFO`](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/packaging/arch/.SRCINFO): Regenerated metadata.
+- [`packaging/arch/build-pacman.sh`](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/packaging/arch/build-pacman.sh): Staged CLI launcher, shell wrapper, and service menu.
+- [`packaging/arch/sentinel`](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/packaging/arch/sentinel): System-wide CLI launcher script.
+- [`packaging/arch/sentinel-shell`](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/packaging/arch/sentinel-shell): IDE terminal shell profile wrapper.
+- [`packaging/arch/sentinel_open.desktop`](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/packaging/arch/sentinel_open.desktop): Dolphin KIO context menu entry.
+- [`packaging/arch/sentinel-terminal.desktop`](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/packaging/arch/sentinel-terminal.desktop): Updated desktop entry with `%U` and directory MIME type.
+- [`packaging/desktop/com.pranav.sentinel-terminal.desktop`](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/packaging/desktop/com.pranav.sentinel-terminal.desktop): Updated desktop entry with `inode/directory`.
+- [`src/domain/integration/InstallerService.test.ts`](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/domain/integration/InstallerService.test.ts): Unit tests verifying recursion elimination, wrapper generation, and desktop registration.
 

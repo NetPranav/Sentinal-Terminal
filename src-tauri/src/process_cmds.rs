@@ -122,6 +122,13 @@ pub fn get_launch_args() -> Vec<String> {
     std::env::args().collect()
 }
 
+#[tauri::command]
+pub fn get_app_binary_path() -> Result<String, String> {
+    std::env::current_exe()
+        .map(|p| p.to_string_lossy().to_string())
+        .map_err(|e| e.to_string())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

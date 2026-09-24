@@ -1,7 +1,7 @@
 # Maintainer: Sentinel Terminal Contributors
 pkgname=sentinel-terminal-bin
 pkgver=2.0.0
-pkgrel=1
+pkgrel=2
 pkgdesc="Autonomous AI-Native Linux Terminal Copilot"
 arch=('x86_64')
 license=('Apache-2.0')
@@ -16,12 +16,17 @@ depends=(
 optdepends=(
     'vte3: Enhanced terminal capability support'
     'curl: Network diagnostic features'
+    'xdg-utils: Desktop URL scheme and directory handling'
 )
-provides=('sentinel-terminal')
+provides=('sentinel-terminal' 'sentinel')
 conflicts=('sentinel-terminal')
+options=('!debug')
 source=(
     "sentinel-terminal"
+    "sentinel"
+    "sentinel-shell"
     "sentinel-terminal.desktop"
+    "sentinel_open.desktop"
     "icon.png"
     "128x128.png"
     "32x32.png"
@@ -32,14 +37,22 @@ sha256sums=(
     'SKIP'
     'SKIP'
     'SKIP'
+    'SKIP'
+    'SKIP'
+    'SKIP'
 )
 
 package() {
-    # Install binary
+    # Install main GUI binary and CLI launcher scripts
     install -Dm755 "${srcdir}/sentinel-terminal" "${pkgdir}/usr/bin/sentinel-terminal"
+    install -Dm755 "${srcdir}/sentinel" "${pkgdir}/usr/bin/sentinel"
+    install -Dm755 "${srcdir}/sentinel-shell" "${pkgdir}/usr/bin/sentinel-shell"
 
-    # Install desktop entry
+    # Install FreeDesktop application entry
     install -Dm644 "${srcdir}/sentinel-terminal.desktop" "${pkgdir}/usr/share/applications/sentinel-terminal.desktop"
+
+    # Install Dolphin KIO service menu
+    install -Dm644 "${srcdir}/sentinel_open.desktop" "${pkgdir}/usr/share/kio/servicemenus/sentinel_open.desktop"
 
     # Install icons
     install -Dm644 "${srcdir}/icon.png" "${pkgdir}/usr/share/icons/hicolor/512x512/apps/sentinel-terminal.png"

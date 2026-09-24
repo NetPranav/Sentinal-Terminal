@@ -140,6 +140,7 @@ pub fn run() {
             process_cmds::get_system_stats,
             process_cmds::execute_command,
             process_cmds::get_launch_args,
+            process_cmds::get_app_binary_path,
             embedded_server::start_embedded_llm,
             embedded_server::stop_embedded_llm,
             embedded_server::get_embedded_llm_status,

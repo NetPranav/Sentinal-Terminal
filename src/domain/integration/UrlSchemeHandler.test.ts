@@ -34,9 +34,20 @@ describe('UrlSchemeHandler', () => {
     expect(handler.parse('sentinel://split').type).toBe('split');
   });
 
+  it('parses file:// URIs provided by Linux FreeDesktop file managers', () => {
+    const action = handler.parse('file:///home/user/workspace/project');
+    expect(action.type).toBe('open');
+    expect(action.path).toBe('/home/user/workspace/project');
+
+    const encodedAction = handler.parse('file:///home/user/My%20Documents/test');
+    expect(encodedAction.type).toBe('open');
+    expect(encodedAction.path).toBe('/home/user/My Documents/test');
+  });
+
   it('filters out invalid or noop inputs when parsing many', () => {
-    const actions = handler.parseMany(['--debug', 'sentinel://open?path=/dir', 'unsupported:protocol']);
-    expect(actions.length).toBe(1);
+    const actions = handler.parseMany(['--debug', 'sentinel://open?path=/dir', 'file:///var/log', 'unsupported:protocol']);
+    expect(actions.length).toBe(2);
     expect(actions[0].path).toBe('/dir');
+    expect(actions[1].path).toBe('/var/log');
   });
 });

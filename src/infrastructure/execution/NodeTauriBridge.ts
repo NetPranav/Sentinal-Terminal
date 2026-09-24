@@ -235,6 +235,10 @@ export class NodeTauriBridge {
         return process.argv;
       }
 
+      case 'get_app_binary_path': {
+        return process.execPath;
+      }
+
       default:
         // No-op for GUI/window commands
         return null;

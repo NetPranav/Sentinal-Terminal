@@ -242,6 +242,9 @@ function App() {
     setActivePaneId(newPane.data.id);
   }, []);
 
+  const startupArgsProcessedRef = useRef(false);
+  const activeSessionIdsRef = useRef<Record<string, string>>({});
+
   useEffect(() => {
     let unlistenMenu: (() => void) | undefined;
     let unlistenUrl: (() => void) | undefined;
@@ -265,6 +268,53 @@ function App() {
         }
       }
     }).then(fn => { unlistenUrl = fn; }).catch(() => {});
+
+    // Process CLI launch arguments on initial application mount
+    if (!startupArgsProcessedRef.current) {
+      startupArgsProcessedRef.current = true;
+      (async () => {
+        try {
+          const args = await invoke<string[]>('get_launch_args');
+          if (!args || args.length <= 1) return;
+
+          const candidateArgs = args.slice(1).filter(arg => arg && !arg.startsWith('-'));
+          if (candidateArgs.length === 0) return;
+
+          const actions = UrlSchemeHandler.getInstance().parseMany(candidateArgs);
+          if (actions.length === 0) return;
+
+          const primaryAction = actions[0];
+          if (primaryAction.path) {
+            const targetPath = primaryAction.path;
+            setTabs(currentTabs => {
+              if (currentTabs.length === 1 && currentTabs[0].id === 'tab_initial') {
+                const rootPane = currentTabs[0].rootPane;
+                const paneId = rootPane.type === 'terminal' ? rootPane.data.id : undefined;
+                if (paneId) {
+                  setPanePaths(prev => ({ ...prev, [paneId]: targetPath }));
+                  const existingSessionId = activeSessionIdsRef.current[paneId] || (rootPane.type === 'terminal' ? rootPane.data.sessionId : undefined);
+                  if (existingSessionId) {
+                    SessionManager.getInstance().write(existingSessionId, `cd ${JSON.stringify(targetPath)}\n`);
+                  }
+                }
+                return currentTabs;
+              } else {
+                addTab(targetPath);
+                return currentTabs;
+              }
+            });
+          }
+
+          for (let i = 1; i < actions.length; i++) {
+            if (actions[i].path) {
+              addTab(actions[i].path);
+            }
+          }
+        } catch (err) {
+          console.warn('[Sentinel] Failed to process startup launch arguments:', err);
+        }
+      })();
+    }
 
     return () => { 
       if (unlistenMenu) unlistenMenu(); 
@@ -293,6 +343,7 @@ function App() {
   };
 
   const handleSessionCreated = (paneId: string, sessionId: string) => {
+    activeSessionIdsRef.current[paneId] = sessionId;
     setTabs(prevTabs => prevTabs.map(tab => {
       if (tab.id !== activeTabId) return tab;
       const updateSessionRecursive = (node: PaneNode): PaneNode => {

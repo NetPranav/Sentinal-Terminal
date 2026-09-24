@@ -509,6 +509,11 @@ export const InstallerWizard: React.FC<InstallerWizardProps> = ({ isOpen, onClos
                 <div style={{ fontSize: '11.8px', color: 'rgba(255, 255, 255, 0.65)', lineHeight: 1.5 }}>
                   Installs a user-space launcher into your PATH. Enables launching Sentinel from any terminal prompt, bash/zsh script, or application launcher (Rofi, Wofi, dmenu) via <code style={{ fontSize: '11px', color: '#ffffff', background: 'rgba(255, 255, 255, 0.08)', padding: '2px 5px', borderRadius: '3px' }}>sentinel &lt;path&gt;</code>.
                 </div>
+                {status.localBinInPath === false && (
+                  <div style={{ fontSize: '10.5px', color: 'rgba(255, 255, 255, 0.5)', marginTop: '4px', fontStyle: 'italic' }}>
+                    Note: Add ~/.local/bin to your PATH in ~/.bashrc or ~/.zshrc
+                  </div>
+                )}
               </div>
 
               {/* Bottom Row: Path badge on left, Action Button on right */}
@@ -606,9 +611,9 @@ export const InstallerWizard: React.FC<InstallerWizardProps> = ({ isOpen, onClos
                   borderRadius: '5px',
                   overflow: 'hidden'
                 }}>
-                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{isLinux() ? '~/.local/share/nautilus/scripts/' : '~/Library/Services/'}</span>
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{isLinux() ? 'Nautilus • Dolphin • Thunar' : '~/Library/Services/'}</span>
                   <span>•</span>
-                  <span style={{ color: 'rgba(255, 255, 255, 0.75)', flexShrink: 0 }}>Context Hook</span>
+                  <span style={{ color: 'rgba(255, 255, 255, 0.75)', flexShrink: 0 }}>Context Action</span>
                 </div>
 
                 <button
@@ -669,7 +674,7 @@ export const InstallerWizard: React.FC<InstallerWizardProps> = ({ isOpen, onClos
 
                 {/* Description */}
                 <div style={{ fontSize: '11.8px', color: 'rgba(255, 255, 255, 0.65)', lineHeight: 1.5 }}>
-                  Safely registers Sentinel under <code style={{ fontSize: '11px', color: '#ffffff', background: 'rgba(255, 255, 255, 0.08)', padding: '2px 5px', borderRadius: '3px' }}>terminal.integrated.profiles.linux</code> in your IDE settings. Switch to Sentinel inside your editor's terminal dropdown.
+                  Registers Sentinel Shell in VS Code & Cursor integrated terminal profiles and sets Sentinel as your external editor terminal (Ctrl+Shift+C).
                 </div>
               </div>
 
@@ -687,9 +692,9 @@ export const InstallerWizard: React.FC<InstallerWizardProps> = ({ isOpen, onClos
                   borderRadius: '5px',
                   overflow: 'hidden'
                 }}>
-                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>~/.config/Code/User/settings.json</span>
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>VS Code & Cursor</span>
                   <span>•</span>
-                  <span style={{ color: 'rgba(255, 255, 255, 0.75)', flexShrink: 0 }}>Safe Merge</span>
+                  <span style={{ color: 'rgba(255, 255, 255, 0.75)', flexShrink: 0 }}>Integrated Shell</span>
                 </div>
 
                 <button
