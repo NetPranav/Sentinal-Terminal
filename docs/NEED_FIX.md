@@ -24,7 +24,7 @@ This document provides technical root-cause analyses, architectural impact asses
 ### 1.1 Problem Statement
 When attaching an API key (OpenAI, Groq, Anthropic, DeepSeek, OpenRouter, or Custom) and clicking **"Test Connection"**, the request frequently fails with a red error badge for the first 2-3 attempts before succeeding on the 3rd or 4th attempt. This misleads users into believing their API key or base URL is invalid.
 
-**Status: RESOLVED & VERIFIED** (Commit: `5daff74`)
+**Status: RESOLVED & VERIFIED** (Commit: `5daff74` — Full resolution log in [FIXED.md](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/docs/FIXED.md#issue-1-cloud-api-test-connection-transient-failures))
 
 ### 1.2 Code Locations
 - [src/ui/components/AiSettingsPage.tsx](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/ui/components/AiSettingsPage.tsx#L249-L269) (`handleTestConnection`)
@@ -168,7 +168,7 @@ When a workflow plan fails (or finishes), a floating HUD card remains stuck on t
 3. Lacks configuration options in Settings to adjust timing or disable floating notifications.
 4. Uses saturated purple colors (`#d8b4fe`, `rgba(192, 132, 252, 0.28)`), violating the project's strict grayscale / matte-dark design standard.
 
-**Status: RESOLVED & VERIFIED**
+**Status: RESOLVED & VERIFIED** (Commit: `8613aca` — Full resolution log in [FIXED.md](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/docs/FIXED.md#issue-3-persistent-execution-plan-hud-notification-overlay))
 
 ### 3.2 Code Locations
 - [src/presentation/TerminalView.tsx](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/presentation/TerminalView.tsx) (Floating HUD overlay, auto-dismiss timers, manual dismiss, and hover pause)

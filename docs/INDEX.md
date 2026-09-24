@@ -55,4 +55,6 @@ Welcome to the comprehensive documentation for **Sentinel Terminal**. This direc
 | **[`REMAINING_PROMPTS.md`](file:///docs/REMAINING_PROMPTS.md)** | Detailed inventory and categorization of upcoming domain prompts. |
 | **[`TEST_CASES.md`](file:///docs/TEST_CASES.md)** | Core test case specifications. |
 | **[`TOOL_TEST_CASES.md`](file:///docs/TOOL_TEST_CASES.md)** | Comprehensive capability driver and tool validation test matrix. |
+| **[`NEED_FIX.md`](file:///docs/NEED_FIX.md)** | Technical root-cause analyses and remediation roadmap for active issues. |
+| **[`FIXED.md`](file:///docs/FIXED.md)** | Technical post-mortems and verification logs for resolved issues. |
 | **[`TODO.md`](file:///docs/TODO.md)** | Engineering action items and backlog register. |
