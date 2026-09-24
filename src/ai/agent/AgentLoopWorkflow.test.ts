@@ -11,11 +11,11 @@ describe('AgentLoop Workflow Generic Fast-Path', () => {
 
   beforeEach(() => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'agentloop-wf-test-'));
-    const storage = DiskWorkflowStorage.getInstance();
-    (storage as any).workflowsDir = tmpDir;
+    DiskWorkflowStorage.getInstance().setCustomBaseDir(tmpDir);
   });
 
   afterEach(() => {
+    DiskWorkflowStorage.getInstance().setCustomBaseDir(undefined);
     try {
       fs.rmSync(tmpDir, { recursive: true, force: true });
     } catch {

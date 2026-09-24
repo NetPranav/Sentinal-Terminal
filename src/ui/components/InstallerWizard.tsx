@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { InstallerService, IntegrationStatus } from '../../domain/integration/InstallerService';
-import { Terminal, Folder, Code2, Check, ExternalLink, Cpu, Download, CheckCircle2, Sparkles, AlertCircle, X, ArrowRight } from 'lucide-react';
+import { Terminal, Folder, Code2, Check, ExternalLink, Cpu, Download, CheckCircle2, Sparkles, AlertCircle, X, ArrowRight, GitBranch, Layers } from 'lucide-react';
 import { isLinux } from '../../shared/platform';
 import { EmbeddedEngineManager, DownloadProgress } from '../../ai/models/EmbeddedEngineManager';
+import { STARTER_WORKFLOWS, getRecommendedStarterWorkflowIds, getAllStarterWorkflowIds } from '../../workflows/templates/StarterWorkflows';
+import { DiskWorkflowStorage } from '../../workflows/storage/DiskWorkflowStorage';
 
 interface InstallerWizardProps {
   isOpen: boolean;
@@ -30,14 +32,29 @@ export const InstallerWizard: React.FC<InstallerWizardProps> = ({ isOpen, onClos
   const [modelError, setModelError] = useState<string | null>(null);
   const [skippedModelDownload, setSkippedModelDownload] = useState<boolean>(false);
 
+  // Phase: Starter Workflows Selection
+  const [selectedWorkflows, setSelectedWorkflows] = useState<string[]>(() => getRecommendedStarterWorkflowIds());
+  const [purgeTestStubs, setPurgeTestStubs] = useState<boolean>(true);
+  const [existingWorkflowCount, setExistingWorkflowCount] = useState<number>(0);
+
   const installer = InstallerService.getInstance();
 
   useEffect(() => {
     if (isOpen) {
       refreshStatus();
       checkModelStatus();
+      checkWorkflowStatus();
     }
   }, [isOpen]);
+
+  const checkWorkflowStatus = async () => {
+    try {
+      const list = await DiskWorkflowStorage.getInstance().listWorkflows();
+      setExistingWorkflowCount(list.length);
+    } catch {
+      // Non-fatal
+    }
+  };
 
   const checkModelStatus = async () => {
     try {
@@ -96,16 +113,55 @@ export const InstallerWizard: React.FC<InstallerWizardProps> = ({ isOpen, onClos
     window.dispatchEvent(new CustomEvent('sentinel:ui-mode-changed', { detail: mode }));
   };
 
+  const handleToggleWorkflow = (id: string) => {
+    setSelectedWorkflows(prev => 
+      prev.includes(id) ? prev.filter(wId => wId !== id) : [...prev, id]
+    );
+  };
+
+  const handleSelectAllWorkflows = () => {
+    setSelectedWorkflows(getAllStarterWorkflowIds());
+  };
+
+  const handleSelectRecommendedWorkflows = () => {
+    setSelectedWorkflows(getRecommendedStarterWorkflowIds());
+  };
+
+  const handleClearAllWorkflows = () => {
+    setSelectedWorkflows([]);
+  };
+
+  const getWorkflowCategoryIcon = (category: string) => {
+    switch (category) {
+      case 'vcs': return <GitBranch size={13} strokeWidth={2} />;
+      case 'system': return <Cpu size={13} strokeWidth={2} />;
+      case 'network': return <Terminal size={13} strokeWidth={2} />;
+      case 'devops': return <Layers size={13} strokeWidth={2} />;
+      case 'developer': return <Code2 size={13} strokeWidth={2} />;
+      default: return <Terminal size={13} strokeWidth={2} />;
+    }
+  };
+
   const handleInstallAll = async () => {
     setLoading(true);
-    setMessage('Installing desktop integrations...');
+    setMessage('Configuring desktop integrations and workflows...');
     try {
       await installer.installCli();
       await installer.enableFinderIntegration();
       await installer.configureVsCodeIntegration();
       await installer.configureCursorIntegration();
       await refreshStatus();
-      setMessage('✓ All desktop integrations successfully configured!');
+
+      // Configure starter workflows and purge test stubs
+      const storage = DiskWorkflowStorage.getInstance();
+      if (purgeTestStubs) {
+        await storage.purgeTestStubs();
+      }
+      if (selectedWorkflows.length > 0) {
+        await storage.initializeStarterWorkflows(selectedWorkflows, false);
+      }
+
+      setMessage('✓ All desktop integrations and starter workflows successfully configured!');
       localStorage.setItem('sentinel_onboarded', 'true');
       setTimeout(() => {
         onClose();
@@ -659,7 +715,213 @@ export const InstallerWizard: React.FC<InstallerWizardProps> = ({ isOpen, onClos
           </div>
         </div>
 
-        {/* Section 3: Local AI Model Setup (Optional) */}
+        {/* Section 3: Curated Starter Workflows & Automation Library */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
+            <div>
+              <div style={{ fontSize: '11px', fontWeight: 600, color: 'rgba(255, 255, 255, 0.7)', textTransform: 'uppercase', letterSpacing: '0.6px' }}>
+                Curated Starter Workflows & Macros
+              </div>
+              <div style={{ fontSize: '12px', color: 'rgba(255, 255, 255, 0.55)', marginTop: '2px' }}>
+                Select automation blueprints to initialize in your workspace (<code style={{ fontSize: '11px', background: 'rgba(255, 255, 255, 0.08)', padding: '1px 5px', borderRadius: '4px' }}>~/.sentinel/workflows</code>). Zero-token deterministic execution.
+              </div>
+            </div>
+
+            {/* Quick Actions */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <button
+                type="button"
+                onClick={handleSelectRecommendedWorkflows}
+                style={{
+                  padding: '4px 10px',
+                  borderRadius: '5px',
+                  border: '1px solid rgba(255, 255, 255, 0.15)',
+                  backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                  color: '#ffffff',
+                  fontSize: '11px',
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                  transition: 'background-color 0.15s ease'
+                }}
+              >
+                Recommended ({getRecommendedStarterWorkflowIds().length})
+              </button>
+              <button
+                type="button"
+                onClick={handleSelectAllWorkflows}
+                style={{
+                  padding: '4px 10px',
+                  borderRadius: '5px',
+                  border: '1px solid rgba(255, 255, 255, 0.12)',
+                  backgroundColor: 'transparent',
+                  color: 'rgba(255, 255, 255, 0.75)',
+                  fontSize: '11px',
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                  transition: 'color 0.15s ease'
+                }}
+              >
+                Select All ({STARTER_WORKFLOWS.length})
+              </button>
+              <button
+                type="button"
+                onClick={handleClearAllWorkflows}
+                style={{
+                  padding: '4px 10px',
+                  borderRadius: '5px',
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  backgroundColor: 'transparent',
+                  color: 'rgba(255, 255, 255, 0.5)',
+                  fontSize: '11px',
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                  transition: 'color 0.15s ease'
+                }}
+              >
+                Clear
+              </button>
+            </div>
+          </div>
+
+          {/* Purge Test Stubs Toggle Option */}
+          <div 
+            onClick={() => setPurgeTestStubs(!purgeTestStubs)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              fontSize: '12px',
+              color: 'rgba(255, 255, 255, 0.75)',
+              cursor: 'pointer',
+              userSelect: 'none',
+              padding: '6px 12px',
+              borderRadius: '6px',
+              backgroundColor: 'rgba(255, 255, 255, 0.02)',
+              border: '1px solid rgba(255, 255, 255, 0.06)'
+            }}
+          >
+            <div style={{
+              width: '15px',
+              height: '15px',
+              borderRadius: '3px',
+              border: purgeTestStubs ? '1.5px solid #ffffff' : '1px solid rgba(255, 255, 255, 0.3)',
+              backgroundColor: purgeTestStubs ? '#ffffff' : 'transparent',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#090b10',
+              flexShrink: 0
+            }}>
+              {purgeTestStubs && <Check size={11} strokeWidth={3} />}
+            </div>
+            <span>
+              Clean and remove obsolete test & benchmark stubs from workspace
+              {existingWorkflowCount > 0 ? ` (${existingWorkflowCount} existing workflow files detected)` : ''}
+            </span>
+          </div>
+
+          {/* Grid of Starter Workflows */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+            gap: '12px'
+          }}>
+            {STARTER_WORKFLOWS.map(wf => {
+              const isSelected = selectedWorkflows.includes(wf.id);
+              return (
+                <div
+                  key={wf.id}
+                  onClick={() => handleToggleWorkflow(wf.id)}
+                  style={{
+                    padding: '14px 16px',
+                    borderRadius: '10px',
+                    backgroundColor: isSelected ? 'rgba(255, 255, 255, 0.05)' : 'rgba(255, 255, 255, 0.015)',
+                    border: isSelected ? '1.5px solid #ffffff' : '1px solid rgba(255, 255, 255, 0.09)',
+                    boxShadow: isSelected ? '0 0 0 1px #ffffff, 0 8px 24px rgba(0, 0, 0, 0.5)' : 'none',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '10px',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  {/* Card Header: Checkbox + Icon + Title + Recommended badge */}
+                  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '8px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <div style={{
+                        width: '16px',
+                        height: '16px',
+                        borderRadius: '4px',
+                        border: isSelected ? '1.5px solid #ffffff' : '1.5px solid rgba(255, 255, 255, 0.3)',
+                        backgroundColor: isSelected ? '#ffffff' : 'transparent',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: '#090b10',
+                        flexShrink: 0
+                      }}>
+                        {isSelected && <Check size={11} strokeWidth={3} />}
+                      </div>
+                      <div style={{
+                        width: '24px',
+                        height: '24px',
+                        borderRadius: '5px',
+                        backgroundColor: 'rgba(255, 255, 255, 0.06)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: '#ffffff',
+                        flexShrink: 0
+                      }}>
+                        {getWorkflowCategoryIcon(wf.category)}
+                      </div>
+                      <span style={{ fontWeight: 600, fontSize: '13px', color: '#ffffff', lineHeight: 1.2 }}>
+                        {wf.title}
+                      </span>
+                    </div>
+                    {wf.recommended && (
+                      <span style={{
+                        fontSize: '9.5px',
+                        fontWeight: 600,
+                        padding: '2px 6px',
+                        borderRadius: '4px',
+                        backgroundColor: 'rgba(255, 255, 255, 0.12)',
+                        color: '#ffffff',
+                        border: '1px solid rgba(255, 255, 255, 0.2)',
+                        whiteSpace: 'nowrap'
+                      }}>
+                        Recommended
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Description */}
+                  <div style={{ fontSize: '11.5px', color: 'rgba(255, 255, 255, 0.65)', lineHeight: 1.45, flex: 1 }}>
+                    {wf.description}
+                  </div>
+
+                  {/* Steps Summary */}
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    paddingTop: '8px',
+                    borderTop: '1px solid rgba(255, 255, 255, 0.06)',
+                    fontSize: '10.5px',
+                    color: 'rgba(255, 255, 255, 0.45)'
+                  }}>
+                    <span>{wf.definition.steps.length} sequential steps</span>
+                    <span style={{ fontFamily: 'monospace', color: 'rgba(255, 255, 255, 0.35)' }}>
+                      {wf.definition.steps[0]?.command.slice(0, 22)}...
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Section 4: Local AI Model Setup (Optional) */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div style={{ fontSize: '11px', fontWeight: 600, color: 'rgba(255, 255, 255, 0.7)', textTransform: 'uppercase', letterSpacing: '0.6px' }}>

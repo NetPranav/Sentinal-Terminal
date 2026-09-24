@@ -135,4 +135,59 @@ describe('DiskWorkflowStorage (Schema-Versioned Persistence)', () => {
     const remaining = await storage.listWorkflows();
     expect(remaining.map(w => w.name)).toEqual(['wf-two']);
   });
+
+  it('initializes selected starter workflows and purges test stubs', async () => {
+    // Simulate test stubs
+    fs.writeFileSync(path.join(tempDir, 'desktop-reset.json'), JSON.stringify({ name: 'desktop-reset' }), 'utf8');
+    fs.writeFileSync(path.join(tempDir, 'db-sync.json'), JSON.stringify({ name: 'db-sync' }), 'utf8');
+    fs.writeFileSync(path.join(tempDir, 'custom-user-wf.json'), JSON.stringify({
+      schemaVersion: 1,
+      name: 'custom-user-wf',
+      steps: [{ id: 's1', name: 'Step 1', command: 'echo hello' }],
+      createdAt: Date.now(),
+      updatedAt: Date.now()
+    }), 'utf8');
+
+    const initialList = await storage.listWorkflows();
+    expect(initialList.length).toBe(3);
+
+    // Purge test stubs
+    const purged = await storage.purgeTestStubs();
+    expect(purged).toContain('desktop-reset');
+    expect(purged).toContain('db-sync');
+    expect(purged).not.toContain('custom-user-wf');
+
+    const afterPurge = await storage.listWorkflows();
+    expect(afterPurge.map(w => w.name)).toEqual(['custom-user-wf']);
+
+    // Initialize starter workflows
+    const initialized = await storage.initializeStarterWorkflows(
+      ['git-quick-sync', 'system-diagnostics'],
+      false
+    );
+    expect(initialized.length).toBe(2);
+
+    const finalList = await storage.listWorkflows();
+    const finalNames = finalList.map(w => w.name).sort();
+    expect(finalNames).toEqual(['custom-user-wf', 'git-quick-sync', 'system-diagnostics']);
+
+    // Verify git-quick-sync definition
+    const gitWf = await storage.loadWorkflow('git-quick-sync');
+    expect(gitWf).toBeDefined();
+    expect(gitWf?.schemaVersion).toBe(1);
+    expect(gitWf?.steps.length).toBe(4);
+  });
+
+  it('purges all workflows when requested', async () => {
+    await storage.initializeStarterWorkflows(['git-quick-sync', 'network-open-ports'], false);
+    const countBefore = (await storage.listWorkflows()).length;
+    expect(countBefore).toBe(2);
+
+    const purgedCount = await storage.purgeAllWorkflows();
+    expect(purgedCount).toBe(2);
+
+    const countAfter = (await storage.listWorkflows()).length;
+    expect(countAfter).toBe(0);
+  });
 });
+

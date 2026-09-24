@@ -14,6 +14,7 @@ import {
   WorkflowStepDefinition,
   CURRENT_WORKFLOW_SCHEMA_VERSION
 } from '../models/WorkflowTypes';
+import { getStarterWorkflowById } from '../templates/StarterWorkflows';
 
 export class DiskWorkflowStorage {
   private static instance?: DiskWorkflowStorage;
@@ -400,4 +401,89 @@ export class DiskWorkflowStorage {
       return false;
     }
   }
+
+  /**
+   * Purge all saved workflows in the workflows directory.
+   * Returns count of successfully deleted workflows.
+   */
+  public async purgeAllWorkflows(): Promise<number> {
+    const list = await this.listWorkflows();
+    let deletedCount = 0;
+    for (const wf of list) {
+      const ok = await this.deleteWorkflow(wf.name);
+      if (ok) deletedCount++;
+    }
+    return deletedCount;
+  }
+
+  /**
+   * Purge known test and benchmark stub workflows left behind from test runs.
+   * Preserves custom workflows crafted by the user.
+   */
+  public async purgeTestStubs(): Promise<string[]> {
+    const list = await this.listWorkflows();
+    const deletedNames: string[] = [];
+
+    const KNOWN_TEST_STUBS = new Set([
+      'desktop-reset',
+      'db-sync',
+      'dev-boot',
+      'release-gate',
+      'dry-run-pipeline',
+      'param-test-workflow',
+      'test-port-replay',
+      'cargo-build-flow',
+      'cargo-build',
+      'curl-check-pipeline',
+      'deploy-service',
+      'get-date',
+      'get-time-wf',
+      'my-ci-pipeline',
+      'my-scoped-pipeline',
+      'scoped-pipeline',
+      'productive'
+    ]);
+
+    for (const wf of list) {
+      const isKnownStub = KNOWN_TEST_STUBS.has(wf.name.toLowerCase());
+      const hasEmptySteps = !wf.steps || wf.steps.length === 0;
+      const isAutoRecorded = wf.description?.includes('Auto-recorded workflow for task') || false;
+      const isMigratedEmpty = wf.tags?.includes('migrated') && wf.steps.length === 0;
+
+      if (isKnownStub || hasEmptySteps || isAutoRecorded || isMigratedEmpty) {
+        const ok = await this.deleteWorkflow(wf.name);
+        if (ok) {
+          deletedNames.push(wf.name);
+        }
+      }
+    }
+
+    return deletedNames;
+  }
+
+  /**
+   * Initialize starter workflows from the curated catalog.
+   * Optionally purges existing workflows or stubs beforehand.
+   */
+  public async initializeStarterWorkflows(
+    selectedWorkflowIds: string[],
+    purgeExisting: boolean = false
+  ): Promise<SavedWorkflowDefinition[]> {
+    if (purgeExisting) {
+      await this.purgeAllWorkflows();
+    }
+
+    const saved: SavedWorkflowDefinition[] = [];
+
+    for (const id of selectedWorkflowIds) {
+      const starter = getStarterWorkflowById(id);
+      if (starter) {
+        await this.saveWorkflow(starter.definition);
+        saved.push(starter.definition);
+      }
+    }
+
+    return saved;
+  }
 }
+

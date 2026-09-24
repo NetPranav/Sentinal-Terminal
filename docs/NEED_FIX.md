@@ -352,36 +352,46 @@ The onboarding screen allows users to install the Sentinel command-line launcher
 When opening the Workflows drawer in the terminal, users see 17 pre-existing workflows stored in `~/.sentinel/workflows/` (e.g. `desktop-reset.json`, `cargo-build.json`, `dry-run-pipeline.json`, `db-sync.json`, etc.). Many of these are incomplete stubs left behind from benchmark and CLI test runs.
 Users should have an onboarding screen option allowing them to select which starter workflows they want to keep; only the chosen workflows should be installed and displayed.
 
+**Status: RESOLVED & VERIFIED** (Full resolution log in [FIXED.md](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/docs/FIXED.md#issue-7-workflows-section-cleanup--onboarding-selection))
+
 ### 7.2 Code Locations
-- Current disk workflows: `~/.sentinel/workflows/*.json` (17 files on disk)
-- [src/workflows/storage/DiskWorkflowStorage.ts](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/workflows/storage/DiskWorkflowStorage.ts)
-- [src/ui/components/WorkflowManagerDrawer.tsx](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/ui/components/WorkflowManagerDrawer.tsx)
-- [src/ui/components/InstallerWizard.tsx](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/ui/components/InstallerWizard.tsx)
+- Current disk workflows: `~/.sentinel/workflows/*.json`
+- [src/workflows/templates/StarterWorkflows.ts](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/workflows/templates/StarterWorkflows.ts) (Curated blueprints)
+- [src/workflows/storage/DiskWorkflowStorage.ts](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/workflows/storage/DiskWorkflowStorage.ts) (`purgeTestStubs`, `purgeAllWorkflows`, `initializeStarterWorkflows`)
+- [src/ui/components/InstallerWizard.tsx](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/ui/components/InstallerWizard.tsx) (Curated Starter Workflows onboarding section)
+- [src/ui/components/WorkflowManagerDrawer.tsx](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/ui/components/WorkflowManagerDrawer.tsx) (Clean Stubs & Seed Starters header actions and stubs banner)
 
 ### 7.3 Technical Root Causes
 1. **Test and Benchmark Artifact Pollution:**
-   - Test suites and taxonomy benchmark scripts generated dummy JSON files directly in `~/.sentinel/workflows/` with minimal content like `{"name": "desktop-reset"}`.
+   - Test suites (`AgentLoopWorkflow.test.ts` and `FeatureEnginesIntegration.test.ts`) used `(storage as any).workflowsDir = tmpDir` instead of calling `storage.setCustomBaseDir(tmpDir)`. Because `workflowsDir` was undefined in `DiskWorkflowStorage`, test runs wrote dummy JSON files directly into `~/.sentinel/workflows/`.
    - Sentinel's `DiskWorkflowStorage` reads all `.json` files in that folder, cluttering the drawer with non-functional workflows.
 2. **Lack of a Curated Starter Workflow Catalog:**
-   - Sentinel lacks a clean, predefined catalog of high-value Linux starter workflows (e.g., Git commits, system health checks, Docker maintenance, port diagnostics).
+   - Sentinel lacked a clean, predefined catalog of high-value Linux starter workflows (e.g., Git commits, system health checks, Docker maintenance, port diagnostics).
 3. **No Onboarding Selection Step:**
-   - `InstallerWizard.tsx` does not currently include a workflow selection step to allow users to pick what starter templates they want installed.
+   - `InstallerWizard.tsx` did not include a workflow selection step to allow users to pick what starter templates they want installed.
 
-### 7.4 Proposed Remediation
-1. **Define Curated Starter Workflow Catalog:**
-   - Create a structured starter workflows library in `src/workflows/templates/StarterWorkflows.ts`:
-     - **Git Quick Sync:** `git status`, stage changes, commit with message, push.
-     - **System Diagnostics:** CPU, RAM, disk, and failed systemd service audit.
-     - **Network & Open Ports:** Scan listening ports (`ss -tulpn`) and test connectivity.
-     - **Docker Environment Prune:** Inspect running containers and safely clean unused images.
-     - **Workspace Clean & Rebuild:** Clean node_modules/target and trigger build.
-2. **Add Starter Workflows Step to Onboarding Wizard:**
-   - Add a "Starter Workflows" section in `InstallerWizard.tsx`:
-     - Displays selectable cards for each curated starter workflow with description and step count.
-     - Provides quick-actions: "Select All", "Recommended (Git + Diagnostics)", or "Start Blank".
-     - Includes a checkbox: "Clean existing test workflows from workspace".
-3. **Batch Seed & Purge in `DiskWorkflowStorage.ts`:**
-   - Add method `initializeStarterWorkflows(selectedWorkflowIds: string[], purgeExisting: boolean)` to clear obsolete test stubs and write only the user-approved workflows with valid `schemaVersion: 1`.
+### 7.4 Implemented Remediation
+1. **Curated Starter Workflow Catalog (`StarterWorkflows.ts`):**
+   - Created production-ready Linux starter workflows with `schemaVersion: 1`:
+     - **Git Quick Sync (`git-quick-sync`):** `git status -s`, `git add -u`, `git commit`, `git push`.
+     - **System Diagnostics (`system-diagnostics`):** RAM/swap (`free -h`), CPU load/uptime (`uptime`), root storage (`df -h /`), failed systemd units (`systemctl --failed`).
+     - **Network & Open Ports (`network-open-ports`):** Listening sockets (`ss -tulpn`), gateway ping (`ping -c 3 1.1.1.1`), DNS resolution (`getent hosts github.com`).
+     - **Docker Hygiene & Cleanup (`docker-prune-clean`):** Container inventory, Docker disk usage (`docker system df`), resource prune (`docker system prune -f`).
+     - **Workspace Clean & Rebuild (`workspace-rebuild`):** Clean build caches, toolchain verification, and project compilation.
+2. **Onboarding Wizard Starter Workflows Step (`InstallerWizard.tsx`):**
+   - Added dedicated "Section 3: Curated Starter Workflows & Macros" in the onboarding wizard.
+   - Includes quick-selection actions ("Recommended", "Select All", "Clear").
+   - Provides a toggle checkbox: "Clean and remove obsolete test & benchmark stubs from workspace".
+   - Renders selectable cards with category icons, step counts, command previews, and recommended badges.
+3. **Storage Seeding & Purging Engine (`DiskWorkflowStorage.ts`):**
+   - Added `purgeTestStubs()` to detect and remove benchmark artifacts and empty stubs without affecting custom user workflows.
+   - Added `purgeAllWorkflows()` and `initializeStarterWorkflows(selectedIds, purgeExisting)`.
+4. **Active Workflow Drawer Management (`WorkflowManagerDrawer.tsx`):**
+   - Added "Clean Stubs" and "Seed Starters" actions in the drawer header.
+   - Displays a banner when test/benchmark stubs are detected in `~/.sentinel/workflows/`.
+   - Enhanced empty state with a 1-click "Seed Curated Starter Workflows" button.
+5. **Test Fixture Directory Isolation:**
+   - Fixed `AgentLoopWorkflow.test.ts` and `FeatureEnginesIntegration.test.ts` to use `storage.setCustomBaseDir(tmpDir)` and reset to `undefined` in `afterEach()`, permanently eliminating test artifact leakage into `~/.sentinel/workflows/`.
 
 ---
 
@@ -565,7 +575,7 @@ When closing a terminal tab (or closing a split pane), the shell prompt (`userna
 | **4. Linux File Manager Actions** | `InstallerService.ts`, `App.tsx`, `TerminalView.tsx` | Feature & Bug Fix | Medium | Needs Fix |
 | **5. IDE Profiles Integration** | `InstallerService.ts`, `InstallerWizard.tsx` | Refactor & Reliability | Medium | Needs Fix |
 | **6. Sentinel CLI Launcher** | `InstallerService.ts`, `packaging/` | Bug Fix & Safety | Medium | Needs Fix |
-| **7. Workflows Onboarding Selection** | `InstallerWizard.tsx`, `DiskWorkflowStorage.ts`, `StarterWorkflows.ts` | New Feature | Medium | Needs Fix |
+| **7. Workflows Onboarding Selection** | `InstallerWizard.tsx`, `DiskWorkflowStorage.ts`, `StarterWorkflows.ts` | New Feature & Cleanup | Medium | **Resolved** |
 | **8. Clipboard Paste on Prompt Entry** | `TerminalView.tsx`, `src/utils/clipboard.ts` | Bug Fix | Low-Medium | **Resolved** (`224a50e`) |
 | **9. Arrow Key In-Buffer Navigation** | `TerminalView.tsx`, `PromptNavigationEngine.ts` | Architecture & UX | Medium | **Resolved** |
 | **10. Tab Close Button Visibility** | `App.tsx`, `App.css` | UI Polish | Low | **Resolved** |

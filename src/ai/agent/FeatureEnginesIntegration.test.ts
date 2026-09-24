@@ -19,11 +19,11 @@ describe('Core Feature Engines Integration Suite', () => {
 
   beforeEach(() => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'sentinel-features-test-'));
-    const storage = DiskWorkflowStorage.getInstance();
-    (storage as any).workflowsDir = tmpDir;
+    DiskWorkflowStorage.getInstance().setCustomBaseDir(tmpDir);
   });
 
   afterEach(() => {
+    DiskWorkflowStorage.getInstance().setCustomBaseDir(undefined);
     try {
       fs.rmSync(tmpDir, { recursive: true, force: true });
     } catch {}

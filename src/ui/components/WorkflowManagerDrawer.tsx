@@ -21,6 +21,7 @@ import {
 import { DiskWorkflowStorage } from '../../workflows/storage/DiskWorkflowStorage';
 import { SavedWorkflowDefinition, WorkflowStepDefinition } from '../../workflows/models/WorkflowTypes';
 import { DeterministicReplayEngine, ReplayExecutionResult } from '../../workflows/engine/DeterministicReplayEngine';
+import { getRecommendedStarterWorkflowIds } from '../../workflows/templates/StarterWorkflows';
 
 export interface WorkflowManagerDrawerProps {
   isOpen: boolean;
@@ -45,6 +46,7 @@ export const WorkflowManagerDrawer: React.FC<WorkflowManagerDrawerProps> = ({
   const [activeStepIndex, setActiveStepIndex] = useState<number | null>(null);
   const [feedbackMsg, setFeedbackMsg] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
   const [workflowToDelete, setWorkflowToDelete] = useState<string | null>(null);
+  const [testStubsDetected, setTestStubsDetected] = useState<boolean>(false);
 
   const fetchWorkflows = async () => {
     setIsLoading(true);
@@ -54,8 +56,50 @@ export const WorkflowManagerDrawer: React.FC<WorkflowManagerDrawerProps> = ({
       // Sort newest first
       list.sort((a, b) => b.updatedAt - a.updatedAt);
       setWorkflows(list);
+
+      const KNOWN_TEST_STUBS = new Set([
+        'desktop-reset', 'db-sync', 'dev-boot', 'release-gate',
+        'dry-run-pipeline', 'param-test-workflow', 'test-port-replay',
+        'cargo-build-flow', 'cargo-build', 'curl-check-pipeline',
+        'deploy-service', 'get-date', 'get-time-wf', 'my-ci-pipeline',
+        'my-scoped-pipeline', 'scoped-pipeline', 'productive'
+      ]);
+      const hasStubs = list.some(w => 
+        KNOWN_TEST_STUBS.has(w.name.toLowerCase()) || 
+        !w.steps || w.steps.length === 0 || 
+        w.description?.includes('Auto-recorded workflow for task')
+      );
+      setTestStubsDetected(hasStubs);
     } catch {
       // ignore
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleCleanTestStubs = async () => {
+    setIsLoading(true);
+    try {
+      const storage = DiskWorkflowStorage.getInstance();
+      const purged = await storage.purgeTestStubs();
+      showToast(`✓ Removed ${purged.length} test stubs.`);
+      await fetchWorkflows();
+    } catch (err: any) {
+      showToast(err?.message || 'Failed to purge test stubs', 'error');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSeedStarterWorkflows = async () => {
+    setIsLoading(true);
+    try {
+      const storage = DiskWorkflowStorage.getInstance();
+      await storage.initializeStarterWorkflows(getRecommendedStarterWorkflowIds(), false);
+      showToast('✓ Seeded curated starter workflows!');
+      await fetchWorkflows();
+    } catch (err: any) {
+      showToast(err?.message || 'Failed to seed starter workflows', 'error');
     } finally {
       setIsLoading(false);
     }
@@ -266,6 +310,48 @@ export const WorkflowManagerDrawer: React.FC<WorkflowManagerDrawerProps> = ({
             </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            {testStubsDetected && (
+              <button
+                onClick={handleCleanTestStubs}
+                title="Purge obsolete test and benchmark stubs"
+                disabled={isLoading}
+                style={{
+                  background: 'rgba(255, 255, 255, 0.08)',
+                  border: '1px solid rgba(255, 255, 255, 0.16)',
+                  borderRadius: '5px',
+                  padding: '4px 8px',
+                  color: '#ffffff',
+                  fontSize: '11px',
+                  cursor: isLoading ? 'not-allowed' : 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px'
+                }}
+              >
+                <Trash2 size={11} />
+                <span>Clean Stubs</span>
+              </button>
+            )}
+            <button
+              onClick={handleSeedStarterWorkflows}
+              title="Seed curated starter workflows"
+              disabled={isLoading}
+              style={{
+                background: 'rgba(255, 255, 255, 0.05)',
+                border: '1px solid rgba(255, 255, 255, 0.09)',
+                borderRadius: '5px',
+                padding: '4px 8px',
+                color: 'rgba(255, 255, 255, 0.8)',
+                fontSize: '11px',
+                cursor: isLoading ? 'not-allowed' : 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px'
+              }}
+            >
+              <Play size={11} />
+              <span>Seed Starters</span>
+            </button>
             <button
               onClick={fetchWorkflows}
               title="Refresh workflows"
@@ -317,6 +403,40 @@ export const WorkflowManagerDrawer: React.FC<WorkflowManagerDrawerProps> = ({
           }}>
             {feedbackMsg.type === 'success' ? <CheckCircle2 size={14} style={{ color: '#ffffff' }} /> : <AlertCircle size={14} style={{ color: 'rgba(255, 255, 255, 0.75)' }} />}
             <span>{feedbackMsg.text}</span>
+          </div>
+        )}
+
+        {/* Test Stubs Detected Banner */}
+        {testStubsDetected && (
+          <div style={{
+            margin: '10px 16px 0 16px',
+            padding: '8px 12px',
+            borderRadius: '6px',
+            backgroundColor: 'rgba(255, 255, 255, 0.03)',
+            border: '1px solid rgba(255, 255, 255, 0.1)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            fontSize: '11.5px',
+            color: 'rgba(255, 255, 255, 0.75)'
+          }}>
+            <span>Test and benchmark stubs detected in workspace</span>
+            <button
+              onClick={handleCleanTestStubs}
+              disabled={isLoading}
+              style={{
+                padding: '3px 9px',
+                borderRadius: '4px',
+                backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                border: '1px solid rgba(255, 255, 255, 0.2)',
+                color: '#ffffff',
+                fontSize: '11px',
+                fontWeight: 500,
+                cursor: isLoading ? 'not-allowed' : 'pointer'
+              }}
+            >
+              Clean Test Stubs
+            </button>
           </div>
         )}
 
@@ -418,7 +538,28 @@ export const WorkflowManagerDrawer: React.FC<WorkflowManagerDrawerProps> = ({
                     Clear Filter
                   </button>
                 ) : (
-                  <>Record recent actions using <code style={{ backgroundColor: 'rgba(255, 255, 255, 0.06)', border: '1px solid rgba(255, 255, 255, 0.08)', padding: '2px 5px', borderRadius: '4px', color: 'rgba(255, 255, 255, 0.8)' }}>&gt;save workflow &lt;name&gt;</code> in the terminal or build composite multi-stage pipelines.</>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', alignItems: 'center', marginTop: '6px' }}>
+                    <span>Record recent actions using <code style={{ backgroundColor: 'rgba(255, 255, 255, 0.06)', border: '1px solid rgba(255, 255, 255, 0.08)', padding: '2px 5px', borderRadius: '4px', color: 'rgba(255, 255, 255, 0.8)' }}>&gt;save workflow &lt;name&gt;</code> in the terminal, or seed curated starters.</span>
+                    <button
+                      onClick={handleSeedStarterWorkflows}
+                      disabled={isLoading}
+                      style={{
+                        padding: '6px 14px',
+                        borderRadius: '6px',
+                        backgroundColor: '#ffffff',
+                        color: '#090b10',
+                        border: '1px solid #ffffff',
+                        fontSize: '11.5px',
+                        fontWeight: 600,
+                        cursor: isLoading ? 'not-allowed' : 'pointer',
+                        transition: 'opacity 0.15s ease'
+                      }}
+                      onMouseEnter={(e) => { e.currentTarget.style.opacity = '0.9'; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.opacity = '1'; }}
+                    >
+                      Seed Curated Starter Workflows
+                    </button>
+                  </div>
                 )}
               </div>
             </div>
