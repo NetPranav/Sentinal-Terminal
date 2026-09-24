@@ -98,6 +98,22 @@ export const AiSettingsPage: React.FC<AiSettingsPageProps> = ({
 
   // General Tab Feedback State
   const [generalMessage, setGeneralMessage] = useState<string | null>(null);
+
+  // Workflow HUD & Execution Notification Overlay State
+  const [hudPlanEnabled, setHudPlanEnabled] = useState<boolean>(() => localStorage.getItem('sentinel_hud_plan_enabled') !== 'false');
+  const [hudPlanDuration, setHudPlanDuration] = useState<string>(() => localStorage.getItem('sentinel_hud_plan_duration') || '8');
+
+  const handleToggleHudPlan = (enabled: boolean) => {
+    setHudPlanEnabled(enabled);
+    localStorage.setItem('sentinel_hud_plan_enabled', String(enabled));
+    window.dispatchEvent(new CustomEvent('sentinel:hud-settings-changed'));
+  };
+
+  const handleSelectHudDuration = (duration: string) => {
+    setHudPlanDuration(duration);
+    localStorage.setItem('sentinel_hud_plan_duration', duration);
+    window.dispatchEvent(new CustomEvent('sentinel:hud-settings-changed'));
+  };
   
   const manager = new OllamaModelManager();
   const cloudProvider = CloudApiProvider.getInstance();
@@ -2008,6 +2024,105 @@ export const AiSettingsPage: React.FC<AiSettingsPageProps> = ({
                 <ExternalLink size={13} />
                 <span>Launch Wizard</span>
               </button>
+            </div>
+
+            {/* Workflow Execution Plan HUD & Notifications Card */}
+            <div style={{
+              padding: '18px 20px',
+              borderRadius: '10px',
+              backgroundColor: 'rgba(255, 255, 255, 0.025)',
+              border: '1px solid rgba(255, 255, 255, 0.08)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '16px'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '16px' }}>
+                <div style={{ display: 'flex', gap: '14px', alignItems: 'flex-start' }}>
+                  <div style={{
+                    width: '36px',
+                    height: '36px',
+                    borderRadius: '8px',
+                    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+                    border: '1px solid rgba(255, 255, 255, 0.12)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#ffffff',
+                    flexShrink: 0
+                  }}>
+                    <Layers size={18} />
+                  </div>
+                  <div>
+                    <div style={{ fontWeight: 600, fontSize: '13.5px', color: '#ffffff' }}>
+                      Workflow Execution Plan HUD & Notifications
+                    </div>
+                    <div style={{ fontSize: '12px', color: 'rgba(255, 255, 255, 0.6)', marginTop: '3px', lineHeight: 1.45 }}>
+                      Controls the real-time floating execution plan HUD overlay in the terminal during multi-step AI workflows.
+                    </div>
+                  </div>
+                </div>
+
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', userSelect: 'none', flexShrink: 0 }}>
+                  <input
+                    type="checkbox"
+                    checked={hudPlanEnabled}
+                    onChange={(e) => handleToggleHudPlan(e.target.checked)}
+                    style={{ accentColor: '#ffffff', cursor: 'pointer', width: '16px', height: '16px' }}
+                  />
+                  <span style={{ fontSize: '12px', color: hudPlanEnabled ? '#ffffff' : 'rgba(255, 255, 255, 0.5)', fontWeight: 500 }}>
+                    {hudPlanEnabled ? 'Enabled' : 'Disabled'}
+                  </span>
+                </label>
+              </div>
+
+              {hudPlanEnabled && (
+                <div style={{
+                  padding: '12px 14px',
+                  borderRadius: '8px',
+                  backgroundColor: 'rgba(0, 0, 0, 0.25)',
+                  border: '1px solid rgba(255, 255, 255, 0.06)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '10px'
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '12px', fontWeight: 500, color: 'rgba(255, 255, 255, 0.9)' }}>
+                      Auto-Dismiss Duration
+                    </span>
+                    <span style={{ fontSize: '11px', color: 'rgba(255, 255, 255, 0.45)' }}>
+                      Hovering cursor over HUD pauses dismissal
+                    </span>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                    {[
+                      { id: '5', label: '5 Seconds' },
+                      { id: '8', label: '8 Seconds (Default)' },
+                      { id: '15', label: '15 Seconds' },
+                      { id: 'persistent', label: 'Persistent (Manual Close Only)' }
+                    ].map(opt => (
+                      <button
+                        key={opt.id}
+                        type="button"
+                        onClick={() => handleSelectHudDuration(opt.id)}
+                        style={{
+                          padding: '6px 12px',
+                          borderRadius: '6px',
+                          border: hudPlanDuration === opt.id ? '1px solid rgba(255, 255, 255, 0.35)' : '1px solid rgba(255, 255, 255, 0.08)',
+                          backgroundColor: hudPlanDuration === opt.id ? 'rgba(255, 255, 255, 0.12)' : 'rgba(255, 255, 255, 0.02)',
+                          color: hudPlanDuration === opt.id ? '#ffffff' : 'rgba(255, 255, 255, 0.6)',
+                          fontSize: '11.5px',
+                          fontWeight: hudPlanDuration === opt.id ? 600 : 400,
+                          cursor: 'pointer',
+                          transition: 'all 0.15s ease'
+                        }}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Environment Diagnostics Card */}

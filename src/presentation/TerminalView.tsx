@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { WebglAddon } from '@xterm/addon-webgl';
@@ -31,7 +31,9 @@ import {
   X, 
   ShieldAlert, 
   AlertCircle, 
-  Check 
+  Check,
+  ChevronUp,
+  ChevronDown
 } from 'lucide-react';
 import { SearchAddon } from '@xterm/addon-search';
 import { TerminalSearchBar } from './TerminalSearchBar';
@@ -63,6 +65,60 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
   const [isVerifying, setIsVerifying] = useState(false);
   const [latestPlan, setLatestPlan] = useState<AgentPlan | null>(null);
   const [isPlanOpen, setIsPlanOpen] = useState(true);
+  const [planExecutionStatus, setPlanExecutionStatus] = useState<'running' | 'completed' | 'failed'>('running');
+  const planExecutionStatusRef = useRef<'running' | 'completed' | 'failed'>('running');
+  const [hudPlanEnabled, setHudPlanEnabled] = useState<boolean>(() => localStorage.getItem('sentinel_hud_plan_enabled') !== 'false');
+  const [hudPlanDuration, setHudPlanDuration] = useState<string>(() => localStorage.getItem('sentinel_hud_plan_duration') || '8');
+  const planDismissTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isHoveringPlanRef = useRef<boolean>(false);
+
+  const clearPlanDismissTimer = useCallback(() => {
+    if (planDismissTimerRef.current) {
+      clearTimeout(planDismissTimerRef.current);
+      planDismissTimerRef.current = null;
+    }
+  }, []);
+
+  const schedulePlanDismiss = useCallback(() => {
+    clearPlanDismissTimer();
+    const enabled = localStorage.getItem('sentinel_hud_plan_enabled') !== 'false';
+    const duration = localStorage.getItem('sentinel_hud_plan_duration') || '8';
+    if (!enabled || duration === 'disabled') {
+      setLatestPlan(null);
+      return;
+    }
+    if (duration === 'persistent') {
+      return;
+    }
+    if (isHoveringPlanRef.current) {
+      return;
+    }
+    const seconds = parseInt(duration, 10);
+    const ms = (!isNaN(seconds) && seconds > 0 ? seconds : 8) * 1000;
+    planDismissTimerRef.current = setTimeout(() => {
+      setLatestPlan(null);
+      planDismissTimerRef.current = null;
+    }, ms);
+  }, [clearPlanDismissTimer]);
+
+  useEffect(() => {
+    const handleSettingsChange = () => {
+      const enabled = localStorage.getItem('sentinel_hud_plan_enabled') !== 'false';
+      const duration = localStorage.getItem('sentinel_hud_plan_duration') || '8';
+      setHudPlanEnabled(enabled);
+      setHudPlanDuration(duration);
+      if (!enabled || duration === 'disabled') {
+        clearPlanDismissTimer();
+        setLatestPlan(null);
+      }
+    };
+
+    window.addEventListener('sentinel:hud-settings-changed', handleSettingsChange);
+    return () => {
+      window.removeEventListener('sentinel:hud-settings-changed', handleSettingsChange);
+      clearPlanDismissTimer();
+    };
+  }, [clearPlanDismissTimer]);
   const [activeRemediation, setActiveRemediation] = useState<RemediationPrompt | null>(null);
   const agentLoopRef = useRef<AgentLoop | null>(null);
   const ptyTrackerRef = useRef<PtyStateTracker>(new PtyStateTracker());
@@ -659,6 +715,7 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
               if (answeringAgentQuestion && cleanCmd === '/cancel') {
                 await ptyTrackerRef.current.safeClearLine(d => sessionManager.write(currentSessionId!, d));
                 agentLoop.cancelPendingQuestion();
+                clearPlanDismissTimer();
                 setLatestPlan(null);
                 writeTerm('\r\n\x1b[33m  Workflow cancelled.\x1b[0m\r\n\r\n');
                 sessionManager.write(currentSessionId!, '\r');
@@ -683,9 +740,30 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
                     PromptProgressManager.getInstance().updateStage(event.message || 'Thinking...', 30);
                   } else if (event.type === 'plan') {
                     PromptProgressManager.getInstance().updateStage('Planning...', 50);
+                    const enabled = localStorage.getItem('sentinel_hud_plan_enabled') !== 'false';
+                    const duration = localStorage.getItem('sentinel_hud_plan_duration') || '8';
+                    if (!enabled || duration === 'disabled') {
+                      return;
+                    }
+                    clearPlanDismissTimer();
                     if (event.data) {
-                      setLatestPlan(event.data as AgentPlan);
+                      const plan = event.data as AgentPlan;
+                      setLatestPlan(plan);
                       setIsPlanOpen(true);
+                      const isAllCompleted = plan.phases && plan.phases.length > 0 && plan.phases.every(p => p.status === 'completed');
+                      const hasFailed = plan.phases && plan.phases.some(p => p.status === 'failed');
+                      if (hasFailed) {
+                        setPlanExecutionStatus('failed');
+                        planExecutionStatusRef.current = 'failed';
+                        schedulePlanDismiss();
+                      } else if (isAllCompleted) {
+                        setPlanExecutionStatus('completed');
+                        planExecutionStatusRef.current = 'completed';
+                        schedulePlanDismiss();
+                      } else {
+                        setPlanExecutionStatus('running');
+                        planExecutionStatusRef.current = 'running';
+                      }
                     }
                     // Keep execution plan strictly in dropdown overlay; avoid terminal buffer spam
                     return;
@@ -698,10 +776,14 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
                   } else if (event.type === 'tool_done') {
                     PromptProgressManager.getInstance().updateStage('Verifying...', 92);
                   } else if (event.type === 'done') {
-                    // Automatically collapse the dropdown plan when goal completes successfully
-                    setIsPlanOpen(false);
+                    setPlanExecutionStatus('completed');
+                    planExecutionStatusRef.current = 'completed';
+                    schedulePlanDismiss();
                     PromptProgressManager.getInstance().completePrompt(true, event.message);
                   } else if (event.type === 'error') {
+                    setPlanExecutionStatus('failed');
+                    planExecutionStatusRef.current = 'failed';
+                    schedulePlanDismiss();
                     PromptProgressManager.getInstance().completePrompt(false, event.message);
                   }
 
@@ -722,8 +804,14 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
                   PromptProgressManager.getInstance().completePrompt(result.success, result.summary);
                   if (!result.success) {
                     lastUnresolvedGoalRef.current = { goal: aiGoal, timestamp: Date.now() };
+                    setPlanExecutionStatus('failed');
+                    planExecutionStatusRef.current = 'failed';
+                    schedulePlanDismiss();
                   } else {
                     lastUnresolvedGoalRef.current = null;
+                    setPlanExecutionStatus('completed');
+                    planExecutionStatusRef.current = 'completed';
+                    schedulePlanDismiss();
                   }
 
                   // Handle clear terminal command
@@ -746,6 +834,9 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
                 }).catch(err => {
                   PromptProgressManager.getInstance().completePrompt(false, err?.message || 'Error');
                   lastUnresolvedGoalRef.current = { goal: aiGoal, timestamp: Date.now() };
+                  setPlanExecutionStatus('failed');
+                  planExecutionStatusRef.current = 'failed';
+                  schedulePlanDismiss();
                   writeTerm(`\r\n\x1b[1;31m  ✗ ${err.message || 'Something went wrong'}\x1b[0m\r\n\r\n`);
                   sessionManager.write(currentSessionId!, '\r');
                 });
@@ -893,101 +984,262 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
         onFocusTerminal={() => xtermRef.current?.focus()}
       />
 
-      {latestPlan && (
-        <details 
-          open={isPlanOpen}
-          onToggle={(e) => setIsPlanOpen(e.currentTarget.open)}
+      {/* Execution Plan Floating HUD Notification Overlay */}
+      {latestPlan && hudPlanEnabled && hudPlanDuration !== 'disabled' && (
+        <div 
+          role="region"
+          aria-label="Execution Plan HUD"
+          onMouseEnter={() => {
+            isHoveringPlanRef.current = true;
+            clearPlanDismissTimer();
+          }}
+          onMouseLeave={() => {
+            isHoveringPlanRef.current = false;
+            if (planExecutionStatusRef.current !== 'running') {
+              schedulePlanDismiss();
+            }
+          }}
           style={{
             position: 'absolute',
             top: '12px',
             right: '14px',
             width: 'min(380px, calc(100% - 28px))',
-            padding: '10px 14px',
+            padding: '12px 14px',
             borderRadius: '10px',
-            border: latestPlan.phases?.every(p => p.status === 'completed')
-              ? '1px solid rgba(74, 222, 128, 0.35)'
-              : '1px solid rgba(192, 132, 252, 0.28)',
-            background: 'rgba(20, 16, 29, 0.94)',
-            boxShadow: '0 10px 32px rgba(0, 0, 0, 0.45)',
+            border: planExecutionStatus === 'failed'
+              ? '1px solid rgba(255, 255, 255, 0.25)'
+              : planExecutionStatus === 'completed'
+              ? '1px solid rgba(255, 255, 255, 0.18)'
+              : '1px solid rgba(255, 255, 255, 0.12)',
+            background: 'rgba(12, 13, 18, 0.96)',
+            boxShadow: '0 12px 36px rgba(0, 0, 0, 0.65)',
             backdropFilter: 'blur(12px)',
-            color: '#f5f3ff',
+            color: '#ffffff',
             fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
             fontSize: '12px',
             zIndex: 30,
-            transition: 'all 0.2s ease'
+            transition: 'all 0.2s ease',
+            userSelect: 'none'
           }}
         >
-          <summary style={{
-            cursor: 'pointer',
-            fontWeight: 650,
-            color: latestPlan.phases?.every(p => p.status === 'completed') ? '#4ade80' : '#d8b4fe',
-            outline: 'none',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            userSelect: 'none'
-          }}>
-            <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <span>{latestPlan.phases?.every(p => p.status === 'completed') ? '✓' : '•'}</span>
-              <span>Execution Plan {latestPlan.phases ? `· ${latestPlan.phases.length} Phases` : `· ${latestPlan.steps.length} Steps`}</span>
-              {latestPlan.phases?.every(p => p.status === 'completed') && (
-                <span style={{ fontSize: '10px', color: '#4ade80', background: 'rgba(34, 197, 94, 0.15)', padding: '1px 6px', borderRadius: '4px' }}>
+          {/* Header Row */}
+          <div 
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              cursor: 'pointer',
+              gap: '8px'
+            }}
+            onClick={() => setIsPlanOpen(!isPlanOpen)}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+              <span style={{ 
+                fontWeight: 700, 
+                color: planExecutionStatus === 'failed' ? 'rgba(255, 255, 255, 0.9)' : '#ffffff',
+                fontSize: '13px'
+              }}>
+                {planExecutionStatus === 'completed' ? '✓' : planExecutionStatus === 'failed' ? '✗' : '▸'}
+              </span>
+              <span style={{ 
+                fontWeight: 600, 
+                color: '#ffffff', 
+                whiteSpace: 'nowrap', 
+                overflow: 'hidden', 
+                textOverflow: 'ellipsis' 
+              }}>
+                Execution Plan {latestPlan.phases ? `· ${latestPlan.phases.length} Phases` : `· ${latestPlan.steps.length} Steps`}
+              </span>
+              {planExecutionStatus === 'completed' && (
+                <span style={{ 
+                  fontSize: '10px', 
+                  color: '#ffffff', 
+                  background: 'rgba(255, 255, 255, 0.12)', 
+                  border: '1px solid rgba(255, 255, 255, 0.18)', 
+                  padding: '1px 6px', 
+                  borderRadius: '4px',
+                  fontWeight: 500
+                }}>
                   Completed
                 </span>
               )}
-            </span>
-            {latestPlan.activePhaseId && (
-              <span style={{ fontSize: '10px', background: 'rgba(56, 189, 248, 0.25)', color: '#38bdf8', padding: '1px 6px', borderRadius: '4px' }}>
-                Running Phase {latestPlan.activePhaseId}
-              </span>
-            )}
-          </summary>
-          <p style={{ margin: '8px 0 8px', color: 'rgba(255,255,255,0.72)', lineHeight: 1.4 }}>
-            {latestPlan.summary}
-          </p>
-          {latestPlan.phases && latestPlan.phases.length > 0 ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', margin: '4px 0 2px' }}>
-              {latestPlan.phases.map((phase) => (
-                <div key={phase.id} style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    color: phase.status === 'completed' ? '#4ade80' : phase.status === 'running' ? '#38bdf8' : phase.status === 'skipped' ? '#94a3b8' : phase.status === 'failed' ? '#f87171' : '#e2e8f0',
-                    fontSize: '11px',
-                    fontWeight: phase.status === 'running' ? 600 : 400
-                  }}>
-                    <span>{phase.status === 'completed' ? '✓' : phase.status === 'running' ? '▸' : phase.status === 'skipped' ? '⊘' : phase.status === 'failed' ? '✗' : '○'}</span>
-                    <span>Phase {phase.id}: {phase.title}</span>
-                    {phase.skippedReason && <span style={{ fontSize: '10px', color: '#64748b' }}>({phase.skippedReason})</span>}
-                  </div>
-                  {phase.subPhases && phase.subPhases.map((sub) => (
-                    <div key={sub.id} style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '6px',
-                      paddingLeft: '16px',
-                      color: sub.status === 'completed' ? '#4ade80' : sub.status === 'running' ? '#38bdf8' : sub.status === 'skipped' ? '#94a3b8' : '#cbd5e1',
-                      fontSize: '10.5px'
-                    }}>
-                      <span>{sub.status === 'completed' ? '✓' : sub.status === 'running' ? '▸' : '○'}</span>
-                      <span>Phase {sub.id}: {sub.title}</span>
+              {planExecutionStatus === 'failed' && (
+                <span style={{ 
+                  fontSize: '10px', 
+                  color: 'rgba(255, 255, 255, 0.95)', 
+                  background: 'rgba(255, 255, 255, 0.08)', 
+                  border: '1px solid rgba(255, 255, 255, 0.25)', 
+                  padding: '1px 6px', 
+                  borderRadius: '4px',
+                  fontWeight: 500
+                }}>
+                  Failed
+                </span>
+              )}
+              {planExecutionStatus === 'running' && latestPlan.activePhaseId && (
+                <span style={{ 
+                  fontSize: '10px', 
+                  background: 'rgba(255, 255, 255, 0.08)', 
+                  border: '1px solid rgba(255, 255, 255, 0.12)', 
+                  color: '#ffffff', 
+                  padding: '1px 6px', 
+                  borderRadius: '4px' 
+                }}>
+                  Phase {latestPlan.activePhaseId}
+                </span>
+              )}
+            </div>
+
+            {/* Action Buttons: Toggle Collapse and Manual Dismiss */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsPlanOpen(!isPlanOpen);
+                }}
+                title={isPlanOpen ? "Collapse plan" : "Expand plan"}
+                aria-label={isPlanOpen ? "Collapse plan" : "Expand plan"}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: 'rgba(255, 255, 255, 0.6)',
+                  cursor: 'pointer',
+                  padding: '3px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  borderRadius: '4px'
+                }}
+              >
+                {isPlanOpen ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+              </button>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  clearPlanDismissTimer();
+                  setLatestPlan(null);
+                }}
+                title="Dismiss plan overlay"
+                aria-label="Dismiss plan overlay"
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: 'rgba(255, 255, 255, 0.6)',
+                  cursor: 'pointer',
+                  padding: '3px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  borderRadius: '4px'
+                }}
+              >
+                <X size={13} />
+              </button>
+            </div>
+          </div>
+
+          {/* Expanded Content */}
+          {isPlanOpen && (
+            <div style={{ marginTop: '8px', userSelect: 'text' }}>
+              <p style={{ margin: '0 0 8px', color: 'rgba(255, 255, 255, 0.7)', lineHeight: 1.45, fontSize: '11.5px' }}>
+                {latestPlan.summary}
+              </p>
+              {latestPlan.phases && latestPlan.phases.length > 0 ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', margin: '4px 0 2px' }}>
+                  {latestPlan.phases.map((phase) => (
+                    <div key={phase.id} style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        color: phase.status === 'completed'
+                          ? 'rgba(255, 255, 255, 0.85)'
+                          : phase.status === 'running'
+                          ? '#ffffff'
+                          : phase.status === 'failed'
+                          ? 'rgba(255, 255, 255, 0.95)'
+                          : phase.status === 'skipped'
+                          ? 'rgba(255, 255, 255, 0.4)'
+                          : 'rgba(255, 255, 255, 0.55)',
+                        fontSize: '11px',
+                        fontWeight: phase.status === 'running' || phase.status === 'failed' ? 600 : 400
+                      }}>
+                        <span style={{ fontWeight: 700 }}>
+                          {phase.status === 'completed' ? '✓' : phase.status === 'running' ? '▸' : phase.status === 'failed' ? '✗' : phase.status === 'skipped' ? '⊘' : '○'}
+                        </span>
+                        <span>Phase {phase.id}: {phase.title}</span>
+                        {phase.skippedReason && (
+                          <span style={{ fontSize: '10px', color: 'rgba(255, 255, 255, 0.4)' }}>({phase.skippedReason})</span>
+                        )}
+                      </div>
+                      {phase.subPhases && phase.subPhases.map((sub) => (
+                        <div key={sub.id} style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          paddingLeft: '16px',
+                          color: sub.status === 'completed'
+                            ? 'rgba(255, 255, 255, 0.75)'
+                            : sub.status === 'running'
+                            ? '#ffffff'
+                            : sub.status === 'failed'
+                            ? 'rgba(255, 255, 255, 0.95)'
+                            : sub.status === 'skipped'
+                            ? 'rgba(255, 255, 255, 0.35)'
+                            : 'rgba(255, 255, 255, 0.5)',
+                          fontSize: '10.5px'
+                        }}>
+                          <span style={{ fontWeight: 700 }}>
+                            {sub.status === 'completed' ? '✓' : sub.status === 'running' ? '▸' : sub.status === 'failed' ? '✗' : '○'}
+                          </span>
+                          <span>Phase {sub.id}: {sub.title}</span>
+                        </div>
+                      ))}
                     </div>
                   ))}
                 </div>
-              ))}
+              ) : latestPlan.steps.length > 0 ? (
+                <ol style={{ margin: '0 0 2px', paddingLeft: '18px', color: 'rgba(255, 255, 255, 0.8)', lineHeight: 1.55 }}>
+                  {latestPlan.steps.map((step, index) => <li key={`${index}-${step}`}>{step}</li>)}
+                </ol>
+              ) : null}
+
+              {latestPlan.question && (
+                <p style={{ 
+                  margin: '8px 0 0', 
+                  padding: '6px 10px', 
+                  borderRadius: '6px', 
+                  background: 'rgba(255, 255, 255, 0.05)', 
+                  border: '1px solid rgba(255, 255, 255, 0.12)', 
+                  color: '#ffffff', 
+                  lineHeight: 1.4,
+                  fontSize: '11px'
+                }}>
+                  Needs your answer: {latestPlan.question}
+                </p>
+              )}
+
+              {/* Status and auto-dismiss hint */}
+              {planExecutionStatus !== 'running' && hudPlanDuration !== 'persistent' && (
+                <div style={{
+                  marginTop: '10px',
+                  paddingTop: '6px',
+                  borderTop: '1px solid rgba(255, 255, 255, 0.06)',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  fontSize: '10px',
+                  color: 'rgba(255, 255, 255, 0.4)'
+                }}>
+                  <span>Auto-dismiss in {hudPlanDuration}s</span>
+                  <span>Hover to pause</span>
+                </div>
+              )}
             </div>
-          ) : latestPlan.steps.length > 0 ? (
-            <ol style={{ margin: '0 0 2px', paddingLeft: '20px', color: '#ede9fe', lineHeight: 1.55 }}>
-              {latestPlan.steps.map((step, index) => <li key={`${index}-${step}`}>{step}</li>)}
-            </ol>
-          ) : null}
-          {latestPlan.question && (
-            <p style={{ margin: '10px 0 0', color: '#fcd34d', lineHeight: 1.4 }}>
-              Needs your answer: {latestPlan.question}
-            </p>
           )}
-        </details>
+        </div>
       )}
 
       {/* Floating Auto-Heal Action Banner HUD */}

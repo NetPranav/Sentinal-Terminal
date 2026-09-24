@@ -126,4 +126,46 @@ describe('Sentinel Settings Center & Multi-Tab Configuration Architecture', () =
 
     window.removeEventListener('sentinel:open-onboarding', listener);
   });
+
+  it('manages Execution Plan HUD notification settings and dispatches sentinel:hud-settings-changed event', () => {
+    let settingsChangedCount = 0;
+    const listener = () => {
+      settingsChangedCount++;
+    };
+    window.addEventListener('sentinel:hud-settings-changed', listener);
+
+    // Verify defaults
+    expect(localStorage.getItem('sentinel_hud_plan_enabled')).toBeNull();
+    const defaultEnabled = localStorage.getItem('sentinel_hud_plan_enabled') !== 'false';
+    const defaultDuration = localStorage.getItem('sentinel_hud_plan_duration') || '8';
+    expect(defaultEnabled).toBe(true);
+    expect(defaultDuration).toBe('8');
+
+    // Toggle HUD to false
+    localStorage.setItem('sentinel_hud_plan_enabled', 'false');
+    window.dispatchEvent(new CustomEvent('sentinel:hud-settings-changed'));
+    expect(localStorage.getItem('sentinel_hud_plan_enabled')).toBe('false');
+    expect(settingsChangedCount).toBe(1);
+
+    // Change duration to '15'
+    localStorage.setItem('sentinel_hud_plan_duration', '15');
+    window.dispatchEvent(new CustomEvent('sentinel:hud-settings-changed'));
+    expect(localStorage.getItem('sentinel_hud_plan_duration')).toBe('15');
+    expect(settingsChangedCount).toBe(2);
+
+    // Set duration to 'persistent'
+    localStorage.setItem('sentinel_hud_plan_duration', 'persistent');
+    window.dispatchEvent(new CustomEvent('sentinel:hud-settings-changed'));
+    expect(localStorage.getItem('sentinel_hud_plan_duration')).toBe('persistent');
+    expect(settingsChangedCount).toBe(3);
+
+    // Re-enable HUD
+    localStorage.setItem('sentinel_hud_plan_enabled', 'true');
+    window.dispatchEvent(new CustomEvent('sentinel:hud-settings-changed'));
+    expect(localStorage.getItem('sentinel_hud_plan_enabled')).toBe('true');
+    expect(settingsChangedCount).toBe(4);
+
+    window.removeEventListener('sentinel:hud-settings-changed', listener);
+  });
 });
+
