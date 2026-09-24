@@ -86,24 +86,57 @@ export function normalizeEndpointUrl(serviceId: CloudServiceId, rawUrl?: string)
 
   if (serviceId === 'anthropic') {
     if (url.endsWith('/messages')) return url;
-    return `${url}/messages`;
+    if (url.endsWith('/v1')) return `${url}/messages`;
+    return `${url}/v1/messages`;
   }
 
-  // OpenAI-compatible endpoints (openai, groq, deepseek, openrouter, custom/nvidia)
+  // If already ends with /chat/completions, return as-is
   if (url.endsWith('/chat/completions')) {
     return url;
   }
 
+  // If ends with /v1, append /chat/completions
   if (url.endsWith('/v1')) {
     return `${url}/chat/completions`;
   }
 
+  // Groq specifics:
+  // Default: https://api.groq.com/openai/v1/chat/completions
+  if (serviceId === 'groq' || url.includes('groq.com')) {
+    if (url.endsWith('/openai/v1')) return `${url}/chat/completions`;
+    if (url.endsWith('/openai')) return `${url}/v1/chat/completions`;
+    return `${url}/openai/v1/chat/completions`;
+  }
+
+  // OpenRouter specifics:
+  // Default: https://openrouter.ai/api/v1/chat/completions
+  if (serviceId === 'openrouter' || url.includes('openrouter.ai')) {
+    if (url.endsWith('/api/v1')) return `${url}/chat/completions`;
+    if (url.endsWith('/api')) return `${url}/v1/chat/completions`;
+    return `${url}/api/v1/chat/completions`;
+  }
+
+  // DeepSeek specifics:
+  // Default: https://api.deepseek.com/chat/completions
+  if (serviceId === 'deepseek' || url.includes('deepseek.com')) {
+    return `${url}/chat/completions`;
+  }
+
+  // OpenAI specifics:
+  // Default: https://api.openai.com/v1/chat/completions
+  if (serviceId === 'openai' || url.includes('openai.com')) {
+    return `${url}/v1/chat/completions`;
+  }
+
+  // NVIDIA endpoints:
   if (url.includes('nvidia.com')) {
     return `${url}/v1/chat/completions`;
   }
 
   return `${url}/chat/completions`;
 }
+
+let cachedTauriFetch: typeof fetch | null = null;
 
 /**
  * Universal fetch that routes via Tauri's native reqwest client when available,
@@ -112,8 +145,11 @@ export function normalizeEndpointUrl(serviceId: CloudServiceId, rawUrl?: string)
 export async function httpFetch(url: string, init?: RequestInit): Promise<Response> {
   if (typeof window !== 'undefined' && ((window as any).__TAURI_INTERNALS__ || (window as any).__TAURI__)) {
     try {
-      const { fetch: tauriFetch } = await import('@tauri-apps/plugin-http');
-      return await tauriFetch(url, init);
+      if (!cachedTauriFetch) {
+        const { fetch: tauriFetch } = await import('@tauri-apps/plugin-http');
+        cachedTauriFetch = tauriFetch;
+      }
+      return await cachedTauriFetch(url, init);
     } catch (err) {
       console.warn('[CloudApiProvider] Tauri HTTP plugin fallback to native fetch:', err);
     }
@@ -126,7 +162,8 @@ export async function httpFetch(url: string, init?: RequestInit): Promise<Respon
  */
 async function extractErrorMessage(res: Response): Promise<string> {
   try {
-    const data = await res.json();
+    const clone = res.clone();
+    const data = await clone.json();
     if (data) {
       if (typeof data.error === 'string') return data.error;
       if (data.error?.message) return data.error.message;
@@ -137,8 +174,13 @@ async function extractErrorMessage(res: Response): Promise<string> {
       if (data.title) return data.title;
     }
   } catch {
-    const text = await res.text().catch(() => '');
-    if (text) return text.slice(0, 200);
+    try {
+      const clone = res.clone();
+      const text = await clone.text();
+      if (text) return text.slice(0, 200);
+    } catch {
+      // Non-fatal
+    }
   }
   return `HTTP ${res.status}: ${res.statusText || 'Request failed'}`;
 }
@@ -220,7 +262,8 @@ export class CloudApiProvider implements ModelProvider {
   }
 
   /**
-   * Tests connection with a lightweight probe request
+   * Tests connection with a lightweight probe request with automatic retry and backoff
+   * to gracefully handle cold sockets, DNS resolution, and transient gateway blips.
    */
   public async testConnection(
     serviceId: CloudServiceId,
@@ -228,58 +271,143 @@ export class CloudApiProvider implements ModelProvider {
     customUrl?: string,
     customModel?: string
   ): Promise<{ success: boolean; latencyMs?: number; error?: string }> {
+    const trimmedKey = apiKey.trim();
+    if (!trimmedKey) {
+      return { success: false, error: 'Please enter an API key first.' };
+    }
+
     const url = normalizeEndpointUrl(serviceId, customUrl);
     const model = customModel?.trim() || CLOUD_CATALOG[serviceId].defaultModel;
 
     const start = performance.now();
+    const MAX_RETRIES = 3;
+    let lastError: string | undefined;
 
-    try {
-      if (serviceId === 'anthropic') {
-        const res = await httpFetch(url, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-api-key': apiKey.trim(),
-            'anthropic-version': '2023-06-01'
-          },
-          body: JSON.stringify({
+    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+        const timeoutId = controller ? setTimeout(() => controller.abort(), 8000) : null;
+
+        const requestInit: RequestInit = {
+          signal: controller?.signal
+        };
+
+        if (serviceId === 'anthropic') {
+          const res = await httpFetch(url, {
+            ...requestInit,
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-api-key': trimmedKey,
+              'anthropic-version': '2023-06-01'
+            },
+            body: JSON.stringify({
+              model,
+              max_tokens: 16,
+              messages: [{ role: 'user', content: 'ping' }]
+            })
+          });
+
+          if (timeoutId) clearTimeout(timeoutId);
+          const latencyMs = Math.round(performance.now() - start);
+
+          if (res.ok) {
+            return { success: true, latencyMs };
+          }
+
+          // Non-retryable authentication failures: 401 Unauthorized, 403 Forbidden
+          if (res.status === 401 || res.status === 403) {
+            const errMessage = await extractErrorMessage(res);
+            return { success: false, error: errMessage };
+          }
+
+          lastError = await extractErrorMessage(res);
+        } else {
+          // Standard OpenAI-compatible format (OpenAI, Groq, DeepSeek, OpenRouter, NVIDIA, Custom)
+          const isReasoningModel = model.startsWith('o1') || model.startsWith('o3') || model.includes('reasoner');
+          const bodyPayload: any = {
             model,
-            max_tokens: 16,
             messages: [{ role: 'user', content: 'ping' }]
-          })
-        });
+          };
+          if (isReasoningModel) {
+            bodyPayload.max_completion_tokens = 16;
+          } else {
+            bodyPayload.max_tokens = 16;
+          }
 
-        const latencyMs = Math.round(performance.now() - start);
-        if (!res.ok) {
-          const errMessage = await extractErrorMessage(res);
-          return { success: false, error: errMessage };
+          let res = await httpFetch(url, {
+            ...requestInit,
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${trimmedKey}`
+            },
+            body: JSON.stringify(bodyPayload)
+          });
+
+          if (timeoutId) clearTimeout(timeoutId);
+          const latencyMs = Math.round(performance.now() - start);
+
+          // If 400 Bad Request because model rejected max_tokens, retry once with max_completion_tokens
+          if (!res.ok && res.status === 400 && bodyPayload.max_tokens) {
+            delete bodyPayload.max_tokens;
+            bodyPayload.max_completion_tokens = 16;
+            res = await httpFetch(url, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${trimmedKey}`
+              },
+              body: JSON.stringify(bodyPayload)
+            });
+          }
+
+          if (res.ok) {
+            return { success: true, latencyMs };
+          }
+
+          // Non-retryable authentication failures: 401 Unauthorized, 403 Forbidden
+          if (res.status === 401 || res.status === 403) {
+            const errMessage = await extractErrorMessage(res);
+            return { success: false, error: errMessage };
+          }
+
+          // If 404 or model not found on final attempt, probe GET /models if OpenAI-compatible
+          if ((res.status === 404 || res.status === 400) && attempt === MAX_RETRIES) {
+            try {
+              const modelsUrl = url.replace(/\/chat\/completions\/?$/, '/models');
+              if (modelsUrl !== url) {
+                const modelsRes = await httpFetch(modelsUrl, {
+                  method: 'GET',
+                  headers: {
+                    'Authorization': `Bearer ${trimmedKey}`
+                  }
+                });
+                if (modelsRes.ok) {
+                  return {
+                    success: true,
+                    latencyMs: Math.round(performance.now() - start)
+                  };
+                }
+              }
+            } catch {
+              // ignore fallback models probe failure
+            }
+          }
+
+          lastError = await extractErrorMessage(res);
         }
-        return { success: true, latencyMs };
+      } catch (err: any) {
+        lastError = err?.name === 'AbortError' ? 'Connection probe timed out (8s)' : (err?.message || 'Network connection failed');
       }
 
-      // Standard OpenAI-compatible format (OpenAI, Groq, DeepSeek, OpenRouter, NVIDIA, Custom)
-      const res = await httpFetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey.trim()}`
-        },
-        body: JSON.stringify({
-          model,
-          max_tokens: 16,
-          messages: [{ role: 'user', content: 'ping' }]
-        })
-      });
-
-      const latencyMs = Math.round(performance.now() - start);
-      if (!res.ok) {
-        const errMessage = await extractErrorMessage(res);
-        return { success: false, error: errMessage };
+      // If we have retries remaining, wait with backoff before next probe
+      if (attempt < MAX_RETRIES) {
+        await new Promise(r => setTimeout(r, attempt * 350));
       }
-      return { success: true, latencyMs };
-    } catch (err: any) {
-      return { success: false, error: err?.message || 'Network connection failed' };
     }
+
+    return { success: false, error: lastError || 'Connection test failed after 3 attempts' };
   }
 
   public async isAvailable(): Promise<boolean> {
@@ -374,11 +502,16 @@ export class CloudApiProvider implements ModelProvider {
     }
 
     // Standard OpenAI-compatible execution
+    const isReasoningModel = model.startsWith('o1') || model.startsWith('o3') || model.includes('reasoner');
     const requestBody: any = {
       model,
       messages,
-      temperature: options?.temperature ?? 0.2,
-      max_tokens: options?.maxTokens || 1024
+      ...(isReasoningModel
+        ? { max_completion_tokens: options?.maxTokens || 1024 }
+        : {
+            temperature: options?.temperature ?? 0.2,
+            max_tokens: options?.maxTokens || 1024
+          })
     };
     if (options?.format === 'json') {
       requestBody.response_format = { type: 'json_object' };
@@ -396,6 +529,23 @@ export class CloudApiProvider implements ModelProvider {
     // If endpoint rejects response_format (e.g. 400 Bad Request on some models), retry once without it
     if (!res.ok && res.status === 400 && requestBody.response_format) {
       delete requestBody.response_format;
+      res = await httpFetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${active.apiKey.trim()}`
+        },
+        body: JSON.stringify(requestBody)
+      });
+    }
+
+    // If endpoint rejects temperature or max_tokens for reasoning models, retry with sanitized payload
+    if (!res.ok && res.status === 400 && (requestBody.temperature !== undefined || requestBody.max_tokens !== undefined)) {
+      delete requestBody.temperature;
+      if (requestBody.max_tokens) {
+        requestBody.max_completion_tokens = requestBody.max_tokens;
+        delete requestBody.max_tokens;
+      }
       res = await httpFetch(url, {
         method: 'POST',
         headers: {

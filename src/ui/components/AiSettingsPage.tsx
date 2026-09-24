@@ -1337,10 +1337,20 @@ export const AiSettingsPage: React.FC<AiSettingsPageProps> = ({
                     fontSize: '12px',
                     fontWeight: 500,
                     cursor: (testingConnection || !keyInput.trim()) ? 'not-allowed' : 'pointer',
-                    opacity: (testingConnection || !keyInput.trim()) ? 0.5 : 1
+                    opacity: (testingConnection || !keyInput.trim()) ? 0.5 : 1,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px'
                   }}
                 >
-                  {testingConnection ? 'Testing...' : 'Test Connection'}
+                  {testingConnection ? (
+                    <>
+                      <RefreshCw size={13} style={{ animation: 'spin 0.9s linear infinite' }} />
+                      <span>Verifying Connection...</span>
+                    </>
+                  ) : (
+                    <span>Test Connection</span>
+                  )}
                 </button>
 
                 <button

@@ -400,6 +400,11 @@ body {
   50% { opacity: 0.6; transform: scale(0.92); }
 }
 
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
 /* Native macOS window dragging and interactive region management */
 .window-drag-region {
   -webkit-app-region: drag;
