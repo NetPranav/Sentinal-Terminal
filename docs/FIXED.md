@@ -190,24 +190,22 @@ When a user drafts or edits a multi-step prompt (e.g. `> Create a temporary test
    - Pressing Up Arrow while positioned in the middle of a command invariably destroyed the command buffer instead of navigating within the text.
 
 ### 9.4 Implemented Architecture & Remediation
-1. **Behavioral Navigation Model (`PromptNavigationEngine.ts`):**
-   - **Rule 1 (History by Default):** By default and on single-line commands, Up and Down arrow keys pass directly to GNU Readline / shell history without interception.
-   - **Rule 2 (In-Command Horizontal Navigation):** Left and Right arrow keys navigate horizontally within the active command/prompt string.
-   - **Rule 3 (Right-Arrow-Triggered In-Buffer Line Navigation):**
-     - To move through lines in a multi-row prompt, the user uses the Right Arrow key once to move the cursor ahead of the last character (last non-whitespace symbol, number, or alphabet).
-     - **Ahead of Last Character (`cursorX > lastCharCol` on `endRow` with `hasPressedRightArrow`):** Up and Down arrow move up and down between the visual lines of the prompt (`\x1b[D`.repeat(cols) for line-up, `\x1b[C`.repeat(cols) for line-down), maintaining line navigation mode.
-     - **On or Behind Last Character (`cursorX <= lastCharCol`):** Up and Down arrow navigate through previous commands and prompts.
-     - **Ahead or On First Character (`cursorX <= firstCharCol` on `startRow`):** Up and Down arrow navigate through previous commands and prompts.
-     - **Boundary Transition:** When moving up reaches the top row of the prompt, Up arrow transitions back to shell history to cycle previous commands.
+1. **Direct Spatial Navigation Model (`PromptNavigationEngine.ts`):**
+   - **Default History Browsing:**
+     - When the cursor is **behind the last character** (at the trailing space at the end of the line, `cursorX > lastCharCol` on `endRow`) or **on or ahead of the first character** (`cursorX <= firstCharCol` on `startRow`), pressing Up and Down arrow performs Default History Browsing through previous commands and prompts.
+     - Single-line commands (`totalRows <= 1`) always perform Default History Browsing.
+   - **In-Buffer Line Navigation in Long Prompts:**
+     - Once the user uses the **Left Arrow** to move **on or ahead of the last character** (`cursorX <= lastCharCol` on `endRow`) or uses the **Right Arrow** to move **behind the first character** (`cursorX > firstCharCol` on `startRow`), Up and Down arrow keys move visual lines up (`\x1b[D`.repeat(cols)) and down (`\x1b[C`.repeat(cols)) in the long prompt or command (`totalRows > 1`).
+     - Up Arrow on `startRow` moves to the first character (`\x01`), allowing the next Up Arrow on the first character to perform Default History Browsing.
+     - Down Arrow on `endRow` moves to the trailing end (`\x05`), allowing the next Down Arrow behind the last character to perform Default History Browsing.
+   - **Alternate Screen Buffer Guard:**
+     - `vim`, `nano`, `htop`, `less` bypass interception completely via `ptyTrackerRef.current.isAlternateBuffer()` and `term.buffer.active.type === 'alternate'`.
 2. **Terminal Key Handler Integration (`TerminalView.tsx`):**
-   - `ArrowRight` sets `hasPressedRightArrowRef.current = true`.
-   - `ArrowLeft` navigates within the command and immediately resets `hasPressedRightArrowRef.current = false` and `isLineNavigatingRef.current = false`, ensuring on-or-behind-character cursor positions cycle shell history.
-   - `Enter`, `Ctrl+C` (`\x03`), `Ctrl+U`, and normal history cycling reset navigation flags.
-   - Alternate screen buffer (vim, nano, htop, less) automatically bypasses interception.
+   - Pure, stateless evaluation inside `attachCustomKeyEventHandler` passing active buffer coordinates (`cursorX`, `cursorY`, `cols`, and extracted lines) into `PromptNavigationEngine.evaluateNavigation`.
 3. **Comprehensive Automated Test Suite (`PromptNavigationEngine.test.ts`):**
-   - 12 comprehensive unit tests validating single-line history pass-through, empty prompt pass-through, alternate buffer bypass, multi-row behind/on last character history pass-through, ahead/on first character history pass-through, right-arrow ahead-of-last-char line navigation, top-line history switch, and bottom-line history switch. All 12 tests pass.
+   - 11 comprehensive unit tests validating single-line history pass-through, empty prompt pass-through, alternate buffer bypass, trailing space behind last character history pass-through, first character history pass-through, on/ahead of last character line navigation, behind first character line navigation, middle line navigation, and bottom-row end-of-text navigation. All 11 tests pass.
 
 ### 9.5 Touched Components & Files
-- [`src/domain/terminal/PromptNavigationEngine.ts`](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/domain/terminal/PromptNavigationEngine.ts): Smart prompt boundary detection, first/last character column resolution, and navigation evaluation.
-- [`src/domain/terminal/PromptNavigationEngine.test.ts`](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/domain/terminal/PromptNavigationEngine.test.ts): Unit tests covering all behavioral rules.
-- [`src/presentation/TerminalView.tsx`](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/presentation/TerminalView.tsx): Integrated `hasPressedRightArrowRef`, `isLineNavigatingRef`, key event hooks, and alternate buffer guards.
+- [`src/domain/terminal/PromptNavigationEngine.ts`](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/domain/terminal/PromptNavigationEngine.ts): Spatial character boundary detection, first/last character column resolution, and navigation evaluation.
+- [`src/domain/terminal/PromptNavigationEngine.test.ts`](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/domain/terminal/PromptNavigationEngine.test.ts): Unit tests covering all behavioral specifications.
+- [`src/presentation/TerminalView.tsx`](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/presentation/TerminalView.tsx): Integrated `PromptNavigationEngine.evaluateNavigation` into xterm key event listener.

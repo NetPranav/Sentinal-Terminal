@@ -2,13 +2,17 @@
  * PromptNavigationEngine.ts — Terminal Line & Cursor Navigation vs History Guard
  * 
  * Issue 9 Specification:
- * 1. Top and down arrow move through previous commands and prompts.
- * 2. Left and right arrow navigate within the command.
- * 3. In order to move through lines in the prompt, user must use the right arrow once
- *    to move the cursor ahead of the last character:
- *    - If cursor is ahead of the last character: Up and Down arrow move up and down in lines.
- *    - If cursor is on or behind the last character: Up and Down arrow navigate through previous commands and prompts.
- *    - If cursor is ahead or on the first character: Up and Down arrow navigate through previous commands and prompts.
+ * 1. Default History Browsing:
+ *    If the cursor is behind the last character (trailing space at end of line)
+ *    or on the first character (first symbol, number, or alphabet), Up and Down
+ *    arrow perform Default History Browsing through previous commands and prompts.
+ * 2. In-Command Horizontal Navigation:
+ *    Left and Right arrow navigate within the written command.
+ * 3. In-Buffer Line Navigation in Long Prompts/Commands:
+ *    Once the user has used the Left Arrow to move on or ahead of the last character
+ *    (inside the text, cursorX <= lastCharCol) or used the Right Arrow to move behind
+ *    the first character (inside the text, cursorX > firstCharCol), Up and Down arrows
+ *    move between lines in the long prompt or command (totalRows > 1).
  * 
  * By last and first character: the last or first symbol, number or alphabet present in the command or prompt.
  */
@@ -25,16 +29,13 @@ export interface NavigationEvaluationInput {
   cols: number;
   lines: BufferLineInfo[];
   baseY?: number;
-  hasPressedRightArrow?: boolean;
-  isLineNavigating?: boolean;
   isAlternateBuffer?: boolean;
 }
 
 export interface NavigationDecision {
   handled: boolean;
-  action: 'move-up-line' | 'move-down-line' | 'pass-to-history';
+  action: 'move-up-line' | 'move-down-line' | 'move-to-start' | 'move-to-end' | 'pass-to-history';
   payload?: string;
-  setLineNavigating?: boolean;
 }
 
 export class PromptNavigationEngine {
@@ -82,11 +83,11 @@ export class PromptNavigationEngine {
   public static evaluateNavigation(input: NavigationEvaluationInput): NavigationDecision {
     // 1. TUI / Full-screen alternate buffer guard (vim, nano, htop, less)
     if (input.isAlternateBuffer) {
-      return { handled: false, action: 'pass-to-history', setLineNavigating: false };
+      return { handled: false, action: 'pass-to-history' };
     }
 
     if (!input.lines || input.lines.length === 0) {
-      return { handled: false, action: 'pass-to-history', setLineNavigating: false };
+      return { handled: false, action: 'pass-to-history' };
     }
 
     const { startRow, endRow, totalRows, currentRowOffset } = this.getPromptRowRange(
@@ -96,7 +97,7 @@ export class PromptNavigationEngine {
 
     // Single-row commands: Up and Down arrow always navigate through previous commands and prompts
     if (totalRows <= 1) {
-      return { handled: false, action: 'pass-to-history', setLineNavigating: false };
+      return { handled: false, action: 'pass-to-history' };
     }
 
     // Find first character of the prompt/command on startRow
@@ -126,87 +127,56 @@ export class PromptNavigationEngine {
 
     // If completely empty prompt, allow normal history cycling
     if (lastCharCol === -1) {
-      return { handled: false, action: 'pass-to-history', setLineNavigating: false };
+      return { handled: false, action: 'pass-to-history' };
     }
 
-    // Check if cursor is ahead or on the first character
-    // "Also if the cursor is ahead or on the first character user should be able to move to the previous ran commands and prompts using the up and down arrow."
+    // Rule: "If the cursor is behind the last character or on the first character user should be able to perform the Default History Browsing using the up and down arrow."
+    // 1. Behind the last character (trailing space after the last character on targetEndRow)
+    if (input.cursorY === targetEndRow && input.cursorX > lastCharCol) {
+      return { handled: false, action: 'pass-to-history' };
+    }
+
+    // 2. On or ahead of the first character on startRow
     if (input.cursorY === startRow && input.cursorX <= firstCharCol) {
-      return { handled: false, action: 'pass-to-history', setLineNavigating: false };
+      return { handled: false, action: 'pass-to-history' };
     }
 
+    // Rule: "once the user has used the left arrow to move on or ahead of the last character or used the right arrow to move behind the first character, then user should be able to use the up and down arrows to move between lines in the long prompt or command."
     const cols = Math.max(1, input.cols);
 
-    // If line navigation mode is currently active:
-    if (input.isLineNavigating) {
-      if (input.direction === 'up') {
-        if (currentRowOffset > 0) {
-          // Move up one visual line
-          return {
-            handled: true,
-            action: 'move-up-line',
-            payload: '\x1b[D'.repeat(cols),
-            setLineNavigating: true,
-          };
-        } else {
-          // Reached the top line of prompt: switch to previous ran commands and prompts
-          return {
-            handled: false,
-            action: 'pass-to-history',
-            setLineNavigating: false,
-          };
-        }
-      } else {
-        // direction === 'down'
-        if (currentRowOffset < totalRows - 1) {
-          // Move down one visual line
-          return {
-            handled: true,
-            action: 'move-down-line',
-            payload: '\x1b[C'.repeat(cols),
-            setLineNavigating: true,
-          };
-        } else {
-          // Reached the bottom line: switch to history
-          return {
-            handled: false,
-            action: 'pass-to-history',
-            setLineNavigating: false,
-          };
-        }
-      }
-    }
-
-    // If line navigation is NOT yet active:
-    // User must have used the right arrow once to move the cursor ahead of the last character
-    const isAheadOfLastChar =
-      input.cursorY === targetEndRow && input.cursorX > lastCharCol;
-
-    if (input.hasPressedRightArrow && isAheadOfLastChar) {
-      if (input.direction === 'up') {
-        // Enter line navigation mode and move up one visual line
+    if (input.direction === 'up') {
+      if (currentRowOffset > 0) {
+        // Move up one visual line
         return {
           handled: true,
           action: 'move-up-line',
           payload: '\x1b[D'.repeat(cols),
-          setLineNavigating: true,
         };
       } else {
-        // Already at bottom line: pass down arrow to history
+        // On top line (startRow), move to start of text (onto first character)
         return {
-          handled: false,
-          action: 'pass-to-history',
-          setLineNavigating: false,
+          handled: true,
+          action: 'move-to-start',
+          payload: '\x01',
+        };
+      }
+    } else {
+      // direction === 'down'
+      if (currentRowOffset < totalRows - 1) {
+        // Move down one visual line
+        return {
+          handled: true,
+          action: 'move-down-line',
+          payload: '\x1b[C'.repeat(cols),
+        };
+      } else {
+        // On bottom line (endRow), move to end of text (behind last character)
+        return {
+          handled: true,
+          action: 'move-to-end',
+          payload: '\x05',
         };
       }
     }
-
-    // In all other cases (cursor is on or behind the last character, or right arrow wasn't pressed):
-    // "if the cursor is on or behind the last character user should be able to navigate through previous commands and prompts."
-    return {
-      handled: false,
-      action: 'pass-to-history',
-      setLineNavigating: false,
-    };
   }
 }

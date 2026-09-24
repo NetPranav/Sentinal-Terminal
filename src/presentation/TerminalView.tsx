@@ -188,8 +188,6 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
   const agentLoopRef = useRef<AgentLoop | null>(null);
   const ptyTrackerRef = useRef<PtyStateTracker>(new PtyStateTracker());
   const lastUnresolvedGoalRef = useRef<{ goal: string; timestamp: number } | null>(null);
-  const hasPressedRightArrowRef = useRef<boolean>(false);
-  const isLineNavigatingRef = useRef<boolean>(false);
 
   const handleExecuteRemediation = async (rem: RemediationPrompt) => {
     setActiveRemediation(null);
@@ -379,32 +377,6 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
         return false;
       }
 
-      // Track Right Arrow navigation to detect moving ahead of the last character
-      if (event.key === 'ArrowRight') {
-        if (event.type === 'keydown') {
-          hasPressedRightArrowRef.current = true;
-        }
-        return true;
-      }
-
-      // Left Arrow navigates within the command and exits line navigation mode
-      if (event.key === 'ArrowLeft') {
-        if (event.type === 'keydown') {
-          hasPressedRightArrowRef.current = false;
-          isLineNavigatingRef.current = false;
-        }
-        return true;
-      }
-
-      // Reset navigation state on Enter or line-clearing shortcuts
-      if (event.key === 'Enter' || (isCmdOrCtrl && (k === 'c' || k === 'u'))) {
-        if (event.type === 'keydown') {
-          hasPressedRightArrowRef.current = false;
-          isLineNavigatingRef.current = false;
-        }
-        return true;
-      }
-
       // Issue 9: In-buffer vertical line navigation vs shell history cycling
       if (!isCmdOrCtrl && (event.key === 'ArrowUp' || event.key === 'ArrowDown')) {
         const direction = event.key === 'ArrowUp' ? 'up' : 'down';
@@ -433,8 +405,6 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
           cursorY: relativeCursorY,
           cols: term.cols,
           lines,
-          hasPressedRightArrow: hasPressedRightArrowRef.current,
-          isLineNavigating: isLineNavigatingRef.current,
           isAlternateBuffer: ptyTrackerRef.current.isAlternateBuffer() || term.buffer.active.type === 'alternate',
         });
 
@@ -447,17 +417,9 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
               SessionManager.getInstance().write(activeSessionId, decision.payload);
             }
           }
-          if (decision.setLineNavigating !== undefined) {
-            isLineNavigatingRef.current = decision.setLineNavigating;
-          }
           return false;
         }
 
-        // Allow shell history cycling when not handled
-        if (event.type === 'keydown') {
-          hasPressedRightArrowRef.current = false;
-          isLineNavigatingRef.current = false;
-        }
         return true;
       }
 
@@ -633,11 +595,6 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
         term.onData(async (data) => {
           if (!currentSessionId) return;
           SentinelSerlCoordinator.getInstance().markActivity();
-
-          if (data.includes('\r') || data === '\n' || data === '\x03' || (data.length === 1 && data >= ' ')) {
-            hasPressedRightArrowRef.current = false;
-            isLineNavigatingRef.current = false;
-          }
 
           // Handle Tab completion or Right Arrow completion
           if (data === '\t' || data === '\x1b[C') {

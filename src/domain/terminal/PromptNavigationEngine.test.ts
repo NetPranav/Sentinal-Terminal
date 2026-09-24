@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { PromptNavigationEngine, BufferLineInfo } from './PromptNavigationEngine';
 
-describe('PromptNavigationEngine (Issue 9 Behavioral Rules)', () => {
+describe('PromptNavigationEngine (Issue 9 Behavioral Specifications)', () => {
   describe('getPromptRowRange', () => {
     it('calculates single-line range correctly', () => {
       const lines: BufferLineInfo[] = [
@@ -46,7 +46,6 @@ describe('PromptNavigationEngine (Issue 9 Behavioral Rules)', () => {
   });
 
   describe('evaluateNavigation', () => {
-    // Rule 1: By default, top and down arrow move through previous commands and prompts
     it('passes arrow keys directly to history on single-line commands', () => {
       const lines: BufferLineInfo[] = [
         { text: 'user@host:~$ ls -la', isWrapped: false },
@@ -57,7 +56,6 @@ describe('PromptNavigationEngine (Issue 9 Behavioral Rules)', () => {
         cursorY: 0,
         cols: 80,
         lines,
-        hasPressedRightArrow: false,
       });
       expect(decision.handled).toBe(false);
       expect(decision.action).toBe('pass-to-history');
@@ -70,7 +68,6 @@ describe('PromptNavigationEngine (Issue 9 Behavioral Rules)', () => {
         cursorY: 0,
         cols: 80,
         lines: [{ text: 'user@host:~$ ', isWrapped: false }],
-        hasPressedRightArrow: false,
       });
       expect(decision.handled).toBe(false);
       expect(decision.action).toBe('pass-to-history');
@@ -89,117 +86,132 @@ describe('PromptNavigationEngine (Issue 9 Behavioral Rules)', () => {
       expect(decision.action).toBe('pass-to-history');
     });
 
-    // Rule 3: If cursor is on or behind the last character, user navigates through previous commands and prompts
-    it('passes to history if cursor is on or behind the last character in multi-row prompt', () => {
+    // Rule: "If the cursor is behind the last character user should be able to perform the Default History Browsing using the up and down arrow."
+    it('performs Default History Browsing when cursor is behind the last character (trailing space) in a long prompt', () => {
       const lines: BufferLineInfo[] = [
         { text: 'user@host:~$ > Create test workspace', isWrapped: false }, // row 0
-        { text: 'with three files inside.', isWrapped: true },              // row 1 (last char '.' is at index 23)
+        { text: 'with three files inside.', isWrapped: true },              // row 1 (last char '.' is at col 23)
       ];
 
-      // Cursor is at col 15 (behind '.' at col 23)
-      const decisionBehind = PromptNavigationEngine.evaluateNavigation({
+      // Cursor is at col 24 (behind '.' at col 23)
+      const decisionUp = PromptNavigationEngine.evaluateNavigation({
         direction: 'up',
-        cursorX: 15,
+        cursorX: 24,
         cursorY: 1,
         cols: 50,
         lines,
-        hasPressedRightArrow: false,
       });
-      expect(decisionBehind.handled).toBe(false);
-      expect(decisionBehind.action).toBe('pass-to-history');
+      expect(decisionUp.handled).toBe(false);
+      expect(decisionUp.action).toBe('pass-to-history');
 
-      // Cursor is at col 23 (ON the last character '.')
-      const decisionOn = PromptNavigationEngine.evaluateNavigation({
-        direction: 'up',
-        cursorX: 23,
+      const decisionDown = PromptNavigationEngine.evaluateNavigation({
+        direction: 'down',
+        cursorX: 24,
         cursorY: 1,
         cols: 50,
         lines,
-        hasPressedRightArrow: false,
       });
-      expect(decisionOn.handled).toBe(false);
-      expect(decisionOn.action).toBe('pass-to-history');
+      expect(decisionDown.handled).toBe(false);
+      expect(decisionDown.action).toBe('pass-to-history');
     });
 
-    // Rule 3: If cursor is ahead or on the first character, user moves to previous ran commands and prompts
-    it('passes to history if cursor is ahead or on the first character', () => {
+    // Rule: "or on the first character user should be able to perform the Default History Browsing using the up and down arrow."
+    it('performs Default History Browsing when cursor is on or ahead of the first character', () => {
       const lines: BufferLineInfo[] = [
         { text: 'user@host:~$ > Create test workspace', isWrapped: false }, // row 0 (prefix len 14, '>' at col 14)
         { text: 'with three files inside.', isWrapped: true },              // row 1
       ];
 
-      // Cursor on first character '>' (col 14)
+      // Cursor ON the first character '>' (col 13)
       const decisionOnFirst = PromptNavigationEngine.evaluateNavigation({
         direction: 'up',
-        cursorX: 14,
+        cursorX: 13,
         cursorY: 0,
         cols: 50,
         lines,
-        hasPressedRightArrow: false,
       });
       expect(decisionOnFirst.handled).toBe(false);
       expect(decisionOnFirst.action).toBe('pass-to-history');
 
-      // Cursor ahead/before first character (col 5)
+      // Cursor ahead/before the first character (col 5)
       const decisionBeforeFirst = PromptNavigationEngine.evaluateNavigation({
         direction: 'up',
         cursorX: 5,
         cursorY: 0,
         cols: 50,
         lines,
-        hasPressedRightArrow: false,
       });
       expect(decisionBeforeFirst.handled).toBe(false);
       expect(decisionBeforeFirst.action).toBe('pass-to-history');
     });
 
-    // Rule 3: User uses right arrow once to move ahead of the last character -> allows moving up and down lines
-    it('moves up one line when user pressed right arrow and cursor is ahead of last character', () => {
+    // Rule: "once the user has used the left arrow to move on or ahead of the last character... then user should be able to use the up and down arrows to move between lines in the long prompt or command."
+    it('moves between lines when user has moved on or ahead of the last character', () => {
       const cols = 50;
       const lines: BufferLineInfo[] = [
         { text: 'user@host:~$ > Create test workspace', isWrapped: false }, // row 0
-        { text: 'with three files inside.', isWrapped: true },              // row 1 (last char '.' at col 23)
+        { text: 'with three files inside.', isWrapped: true },              // row 1 (last char '.' is at col 23)
       ];
 
-      // Cursor is at col 24 (ahead of last character '.') and hasPressedRightArrow is true
-      const decision = PromptNavigationEngine.evaluateNavigation({
+      // Cursor is ON the last character '.' (col 23)
+      const decisionOnLastChar = PromptNavigationEngine.evaluateNavigation({
         direction: 'up',
-        cursorX: 24,
+        cursorX: 23,
         cursorY: 1,
         cols,
         lines,
-        hasPressedRightArrow: true,
       });
+      expect(decisionOnLastChar.handled).toBe(true);
+      expect(decisionOnLastChar.action).toBe('move-up-line');
+      expect(decisionOnLastChar.payload).toBe('\x1b[D'.repeat(cols));
 
-      expect(decision.handled).toBe(true);
-      expect(decision.action).toBe('move-up-line');
-      expect(decision.payload).toBe('\x1b[D'.repeat(cols));
-      expect(decision.setLineNavigating).toBe(true);
+      // Cursor is ahead of the last character (col 15, into the text to the left)
+      const decisionInside = PromptNavigationEngine.evaluateNavigation({
+        direction: 'up',
+        cursorX: 15,
+        cursorY: 1,
+        cols,
+        lines,
+      });
+      expect(decisionInside.handled).toBe(true);
+      expect(decisionInside.action).toBe('move-up-line');
+      expect(decisionInside.payload).toBe('\x1b[D'.repeat(cols));
     });
 
-    it('passes to history if cursor is ahead of last character but right arrow was NOT pressed', () => {
+    // Rule: "or used the right arrow to move behind the first character, then user should be able to use the up and down arrows to move between lines in the long prompt or command."
+    it('moves between lines when user has moved behind the first character (into the text to the right)', () => {
       const cols = 50;
       const lines: BufferLineInfo[] = [
-        { text: 'user@host:~$ > Create test workspace', isWrapped: false }, // row 0
+        { text: 'user@host:~$ > Create test workspace', isWrapped: false }, // row 0 ('>' at col 14)
         { text: 'with three files inside.', isWrapped: true },              // row 1
       ];
 
-      // Cursor is at col 24, but user did NOT use right arrow (e.g. loaded from history)
-      const decision = PromptNavigationEngine.evaluateNavigation({
-        direction: 'up',
-        cursorX: 24,
-        cursorY: 1,
+      // Cursor is behind the first character (col 16, on 'C')
+      const decisionDown = PromptNavigationEngine.evaluateNavigation({
+        direction: 'down',
+        cursorX: 16,
+        cursorY: 0,
         cols,
         lines,
-        hasPressedRightArrow: false,
       });
+      expect(decisionDown.handled).toBe(true);
+      expect(decisionDown.action).toBe('move-down-line');
+      expect(decisionDown.payload).toBe('\x1b[C'.repeat(cols));
 
-      expect(decision.handled).toBe(false);
-      expect(decision.action).toBe('pass-to-history');
+      // Up arrow from row 0 behind first character moves to start of text (onto first character)
+      const decisionUp = PromptNavigationEngine.evaluateNavigation({
+        direction: 'up',
+        cursorX: 16,
+        cursorY: 0,
+        cols,
+        lines,
+      });
+      expect(decisionUp.handled).toBe(true);
+      expect(decisionUp.action).toBe('move-to-start');
+      expect(decisionUp.payload).toBe('\x01');
     });
 
-    // Line navigation mode transitions
-    it('continues moving up and down lines while isLineNavigating is active', () => {
+    it('moves up and down lines on middle lines of a 3-line prompt', () => {
       const cols = 50;
       const lines: BufferLineInfo[] = [
         { text: 'user@host:~$ > First line of prompt', isWrapped: false }, // row 0
@@ -207,77 +219,49 @@ describe('PromptNavigationEngine (Issue 9 Behavioral Rules)', () => {
         { text: 'Third line of prompt.', isWrapped: true },                // row 2
       ];
 
-      // On row 1 moving up while line navigation is active
-      const moveUpDecision = PromptNavigationEngine.evaluateNavigation({
+      // On row 1 (middle line) moving up
+      const moveUp = PromptNavigationEngine.evaluateNavigation({
         direction: 'up',
         cursorX: 10,
-        cursorY: 1, // row 1
+        cursorY: 1,
         cols,
         lines,
-        isLineNavigating: true,
       });
-      expect(moveUpDecision.handled).toBe(true);
-      expect(moveUpDecision.action).toBe('move-up-line');
-      expect(moveUpDecision.payload).toBe('\x1b[D'.repeat(cols));
-      expect(moveUpDecision.setLineNavigating).toBe(true);
+      expect(moveUp.handled).toBe(true);
+      expect(moveUp.action).toBe('move-up-line');
+      expect(moveUp.payload).toBe('\x1b[D'.repeat(cols));
 
-      // On row 1 moving down while line navigation is active
-      const moveDownDecision = PromptNavigationEngine.evaluateNavigation({
+      // On row 1 (middle line) moving down
+      const moveDown = PromptNavigationEngine.evaluateNavigation({
         direction: 'down',
         cursorX: 10,
-        cursorY: 1, // row 1
+        cursorY: 1,
         cols,
         lines,
-        isLineNavigating: true,
       });
-      expect(moveDownDecision.handled).toBe(true);
-      expect(moveDownDecision.action).toBe('move-down-line');
-      expect(moveDownDecision.payload).toBe('\x1b[C'.repeat(cols));
-      expect(moveDownDecision.setLineNavigating).toBe(true);
+      expect(moveDown.handled).toBe(true);
+      expect(moveDown.action).toBe('move-down-line');
+      expect(moveDown.payload).toBe('\x1b[C'.repeat(cols));
     });
 
-    it('switches back to history when Up arrow is pressed at the top line during line navigation', () => {
-      const cols = 50;
-      const lines: BufferLineInfo[] = [
-        { text: 'user@host:~$ > First line of prompt', isWrapped: false }, // row 0 (top line)
-        { text: 'Second line of prompt.', isWrapped: true },               // row 1
-      ];
-
-      // On row 0 (top line) moving up while line navigation is active
-      const decision = PromptNavigationEngine.evaluateNavigation({
-        direction: 'up',
-        cursorX: 20,
-        cursorY: 0, // row 0
-        cols,
-        lines,
-        isLineNavigating: true,
-      });
-
-      expect(decision.handled).toBe(false);
-      expect(decision.action).toBe('pass-to-history');
-      expect(decision.setLineNavigating).toBe(false);
-    });
-
-    it('switches back to history when Down arrow is pressed at the bottom line during line navigation', () => {
+    it('moves to end of text when Down arrow is pressed on bottom row inside text', () => {
       const cols = 50;
       const lines: BufferLineInfo[] = [
         { text: 'user@host:~$ > First line of prompt', isWrapped: false }, // row 0
-        { text: 'Second line of prompt.', isWrapped: true },               // row 1 (bottom line)
+        { text: 'Second line of prompt.', isWrapped: true },               // row 1 (last char '.' at col 21)
       ];
 
-      // On row 1 (bottom line) moving down while line navigation is active
+      // On row 1 at col 10 (inside text) moving down
       const decision = PromptNavigationEngine.evaluateNavigation({
         direction: 'down',
-        cursorX: 20,
-        cursorY: 1, // row 1
+        cursorX: 10,
+        cursorY: 1,
         cols,
         lines,
-        isLineNavigating: true,
       });
-
-      expect(decision.handled).toBe(false);
-      expect(decision.action).toBe('pass-to-history');
-      expect(decision.setLineNavigating).toBe(false);
+      expect(decision.handled).toBe(true);
+      expect(decision.action).toBe('move-to-end');
+      expect(decision.payload).toBe('\x05');
     });
   });
 });
