@@ -1,6 +1,6 @@
 # Sentinel Terminal — Analysis & Fix Roadmap (NEED_FIX.md)
 
-This document provides technical root-cause analyses, architectural impact assessments, and remediation plans for seven issues identified across the AI connection test, workflow planner, notification overlay, desktop integrations, CLI launcher, and starter workflows.
+This document provides technical root-cause analyses, architectural impact assessments, and remediation plans for core issues identified across the AI connection test, workflow planner, notification overlay, desktop integrations, CLI launcher, clipboard management, terminal navigation, and tab aesthetics.
 
 ---
 
@@ -12,6 +12,10 @@ This document provides technical root-cause analyses, architectural impact asses
 5. [Issue 5: VS Code & Cursor IDE Profiles Usability](#issue-5-vs-code--cursor-ide-profiles-usability)
 6. [Issue 6: Sentinel CLI Launcher Installation & Execution](#issue-6-sentinel-cli-launcher-installation--execution)
 7. [Issue 7: Workflows Section Cleanup & Onboarding Selection](#issue-7-workflows-section-cleanup--onboarding-selection)
+8. [Issue 8: Clipboard Paste Failure on Prompt Entry (Ctrl+Shift+V / Ctrl+V)](#issue-8-clipboard-paste-failure-on-prompt-entry-ctrlshiftv--ctrlv)
+9. [Issue 9: Arrow Key In-Buffer Line Navigation vs. History Ingestion in Long Prompts](#issue-9-arrow-key-in-buffer-line-navigation-vs-history-ingestion-in-long-prompts)
+10. [Issue 10: Diminutive Tab Close Button Hit-Target and Sub-Pixel Dot Artifact](#issue-10-diminutive-tab-close-button-hit-target-and-sub-pixel-dot-artifact)
+11. [Issue 11: Prompt Abnormally Magnifying / Canvas Scaling Glitch on Tab Close](#issue-11-prompt-abnormally-magnifying--canvas-scaling-glitch-on-tab-close)
 
 ---
 
@@ -381,17 +385,179 @@ Users should have an onboarding screen option allowing them to select which star
 
 ---
 
+## Issue 8: Clipboard Paste Failure on Prompt Entry (Ctrl+Shift+V / Ctrl+V)
+
+### 8.1 Problem Statement
+When typing an AI prompt starting with `>` (or typing any command) in the terminal and attempting to paste text (such as an instruction, code snippet, or prompt) using `Ctrl+Shift+V` or `Ctrl+V`, nothing is pasted into the terminal buffer. The keystroke is swallowed silently without error feedback or output.
+
+### 8.2 Code Locations
+- [src/presentation/TerminalView.tsx](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/presentation/TerminalView.tsx#L310-L320) (`term.attachCustomKeyEventHandler` paste handler)
+- [src/presentation/TerminalView.tsx](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/presentation/TerminalView.tsx#L372) (`currentSessionId` vs `sessionId` scope)
+- [src/domain/capabilities/ClipboardCapability.ts](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/domain/capabilities/ClipboardCapability.ts) (`@tauri-apps/plugin-clipboard-manager`)
+
+### 8.3 Technical Root Causes
+1. **Stale Closure Bug on `sessionId` in `attachCustomKeyEventHandler`:**
+   - In `TerminalView.tsx`:
+     ```typescript
+     // Paste: Ctrl+Shift+V OR Ctrl+V
+     if (isCmdOrCtrl && (k === 'v' || event.code === 'KeyV')) {
+       if (event.type === 'keydown') {
+         navigator.clipboard.readText().then(text => {
+           if (text && sessionId) {
+             SessionManager.getInstance().write(sessionId, text);
+           }
+         }).catch(() => {});
+       }
+       return false;
+     }
+     ```
+   - `attachCustomKeyEventHandler` is registered inside a mount `useEffect(() => {}, [])`.
+   - It captures `sessionId` from the component scope, which starts as `initialSessionId` (`undefined`).
+   - When `initSession()` runs asynchronously and creates the actual PTY session (`setSessionId(currentSessionId)`), `sessionId` inside the event handler closure remains permanently `undefined`.
+   - Consequently, `if (text && sessionId)` constantly evaluates to `false`, and `SessionManager.write` is never called.
+2. **Event Cancellation Swallowing Fallback Paste:**
+   - The handler unconditionally returns `false`.
+   - Returning `false` from `attachCustomKeyEventHandler` instructs xterm.js to halt event propagation and suppress all default terminal paste mechanisms.
+   - Because Sentinel's custom handler fails silently due to the stale `sessionId`, and default paste is suppressed, the keystroke is completely swallowed.
+3. **Web API Clipboard Permissions in Linux WebViews:**
+   - `navigator.clipboard.readText()` is a browser Web API that requires transient user activation and document focus in WebKitGTK / Chromium webviews. Under Linux (X11 / Wayland), it frequently throws `NotAllowedError` or returns empty strings when invoked from a keyboard event hook without an active selection.
+   - Sentinel already has `@tauri-apps/plugin-clipboard-manager` installed, which communicates directly with native desktop clipboards via Rust (`wl-clipboard` / `x11-clipboard`), but does not use it inside the terminal view keyboard handler.
+
+### 8.4 Proposed Remediation
+1. **Use Mutable Session Ref in Key Event Handler:**
+   - Store `currentSessionId` in a mutable React ref (`sessionIdRef.current = currentSessionId`), or reference `currentSessionId` directly inside the session lifecycle, so paste events always resolve the active PTY session.
+2. **Native Clipboard Integration with Fallback:**
+   - Use `@tauri-apps/plugin-clipboard-manager` `readText()` to reliably read the OS clipboard on Linux (Wayland / X11), with fallback to `navigator.clipboard.readText()`.
+3. **Safe Event Propagation:**
+   - Once clipboard text is retrieved, write directly to the PTY via `SessionManager.getInstance().write(activeSessionId, text)`. If clipboard access fails or is empty, allow fallback handling rather than silently dropping input.
+
+---
+
+## Issue 9: Arrow Key In-Buffer Line Navigation vs. History Ingestion in Long Prompts
+
+### 9.1 Problem Statement
+When a user enters a multi-step or long prompt (e.g. `> Create a temporary testing workspace...`) that wraps across multiple terminal rows, moving the cursor backwards into the text using Left/Right arrow keys and subsequently pressing Up Arrow (`↑`) does not move the cursor to the line above in the prompt. Instead, the underlying shell triggers `previous-history`, obliterating the draft prompt and replacing it with the last executed shell command from history (e.g., `git status` or `ls`).
+
+### 9.2 Code Locations
+- [src/presentation/TerminalView.tsx](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/presentation/TerminalView.tsx#L481-L509) (`term.onData` key routing)
+- [src/presentation/TerminalView.tsx](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/presentation/TerminalView.tsx#L280-L330) (`attachCustomKeyEventHandler`)
+- [src/domain/terminal/PtyStateTracker.ts](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/domain/terminal/PtyStateTracker.ts)
+
+### 9.3 Technical Root Causes
+1. **Direct Unchecked Forwarding of Escape Sequences:**
+   - In `term.onData`:
+     `sessionManager.write(currentSessionId, data);`
+   - When the user presses Up Arrow, `\x1b[A` is passed directly and unmodified to the shell PTY process.
+2. **GNU Readline Buffer Model in Bash:**
+   - Readline's default keybinding for `\e[A` is `previous-history`.
+   - Readline does not treat terminal-wrapped lines as multi-line editing buffers. Even if the cursor is navigated 50 characters to the left (placing it visually on the preceding row of the prompt), pressing Up Arrow commands Readline to discard the line and load the previous history entry.
+3. **Lack of In-Prompt State Tracking in TerminalView:**
+   - Sentinel intercepts Enter (line 512) and Tab / Right Arrow (line 482 for ghost text completion), but lacks any intercept for Up/Down arrow keys when editing natural language prompts starting with `>`.
+
+### 9.4 Proposed Remediation
+1. **Detect Multi-Row Prompts and Contextual Cursor Movement:**
+   - In `attachCustomKeyEventHandler` or `term.onData`, inspect `term.buffer.active` when Up Arrow is pressed:
+     - Check if the active buffer line starts with `>` or spans multiple visual rows (`buffer.cursorY > startY`).
+     - If the cursor is positioned on row 2 or higher of a multi-row prompt, or if the cursor has navigated horizontally within the prompt text, intercept the key event and emit horizontal cursor movements (e.g., `term.cols` Left-Arrow sequences `\x1b[D` to move up one visual line) instead of sending `\x1b[A`.
+2. **Shell Readline / Zsh Configuration:**
+   - In the managed environment profiles or generated `.inputrc`, bind `\e[A` to `up-line-or-history` and `\e[B` to `down-line-or-history` so shells that support multi-line navigation move lines before switching history entries.
+
+---
+
+## Issue 10: Diminutive Tab Close Button Hit-Target and Sub-Pixel Dot Artifact
+
+### 10.1 Problem Statement
+The close button on terminal tabs is barely visible, appearing as a tiny, faint dot or blurry smudge instead of a distinct 'X' vector icon. Users struggle to click it because the hit-target is undersized and visually imperceptible.
+
+### 10.2 Code Locations
+- [src/App.tsx](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/App.tsx#L819-L822) (`<X size={10} />` in `.pill-close-btn`)
+- [src/App.css](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/App.css#L85-L120) (`.tab-pill` styles)
+- [src/App.css](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/App.css#L130-L153) (`.pill-close-btn` styles)
+
+### 10.3 Technical Root Causes
+1. **Microscopic Vector Dimensions:**
+   - In `App.tsx:820`:
+     `<button className="pill-close-btn" onClick={(e) => closeTab(tab.id, e)} title="Close Tab"><X size={10} /></button>`
+   - `size={10}` renders a 10px by 10px SVG box with a 2px stroke. The diagonal vector arms of the 'X' glyph span less than 5 pixels across.
+2. **Compounded CSS Opacity Attenuation:**
+   - In `App.css`:
+     - `.tab-pill` (inactive): `opacity: 0.55;`
+     - `.pill-close-btn`: `opacity: 0.45;`
+   - The compounded effective opacity is `0.55 × 0.45 ≈ 0.247` (under 25% opacity against a dark background `#101218`).
+3. **Sub-Pixel Antialiasing Degradation:**
+   - On standard 96-120 DPI Linux monitors, a 10px SVG path rendered at 24% opacity is antialiased down to a 2x2 pixel faint gray blob or single indistinct dot.
+4. **Constrained Hit-Box:**
+   - The `16px × 16px` button container provides an inadequate click target, leading to frequent mis-clicks that activate or switch tabs rather than closing them.
+
+### 10.4 Proposed Remediation
+1. **Increase Vector Icon Dimensions & Stroke:**
+   - Increase icon size from `size={10}` to `size={13}` with `strokeWidth={2}`.
+2. **Expand Container Hit-Box:**
+   - Set `.pill-close-btn` width and height to `20px × 20px`, with `display: flex; align-items: center; justify-content: center; border-radius: 4px`.
+3. **Normalize Opacity & Hover States:**
+   - Set base `.pill-close-btn` opacity to `0.65` on active tabs, and reveal at `0.85` on `.tab-pill:hover`.
+   - On `.pill-close-btn:hover`, set `opacity: 1`, background `rgba(255, 255, 255, 0.12)`, and text `#ffffff`, adhering strictly to the grayscale palette without saturated red accents.
+
+---
+
+## Issue 11: Prompt Abnormally Magnifying / Canvas Scaling Glitch on Tab Close
+
+### 11.1 Problem Statement
+When closing a terminal tab (or closing a split pane), the shell prompt (`username@hostname:~$`) displayed in front of all commands on screen momentarily balloons or magnifies abnormally before snapping back to normal size, creating a jarring visual UI glitch.
+
+### 11.2 Code Locations
+- [src/presentation/TerminalView.tsx](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/presentation/TerminalView.tsx#L940-L950) (`setTimeout(..., 50)` on `fitAddon.fit()`)
+- [src/presentation/TerminalView.tsx](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/presentation/TerminalView.tsx#L953) (`display: isActive ? 'block' : 'none'`)
+- [src/App.tsx](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/App.tsx#L1105-L1113) (`terminal-container` tab mounting)
+- [src/App.css](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/App.css#L104), [src/App.css](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/App.css#L269) (Transitions)
+
+### 11.3 Technical Root Causes
+1. **HTML5 Canvas Bitmap Stretch During Container Relayout:**
+   - In xterm.js (under WebGL or Canvas rendering), characters and glyphs are rendered into an HTML5 `<canvas>` element possessing an internal raster resolution (`canvas.width`, `canvas.height`).
+   - When an active tab is closed, the newly selected tab switches from `display: none` (`width: 0, height: 0`) to `display: flex` / `block`.
+   - The browser's layout engine instantly expands the canvas display style (`width: 100%; height: 100%`) to fill the full viewport.
+   - Because the internal raster buffer retains its previous dimensions, the browser GPU compositor stretches the bitmap to fit the enlarged container, magnifying all rendered text (most noticeably the high-contrast `username@hostname:~$` prompt) by 200%-300%.
+2. **Asynchronous 50ms Fit Delay:**
+   - In `TerminalView.tsx:942`:
+     ```typescript
+     if (isActive && fitAddonRef.current && xtermRef.current) {
+       setTimeout(() => {
+         fitAddonRef.current?.fit();
+         ...
+       }, 50);
+     }
+     ```
+   - For 50 milliseconds (3 to 6 display frames at 60Hz/120Hz), the stretched, pixelated canvas remains visible on screen before `fitAddon.fit()` recalculates cell dimensions and redraws the canvas at native resolution.
+3. **DOM Renderer Fallback on Component Disposal:**
+   - When `term.dispose()` runs on the closing tab, `WebglAddon.dispose()` destroys the WebGL context, temporarily falling back to unstyled DOM rows (`<span>` tags) before unmounting from the DOM.
+4. **Split Pane Expansion:**
+   - When a split pane is closed, the remaining pane's container width immediately doubles from 50% to 100%, causing the existing canvas bitmap to stretch horizontally by 200% until `ResizeObserver` triggers a refit.
+
+### 11.4 Proposed Remediation
+1. **Immediate Synchronous Refit on Activation:**
+   - Replace the 50ms `setTimeout` with synchronous `fitAddon.fit()` or `requestAnimationFrame` upon `isActive` becoming `true`.
+2. **Transient Opacity Masking During Resize / Relayout:**
+   - Keep the terminal container hidden (`opacity: 0` or `visibility: hidden`) for one animation frame when switching tabs or closing panes, revealing it only after `fitAddon.fit()` has completed rasterizing the canvas at target dimensions.
+3. **Preserve Viewport Geometry with `visibility: hidden`:**
+   - Replace `display: none` with `visibility: hidden; position: absolute; pointer-events: none` for inactive tabs so background terminals maintain valid layout dimensions and cell geometry, preventing canvas buffer collapse when toggled active.
+
+---
+
 ## Summary Matrix of Required Changes
 
 | Item | Primary Components | Type | Complexity | Status |
 |---|---|---|---|---|
 | **1. Cloud API Connection Test** | `CloudApiProvider.ts`, `AiSettingsPage.tsx` | Bug Fix & Resilience | Low-Medium | **Resolved** (`5daff74`) |
 | **2. Multi-Step Workflow Failure** | `AdaptivePlanEngine.ts`, `ShellSDKCapability.ts`, `IntentModel.ts` | Bug Fix & Architecture | Medium-High | Needs Fix |
-| **3. Persistent HUD Overlay** | `TerminalView.tsx`, `AiSettingsPage.tsx` | UI Bug Fix & Settings | Low-Medium | Needs Fix |
+| **3. Persistent HUD Overlay** | `TerminalView.tsx`, `AiSettingsPage.tsx` | UI Bug Fix & Settings | Low-Medium | **Resolved** (`8613aca`) |
 | **4. Linux File Manager Actions** | `InstallerService.ts`, `App.tsx`, `TerminalView.tsx` | Feature & Bug Fix | Medium | Needs Fix |
 | **5. IDE Profiles Integration** | `InstallerService.ts`, `InstallerWizard.tsx` | Refactor & Reliability | Medium | Needs Fix |
 | **6. Sentinel CLI Launcher** | `InstallerService.ts`, `packaging/` | Bug Fix & Safety | Medium | Needs Fix |
 | **7. Workflows Onboarding Selection** | `InstallerWizard.tsx`, `DiskWorkflowStorage.ts`, `StarterWorkflows.ts` | New Feature | Medium | Needs Fix |
+| **8. Clipboard Paste on Prompt Entry** | `TerminalView.tsx`, `ClipboardCapability.ts` | Bug Fix | Low-Medium | Needs Fix |
+| **9. Arrow Key In-Buffer Navigation** | `TerminalView.tsx`, `PtyStateTracker.ts` | Architecture & UX | Medium | Needs Fix |
+| **10. Tab Close Button Visibility** | `App.tsx`, `App.css` | UI Polish | Low | Needs Fix |
+| **11. Tab Close Canvas Scaling Glitch** | `TerminalView.tsx`, `App.tsx` | UI Bug Fix | Low-Medium | Needs Fix |
 
 ---
 *Document generated for pair-programming reference following repository guidelines (Zero Emojis, Grayscale Standards, Full Screens).*
