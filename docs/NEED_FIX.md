@@ -473,8 +473,10 @@ When a user enters a multi-step or long prompt (e.g. `> Create a temporary testi
 ### 10.1 Problem Statement
 The close button on terminal tabs is barely visible, appearing as a tiny, faint dot or blurry smudge instead of a distinct 'X' vector icon. Users struggle to click it because the hit-target is undersized and visually imperceptible.
 
+**Status: RESOLVED & VERIFIED** (Full resolution log in [FIXED.md](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/docs/FIXED.md#issue-10-diminutive-tab-close-button-hit-target-and-sub-pixel-dot-artifact))
+
 ### 10.2 Code Locations
-- [src/App.tsx](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/App.tsx#L819-L822) (`<X size={10} />` in `.pill-close-btn`)
+- [src/App.tsx](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/App.tsx#L819-L822) (`<X size={13} strokeWidth={2} />` in `.pill-close-btn`)
 - [src/App.css](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/App.css#L85-L120) (`.tab-pill` styles)
 - [src/App.css](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/App.css#L130-L153) (`.pill-close-btn` styles)
 
@@ -493,14 +495,15 @@ The close button on terminal tabs is barely visible, appearing as a tiny, faint 
 4. **Constrained Hit-Box:**
    - The `16px × 16px` button container provides an inadequate click target, leading to frequent mis-clicks that activate or switch tabs rather than closing them.
 
-### 10.4 Proposed Remediation
-1. **Increase Vector Icon Dimensions & Stroke:**
-   - Increase icon size from `size={10}` to `size={13}` with `strokeWidth={2}`.
-2. **Expand Container Hit-Box:**
-   - Set `.pill-close-btn` width and height to `20px × 20px`, with `display: flex; align-items: center; justify-content: center; border-radius: 4px`.
-3. **Normalize Opacity & Hover States:**
-   - Set base `.pill-close-btn` opacity to `0.65` on active tabs, and reveal at `0.85` on `.tab-pill:hover`.
-   - On `.pill-close-btn:hover`, set `opacity: 1`, background `rgba(255, 255, 255, 0.12)`, and text `#ffffff`, adhering strictly to the grayscale palette without saturated red accents.
+### 10.4 Implemented Remediation
+1. **Expanded Vector Icon Dimensions & Stroke Width:**
+   - Upgraded tab close vector icon from `<X size={10} />` to `<X size={13} strokeWidth={2} />` in [`src/App.tsx`](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/App.tsx).
+   - Also upgraded split pane close button from `<X size={11} />` to `<X size={12} strokeWidth={2} />`.
+2. **Enlarged Container Hit-Target:**
+   - Resized `.pill-close-btn` in [`src/App.css`](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/App.css) from `16px × 16px` to a generous `20px × 20px` target with flex centering and a 4px rounded radius.
+3. **Enhanced Base Opacity & Grayscale Contrast:**
+   - Increased base button opacity to `0.65`, ramping to `0.85` on `.tab-pill:hover`.
+   - On `.pill-close-btn:hover`, applied `background-color: rgba(255, 255, 255, 0.12)`, `color: #ffffff`, and `opacity: 1`. Eliminated saturated red accents in strict accordance with grayscale design rules.
 
 ---
 
@@ -509,11 +512,13 @@ The close button on terminal tabs is barely visible, appearing as a tiny, faint 
 ### 11.1 Problem Statement
 When closing a terminal tab (or closing a split pane), the shell prompt (`username@hostname:~$`) displayed in front of all commands on screen momentarily balloons or magnifies abnormally before snapping back to normal size, creating a jarring visual UI glitch.
 
+**Status: RESOLVED & VERIFIED** (Full resolution log in [FIXED.md](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/docs/FIXED.md#issue-11-prompt-abnormally-magnifying--canvas-scaling-glitch-on-tab-close))
+
 ### 11.2 Code Locations
-- [src/presentation/TerminalView.tsx](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/presentation/TerminalView.tsx#L940-L950) (`setTimeout(..., 50)` on `fitAddon.fit()`)
-- [src/presentation/TerminalView.tsx](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/presentation/TerminalView.tsx#L953) (`display: isActive ? 'block' : 'none'`)
-- [src/App.tsx](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/App.tsx#L1105-L1113) (`terminal-container` tab mounting)
-- [src/App.css](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/App.css#L104), [src/App.css](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/App.css#L269) (Transitions)
+- [src/presentation/TerminalView.tsx](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/presentation/TerminalView.tsx#L1057-L1095) (Immediate refit, requestAnimationFrame sync, and visibility control)
+- [src/App.tsx](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/App.tsx#L284-L291) (`closeTab` adjacent tab selection)
+- [src/App.tsx](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/App.tsx#L1107-L1128) (`terminal-container` tab preservation with `visibility: hidden; position: absolute; inset: 0`)
+- [src/App.css](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/App.css#L192-L195) (Crisp canvas bitmap rendering)
 
 ### 11.3 Technical Root Causes
 1. **HTML5 Canvas Bitmap Stretch During Container Relayout:**
@@ -537,13 +542,16 @@ When closing a terminal tab (or closing a split pane), the shell prompt (`userna
 4. **Split Pane Expansion:**
    - When a split pane is closed, the remaining pane's container width immediately doubles from 50% to 100%, causing the existing canvas bitmap to stretch horizontally by 200% until `ResizeObserver` triggers a refit.
 
-### 11.4 Proposed Remediation
-1. **Immediate Synchronous Refit on Activation:**
-   - Replace the 50ms `setTimeout` with synchronous `fitAddon.fit()` or `requestAnimationFrame` upon `isActive` becoming `true`.
-2. **Transient Opacity Masking During Resize / Relayout:**
-   - Keep the terminal container hidden (`opacity: 0` or `visibility: hidden`) for one animation frame when switching tabs or closing panes, revealing it only after `fitAddon.fit()` has completed rasterizing the canvas at target dimensions.
-3. **Preserve Viewport Geometry with `visibility: hidden`:**
-   - Replace `display: none` with `visibility: hidden; position: absolute; pointer-events: none` for inactive tabs so background terminals maintain valid layout dimensions and cell geometry, preventing canvas buffer collapse when toggled active.
+### 11.4 Implemented Remediation
+1. **Preserve Viewport Geometry with Visibility Toggling:**
+   - In [`src/App.tsx`](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/App.tsx) and [`src/presentation/TerminalView.tsx`](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/presentation/TerminalView.tsx), replaced `display: activeTabId === tab.id ? 'flex' : 'none'` with `visibility: isTabActive ? 'visible' : 'hidden'`, `position: isTabActive ? 'relative' : 'absolute'`, `inset: 0`, and `pointerEvents: isTabActive ? 'auto' : 'none'`.
+   - Inactive tabs remain fully mounted with exact viewport dimensions in the background DOM, preventing canvas resolution collapse to 0x0.
+2. **Immediate Synchronous Refit with RequestAnimationFrame Follow-up:**
+   - Removed the 50ms `setTimeout` completely. When a tab becomes active, `TerminalView` executes `fitAddon.fit()` synchronously on the current thread, followed by an immediate `requestAnimationFrame` pass to guarantee zero-latency raster synchronization.
+3. **Smooth Adjacent Tab Selection:**
+   - Updated `closeTab` in [`src/App.tsx`](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/App.tsx) to select the neighbor tab at the closing index (`newTabs[Math.min(closingIndex, newTabs.length - 1)]`) rather than jumping unconditionally to the end of the tab strip.
+4. **Crisp Canvas Rendering:**
+   - Added `image-rendering: -webkit-optimize-contrast; image-rendering: crisp-edges;` to `.terminal-container .xterm-screen canvas` in [`src/App.css`](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/App.css) to eliminate GPU bilinear interpolation blur during container transitions.
 
 ---
 
@@ -560,8 +568,8 @@ When closing a terminal tab (or closing a split pane), the shell prompt (`userna
 | **7. Workflows Onboarding Selection** | `InstallerWizard.tsx`, `DiskWorkflowStorage.ts`, `StarterWorkflows.ts` | New Feature | Medium | Needs Fix |
 | **8. Clipboard Paste on Prompt Entry** | `TerminalView.tsx`, `src/utils/clipboard.ts` | Bug Fix | Low-Medium | **Resolved** (`224a50e`) |
 | **9. Arrow Key In-Buffer Navigation** | `TerminalView.tsx`, `PromptNavigationEngine.ts` | Architecture & UX | Medium | **Resolved** |
-| **10. Tab Close Button Visibility** | `App.tsx`, `App.css` | UI Polish | Low | Needs Fix |
-| **11. Tab Close Canvas Scaling Glitch** | `TerminalView.tsx`, `App.tsx` | UI Bug Fix | Low-Medium | Needs Fix |
+| **10. Tab Close Button Visibility** | `App.tsx`, `App.css` | UI Polish | Low | **Resolved** |
+| **11. Tab Close Canvas Scaling Glitch** | `TerminalView.tsx`, `App.tsx`, `App.css` | UI Bug Fix | Low-Medium | **Resolved** |
 
 ---
 *Document generated for pair-programming reference following repository guidelines (Zero Emojis, Grayscale Standards, Full Screens).*

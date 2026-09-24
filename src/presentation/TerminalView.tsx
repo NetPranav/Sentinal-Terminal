@@ -1055,21 +1055,43 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
   }, []); // Run once on mount
 
   useEffect(() => {
-    // When this tab becomes active, we should focus the terminal and refit
+    // When this tab becomes active, synchronously refit immediately without delay
     if (isActive && fitAddonRef.current && xtermRef.current) {
-      setTimeout(() => {
-        fitAddonRef.current?.fit();
-        xtermRef.current?.focus();
+      try {
+        fitAddonRef.current.fit();
+        xtermRef.current.focus();
         const activeId = sessionIdRef.current || sessionId;
-        if (activeId) {
-          SessionManager.getInstance().resize(activeId, xtermRef.current!.rows, xtermRef.current!.cols);
+        if (activeId && xtermRef.current.rows > 0 && xtermRef.current.cols > 0) {
+          SessionManager.getInstance().resize(activeId, xtermRef.current.rows, xtermRef.current.cols);
         }
-      }, 50);
+      } catch {}
+
+      const animId = requestAnimationFrame(() => {
+        try {
+          fitAddonRef.current?.fit();
+          xtermRef.current?.focus();
+          const activeId = sessionIdRef.current || sessionId;
+          if (activeId && xtermRef.current && xtermRef.current.rows > 0 && xtermRef.current.cols > 0) {
+            SessionManager.getInstance().resize(activeId, xtermRef.current.rows, xtermRef.current.cols);
+          }
+        } catch {}
+      });
+
+      return () => cancelAnimationFrame(animId);
     }
   }, [isActive, sessionId]);
 
   return (
-    <div style={{ position: 'relative', width: '100%', height: '100%', overflow: 'hidden', display: isActive ? 'block' : 'none' }}>
+    <div 
+      style={{ 
+        position: 'relative', 
+        width: '100%', 
+        height: '100%', 
+        overflow: 'hidden', 
+        visibility: isActive ? 'visible' : 'hidden',
+        pointerEvents: isActive ? 'auto' : 'none',
+      }}
+    >
       <div 
         ref={terminalRef} 
         className="allow-context-menu"

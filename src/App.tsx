@@ -284,7 +284,9 @@ function App() {
       setActivePaneId(newPane.data.id);
     } else {
       if (activeTabId === id) {
-        setActiveTabId(newTabs[newTabs.length - 1].id);
+        const closingIndex = tabs.findIndex(t => t.id === id);
+        const nextActiveTab = newTabs[Math.min(closingIndex, newTabs.length - 1)];
+        setActiveTabId(nextActiveTab.id);
       }
       setTabs(newTabs);
     }
@@ -693,7 +695,7 @@ function App() {
                   borderRadius: '3px'
                 }}
               >
-                <X size={11} />
+                <X size={12} strokeWidth={2} />
               </button>
             </div>
           )}
@@ -817,7 +819,7 @@ function App() {
                 )}
                 {tabs.length > 1 && (
                   <button className="pill-close-btn" onClick={(e) => closeTab(tab.id, e)} title="Close Tab">
-                    <X size={10} />
+                    <X size={13} strokeWidth={2} />
                   </button>
                 )}
               </div>
@@ -1102,15 +1104,28 @@ function App() {
         </div>
       )}
 
-      <div className="terminal-container">
-        {tabs.map(tab => (
-          <div 
-            key={tab.id} 
-            style={{ display: activeTabId === tab.id ? 'flex' : 'none', width: '100%', height: '100%', flex: 1 }}
-          >
-            {renderPane(tab.rootPane, activeTabId === tab.id, true)}
-          </div>
-        ))}
+      <div className="terminal-container" style={{ position: 'relative', width: '100%', height: '100%', flex: 1, overflow: 'hidden' }}>
+        {tabs.map(tab => {
+          const isTabActive = activeTabId === tab.id;
+          return (
+            <div 
+              key={tab.id} 
+              style={{ 
+                position: isTabActive ? 'relative' : 'absolute',
+                inset: 0,
+                width: '100%',
+                height: '100%',
+                visibility: isTabActive ? 'visible' : 'hidden',
+                pointerEvents: isTabActive ? 'auto' : 'none',
+                zIndex: isTabActive ? 1 : 0,
+                display: 'flex',
+                flexDirection: 'column'
+              }}
+            >
+              {renderPane(tab.rootPane, isTabActive, true)}
+            </div>
+          );
+        })}
       </div>
 
       {resizingSplit && (

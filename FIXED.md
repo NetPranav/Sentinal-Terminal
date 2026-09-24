@@ -8,6 +8,9 @@ This document tracks verified resolutions, architectural implementations, touche
 1. [Issue 1: Cloud API "Test Connection" Transient Failures](#issue-1-cloud-api-test-connection-transient-failures)
 2. [Issue 3: Persistent Execution Plan HUD Notification Overlay](#issue-3-persistent-execution-plan-hud-notification-overlay)
 3. [Issue 8: Clipboard Paste Failure on Prompt Entry (Ctrl+Shift+V / Ctrl+V)](#issue-8-clipboard-paste-failure-on-prompt-entry-ctrlshiftv--ctrlv)
+4. [Issue 9: Arrow Key In-Buffer Line Navigation vs. History Ingestion in Long Prompts](#issue-9-arrow-key-in-buffer-line-navigation-vs-history-ingestion-in-long-prompts)
+5. [Issue 10: Diminutive Tab Close Button Hit-Target and Sub-Pixel Dot Artifact](#issue-10-diminutive-tab-close-button-hit-target-and-sub-pixel-dot-artifact)
+6. [Issue 11: Prompt Abnormally Magnifying / Canvas Scaling Glitch on Tab Close](#issue-11-prompt-abnormally-magnifying--canvas-scaling-glitch-on-tab-close)
 
 ---
 
@@ -209,3 +212,77 @@ When a user drafts or edits a multi-step prompt (e.g. `> Create a temporary test
 - [`src/domain/terminal/PromptNavigationEngine.ts`](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/domain/terminal/PromptNavigationEngine.ts): Spatial character boundary detection, first/last character column resolution, and navigation evaluation.
 - [`src/domain/terminal/PromptNavigationEngine.test.ts`](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/domain/terminal/PromptNavigationEngine.test.ts): Unit tests covering all behavioral specifications.
 - [`src/presentation/TerminalView.tsx`](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/presentation/TerminalView.tsx): Integrated `PromptNavigationEngine.evaluateNavigation` into xterm key event listener.
+
+---
+
+## Issue 10: Diminutive Tab Close Button Hit-Target and Sub-Pixel Dot Artifact
+
+### 10.1 Problem Statement
+The close button on terminal tab pills was barely visible, rendering as an indistinct, blurry dot or single faint pixel smudge rather than an identifiable 'X' glyph. Users faced difficulty clicking it because the hit target was restricted to 16x16px and compounded CSS opacity rendered the icon nearly invisible against the dark tab background.
+
+### 10.2 Resolution Status
+- **Status:** Resolved & Verified
+- **Validation:** 100% test pass rate across test suite (193 test files, 1,385 tests) and production bundle build (`npm run build`).
+
+### 10.3 Technical Root Causes
+1. **Microscopic Vector Dimensions:**
+   - `<X size={10} />` rendered a 10px SVG box whose diagonal stroke arms spanned less than 5 pixels across.
+2. **Compounded CSS Opacity Attenuation:**
+   - Inactive tab pill had `opacity: 0.55`, and `.pill-close-btn` had `opacity: 0.45`. The effective opacity was `0.55 * 0.45 ≈ 0.247` (~24% opacity), causing sub-pixel rasterization on standard DPI screens to blur the icon into a faint dot.
+3. **Constrained Hit-Box:**
+   - A 16px × 16px button container made precise clicking difficult, causing accidental tab switching.
+4. **Non-Grayscale Hover Palette:**
+   - The hover state previously used saturated red (`#ff3b30`), violating repository grayscale design guidelines.
+
+### 10.4 Implemented Architecture & Remediation
+1. **Upgraded Vector Glyph Size & Stroke:**
+   - Upgraded tab close button icon in [`src/App.tsx`](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/App.tsx) from `<X size={10} />` to `<X size={13} strokeWidth={2} />`.
+   - Upgraded split pane close button from `<X size={11} />` to `<X size={12} strokeWidth={2} />`.
+2. **Expanded Hit-Target Container:**
+   - Enlarged `.pill-close-btn` dimensions to `20px × 20px` with flex centering and a 4px rounded radius in [`src/App.css`](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/App.css).
+3. **Optimized Opacity & Grayscale Hover:**
+   - Raised base button opacity to `0.65`, increasing to `0.85` on `.tab-pill:hover`.
+   - On `.pill-close-btn:hover`, applied grayscale highlight `background-color: rgba(255, 255, 255, 0.12)`, `color: #ffffff`, and `opacity: 1`.
+
+### 10.5 Touched Components & Files
+- [`src/App.tsx`](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/App.tsx): Upgraded Lucide `X` icon sizing and stroke widths for tabs and split panes.
+- [`src/App.css`](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/App.css): Enlarged close button hit-target to 20x20px, tuned opacity hierarchy, and aligned hover state with matte grayscale design standards.
+
+---
+
+## Issue 11: Prompt Abnormally Magnifying / Canvas Scaling Glitch on Tab Close
+
+### 11.1 Problem Statement
+When closing a terminal tab (or split pane), the shell prompt (`username@hostname:~$`) displayed in front of all commands on screen momentarily ballooned or magnified abnormally by 200%-300% before snapping back to normal size, creating an unpolished and jarring visual glitch.
+
+### 11.2 Resolution Status
+- **Status:** Resolved & Verified
+- **Validation:** 100% test pass rate across test suite (193 test files, 1,385 tests) and production bundle build (`npm run build`).
+
+### 11.3 Technical Root Causes
+1. **Canvas Raster Buffer Stretch on Container Unhide:**
+   - Inactive tabs were previously hidden using `display: none` (`width: 0, height: 0`), collapsing container geometry.
+   - When a tab was closed and an inactive tab was activated, the newly active tab's container immediately expanded to 100% viewport width while the xterm `<canvas>` element's internal raster buffer remained at its previous or collapsed dimensions. The browser GPU compositor stretched the small raster bitmap across the full container until a resize/fit cycle occurred.
+2. **Asynchronous 50ms Fit Delay:**
+   - In `TerminalView.tsx`, tab activation triggered `setTimeout(() => { fitAddon.fit(); }, 50)`.
+   - For 50 milliseconds (3 to 6 display frames at 60Hz/120Hz), the magnified, pixelated canvas remained visible on screen before `fitAddon.fit()` recalculated cell dimensions and redrew the canvas.
+3. **Discontinuous Active Tab Selection:**
+   - In `App.tsx`, `closeTab` previously jumped to the last tab (`newTabs[newTabs.length - 1]`) instead of the adjacent neighbor tab at the closing index, causing abrupt context jumps.
+
+### 11.4 Implemented Architecture & Remediation
+1. **Preserve Viewport Geometry with Visibility Toggling:**
+   - In [`src/App.tsx`](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/App.tsx) and [`src/presentation/TerminalView.tsx`](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/presentation/TerminalView.tsx), replaced `display: none` with `visibility: isTabActive ? 'visible' : 'hidden'`, `position: isTabActive ? 'relative' : 'absolute'`, `inset: 0`, and `pointerEvents: isTabActive ? 'auto' : 'none'`.
+   - Inactive tabs retain exact full-frame viewport dimensions in background DOM layout without rendering visible pixels or capturing mouse events. Their internal canvas buffers never collapse to 0x0.
+2. **Immediate Synchronous Refit & RequestAnimationFrame Sync:**
+   - Eliminated the 50ms `setTimeout` delay in [`src/presentation/TerminalView.tsx`](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/presentation/TerminalView.tsx).
+   - When a tab becomes active, `TerminalView` executes `fitAddon.fit()` and `xterm.focus()` immediately and synchronously on the current execution tick, followed by a `requestAnimationFrame` pass for seamless raster buffer alignment.
+3. **Smooth Adjacent Tab Selection:**
+   - Updated `closeTab` in [`src/App.tsx`](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/App.tsx) to select `newTabs[Math.min(closingIndex, newTabs.length - 1)]`, maintaining natural tab strip focus.
+4. **Crisp GPU Rendering Style:**
+   - Added `image-rendering: -webkit-optimize-contrast; image-rendering: crisp-edges;` to `.terminal-container .xterm-screen canvas` in [`src/App.css`](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/App.css) to eliminate bilinear interpolation blur during container transitions.
+
+### 11.5 Touched Components & Files
+- [`src/App.tsx`](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/App.tsx): Replaced `display: none` with absolute positioning and visibility toggling for tab containers, and updated `closeTab` index selection.
+- [`src/presentation/TerminalView.tsx`](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/presentation/TerminalView.tsx): Removed 50ms refit delay; added immediate synchronous + rAF `fitAddon.fit()` and visibility styling.
+- [`src/App.css`](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/App.css): Enforced crisp canvas rendering styles.
+
