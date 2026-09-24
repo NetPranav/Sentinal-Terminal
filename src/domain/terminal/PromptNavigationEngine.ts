@@ -1,19 +1,16 @@
 /**
  * PromptNavigationEngine.ts — Terminal Line & Cursor Navigation vs History Guard
  * 
- * Part of Issue 9:
- * Prevents GNU Readline from discarding user-drafted multi-line or edited prompts
- * when pressing Up/Down arrow keys.
+ * Issue 9 Specification:
+ * 1. Top and down arrow move through previous commands and prompts.
+ * 2. Left and right arrow navigate within the command.
+ * 3. In order to move through lines in the prompt, user must use the right arrow once
+ *    to move the cursor ahead of the last character:
+ *    - If cursor is ahead of the last character: Up and Down arrow move up and down in lines.
+ *    - If cursor is on or behind the last character: Up and Down arrow navigate through previous commands and prompts.
+ *    - If cursor is ahead or on the first character: Up and Down arrow navigate through previous commands and prompts.
  * 
- * - If editing a multi-row prompt (wrapped across visual terminal lines):
- *   Moves the cursor visually UP / DOWN one line within the prompt buffer
- *   using column-offset navigation sequences.
- * - If the cursor has navigated horizontally inside a draft prompt:
- *   Moves the cursor to the beginning / end of the draft instead of wiping the buffer with history.
- * - If at an empty prompt line:
- *   Passes Up/Down arrows to the shell to allow normal history cycling.
- * - If inside an alternate screen buffer (vim, htop, less):
- *   Never intercepts; passes all arrow keys directly to the active TUI.
+ * By last and first character: the last or first symbol, number or alphabet present in the command or prompt.
  */
 
 export interface BufferLineInfo {
@@ -28,14 +25,16 @@ export interface NavigationEvaluationInput {
   cols: number;
   lines: BufferLineInfo[];
   baseY?: number;
-  hasNavigatedCursorInLine?: boolean;
+  hasPressedRightArrow?: boolean;
+  isLineNavigating?: boolean;
   isAlternateBuffer?: boolean;
 }
 
 export interface NavigationDecision {
   handled: boolean;
-  action: 'move-up-line' | 'move-down-line' | 'move-to-start' | 'move-to-end' | 'pass-to-history';
+  action: 'move-up-line' | 'move-down-line' | 'pass-to-history';
   payload?: string;
+  setLineNavigating?: boolean;
 }
 
 export class PromptNavigationEngine {
@@ -83,11 +82,11 @@ export class PromptNavigationEngine {
   public static evaluateNavigation(input: NavigationEvaluationInput): NavigationDecision {
     // 1. TUI / Full-screen alternate buffer guard (vim, nano, htop, less)
     if (input.isAlternateBuffer) {
-      return { handled: false, action: 'pass-to-history' };
+      return { handled: false, action: 'pass-to-history', setLineNavigating: false };
     }
 
     if (!input.lines || input.lines.length === 0) {
-      return { handled: false, action: 'pass-to-history' };
+      return { handled: false, action: 'pass-to-history', setLineNavigating: false };
     }
 
     const { startRow, endRow, totalRows, currentRowOffset } = this.getPromptRowRange(
@@ -95,91 +94,119 @@ export class PromptNavigationEngine {
       input.cursorY
     );
 
-    // Reconstruct full prompt text across all participating rows
-    let fullText = '';
-    for (let r = startRow; r <= endRow; r++) {
-      if (input.lines[r]) {
-        fullText += input.lines[r].text;
+    // Single-row commands: Up and Down arrow always navigate through previous commands and prompts
+    if (totalRows <= 1) {
+      return { handled: false, action: 'pass-to-history', setLineNavigating: false };
+    }
+
+    // Find first character of the prompt/command on startRow
+    // The command/prompt starts after any standard shell prompt prefix (e.g. "user@host:~$ ")
+    const startLineRaw = input.lines[startRow]?.text || '';
+    const promptMatch = startLineRaw.match(/.*(?:[$%#❯])\s*/);
+    const prefixLen = promptMatch ? promptMatch[0].length : 0;
+    const commandPart = startLineRaw.substring(prefixLen);
+    const firstCharRelIdx = commandPart.search(/\S/);
+    const firstCharCol = firstCharRelIdx !== -1 ? prefixLen + firstCharRelIdx : prefixLen;
+
+    // Find last character of the prompt/command across endRow (walking backwards if empty)
+    let lastCharCol = -1;
+    let targetEndRow = endRow;
+    while (targetEndRow >= startRow && lastCharCol === -1) {
+      const endLineText = input.lines[targetEndRow]?.text || '';
+      for (let c = endLineText.length - 1; c >= 0; c--) {
+        if (/\S/.test(endLineText[c])) {
+          lastCharCol = c;
+          break;
+        }
+      }
+      if (lastCharCol === -1) {
+        targetEndRow--;
       }
     }
 
-    // Strip shell prompt prefix (e.g. "user@host:~$ ", "❯ ", etc.)
-    const promptMatch = fullText.match(/.*(?:[$%#❯])\s*/);
-    const rawInput = promptMatch ? fullText.substring(promptMatch[0].length) : fullText;
-    const trimmedInput = rawInput.trim();
-
-    // 2. Empty input at prompt: Allow normal shell history cycling
-    if (trimmedInput.length === 0) {
-      return { handled: false, action: 'pass-to-history' };
+    // If completely empty prompt, allow normal history cycling
+    if (lastCharCol === -1) {
+      return { handled: false, action: 'pass-to-history', setLineNavigating: false };
     }
 
-    const isAiPrompt = trimmedInput.startsWith('>');
+    // Check if cursor is ahead or on the first character
+    // "Also if the cursor is ahead or on the first character user should be able to move to the previous ran commands and prompts using the up and down arrow."
+    if (input.cursorY === startRow && input.cursorX <= firstCharCol) {
+      return { handled: false, action: 'pass-to-history', setLineNavigating: false };
+    }
+
     const cols = Math.max(1, input.cols);
 
-    // 3. Multi-row prompt navigation (wrapped across 2 or more visual terminal rows)
-    if (totalRows > 1) {
+    // If line navigation mode is currently active:
+    if (input.isLineNavigating) {
       if (input.direction === 'up') {
         if (currentRowOffset > 0) {
-          // Move up one visual row in the text
+          // Move up one visual line
           return {
             handled: true,
             action: 'move-up-line',
             payload: '\x1b[D'.repeat(cols),
+            setLineNavigating: true,
           };
         } else {
-          // Already on top line of multi-row prompt: Move to start of text
+          // Reached the top line of prompt: switch to previous ran commands and prompts
           return {
-            handled: true,
-            action: 'move-to-start',
-            payload: '\x01', // Beginning-of-line (Ctrl+A)
+            handled: false,
+            action: 'pass-to-history',
+            setLineNavigating: false,
           };
         }
       } else {
         // direction === 'down'
         if (currentRowOffset < totalRows - 1) {
-          // Move down one visual row in the text
+          // Move down one visual line
           return {
             handled: true,
             action: 'move-down-line',
             payload: '\x1b[C'.repeat(cols),
+            setLineNavigating: true,
           };
         } else {
-          // Already on bottom line of multi-row prompt: Move to end of text
+          // Reached the bottom line: switch to history
           return {
-            handled: true,
-            action: 'move-to-end',
-            payload: '\x05', // End-of-line (Ctrl+E)
+            handled: false,
+            action: 'pass-to-history',
+            setLineNavigating: false,
           };
         }
       }
     }
 
-    // 4. Single-row line handling (totalRows === 1)
-    const endOfTextCol = input.lines[input.cursorY]?.text.trimEnd().length ?? 0;
-    const isCursorNavigatedInside = input.hasNavigatedCursorInLine || input.cursorX < endOfTextCol;
+    // If line navigation is NOT yet active:
+    // User must have used the right arrow once to move the cursor ahead of the last character
+    const isAheadOfLastChar =
+      input.cursorY === targetEndRow && input.cursorX > lastCharCol;
 
-    if (input.direction === 'up') {
-      if (isAiPrompt || isCursorNavigatedInside) {
-        // User is editing or composing text: Move to start rather than wiping with history
+    if (input.hasPressedRightArrow && isAheadOfLastChar) {
+      if (input.direction === 'up') {
+        // Enter line navigation mode and move up one visual line
         return {
           handled: true,
-          action: 'move-to-start',
-          payload: '\x01',
+          action: 'move-up-line',
+          payload: '\x1b[D'.repeat(cols),
+          setLineNavigating: true,
         };
-      }
-      // User is at end of line without manual horizontal navigation: allow history
-      return { handled: false, action: 'pass-to-history' };
-    } else {
-      // direction === 'down'
-      if (isAiPrompt || isCursorNavigatedInside) {
-        // Move to end of text
+      } else {
+        // Already at bottom line: pass down arrow to history
         return {
-          handled: true,
-          action: 'move-to-end',
-          payload: '\x05',
+          handled: false,
+          action: 'pass-to-history',
+          setLineNavigating: false,
         };
       }
-      return { handled: false, action: 'pass-to-history' };
     }
+
+    // In all other cases (cursor is on or behind the last character, or right arrow wasn't pressed):
+    // "if the cursor is on or behind the last character user should be able to navigate through previous commands and prompts."
+    return {
+      handled: false,
+      action: 'pass-to-history',
+      setLineNavigating: false,
+    };
   }
 }
