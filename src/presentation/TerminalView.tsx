@@ -37,6 +37,7 @@ import {
 } from 'lucide-react';
 import { SearchAddon } from '@xterm/addon-search';
 import { TerminalSearchBar } from './TerminalSearchBar';
+import { readClipboardText, writeClipboardText, formatTerminalPastePayload } from '../utils/clipboard';
 import '@xterm/xterm/css/xterm.css';
 
 interface TerminalViewProps {
@@ -53,6 +54,69 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
   const fitAddonRef = useRef<FitAddon | null>(null);
   const searchAddonRef = useRef<SearchAddon | null>(null);
   const [sessionId, setSessionId] = useState<string | undefined>(initialSessionId);
+  const sessionIdRef = useRef<string | undefined>(initialSessionId);
+
+  useEffect(() => {
+    sessionIdRef.current = sessionId;
+  }, [sessionId]);
+
+  useEffect(() => {
+    if (initialSessionId) {
+      setSessionId(initialSessionId);
+      sessionIdRef.current = initialSessionId;
+    }
+  }, [initialSessionId]);
+
+  const handlePaste = useCallback(async () => {
+    const activeSessionId = sessionIdRef.current || sessionId;
+    if (!activeSessionId) return;
+
+    try {
+      const text = await readClipboardText();
+      if (!text) return;
+
+      const term = xtermRef.current;
+      const isBracketed = Boolean(term?.modes?.bracketedPasteMode);
+
+      let isPromptDraft = false;
+      const buffer = term?.buffer?.active;
+      if (buffer) {
+        const line = buffer.getLine(buffer.baseY + buffer.cursorY);
+        const lineStr = line ? line.translateToString(true).trim() : '';
+        if (lineStr.includes('>')) {
+          isPromptDraft = true;
+        }
+      }
+
+      const payload = formatTerminalPastePayload(text, {
+        isBracketedPaste: isBracketed,
+        isPromptDraft: isPromptDraft
+      });
+
+      await SessionManager.getInstance().write(activeSessionId, payload);
+    } catch (err) {
+      console.warn('[TerminalView] Clipboard paste error:', err);
+    }
+  }, [sessionId]);
+
+  const handlePasteRef = useRef(handlePaste);
+  useEffect(() => {
+    handlePasteRef.current = handlePaste;
+  });
+
+  const handleCopy = useCallback(async (text: string) => {
+    try {
+      await writeClipboardText(text);
+    } catch (err) {
+      console.warn('[TerminalView] Clipboard copy error:', err);
+    }
+  }, []);
+
+  const handleCopyRef = useRef(handleCopy);
+  useEffect(() => {
+    handleCopyRef.current = handleCopy;
+  });
+
   const [isSearchOpen, setIsSearchOpen] = useState(false);
 
   const [securityModalPlan, setSecurityModalPlan] = useState<{
@@ -127,14 +191,15 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
   const handleExecuteRemediation = async (rem: RemediationPrompt) => {
     setActiveRemediation(null);
     PtyOutputObserver.getInstance().clearRemediation();
-    if (sessionId) {
-      await SessionManager.getInstance().write(sessionId, '\x03');
+    const activeSessionId = sessionIdRef.current || sessionId;
+    if (activeSessionId) {
+      await SessionManager.getInstance().write(activeSessionId, '\x03');
     }
     if (xtermRef.current) {
       xtermRef.current.write(`\r\n\x1b[1;32m[Sentinel Auto-Heal] Executing: ${rem.actionTitle}...\x1b[0m\r\n`);
     }
-    if (rem.tool === 'shell.execute' && rem.params?.command && sessionId) {
-      await SessionManager.getInstance().write(sessionId, `${rem.params.command}\r`);
+    if (rem.tool === 'shell.execute' && rem.params?.command && activeSessionId) {
+      await SessionManager.getInstance().write(activeSessionId, `${rem.params.command}\r`);
     } else if (agentLoopRef.current) {
       PromptProgressManager.getInstance().startPrompt(`Auto-Heal: ${rem.actionTitle}`);
       try {
@@ -279,9 +344,39 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
 
     term.attachCustomKeyEventHandler((event: KeyboardEvent) => {
       const isCmdOrCtrl = event.ctrlKey || event.metaKey;
-      if (!isCmdOrCtrl) return true;
-
       const k = event.key?.toLowerCase();
+
+      // Paste: Ctrl+Shift+V, Ctrl+V, Cmd+V, or Shift+Insert
+      const isPasteKey = (isCmdOrCtrl && (k === 'v' || event.code === 'KeyV')) ||
+                         (event.shiftKey && (event.key === 'Insert' || event.code === 'Insert'));
+
+      if (isPasteKey) {
+        if (event.type === 'keydown') {
+          event.preventDefault();
+          event.stopPropagation();
+          handlePasteRef.current();
+        }
+        return false;
+      }
+
+      // Copy: Ctrl+Shift+C, (Ctrl+C when text is highlighted), or Ctrl+Insert
+      const isCopyKey = (isCmdOrCtrl && event.shiftKey && (k === 'c' || event.code === 'KeyC')) ||
+                        (isCmdOrCtrl && !event.shiftKey && (k === 'c' || event.code === 'KeyC') && term.hasSelection()) ||
+                        (isCmdOrCtrl && (event.key === 'Insert' || event.code === 'Insert'));
+
+      if (isCopyKey) {
+        if (event.type === 'keydown') {
+          event.preventDefault();
+          event.stopPropagation();
+          const selection = term.getSelection();
+          if (selection) {
+            handleCopyRef.current(selection);
+          }
+        }
+        return false;
+      }
+
+      if (!isCmdOrCtrl) return true;
 
       // Ctrl+Shift+F: Toggle In-Buffer Search
       if (k === 'f' && event.shiftKey) {
@@ -289,32 +384,6 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
           event.preventDefault();
           event.stopPropagation();
           setIsSearchOpen(prev => !prev);
-        }
-        return false;
-      }
-
-      // Copy: Ctrl+Shift+C OR (Ctrl+C when text is highlighted)
-      if (
-        (isCmdOrCtrl && event.shiftKey && (k === 'c' || event.code === 'KeyC')) ||
-        (isCmdOrCtrl && !event.shiftKey && (k === 'c' || event.code === 'KeyC') && term.hasSelection())
-      ) {
-        if (event.type === 'keydown') {
-          const selection = term.getSelection();
-          if (selection) {
-            navigator.clipboard.writeText(selection);
-          }
-        }
-        return false;
-      }
-
-      // Paste: Ctrl+Shift+V OR Ctrl+V
-      if (isCmdOrCtrl && (k === 'v' || event.code === 'KeyV')) {
-        if (event.type === 'keydown') {
-          navigator.clipboard.readText().then(text => {
-            if (text && sessionId) {
-              SessionManager.getInstance().write(sessionId, text);
-            }
-          }).catch(() => {});
         }
         return false;
       }
@@ -404,9 +473,11 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
             currentPath || undefined, 
             true
           );
+          sessionIdRef.current = currentSessionId;
           setSessionId(currentSessionId);
           onSessionCreated?.(currentSessionId);
         } else {
+          sessionIdRef.current = currentSessionId;
           await sessionManager.resize(currentSessionId, term.rows, term.cols);
         }
 
@@ -942,8 +1013,9 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
       setTimeout(() => {
         fitAddonRef.current?.fit();
         xtermRef.current?.focus();
-        if (sessionId) {
-          SessionManager.getInstance().resize(sessionId, xtermRef.current!.rows, xtermRef.current!.cols);
+        const activeId = sessionIdRef.current || sessionId;
+        if (activeId) {
+          SessionManager.getInstance().resize(activeId, xtermRef.current!.rows, xtermRef.current!.cols);
         }
       }, 50);
     }
@@ -963,15 +1035,11 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
           if (term.hasSelection()) {
             const text = term.getSelection();
             if (text) {
-              navigator.clipboard.writeText(text);
+              handleCopy(text);
               term.clearSelection();
             }
           } else {
-            navigator.clipboard.readText().then(text => {
-              if (text && sessionId) {
-                SessionManager.getInstance().write(sessionId, text);
-              }
-            }).catch(() => {});
+            handlePaste();
           }
         }}
       />

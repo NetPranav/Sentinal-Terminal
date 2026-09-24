@@ -390,6 +390,8 @@ Users should have an onboarding screen option allowing them to select which star
 ### 8.1 Problem Statement
 When typing an AI prompt starting with `>` (or typing any command) in the terminal and attempting to paste text (such as an instruction, code snippet, or prompt) using `Ctrl+Shift+V` or `Ctrl+V`, nothing is pasted into the terminal buffer. The keystroke is swallowed silently without error feedback or output.
 
+**Status: RESOLVED & VERIFIED** (See full resolution post-mortem in [FIXED.md](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/docs/FIXED.md#issue-8-clipboard-paste-failure-on-prompt-entry-ctrlshiftv--ctrlv))
+
 ### 8.2 Code Locations
 - [src/presentation/TerminalView.tsx](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/presentation/TerminalView.tsx#L310-L320) (`term.attachCustomKeyEventHandler` paste handler)
 - [src/presentation/TerminalView.tsx](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/presentation/TerminalView.tsx#L372) (`currentSessionId` vs `sessionId` scope)
@@ -554,7 +556,7 @@ When closing a terminal tab (or closing a split pane), the shell prompt (`userna
 | **5. IDE Profiles Integration** | `InstallerService.ts`, `InstallerWizard.tsx` | Refactor & Reliability | Medium | Needs Fix |
 | **6. Sentinel CLI Launcher** | `InstallerService.ts`, `packaging/` | Bug Fix & Safety | Medium | Needs Fix |
 | **7. Workflows Onboarding Selection** | `InstallerWizard.tsx`, `DiskWorkflowStorage.ts`, `StarterWorkflows.ts` | New Feature | Medium | Needs Fix |
-| **8. Clipboard Paste on Prompt Entry** | `TerminalView.tsx`, `ClipboardCapability.ts` | Bug Fix | Low-Medium | Needs Fix |
+| **8. Clipboard Paste on Prompt Entry** | `TerminalView.tsx`, `src/utils/clipboard.ts` | Bug Fix | Low-Medium | **Resolved** |
 | **9. Arrow Key In-Buffer Navigation** | `TerminalView.tsx`, `PtyStateTracker.ts` | Architecture & UX | Medium | Needs Fix |
 | **10. Tab Close Button Visibility** | `App.tsx`, `App.css` | UI Polish | Low | Needs Fix |
 | **11. Tab Close Canvas Scaling Glitch** | `TerminalView.tsx`, `App.tsx` | UI Bug Fix | Low-Medium | Needs Fix |

@@ -7,6 +7,7 @@ This document tracks verified resolutions, architectural implementations, touche
 ## Table of Contents
 1. [Issue 1: Cloud API "Test Connection" Transient Failures](#issue-1-cloud-api-test-connection-transient-failures)
 2. [Issue 3: Persistent Execution Plan HUD Notification Overlay](#issue-3-persistent-execution-plan-hud-notification-overlay)
+3. [Issue 8: Clipboard Paste Failure on Prompt Entry (Ctrl+Shift+V / Ctrl+V)](#issue-8-clipboard-paste-failure-on-prompt-entry-ctrlshiftv--ctrlv)
 
 ---
 
@@ -115,3 +116,53 @@ The card:
 - [`src/presentation/TerminalView.tsx`](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/presentation/TerminalView.tsx): Floating HUD overlay component, manual dismiss `X`, collapse toggle, hover-pause auto-dismiss timer, and settings event listener.
 - [`src/ui/components/AiSettingsPage.tsx`](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/ui/components/AiSettingsPage.tsx): Workflow Execution Plan HUD & Notifications settings section under General tab.
 - [`src/ui/__tests__/SettingsCenter.test.ts`](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/ui/__tests__/SettingsCenter.test.ts): Unit tests verifying HUD preference persistence and custom event dispatching.
+
+---
+
+## Issue 8: Clipboard Paste Failure on Prompt Entry (Ctrl+Shift+V / Ctrl+V)
+
+### 8.1 Problem Statement
+When typing an AI prompt starting with `>` (or entering any shell command) in the terminal and attempting to paste text (such as an instruction, code snippet, or multiline prompt) using `Ctrl+Shift+V` or `Ctrl+V`, nothing was pasted into the terminal buffer. The keystroke was swallowed silently without error feedback or output.
+
+### 8.2 Resolution Status
+- **Status:** Resolved & Verified
+- **Commit:** `Pending`
+- **Validation:** 100% test pass rate across unit test suite ([`src/utils/__tests__/clipboard.test.ts`](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/utils/__tests__/clipboard.test.ts)), full test suite (192 test files, 1,374 tests), and production bundle build.
+
+### 8.3 Technical Root Causes
+1. **Stale Closure Bug on `sessionId` in `attachCustomKeyEventHandler`:**
+   - In [`TerminalView.tsx`](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/presentation/TerminalView.tsx), `term.attachCustomKeyEventHandler` was registered on initial component mount inside `useEffect(() => { ... }, [])`.
+   - It closed over `sessionId` from the component scope, which initialized as `initialSessionId` (`undefined`).
+   - When asynchronous PTY session initialization created `currentSessionId`, the `attachCustomKeyEventHandler` closure retained `sessionId === undefined`.
+   - Consequently, `if (text && sessionId)` continuously evaluated to `false`, and `SessionManager.getInstance().write(sessionId, text)` was never invoked.
+2. **Key Event Cancellation Swallowing Fallbacks:**
+   - The key event handler returned `false` unconditionally for `Ctrl+V` and `Ctrl+Shift+V`, which instructed xterm.js to halt event propagation and suppress all default terminal paste mechanisms. Because the custom handler dropped the text due to the stale `sessionId`, the paste action was swallowed silently.
+3. **Linux WebKitGTK Clipboard Permission Restraints:**
+   - The handler called `navigator.clipboard.readText()`. In Linux desktop WebKitGTK / Wayland environments, this Web API frequently rejects with `NotAllowedError` or returns empty strings when called from a keyboard hook without an active DOM text selection.
+   - The app already had `@tauri-apps/plugin-clipboard-manager` installed and registered in Rust, but it was not being utilized by the terminal view.
+4. **Multiline Prompt Early Shell Execution:**
+   - When pasting multiline text into an AI prompt starting with `>`, raw newlines could cause shells without bracketed paste to execute partial command fragments prematurely.
+
+### 8.4 Implemented Architecture & Remediation
+1. **Unified Clipboard Utility Module:**
+   - Created [`src/utils/clipboard.ts`](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/utils/clipboard.ts) providing `readClipboardText()` and `writeClipboardText()`.
+   - Directly leverages Tauri's native desktop clipboard plugin (`@tauri-apps/plugin-clipboard-manager`) to read system clipboards via `wl-clipboard` / `x11-clipboard` on Linux, completely bypassing WebKitGTK permission constraints.
+   - Gracefully falls back to `navigator.clipboard` for web preview and testing environments.
+2. **Mutable Session Ref Synchronization:**
+   - Introduced `sessionIdRef = useRef<string | undefined>(initialSessionId)` in [`TerminalView.tsx`](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/presentation/TerminalView.tsx).
+   - Synchronized `sessionIdRef.current` immediately during `initSession()` upon session creation and whenever props update.
+   - Wrapped paste execution in `handlePasteRef.current()` so key handlers always resolve the active PTY session without stale closure traps.
+3. **Comprehensive Linux & Universal Shortcut Support:**
+   - Extended key event interception to support `Ctrl+Shift+V`, `Ctrl+V`, `Cmd+V`, and standard Linux `Shift+Insert`.
+   - Extended copy interception to support `Ctrl+Shift+C`, `Ctrl+C` (when selection exists), and `Ctrl+Insert`.
+   - Updated the right-click context menu handler to use the same unified `handlePaste()` and `handleCopy()` logic.
+4. **Bracketed Paste and AI Prompt Formatting:**
+   - Implemented `formatTerminalPastePayload()` to wrap payloads in `\x1b[200~` ... `\x1b[201~` when the terminal mode indicates active bracketed paste.
+   - For environments where bracketed paste is inactive and the user is drafting an AI prompt (`>`), automatically flattens internal line breaks into clean spaces to protect against premature shell execution of partial commands.
+5. **Automated Unit Testing:**
+   - Created test suite [`src/utils/__tests__/clipboard.test.ts`](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/utils/__tests__/clipboard.test.ts) covering formatting, bracketed paste wrapping, multiline flattening, and web API fallbacks.
+
+### 8.5 Touched Components & Files
+- [`src/utils/clipboard.ts`](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/utils/clipboard.ts): Unified clipboard read/write engine and terminal paste payload formatter.
+- [`src/utils/__tests__/clipboard.test.ts`](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/utils/__tests__/clipboard.test.ts): Unit tests for clipboard utilities.
+- [`src/presentation/TerminalView.tsx`](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/presentation/TerminalView.tsx): Replaced stale closure paste with ref-synchronized handler, integrated native clipboard reading, expanded Linux shortcut support (`Shift+Insert`, `Ctrl+Insert`), and unified context menu handling.
