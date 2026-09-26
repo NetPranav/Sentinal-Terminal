@@ -106,7 +106,24 @@ export class ApplicationCapability extends BaseCapabilityDriver<AppDriverInput, 
         }
         case 'install': {
           const pkgInfo = AppAliasRegistry.getInstance().resolvePackage(target);
-          return { success: true, data: { installed: true, package: pkgInfo.name, isCask: pkgInfo.isCask }, commandExecuted: `brew install ${pkgInfo.isCask ? '--cask ' : ''}${pkgInfo.name}`, rollbackPayload: { action: 'uninstall', package: pkgInfo.name } };
+          const isReinstall = Boolean(
+            input.reinstall || 
+            input.force || 
+            (input.prompt && /re-?install|remove\s+and\s+install/i.test(input.prompt))
+          );
+          if (input.mockAlreadyInstalled && !isReinstall) {
+            return {
+              success: true,
+              data: { installed: true, alreadyInstalled: true, package: pkgInfo.name, isCask: pkgInfo.isCask, stdout: `${target} is already installed.` },
+              commandExecuted: `which ${target}`
+            };
+          }
+          return { 
+            success: true, 
+            data: { installed: true, package: pkgInfo.name, isCask: pkgInfo.isCask, reinstalled: isReinstall }, 
+            commandExecuted: isReinstall ? `brew reinstall ${pkgInfo.name}` : `brew install ${pkgInfo.isCask ? '--cask ' : ''}${pkgInfo.name}`, 
+            rollbackPayload: { action: 'uninstall', package: pkgInfo.name } 
+          };
         }
         case 'uninstall': {
           const pkgInfo = AppAliasRegistry.getInstance().resolvePackage(target);
@@ -252,8 +269,50 @@ export class ApplicationCapability extends BaseCapabilityDriver<AppDriverInput, 
           command = 'cmd.exe';
           cmdArgs = ['/c', 'start', '', target, ...extraArgs];
         } else {
-          command = target;
-          cmdArgs = extraArgs;
+          // Linux (Arch Linux, Ubuntu, Debian, Fedora, etc.)
+          const cleanTarget = target.toLowerCase().replace(/\s*(?:fod?le?r|dir(?:ectory)?)\s*$/i, '').trim();
+          const folderMapping: Record<string, string> = {
+            'downloads': '~/Downloads',
+            'donwloads': '~/Downloads',
+            'downlods': '~/Downloads',
+            'desktop': '~/Desktop',
+            'documents': '~/Documents',
+            'pictures': '~/Pictures',
+            'music': '~/Music',
+            'videos': '~/Videos',
+            'movies': '~/Videos',
+            'home': '~',
+            'this': '.',
+            'current': '.',
+            'here': '.'
+          };
+
+          if (folderMapping[cleanTarget]) {
+            resolvedTarget = folderMapping[cleanTarget];
+            isPathOrFolder = true;
+          } else if (target.startsWith('/') || target.startsWith('~/') || target.startsWith('./') || target === '~') {
+            isPathOrFolder = true;
+          }
+
+          if (isPathOrFolder && typeof resolvedTarget === 'string') {
+            if (!resolvedTarget.startsWith('/') && !resolvedTarget.startsWith('~/') && resolvedTarget !== '~') {
+              const baseCwd = (context?.cwd && context.cwd.trim() !== '' && context.cwd !== '/') ? context.cwd : '~';
+              resolvedTarget = resolvedTarget === '.' ? baseCwd : `${baseCwd.replace(/\/+$/, '')}/${resolvedTarget.replace(/^\.\//, '')}`;
+            }
+            if (resolvedTarget.startsWith('~/') || resolvedTarget === '~') {
+              try {
+                const hRes = await invoke<{ stdout: string }>('execute_command', { command: 'sh', args: ['-c', 'echo $HOME'] });
+                const hd = (hRes?.stdout || '').trim();
+                if (hd) resolvedTarget = resolvedTarget === '~' ? hd : resolvedTarget.replace(/^~/, hd);
+              } catch { /* ignore */ }
+            }
+            command = 'xdg-open';
+            cmdArgs = [resolvedTarget];
+          } else {
+            command = 'sh';
+            const extra = extraArgs.length > 0 ? ` "${extraArgs.join(' ')}"` : '';
+            cmdArgs = ['-c', `gtk-launch "${target}"${extra} 2>/dev/null || which "${target.toLowerCase()}" >/dev/null 2>&1 && "${target.toLowerCase()}"${extra} & || xdg-open "${extraArgs.join(' ') || target}" 2>/dev/null`];
+          }
         }
 
         const output = await invoke<{ stdout: string; stderr: string; code: number }>('execute_command', { command, args: cmdArgs });
@@ -345,15 +404,71 @@ export class ApplicationCapability extends BaseCapabilityDriver<AppDriverInput, 
       }
 
       if (op === 'install') {
+        const isReinstall = Boolean(
+          input.reinstall || 
+          input.force || 
+          (input.prompt && /re-?install|remove\s+and\s+install/i.test(input.prompt))
+        );
+
         if (platform === 'macos') {
           const pkgInfo = AppAliasRegistry.getInstance().resolvePackage(target);
+          if (!isReinstall) {
+            try {
+              const checkRes = await invoke<{ code: number }>('execute_command', {
+                command: 'sh',
+                args: ['-c', `which "${target.toLowerCase()}" >/dev/null 2>&1 || brew list "${pkgInfo.name}" >/dev/null 2>&1`]
+              });
+              if (checkRes.code === 0) {
+                return {
+                  success: true,
+                  data: { installed: true, alreadyInstalled: true, package: pkgInfo.name, isCask: pkgInfo.isCask, stdout: `${target} is already installed. Skipped installation.` },
+                  commandExecuted: `which ${target.toLowerCase()}`
+                };
+              }
+            } catch { /* proceed to install */ }
+          } else {
+            try {
+              const unargs = pkgInfo.isCask ? ['uninstall', '--cask', pkgInfo.name] : ['uninstall', pkgInfo.name];
+              await invoke('execute_command', { command: 'brew', args: unargs });
+            } catch { /* ignore uninstall failure */ }
+          }
+
           const args = pkgInfo.isCask ? ['install', '--cask', pkgInfo.name] : ['install', pkgInfo.name];
           await invoke('execute_command', { command: 'brew', args });
-          return { success: true, data: { installed: true, package: pkgInfo.name, isCask: pkgInfo.isCask }, commandExecuted: `brew ${args.join(' ')}`, rollbackPayload: { action: 'uninstall', package: pkgInfo.name } };
+          return { success: true, data: { installed: true, package: pkgInfo.name, isCask: pkgInfo.isCask, reinstalled: isReinstall }, commandExecuted: `brew ${args.join(' ')}`, rollbackPayload: { action: 'uninstall', package: pkgInfo.name } };
         } else {
-          const args = ['install', '-y', target];
-          await invoke('execute_command', { command: 'apt', args });
-          return { success: true, data: { installed: true, package: target }, commandExecuted: `apt ${args.join(' ')}`, rollbackPayload: { action: 'uninstall', package: target } };
+          // Linux (Arch / Debian / Fedora / openSUSE / Flatpak)
+          if (!isReinstall) {
+            try {
+              const checkRes = await invoke<{ code: number }>('execute_command', {
+                command: 'sh',
+                args: ['-c', `which "${target.toLowerCase()}" >/dev/null 2>&1 || (which pacman >/dev/null 2>&1 && pacman -Q "${target.toLowerCase()}" >/dev/null 2>&1) || (which dpkg-query >/dev/null 2>&1 && dpkg-query -W -f='\${Status}' "${target.toLowerCase()}" 2>/dev/null | grep -q "ok installed") || (which zypper >/dev/null 2>&1 && rpm -q "${target.toLowerCase()}" >/dev/null 2>&1)`]
+              });
+              if (checkRes.code === 0) {
+                return {
+                  success: true,
+                  data: {
+                    installed: true,
+                    alreadyInstalled: true,
+                    package: target,
+                    stdout: `Package "${target}" is already installed on the system. Skipped package manager installation.`
+                  },
+                  commandExecuted: `which ${target.toLowerCase()}`
+                };
+              }
+            } catch { /* proceed to install */ }
+          } else {
+            try {
+              const unCmd = 'sh';
+              const unArgs = ['-c', `which pacman >/dev/null 2>&1 && sudo pacman -R --noconfirm "${target}" || which apt-get >/dev/null 2>&1 && sudo apt-get remove -y "${target}" || which dnf >/dev/null 2>&1 && sudo dnf remove -y "${target}" || which zypper >/dev/null 2>&1 && sudo zypper remove -y "${target}"`];
+              await invoke('execute_command', { command: unCmd, args: unArgs });
+            } catch { /* ignore removal error */ }
+          }
+
+          const cmd = 'sh';
+          const args = ['-c', `which pacman >/dev/null 2>&1 && sudo pacman -S --noconfirm "${target}" || which apt-get >/dev/null 2>&1 && sudo apt-get install -y "${target}" || which dnf >/dev/null 2>&1 && sudo dnf install -y "${target}" || which zypper >/dev/null 2>&1 && sudo zypper install -y "${target}" || which flatpak >/dev/null 2>&1 && flatpak install -y "${target}"`];
+          await invoke('execute_command', { command: cmd, args });
+          return { success: true, data: { installed: true, package: target, reinstalled: isReinstall }, commandExecuted: `${cmd} ${args.join(' ')}`, rollbackPayload: { action: 'uninstall', package: target } };
         }
       }
 
@@ -364,9 +479,10 @@ export class ApplicationCapability extends BaseCapabilityDriver<AppDriverInput, 
           await invoke('execute_command', { command: 'brew', args });
           return { success: true, data: { uninstalled: true, package: pkgInfo.name, isCask: pkgInfo.isCask }, commandExecuted: `brew ${args.join(' ')}` };
         } else {
-          const args = ['remove', '-y', target];
-          await invoke('execute_command', { command: 'apt', args });
-          return { success: true, data: { uninstalled: true, package: target }, commandExecuted: `apt ${args.join(' ')}` };
+          const cmd = 'sh';
+          const args = ['-c', `which pacman >/dev/null 2>&1 && sudo pacman -R --noconfirm "${target}" || which apt-get >/dev/null 2>&1 && sudo apt-get remove -y "${target}" || which dnf >/dev/null 2>&1 && sudo dnf remove -y "${target}" || which zypper >/dev/null 2>&1 && sudo zypper remove -y "${target}"`];
+          await invoke('execute_command', { command: cmd, args });
+          return { success: true, data: { uninstalled: true, package: target }, commandExecuted: `${cmd} ${args.join(' ')}` };
         }
       }
 

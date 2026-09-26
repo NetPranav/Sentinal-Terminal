@@ -165,9 +165,15 @@ export abstract class BaseCapabilityDriver<I = any, O = any> implements ICapabil
   protected detectPlatform(): Platform {
     if (typeof navigator !== 'undefined') {
       const ua = navigator.userAgent.toLowerCase();
+      if (ua.includes('linux') || ua.includes('x11')) return 'linux';
       if (ua.includes('mac')) return 'macos';
       if (ua.includes('win')) return 'windows';
     }
-    return 'macos'; // Default developer platform for Sentinel Terminal
+    if (typeof process !== 'undefined' && process.platform) {
+      if (process.platform === 'linux') return 'linux';
+      if (process.platform === 'darwin') return 'macos';
+      if (process.platform === 'win32') return 'windows';
+    }
+    return 'linux';
   }
 }

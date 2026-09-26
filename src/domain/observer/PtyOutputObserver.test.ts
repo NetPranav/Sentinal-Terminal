@@ -63,4 +63,33 @@ To push the current branch and set the remote as upstream, use
     expect(rem?.fixedCommand).toBe('git push --set-upstream origin my-feature');
     expect(rem?.tool).toBe('shell.execute');
   });
+
+  it('suspends observation when entering alternate screen buffer (vim/htop/tmux) and ignores errors', () => {
+    // Simulate launching vim or htop (enters alternate screen buffer)
+    observer.ingest('\x1b[?1049hWelcome to VIM - Vi IMproved');
+    expect(observer.isObserverSuspended()).toBe(true);
+
+    // An error string appearing in TUI redraw should NOT trigger any remediation
+    const tuiRedrawWithError = `
+    Error: listen EADDRINUSE: address already in use :::3000
+    ~
+    ~ [Vim buffer content]
+    `;
+    const rem = observer.ingest(tuiRedrawWithError, '/test/repo');
+    expect(rem).toBeNull();
+    expect(observer.getActiveRemediation()).toBeNull();
+
+    // Exit alternate screen buffer (user quits vim with :q)
+    observer.ingest('\x1b[?1049l');
+    expect(observer.isObserverSuspended()).toBe(false);
+
+    // Subsequent normal shell errors now trigger remediation again
+    const normalError = `
+    Error: listen EADDRINUSE: address already in use :::3000
+    `;
+    const normalRem = observer.ingest(normalError, '/test/repo');
+    expect(normalRem).not.toBeNull();
+    expect(normalRem?.params.port).toBe(3000);
+  });
 });
+

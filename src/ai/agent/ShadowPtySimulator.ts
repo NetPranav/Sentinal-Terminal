@@ -20,6 +20,7 @@
 import { invoke } from '@tauri-apps/api/core';
 import { TldrKnowledgeEngine } from '../../domain/knowledge/TldrKnowledgeEngine';
 import { ShellAstParser } from '../../domain/security/ShellAstParser';
+import { CommandCapabilityClassifier } from '../../domain/simulation/CommandCapabilityClassifier';
 
 export type RiskLevel = 'read_only' | 'safe_mutation' | 'high_risk';
 
@@ -350,13 +351,19 @@ export class ShadowPtySimulator {
       return 'high_risk';
     }
 
+    // Phase 0.5, Item 5: Use capability classifier
+    const capability = CommandCapabilityClassifier.classify(trimmed);
+    if (capability.strategy === 'full_shadow') {
+      return 'read_only';
+    }
+
     // Mutating operations
     if (/\b(kill|pkill|killall|rm|rmdir|mv|touch|mkdir|chmod|chown|git\s+(commit|push|merge|rebase|reset)|npm\s+install|brew\s+install)\b/i.test(trimmed)) {
       return 'safe_mutation';
     }
 
-    // Default to read-only diagnostics
-    return 'read_only';
+    // Default to read-only diagnostics if classified read-only, otherwise safe_mutation
+    return capability.isReadOnly ? 'read_only' : 'safe_mutation';
   }
 
   /**
@@ -365,6 +372,12 @@ export class ShadowPtySimulator {
    */
   public toSafePredicate(command: string, risk: RiskLevel): { predicate: string; isTransformed: boolean } {
     const trimmed = command.trim();
+
+    // Check dry-run capable tools (Phase 0.5, Item 5)
+    const dryRun = CommandCapabilityClassifier.getDryRunCommand(trimmed);
+    if (dryRun && dryRun !== trimmed) {
+      return { predicate: dryRun, isTransformed: true };
+    }
 
     if (risk === 'read_only') {
       return { predicate: trimmed, isTransformed: false };
@@ -423,7 +436,7 @@ export class ShadowPtySimulator {
     // Pure syntax validation using '/bin/zsh -n -c "<cmd>"'
     // -n parses and verifies syntax/grammar without running any command!
     const escaped = trimmed.replace(/'/g, `'\\''`);
-    return { predicate: `/bin/zsh -n -c '${escaped}'`, isTransformed: true };
+    return { predicate: `${this.getSandboxShell()} -n -c '${escaped}'`, isTransformed: true };
   }
 
   /**
@@ -452,6 +465,35 @@ export class ShadowPtySimulator {
         pruneReason: `AST Syntax Validation Failed: ${syntax.error}`
       };
     }
+
+    // Phase 0.5, Item 5: Check command capability routing (skip shadow sandbox for catastrophic AST-only)
+    const capability = CommandCapabilityClassifier.classify(candidate.command);
+    if (capability.strategy === 'ast_only') {
+      let isCatastrophic = false;
+      try {
+        const ast = ShellAstParser.parse(candidate.command);
+        isCatastrophic = ShellAstParser.isDestructiveOperation(ast).isDestructive;
+      } catch {
+        isCatastrophic = true;
+      }
+
+      if (isCatastrophic) {
+        return {
+          candidate,
+          executedCommand: candidate.command,
+          isPredicateTransformed: false,
+          exitCode: 1,
+          stdout: `[AST-Only Assessment: ${capability.reason}]`,
+          stderr: 'High-risk destructive operation blocked via AST analysis',
+          durationMs: 0.1,
+          empiricalScore: -3.0,
+          pruned: true,
+          pruneReason: capability.reason
+        };
+      }
+    }
+
+
 
     // Transform into safe predicate if necessary
     const { predicate, isTransformed } = this.toSafePredicate(candidate.command, candidate.estimatedRisk);
@@ -498,6 +540,16 @@ export class ShadowPtySimulator {
     };
   }
 
+  private getSandboxShell(): string {
+    if (typeof process !== 'undefined') {
+      if (process.env?.SHELL && (process.env.SHELL.endsWith('/bash') || process.env.SHELL.endsWith('/zsh') || process.env.SHELL.endsWith('/sh'))) {
+        return process.env.SHELL;
+      }
+      return '/bin/sh';
+    }
+    return '/bin/sh';
+  }
+
   /**
    * Executes a command string inside the shadow sandbox with a strict timeout.
    */
@@ -505,9 +557,11 @@ export class ShadowPtySimulator {
     commandLine: string,
     cwd?: string
   ): Promise<{ stdout: string; stderr: string; code: number }> {
+    const shell = this.getSandboxShell();
+
     // 1. If custom executor provided, use it
     if (this.customExecutor) {
-      return this.customExecutor('/bin/zsh', ['-lc', commandLine], cwd);
+      return this.customExecutor(shell, ['-c', commandLine], cwd);
     }
 
     // 2. Node/test environment check
@@ -518,7 +572,7 @@ export class ShadowPtySimulator {
           ...process.env,
           PATH: `${process.env.PATH || ''}:/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin`
         };
-        const res = spawnSync('/bin/zsh', ['-lc', commandLine], {
+        const res = spawnSync(shell, ['-c', commandLine], {
           cwd: cwd || process.cwd(),
           env,
           encoding: 'utf-8',
@@ -540,8 +594,8 @@ export class ShadowPtySimulator {
     });
 
     const executionPromise = invoke<{ stdout: string; stderr: string; code: number }>('execute_command', {
-      command: '/bin/zsh',
-      args: ['-lc', commandLine],
+      command: shell,
+      args: ['-c', commandLine],
       cwd
     });
 

@@ -15,6 +15,9 @@ export interface GenerateOptions {
   messages?: { role: string; content: string }[];
   logitBias?: Record<string | number, number>;
   grammar?: string; // Phase 5.3: GBNF (GGML BNF) Grammar constraint
+  sessionId?: string; // Phase 0.5 item 11: Request isolation per-tab / PTY session
+  requestId?: string; // Phase 0.5 item 11: Unique request tracking ID
+  timeoutMs?: number;
 }
 
 export interface ProviderResponse {

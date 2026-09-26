@@ -1,21 +1,44 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { TerminalView } from "./presentation/TerminalView";
 import { CommandPalette } from "./ui/components/CommandPalette";
 import { StatusBar } from "./ui/components/StatusBar";
 import { ThemeManager } from "./ui/theme/ThemeManager";
-import { AiSettingsPage } from "./ui/components/AiSettingsPage";
+import { AiSettingsPage, SettingsTabId } from "./ui/components/AiSettingsPage";
 import { SessionManager } from "./domain/SessionManager";
 import { InstallerWizard } from "./ui/components/InstallerWizard";
 import { UrlSchemeHandler } from "./domain/integration/UrlSchemeHandler";
 import { SessionPersistenceEngine } from "./domain/session/SessionPersistenceEngine";
-import { WorkspaceSwitcherModal } from "./ui/components/WorkspaceSwitcherModal";
-import { ProcessPortManagerDrawer } from "./ui/components/ProcessPortManagerDrawer";
+import { WorkflowManagerDrawer } from "./ui/components/WorkflowManagerDrawer";
 import { HistorySearchModal } from "./ui/components/HistorySearchModal";
 import { PluginMarketplaceModal } from "./ui/components/PluginMarketplaceModal";
 import { EmbeddedModelManagerModal } from "./ui/components/EmbeddedModelManagerModal";
+import { KeyboardShortcutsModal } from "./ui/components/KeyboardShortcutsModal";
+import { ZenModeHelpCallout } from "./ui/components/ZenModeHelpCallout";
 import { AuditLogger } from "./domain/security/AuditLogger";
 import { DotfileSyncEngine } from "./domain/rice/DotfileSyncEngine";
+import { EmbeddedEngineManager } from "./ai/models/EmbeddedEngineManager";
+import { SystemKnowledgeScanner } from "./domain/knowledge/SystemKnowledgeScanner";
+import { invoke } from "@tauri-apps/api/core";
+import { 
+  Terminal, 
+  Folder, 
+  Columns2, 
+  Rows2, 
+  Palette, 
+  X, 
+  Plus, 
+  ChevronDown, 
+  Sparkles, 
+  ShieldCheck, 
+  Compass, 
+  RotateCcw, 
+  Eraser, 
+  Trash2,
+  Search,
+  Code2 
+} from "lucide-react";
+import { isLinux, getShortcutModifier, formatShortcut } from "./shared/platform";
 import "./App.css";
 
 type SplitDirection = 'vertical' | 'horizontal';
@@ -28,6 +51,7 @@ interface TerminalPane {
 interface SplitNode {
   id: string;
   direction: SplitDirection;
+  ratio?: number;
   pane1: PaneNode;
   pane2: PaneNode;
 }
@@ -37,11 +61,15 @@ type PaneNode = { type: 'terminal', data: TerminalPane } | { type: 'split', data
 interface Tab {
   id: string;
   name: string;
+  customName?: boolean;
   rootPane: PaneNode;
 }
 
 function App() {
   const getUniqueId = (prefix = 'id') => `${prefix}_${Math.random().toString(36).substring(2, 9)}_${Date.now().toString(36)}`;
+
+  const splitContainerRefs = useRef<Record<string, HTMLDivElement>>({});
+  const [resizingSplit, setResizingSplit] = useState<{ id: string, isVertical: boolean } | null>(null);
 
   const createTerminalPane = (): PaneNode => ({
     type: 'terminal',
@@ -63,57 +91,140 @@ function App() {
   const [activeTabId, setActiveTabId] = useState<string>(() => {
     return initialSession?.activeTabId || 'tab_initial';
   });
-  const [activePaneId, setActivePaneId] = useState<string>(''); // For focusing
+  const [activePaneId, setActivePaneId] = useState<string>(() => {
+    return initialSession?.activePaneId || '';
+  }); // For focusing
+  const [editingTabId, setEditingTabId] = useState<string | null>(null);
+  const [editingTabName, setEditingTabName] = useState<string>('');
   const [isCommandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [showAiSettings, setShowAiSettings] = useState(false);
+  const [settingsTab, setSettingsTab] = useState<SettingsTabId>('ai');
 
   // New UI & Theme customization states
   const [panePaths, setPanePaths] = useState<Record<string, string>>(() => {
     return initialSession?.panePaths || {};
   });
   const [showThemeModal, setShowThemeModal] = useState(false);
-  const [showWorkspaceSwitcher, setShowWorkspaceSwitcher] = useState(false);
-  const [showPortManager, setShowPortManager] = useState(false);
+  const [showWorkflowManager, setShowWorkflowManager] = useState(false);
   const [showHistorySearch, setShowHistorySearch] = useState(false);
   const [showPluginMarketplace, setShowPluginMarketplace] = useState(false);
   const [showEmbeddedModal, setShowEmbeddedModal] = useState(false);
+  const [showZenCallout, setShowZenCallout] = useState<boolean>(() => {
+    if (typeof window !== 'undefined' && window.location && window.location.search.includes('capture_mode=')) {
+      return false;
+    }
+    return !localStorage.getItem('sentinel_zen_tip_shown') && !!localStorage.getItem('sentinel_onboarded') && localStorage.getItem('sentinel_ui_mode') === 'zen';
+  });
   const [selectedThemeId, setSelectedThemeId] = useState<string>('classic-dark');
+  const [uiMode, setUiMode] = useState<'zen' | 'visual'>(() => {
+    if (typeof window !== 'undefined' && window.location) {
+      if (window.location.search.includes('capture_mode=zen')) return 'zen';
+      if (window.location.search.includes('capture_mode=visual')) return 'visual';
+    }
+    return (localStorage.getItem('sentinel_ui_mode') as 'zen' | 'visual') || 'zen';
+  });
+  const [showHelpModal, setShowHelpModal] = useState<boolean>(false);
+
+  const handleToggleUiMode = (mode: 'zen' | 'visual') => {
+    setUiMode(mode);
+    localStorage.setItem('sentinel_ui_mode', mode);
+  };
+
+  useEffect(() => {
+    const handleModeChange = (e: any) => {
+      if (e.detail && (e.detail === 'zen' || e.detail === 'visual')) {
+        setUiMode(e.detail);
+      }
+    };
+    window.addEventListener('sentinel:ui-mode-changed', handleModeChange);
+    return () => window.removeEventListener('sentinel:ui-mode-changed', handleModeChange);
+  }, []);
 
   const handleHistorySelect = (command: string) => {
     if (activeTerminal && activeTerminal.sessionId) {
       SessionManager.getInstance().write(activeTerminal.sessionId, command);
     }
   };
+
+  const handleRunWorkflowInTerminal = (command: string) => {
+    if (activeTerminal && activeTerminal.sessionId) {
+      SessionManager.getInstance().write(activeTerminal.sessionId, command + '\n');
+    }
+  };
   const [transparency, setTransparency] = useState<number>(0.82);
   const [blurLevel, setBlurLevel] = useState<number>(20);
   const [activeShellMenuPaneId, setActiveShellMenuPaneId] = useState<string | null>(null);
-  const [showWizard, setShowWizard] = useState<boolean>(() => !localStorage.getItem('sentinel_onboarded'));
-
-  const handleWorkspaceSelect = (targetPath: string, action: 'navigate' | 'new-tab', setupScript?: string) => {
-    if (action === 'new-tab') {
-      addTab(targetPath);
-      if (setupScript && activeTerminal && activeTerminal.sessionId) {
-        setTimeout(() => {
-          SessionManager.getInstance().write(activeTerminal.sessionId!, `source "${setupScript}"\r`);
-        }, 300);
-      }
-    } else {
-      if (activeTerminal && activeTerminal.sessionId) {
-        setPanePaths(prev => ({ ...prev, [activeTerminal.id]: targetPath }));
-        SessionManager.getInstance().write(activeTerminal.sessionId, `cd "${targetPath}"\r`);
-        if (setupScript) {
-          setTimeout(() => {
-            SessionManager.getInstance().write(activeTerminal.sessionId!, `source "${setupScript}"\r`);
-          }, 150);
-        }
-      }
+  const [showWizard, setShowWizard] = useState<boolean>(() => {
+    if (typeof window !== 'undefined' && window.location) {
+      if (window.location.search.includes('capture_mode=')) return false;
+      if (window.location.search.includes('onboarding')) return true;
     }
-  };
+    return !localStorage.getItem('sentinel_onboarded');
+  });
+  const [detectedShell, setDetectedShell] = useState<string>(() => isLinux() ? 'bash' : 'zsh');
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      (window as any).openOnboarding = () => setShowWizard(true);
+    }
+    const detect = async () => {
+      try {
+        const shell = await invoke<string>('get_default_shell');
+        if (shell) {
+          const name = shell.split('/').pop()?.replace(/^-/, '') || 'bash';
+          setDetectedShell(name);
+        }
+      } catch {
+        setDetectedShell(isLinux() ? 'bash' : 'zsh');
+      }
+    };
+    detect();
+    SystemKnowledgeScanner.getInstance().scan().catch(() => {});
+  }, []);
+
+  // Close shell action menu on outside click or Escape
+  useEffect(() => {
+    if (!activeShellMenuPaneId) return;
+    const handleOutsideClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (!target?.closest('.shell-menu-container')) {
+        setActiveShellMenuPaneId(null);
+      }
+    };
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setActiveShellMenuPaneId(null);
+      }
+    };
+    window.addEventListener('mousedown', handleOutsideClick);
+    window.addEventListener('keydown', handleEscape);
+    return () => {
+      window.removeEventListener('mousedown', handleOutsideClick);
+      window.removeEventListener('keydown', handleEscape);
+    };
+  }, [activeShellMenuPaneId]);
 
   // Auto-persist session tabs, splits, and paths across app reloads and crashes
   useEffect(() => {
-    SessionPersistenceEngine.getInstance().saveSession(tabs, activeTabId, panePaths);
-  }, [tabs, activeTabId, panePaths]);
+    SessionPersistenceEngine.getInstance().saveSession(tabs, activeTabId, panePaths, activePaneId);
+  }, [tabs, activeTabId, panePaths, activePaneId]);
+
+  // Auto-start embedded local AI inference engine on launch if model is available
+  useEffect(() => {
+    const autoStartInference = async () => {
+      try {
+        const autostartPref = localStorage.getItem('sentinel_autostart_ai');
+        if (autostartPref === 'false') return;
+
+        const manager = EmbeddedEngineManager.getInstance();
+        await manager.proactiveWarmup();
+      } catch (err) {
+        console.warn('[Sentinel] Auto-start inference engine error:', err);
+      }
+    };
+    const timer = setTimeout(autoStartInference, 150);
+    return () => clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
     ThemeManager.getInstance();
@@ -130,6 +241,9 @@ function App() {
     setActiveTabId(newId);
     setActivePaneId(newPane.data.id);
   }, []);
+
+  const startupArgsProcessedRef = useRef(false);
+  const activeSessionIdsRef = useRef<Record<string, string>>({});
 
   useEffect(() => {
     let unlistenMenu: (() => void) | undefined;
@@ -155,6 +269,53 @@ function App() {
       }
     }).then(fn => { unlistenUrl = fn; }).catch(() => {});
 
+    // Process CLI launch arguments on initial application mount
+    if (!startupArgsProcessedRef.current) {
+      startupArgsProcessedRef.current = true;
+      (async () => {
+        try {
+          const args = await invoke<string[]>('get_launch_args');
+          if (!args || args.length <= 1) return;
+
+          const candidateArgs = args.slice(1).filter(arg => arg && !arg.startsWith('-'));
+          if (candidateArgs.length === 0) return;
+
+          const actions = UrlSchemeHandler.getInstance().parseMany(candidateArgs);
+          if (actions.length === 0) return;
+
+          const primaryAction = actions[0];
+          if (primaryAction.path) {
+            const targetPath = primaryAction.path;
+            setTabs(currentTabs => {
+              if (currentTabs.length === 1 && currentTabs[0].id === 'tab_initial') {
+                const rootPane = currentTabs[0].rootPane;
+                const paneId = rootPane.type === 'terminal' ? rootPane.data.id : undefined;
+                if (paneId) {
+                  setPanePaths(prev => ({ ...prev, [paneId]: targetPath }));
+                  const existingSessionId = activeSessionIdsRef.current[paneId] || (rootPane.type === 'terminal' ? rootPane.data.sessionId : undefined);
+                  if (existingSessionId) {
+                    SessionManager.getInstance().write(existingSessionId, `cd ${JSON.stringify(targetPath)}\n`);
+                  }
+                }
+                return currentTabs;
+              } else {
+                addTab(targetPath);
+                return currentTabs;
+              }
+            });
+          }
+
+          for (let i = 1; i < actions.length; i++) {
+            if (actions[i].path) {
+              addTab(actions[i].path);
+            }
+          }
+        } catch (err) {
+          console.warn('[Sentinel] Failed to process startup launch arguments:', err);
+        }
+      })();
+    }
+
     return () => { 
       if (unlistenMenu) unlistenMenu(); 
       if (unlistenUrl) unlistenUrl();
@@ -173,13 +334,16 @@ function App() {
       setActivePaneId(newPane.data.id);
     } else {
       if (activeTabId === id) {
-        setActiveTabId(newTabs[newTabs.length - 1].id);
+        const closingIndex = tabs.findIndex(t => t.id === id);
+        const nextActiveTab = newTabs[Math.min(closingIndex, newTabs.length - 1)];
+        setActiveTabId(nextActiveTab.id);
       }
       setTabs(newTabs);
     }
   };
 
   const handleSessionCreated = (paneId: string, sessionId: string) => {
+    activeSessionIdsRef.current[paneId] = sessionId;
     setTabs(prevTabs => prevTabs.map(tab => {
       if (tab.id !== activeTabId) return tab;
       const updateSessionRecursive = (node: PaneNode): PaneNode => {
@@ -224,6 +388,7 @@ function App() {
             data: {
               id: getUniqueId('split'),
               direction,
+              ratio: 0.5,
               pane1: { type: 'terminal', data: { ...node.data } },
               pane2: newTerminal
             }
@@ -247,6 +412,70 @@ function App() {
     }));
   };
 
+  const updateSplitRatio = (splitId: string, ratio: number) => {
+    setTabs(prevTabs => prevTabs.map(tab => {
+      if (tab.id !== activeTabId) return tab;
+      const updateRatioRecursive = (node: PaneNode): PaneNode => {
+        if (node.type === 'split') {
+          if (node.data.id === splitId) {
+            return {
+              ...node,
+              data: {
+                ...node.data,
+                ratio
+              }
+            };
+          }
+          return {
+            ...node,
+            data: {
+              ...node.data,
+              pane1: updateRatioRecursive(node.data.pane1),
+              pane2: updateRatioRecursive(node.data.pane2)
+            }
+          };
+        }
+        return node;
+      };
+      return {
+        ...tab,
+        rootPane: updateRatioRecursive(tab.rootPane)
+      };
+    }));
+  };
+
+  const handleStartSplitResize = (e: React.MouseEvent, splitId: string, isVertical: boolean) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const container = splitContainerRefs.current[splitId];
+    if (!container) return;
+
+    setResizingSplit({ id: splitId, isVertical });
+    const rect = container.getBoundingClientRect();
+
+    const onMouseMove = (moveEvent: MouseEvent) => {
+      moveEvent.preventDefault();
+      let newRatio: number;
+      if (isVertical) {
+        newRatio = (moveEvent.clientX - rect.left) / rect.width;
+      } else {
+        newRatio = (moveEvent.clientY - rect.top) / rect.height;
+      }
+      const clamped = Math.max(0.1, Math.min(0.9, newRatio));
+      updateSplitRatio(splitId, clamped);
+    };
+
+    const onMouseUp = () => {
+      setResizingSplit(null);
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
+      window.dispatchEvent(new Event('resize'));
+    };
+
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+  };
+
   const closePane = (paneId: string) => {
     if (activePaneId === paneId) {
       setActivePaneId('');
@@ -266,66 +495,104 @@ function App() {
             return null;
           }
           return node;
+        } else if (node.type === 'split') {
+          const newPane1 = removeRecursive(node.data.pane1);
+          const newPane2 = removeRecursive(node.data.pane2);
+
+          if (!newPane1 && !newPane2) return null;
+          if (!newPane1) return newPane2;
+          if (!newPane2) return newPane1;
+
+          return {
+            ...node,
+            data: {
+              ...node.data,
+              pane1: newPane1,
+              pane2: newPane2
+            }
+          };
         }
-        const left = removeRecursive(node.data.pane1);
-        const right = removeRecursive(node.data.pane2);
-        if (!left && !right) return null;
-        if (!left) return right;
-        if (!right) return left;
-        return { ...node, data: { ...node.data, pane1: left, pane2: right } };
+        return node;
       };
-      const updated = removeRecursive(tab.rootPane);
-      return updated ? { ...tab, rootPane: updated } : tab;
+
+      const newRoot = removeRecursive(tab.rootPane);
+      return {
+        ...tab,
+        rootPane: newRoot || createTerminalPane()
+      };
     }));
   };
 
-  const getActiveTerminalPane = (root?: PaneNode): { id: string; sessionId?: string } | undefined => {
-    if (!root) return undefined;
-    const allTerminals: { id: string; sessionId?: string }[] = [];
-    const collect = (node: PaneNode) => {
-      if (node.type === 'terminal') {
-        allTerminals.push(node.data);
-      } else {
-        collect(node.data.pane1);
-        collect(node.data.pane2);
-      }
-    };
-    collect(root);
-
-    if (activePaneId) {
-      const match = allTerminals.find(t => t.id === activePaneId);
-      if (match) return match;
-    }
-    return allTerminals[0];
+  const getActiveTerminalPane = (node: PaneNode): TerminalPane | null => {
+    if (node.type === 'terminal') return node.data;
+    return getActiveTerminalPane(node.data.pane1);
   };
 
-  const activeTab = tabs.find(t => t.id === activeTabId);
-  const activeTerminal = getActiveTerminalPane(activeTab?.rootPane);
+  const activeTab = useMemo(() => tabs.find(t => t.id === activeTabId), [tabs, activeTabId]);
+
+  const activeTerminal = useMemo(() => {
+    if (!activeTab) return null;
+    
+    // Find active pane if id is known
+    if (activePaneId) {
+      const findPane = (node: PaneNode): TerminalPane | null => {
+        if (node.type === 'terminal' && node.data.id === activePaneId) return node.data;
+        if (node.type === 'split') {
+          return findPane(node.data.pane1) || findPane(node.data.pane2);
+        }
+        return null;
+      };
+      const found = findPane(activeTab.rootPane);
+      if (found) return found;
+    }
+
+    return getActiveTerminalPane(activeTab.rootPane);
+  }, [activeTab, activePaneId]);
+
   const currentDisplayPath = activeTerminal ? (panePaths[activeTerminal.id] || '~') : '~';
 
-  const formatDisplayPath = (path?: string): string => {
-    if (!path || path === '~' || path.trim() === '') return '~';
-    return path.replace(/^(\/Users\/[^\/]+|\/home\/[^\/]+)/, '~');
+  const formatDisplayPath = (fullPath: string): string => {
+    if (!fullPath || fullPath === '~') return '~';
+    const home = typeof process !== 'undefined' ? (process.env.HOME || process.env.USERPROFILE || '') : '';
+    if (home && fullPath.startsWith(home)) {
+      return '~' + fullPath.slice(home.length);
+    }
+    return fullPath;
   };
 
-  const getFolderBasename = (path: string): string => {
-    const cleaned = formatDisplayPath(path);
+  const getFolderBasename = (fullPath: string): string => {
+    const cleaned = formatDisplayPath(fullPath);
     if (cleaned === '~' || cleaned === '') return '~';
     const parts = cleaned.split('/').filter(Boolean);
     return parts.length > 0 ? parts[parts.length - 1] : '~';
   };
 
-  const getTabDisplayTitle = (tab: Tab): string => {
+  const getTabIcon = (tab: Tab) => {
     const term = getActiveTerminalPane(tab.rootPane);
     const rawPath = term ? (panePaths[term.id] || '~') : '~';
-    const cleaned = formatDisplayPath(rawPath);
-    return `${cleaned} — -zsh`;
+    const cleaned = formatDisplayPath(rawPath).toLowerCase();
+    if (cleaned.includes('.sentinel') || cleaned.includes('src') || cleaned.includes('git') || cleaned.includes('project') || cleaned.includes('code')) {
+      return <Code2 size={12} style={{ marginRight: 6, opacity: 0.75, flexShrink: 0 }} />;
+    }
+    if (cleaned === '~' || cleaned === '') {
+      return <span style={{ marginRight: 6, opacity: 0.75, flexShrink: 0, fontSize: '11px', fontWeight: 600 }}>❯_</span>;
+    }
+    return <Folder size={12} style={{ marginRight: 6, opacity: 0.75, flexShrink: 0 }} />;
+  };
+
+  const getTabDisplayTitle = (tab: Tab): string => {
+    if (tab.customName && tab.name) {
+      return tab.name;
+    }
+    const term = getActiveTerminalPane(tab.rootPane);
+    const rawPath = term ? (panePaths[term.id] || '~') : '~';
+    return formatDisplayPath(rawPath);
   };
 
   useEffect(() => {
     try {
       const basename = getFolderBasename(currentDisplayPath);
-      const windowTitle = `📁 ${basename} — -zsh`;
+      const windowTitle = `${basename} — -${detectedShell}`;
       document.title = windowTitle;
       import('@tauri-apps/api/window').then(({ getCurrentWindow }) => {
         getCurrentWindow().setTitle(windowTitle).catch(() => {});
@@ -333,24 +600,34 @@ function App() {
     } catch (e) {
       // Ignore in non-Tauri environments
     }
-  }, [currentDisplayPath, panePaths]);
+  }, [currentDisplayPath, panePaths, detectedShell]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       try {
-        if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key && e.key.toLowerCase() === 'o') {
+        if (e.key === 'F1' || ((e.metaKey || e.ctrlKey) && (e.key === '?' || e.key === '/'))) {
           e.preventDefault();
-          setShowWorkspaceSwitcher(prev => !prev);
+          setShowHelpModal(prev => !prev);
           return;
         }
-        if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key && e.key.toLowerCase() === 'p') {
+        if ((e.metaKey || e.ctrlKey) && e.shiftKey && !e.altKey && e.key && e.key.toLowerCase() === 'p') {
           e.preventDefault();
-          setShowPortManager(prev => !prev);
+          setCommandPaletteOpen(prev => !prev);
+          return;
+        }
+        if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key && e.key.toLowerCase() === 'w') {
+          e.preventDefault();
+          setShowWorkflowManager(prev => !prev);
           return;
         }
         if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key && e.key.toLowerCase() === 'x') {
           e.preventDefault();
           setShowPluginMarketplace(prev => !prev);
+          return;
+        }
+        if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key && e.key.toLowerCase() === 'f') {
+          e.preventDefault();
+          window.dispatchEvent(new CustomEvent('sentinel:toggle-search'));
           return;
         }
         if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key && e.key.toLowerCase() === 't') {
@@ -387,6 +664,11 @@ function App() {
           }
           return;
         }
+        if (e.key === 'Escape' && showAiSettings) {
+          e.preventDefault();
+          setShowAiSettings(false);
+          return;
+        }
         if ((e.metaKey || e.ctrlKey) && e.key === ',') {
           e.preventDefault();
           setShowAiSettings(prev => !prev);
@@ -407,8 +689,17 @@ function App() {
         console.error("Keyboard event error:", err);
       }
     };
+
+    const handleToggleHistory = () => {
+      setShowHistorySearch(prev => !prev);
+    };
+
     window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    window.addEventListener('sentinel:toggle-history', handleToggleHistory);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('sentinel:toggle-history', handleToggleHistory);
+    };
   }, [tabs, activeTabId, activeTab, activeTerminal, addTab]);
 
   const handleStatusBarNavigate = (targetPath: string, commandToExecute: string) => {
@@ -430,112 +721,36 @@ function App() {
           onClick={() => setActivePaneId(node.data.id)}
           style={{ 
             border: isSelected ? '1px solid var(--sentinel-border-active, rgba(255, 255, 255, 0.35))' : '1px solid var(--sentinel-border, rgba(255, 255, 255, 0.08))',
+            zIndex: activeShellMenuPaneId === node.data.id ? 100 : undefined,
           }}
         >
-          <div className="pane-header-controls">
-            <span style={{ display: 'flex', alignItems: 'center', gap: '6px', opacity: 0.85, fontSize: '11px', fontWeight: 500 }}>
-              <span>📁 {formatDisplayPath(panePaths[node.data.id] || '~')} — -zsh</span>
-            </span>
-            <div className="pane-action-buttons">
-              <div style={{ position: 'relative', display: 'inline-block' }}>
-                <button 
-                  className="shell-btn"
-                  onClick={(e) => { e.stopPropagation(); setActiveShellMenuPaneId(activeShellMenuPaneId === node.data.id ? null : node.data.id); setShowThemeModal(false); }}
-                  title="Shell Session & Workspace Actions"
-                  style={{
-                    background: activeShellMenuPaneId === node.data.id ? 'var(--sentinel-hover, rgba(255, 255, 255, 0.15))' : 'transparent',
-                    borderColor: activeShellMenuPaneId === node.data.id ? 'var(--sentinel-border-active, rgba(255, 255, 255, 0.35))' : 'var(--sentinel-border, rgba(255, 255, 255, 0.1))',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '4px'
-                  }}
-                >
-                  <span>Shell</span>
-                  <span style={{ fontSize: '9px', opacity: 0.6 }}>▼</span>
-                </button>
-                {activeShellMenuPaneId === node.data.id && (
-                  <div 
-                    onClick={(e) => e.stopPropagation()}
-                    style={{
-                      position: 'absolute',
-                      top: '100%',
-                      right: 0,
-                      marginTop: '6px',
-                      width: '240px',
-                      background: 'var(--sentinel-modal-bg, rgba(16, 17, 21, 0.98))',
-                      border: '1px solid var(--sentinel-border-active, rgba(255, 255, 255, 0.2))',
-                      borderRadius: '8px',
-                      boxShadow: '0 12px 32px rgba(0, 0, 0, 0.55)',
-                      padding: '6px 0',
-                      zIndex: 10000,
-                      color: 'var(--sentinel-fg, #ffffff)',
-                      fontSize: '12px'
-                    }}
-                  >
-                    {[
-                      { label: 'New Terminal Tab', shortcut: '⌘T', action: () => addTab() },
-                      { label: 'Split Vertically (Side by side)', shortcut: '⌘D', action: () => splitPane(node.data.id, 'vertical') },
-                      { label: 'Split Horizontally (Stacked)', shortcut: '⇧⌘D', action: () => splitPane(node.data.id, 'horizontal') },
-                      { type: 'divider' },
-                      { label: 'Clear Scrollback & Screen', shortcut: '⌘K', action: () => { if (node.data.sessionId) SessionManager.getInstance().write(node.data.sessionId, 'clear\r'); } },
-                      { label: 'Reset Shell Session', shortcut: '⌘R', action: () => { if (node.data.sessionId) SessionManager.getInstance().write(node.data.sessionId, 'clear && printf "\\033c"\r'); } },
-                      { type: 'divider' },
-                      { label: 'AI Command Palette & Prompt', shortcut: '⇧⌘P', action: () => setCommandPaletteOpen(true) },
-                      { label: 'Zero-Trust AI Security & Profile', shortcut: '⌘,', action: () => setShowAiSettings(true) },
-                      { label: 'macOS Integration & Setup Wizard...', shortcut: '⌘I', action: () => setShowWizard(true) },
-                      { type: 'divider' },
-                      { label: 'Close Pane / Tab', shortcut: '⌘W', action: () => {
-                        if (!isRoot) closePane(node.data.id);
-                        else if (tabs.length > 1) closeTab(activeTabId, { stopPropagation: () => {} } as any);
-                      }, disabled: isRoot && tabs.length === 1 }
-                    ].map((item, idx) => {
-                      if ('type' in item && item.type === 'divider') {
-                        return <div key={idx} style={{ height: '1px', background: 'var(--sentinel-border, rgba(255, 255, 255, 0.08))', margin: '4px 0' }} />;
-                      }
-                      const menuItem = item as { label: string; shortcut: string; action: () => void; disabled?: boolean };
-                      return (
-                        <div
-                          key={idx}
-                          onClick={() => { if (!menuItem.disabled) { menuItem.action(); setActiveShellMenuPaneId(null); } }}
-                          style={{
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            alignItems: 'center',
-                            padding: '6px 14px',
-                            cursor: menuItem.disabled ? 'default' : 'pointer',
-                            opacity: menuItem.disabled ? 0.35 : 0.9,
-                            transition: 'background-color 0.15s ease',
-                          }}
-                          onMouseEnter={(e) => { if (!menuItem.disabled) (e.currentTarget as HTMLElement).style.backgroundColor = 'var(--sentinel-hover, rgba(255, 255, 255, 0.08))'; }}
-                          onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.backgroundColor = 'transparent'; }}
-                        >
-                          <span>{menuItem.label}</span>
-                          <span style={{ fontSize: '11px', opacity: 0.5, fontFamily: 'monospace' }}>{menuItem.shortcut}</span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
+          {!isRoot && (
+            <div className="pane-header-controls pane-header-compact">
+              <span style={{ display: 'flex', alignItems: 'center', gap: '6px', opacity: 0.85, fontSize: '11px', fontWeight: 500 }}>
+                <Folder size={11} style={{ opacity: 0.75, flexShrink: 0 }} />
+                <span>{formatDisplayPath(panePaths[node.data.id] || '~')} — -${detectedShell}</span>
+              </span>
               <button 
-                className="personalize-btn"
-                onClick={(e) => { e.stopPropagation(); setShowThemeModal(!showThemeModal); setActiveShellMenuPaneId(null); }} 
-                title="Personalize Workspace Appearance & Theme"
+                className="pane-close-btn" 
+                onClick={(e) => { e.stopPropagation(); closePane(node.data.id); }} 
+                title="Close Split Pane (Ctrl+W)"
                 style={{
-                  background: showThemeModal ? 'var(--sentinel-hover, rgba(255, 255, 255, 0.15))' : 'transparent',
-                  borderColor: showThemeModal ? 'var(--sentinel-border-active, rgba(255, 255, 255, 0.35))' : 'var(--sentinel-border, rgba(255, 255, 255, 0.1))'
+                  background: 'transparent',
+                  border: 'none',
+                  color: 'inherit',
+                  cursor: 'pointer',
+                  opacity: 0.65,
+                  display: 'flex',
+                  alignItems: 'center',
+                  padding: '2px 4px',
+                  borderRadius: '3px'
                 }}
               >
-                Personalize
+                <X size={12} strokeWidth={2} />
               </button>
-              <button onClick={(e) => { e.stopPropagation(); splitPane(node.data.id, 'vertical'); }} title="Split Vertically (Side by side)">Split V</button>
-              <button onClick={(e) => { e.stopPropagation(); splitPane(node.data.id, 'horizontal'); }} title="Split Horizontally (Stacked)">Split H</button>
-              {!isRoot && (
-                <button className="pane-close-btn" onClick={(e) => { e.stopPropagation(); closePane(node.data.id); }} title="Close Pane">✕</button>
-              )}
             </div>
-          </div>
-          <div style={{ flex: 1, position: 'relative', overflow: 'hidden', padding: '6px' }}>
+          )}
+          <div style={{ flex: 1, position: 'relative', overflow: 'hidden', padding: '6px', zIndex: 1 }}>
             <TerminalView 
               key={node.data.id}
               sessionId={node.data.sessionId}
@@ -549,11 +764,23 @@ function App() {
       );
     } else {
       const isVertical = node.data.direction === 'vertical';
+      const ratio = typeof node.data.ratio === 'number' ? node.data.ratio : 0.5;
       return (
-        <div key={node.data.id} className={`split-container ${isVertical ? 'split-vertical' : 'split-horizontal'}`}>
-          <div className="split-pane">{renderPane(node.data.pane1, isTabActive, false)}</div>
-          <div className="split-divider" />
-          <div className="split-pane">{renderPane(node.data.pane2, isTabActive, false)}</div>
+        <div 
+          key={node.data.id} 
+          ref={(el) => { if (el) splitContainerRefs.current[node.data.id] = el; }}
+          className={`split-container ${isVertical ? 'split-vertical' : 'split-horizontal'}`}
+        >
+          <div className="split-pane" style={{ flex: `${ratio} ${ratio} 0%` }}>
+            {renderPane(node.data.pane1, isTabActive, false)}
+          </div>
+          <div 
+            className="split-divider" 
+            onMouseDown={(e) => handleStartSplitResize(e, node.data.id, isVertical)}
+          />
+          <div className="split-pane" style={{ flex: `${1 - ratio} ${1 - ratio} 0%` }}>
+            {renderPane(node.data.pane2, isTabActive, false)}
+          </div>
         </div>
       );
     }
@@ -569,27 +796,221 @@ function App() {
         }
       }}
     >
-      <div className="tabs-bar window-drag-region">
+      <div className={`tabs-bar window-drag-region ${isLinux() ? 'platform-linux' : ''}`}>
         <div className="tabs-track">
           {tabs.map((tab) => {
             const isActive = activeTabId === tab.id;
+            const isEditing = editingTabId === tab.id;
             return (
               <div 
                 key={tab.id} 
                 className={`tab-pill ${isActive ? 'active' : ''}`}
                 onClick={() => setActiveTabId(tab.id)}
+                onDoubleClick={(e) => {
+                  e.stopPropagation();
+                  setEditingTabId(tab.id);
+                  setEditingTabName(tab.customName ? tab.name : '');
+                }}
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setEditingTabId(tab.id);
+                  setEditingTabName(tab.customName ? tab.name : '');
+                }}
+                title={tab.customName ? `${tab.name} — Double-click or right-click to rename` : "Click to select, double-click or right-click to rename"}
               >
-                <span className="tab-pill-text">
-                  {getTabDisplayTitle(tab)}
-                </span>
+                {getTabIcon(tab)}
+                {isEditing ? (
+                  <input
+                    type="text"
+                    autoFocus
+                    value={editingTabName}
+                    onChange={(e) => setEditingTabName(e.target.value)}
+                    onClick={(e) => e.stopPropagation()}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        const trimmed = editingTabName.trim();
+                        if (trimmed) {
+                          setTabs(prev => prev.map(t => t.id === tab.id ? { ...t, name: trimmed, customName: true } : t));
+                        } else {
+                          setTabs(prev => prev.map(t => t.id === tab.id ? { ...t, customName: false } : t));
+                        }
+                        setEditingTabId(null);
+                      } else if (e.key === 'Escape') {
+                        e.preventDefault();
+                        setEditingTabId(null);
+                      }
+                    }}
+                    onBlur={() => {
+                      const trimmed = editingTabName.trim();
+                      if (trimmed) {
+                        setTabs(prev => prev.map(t => t.id === tab.id ? { ...t, name: trimmed, customName: true } : t));
+                      } else {
+                        setTabs(prev => prev.map(t => t.id === tab.id ? { ...t, customName: false } : t));
+                      }
+                      setEditingTabId(null);
+                    }}
+                    style={{
+                      background: 'rgba(0, 0, 0, 0.5)',
+                      border: '1px solid #3b82f6',
+                      borderRadius: '4px',
+                      color: '#ffffff',
+                      fontSize: '11px',
+                      padding: '1px 6px',
+                      outline: 'none',
+                      width: '100px',
+                      fontFamily: 'inherit'
+                    }}
+                  />
+                ) : (
+                  <span className="tab-pill-text">
+                    {getTabDisplayTitle(tab)}
+                  </span>
+                )}
                 {tabs.length > 1 && (
-                  <button className="pill-close-btn" onClick={(e) => closeTab(tab.id, e)} title="Close Tab">✕</button>
+                  <button className="pill-close-btn" onClick={(e) => closeTab(tab.id, e)} title="Close Tab">
+                    <X size={13} strokeWidth={2} />
+                  </button>
                 )}
               </div>
             );
           })}
-          <button className="pill-add-btn" onClick={addTab} title="New Terminal Tab">+</button>
+          <button className="pill-add-btn" onClick={addTab} title="New Terminal Tab">
+            <Plus size={13} />
+          </button>
         </div>
+
+        {/* Master Active Terminal Pane Actions Strip */}
+        {activeTerminal && (
+          <div 
+            className={`tabs-actions ${uiMode === 'zen' ? 'tabs-actions-zen' : ''} ${activeShellMenuPaneId === activeTerminal.id ? 'menu-active' : ''}`}
+            style={{
+              opacity: (uiMode === 'zen' && activeShellMenuPaneId === activeTerminal.id) ? 1 : undefined,
+              pointerEvents: (uiMode === 'zen' && activeShellMenuPaneId === activeTerminal.id) ? 'auto' : undefined,
+            }}
+          >
+            <div className="shell-menu-container" style={{ position: 'relative', display: 'inline-block', zIndex: 60 }}>
+              <button 
+                className="shell-btn"
+                onClick={(e) => { 
+                  e.stopPropagation(); 
+                  setActiveShellMenuPaneId(activeShellMenuPaneId === activeTerminal.id ? null : activeTerminal.id); 
+                  setShowThemeModal(false); 
+                }}
+                title="Shell Session & Workspace Actions"
+                style={{
+                  background: activeShellMenuPaneId === activeTerminal.id ? 'var(--sentinel-hover, rgba(255, 255, 255, 0.15))' : 'transparent',
+                  borderColor: activeShellMenuPaneId === activeTerminal.id ? 'var(--sentinel-border-active, rgba(255, 255, 255, 0.35))' : 'var(--sentinel-border, rgba(255, 255, 255, 0.1))',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px'
+                }}
+              >
+                <Terminal size={11} />
+                <span>Shell</span>
+                <ChevronDown size={10} style={{ opacity: 0.6 }} />
+              </button>
+              {activeShellMenuPaneId === activeTerminal.id && (
+                <div 
+                  className="shell-dropdown-menu"
+                  onClick={(e) => e.stopPropagation()}
+                  style={{
+                    position: 'absolute',
+                    top: '100%',
+                    right: 0,
+                    marginTop: '6px',
+                    width: '240px',
+                    backgroundColor: '#16171a',
+                    background: 'var(--sentinel-modal-bg, #16171a)',
+                    border: '1px solid var(--sentinel-border-active, rgba(255, 255, 255, 0.18))',
+                    borderRadius: '8px',
+                    boxShadow: '0 16px 36px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(255, 255, 255, 0.05)',
+                    padding: '5px 0',
+                    zIndex: 10000,
+                    color: 'var(--sentinel-fg, #ffffff)',
+                    fontSize: '12px'
+                  }}
+                >
+                  {[
+                    { label: 'New Terminal Tab', icon: <Plus size={12} />, shortcut: formatShortcut('t'), action: () => addTab() },
+                    { label: 'Split Vertically (Side by side)', icon: <Columns2 size={12} />, shortcut: formatShortcut('d'), action: () => splitPane(activeTerminal.id, 'vertical') },
+                    { label: 'Split Horizontally (Stacked)', icon: <Rows2 size={12} />, shortcut: formatShortcut('d', true), action: () => splitPane(activeTerminal.id, 'horizontal') },
+                    { type: 'divider' },
+                    { label: 'Clear Scrollback & Screen', icon: <Eraser size={12} />, shortcut: formatShortcut('k'), action: () => { if (activeTerminal.sessionId) SessionManager.getInstance().write(activeTerminal.sessionId, 'clear\r'); } },
+                    { label: 'Reset Shell Session', icon: <RotateCcw size={12} />, shortcut: formatShortcut('r'), action: () => { if (activeTerminal.sessionId) SessionManager.getInstance().write(activeTerminal.sessionId, 'clear && printf "\\033c"\r'); } },
+                    { type: 'divider' },
+                    { label: 'AI Command Palette & Prompt', icon: <Sparkles size={12} />, shortcut: formatShortcut('p', true), action: () => setCommandPaletteOpen(true) },
+                    { label: 'Zero-Trust AI Security & Profile', icon: <ShieldCheck size={12} />, shortcut: formatShortcut(','), action: () => setShowAiSettings(true) },
+                    { label: isLinux() ? 'Linux Integration & Setup Wizard...' : 'macOS Integration & Setup Wizard...', icon: <Compass size={12} />, shortcut: formatShortcut('i'), action: () => setShowWizard(true) },
+                    { type: 'divider' },
+                    { label: 'Close Pane / Tab', icon: <Trash2 size={12} />, shortcut: formatShortcut('w'), action: () => {
+                      if (activeTab && activeTab.rootPane.type === 'split') closePane(activeTerminal.id);
+                      else if (tabs.length > 1) closeTab(activeTabId, { stopPropagation: () => {} } as any);
+                    }, disabled: (!activeTab || activeTab.rootPane.type !== 'split') && tabs.length === 1 }
+                  ].map((item, idx) => {
+                    if ('type' in item && item.type === 'divider') {
+                      return <div key={idx} style={{ height: '1px', background: 'var(--sentinel-border, rgba(255, 255, 255, 0.08))', margin: '4px 6px' }} />;
+                    }
+                    const menuItem = item as { label: string; icon?: React.ReactNode; shortcut: string; action: () => void; disabled?: boolean };
+                    return (
+                      <div
+                        key={idx}
+                        onClick={() => { if (!menuItem.disabled) { menuItem.action(); setActiveShellMenuPaneId(null); } }}
+                        style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          margin: '1px 5px',
+                          padding: '6px 10px',
+                          borderRadius: '5px',
+                          cursor: menuItem.disabled ? 'default' : 'pointer',
+                          opacity: menuItem.disabled ? 0.35 : 0.9,
+                          transition: 'background-color 0.15s ease',
+                        }}
+                        onMouseEnter={(e) => { if (!menuItem.disabled) (e.currentTarget as HTMLElement).style.backgroundColor = 'var(--sentinel-hover, rgba(255, 255, 255, 0.08))'; }}
+                        onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.backgroundColor = 'transparent'; }}
+                      >
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                          {menuItem.icon && <span style={{ opacity: 0.7, display: 'flex', alignItems: 'center' }}>{menuItem.icon}</span>}
+                          <span>{menuItem.label}</span>
+                        </span>
+                        <span style={{ fontSize: '11px', opacity: 0.5, fontFamily: 'monospace' }}>{menuItem.shortcut}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+            <button 
+              onClick={(e) => { 
+                e.stopPropagation(); 
+                window.dispatchEvent(new CustomEvent('sentinel:toggle-search')); 
+              }} 
+              title="Search Terminal Buffer (Ctrl+Shift+F)"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+            >
+              <Search size={11} />
+              <span>Find</span>
+            </button>
+            <button 
+              onClick={(e) => { e.stopPropagation(); splitPane(activeTerminal.id, 'vertical'); }} 
+              title="Split Vertically (Ctrl+D)"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+            >
+              <Columns2 size={11} />
+              <span>Split V</span>
+            </button>
+            <button 
+              onClick={(e) => { e.stopPropagation(); splitPane(activeTerminal.id, 'horizontal'); }} 
+              title="Split Horizontally (Ctrl+Shift+D)"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+            >
+              <Rows2 size={11} />
+              <span>Split H</span>
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Classic Minimalist Workspace Appearance Modal */}
@@ -608,13 +1029,16 @@ function App() {
           color: 'var(--sentinel-fg, #F8FAFC)',
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', borderBottom: '1px solid var(--sentinel-border, rgba(255,255,255,0.08))', paddingBottom: '8px' }}>
-            <h3 style={{ margin: 0, fontSize: '13px', fontWeight: 600, opacity: 0.9 }}>
-              Workspace Appearance
+            <h3 style={{ margin: 0, fontSize: '13px', fontWeight: 600, opacity: 0.9, display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+              <Palette size={13} />
+              <span>Workspace Appearance</span>
             </h3>
             <button 
               onClick={() => setShowThemeModal(false)}
-              style={{ background: 'transparent', border: 'none', color: 'inherit', opacity: 0.5, cursor: 'pointer', fontSize: '14px', padding: '0 4px' }}
-            >✕</button>
+              style={{ background: 'transparent', border: 'none', color: 'inherit', opacity: 0.5, cursor: 'pointer', fontSize: '14px', padding: '0 4px', display: 'flex', alignItems: 'center' }}
+            >
+              <X size={13} />
+            </button>
           </div>
 
           <div style={{ marginBottom: '16px' }}>
@@ -731,30 +1155,57 @@ function App() {
         </div>
       )}
 
-      <div className="terminal-container">
-        {tabs.map(tab => (
-          <div 
-            key={tab.id} 
-            style={{ display: activeTabId === tab.id ? 'flex' : 'none', width: '100%', height: '100%', flex: 1 }}
-          >
-            {renderPane(tab.rootPane, activeTabId === tab.id, true)}
-          </div>
-        ))}
+      <div className="terminal-container" style={{ position: 'relative', width: '100%', height: '100%', flex: 1, overflow: 'hidden' }}>
+        {tabs.map(tab => {
+          const isTabActive = activeTabId === tab.id;
+          return (
+            <div 
+              key={tab.id} 
+              style={{ 
+                position: isTabActive ? 'relative' : 'absolute',
+                inset: 0,
+                width: '100%',
+                height: '100%',
+                visibility: isTabActive ? 'visible' : 'hidden',
+                pointerEvents: isTabActive ? 'auto' : 'none',
+                zIndex: isTabActive ? 1 : 0,
+                display: 'flex',
+                flexDirection: 'column'
+              }}
+            >
+              {renderPane(tab.rootPane, isTabActive, true)}
+            </div>
+          );
+        })}
       </div>
+
+      {resizingSplit && (
+        <div 
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 99999,
+            cursor: resizingSplit.isVertical ? 'col-resize' : 'row-resize',
+            userSelect: 'none',
+            background: 'transparent'
+          }}
+        />
+      )}
+
       <StatusBar 
+        currentShell={detectedShell}
         currentPath={currentDisplayPath}
         onNavigate={handleStatusBarNavigate}
-        onOpenWorkspaces={() => setShowWorkspaceSwitcher(true)}
-        onOpenPorts={() => setShowPortManager(true)}
+        onOpenWorkflows={() => setShowWorkflowManager(true)}
+        onOpenHelp={() => setShowHelpModal(true)}
+        onOpenAiSettings={() => setShowAiSettings(true)}
+        uiMode={uiMode}
+        highlightHelp={showZenCallout}
       />
-      <WorkspaceSwitcherModal 
-        isOpen={showWorkspaceSwitcher}
-        onClose={() => setShowWorkspaceSwitcher(false)}
-        onSelect={handleWorkspaceSelect}
-      />
-      <ProcessPortManagerDrawer 
-        isOpen={showPortManager}
-        onClose={() => setShowPortManager(false)}
+      <WorkflowManagerDrawer 
+        isOpen={showWorkflowManager}
+        onClose={() => setShowWorkflowManager(false)}
+        onRunInTerminal={handleRunWorkflowInTerminal}
       />
       <HistorySearchModal 
         isOpen={showHistorySearch}
@@ -770,31 +1221,74 @@ function App() {
         isOpen={showEmbeddedModal}
         onClose={() => setShowEmbeddedModal(false)}
       />
+      <KeyboardShortcutsModal 
+        isOpen={showHelpModal}
+        onClose={() => setShowHelpModal(false)}
+        uiMode={uiMode}
+        onToggleUiMode={handleToggleUiMode}
+        onTriggerAction={(actionId) => {
+          if (actionId === 'new_tab') addTab();
+          else if (actionId === 'close_tab') {
+            if (tabs.length > 1) closeTab(activeTabId, { stopPropagation: () => {} } as any);
+            else if (activeTerminal) closePane(activeTerminal.id);
+          }
+          else if (actionId === 'split_v' && activeTerminal) splitPane(activeTerminal.id, 'vertical');
+          else if (actionId === 'split_h' && activeTerminal) splitPane(activeTerminal.id, 'horizontal');
+          else if (actionId === 'find_buffer') window.dispatchEvent(new CustomEvent('sentinel:toggle-search'));
+          else if (actionId === 'history_search') setShowHistorySearch(true);
+          else if (actionId === 'clear_screen' && activeTerminal?.sessionId) SessionManager.getInstance().write(activeTerminal.sessionId, 'clear\r');
+          else if (actionId === 'command_palette') setCommandPaletteOpen(true);
+          else if (actionId === 'workflow_manager') setShowWorkflowManager(true);
+          else if (actionId === 'ai_settings') {
+            setSettingsTab('ai');
+            setShowAiSettings(true);
+          }
+        }}
+      />
       <CommandPalette 
         isOpen={isCommandPaletteOpen} 
         onClose={() => setCommandPaletteOpen(false)} 
         capabilities={[
+          { id: 'open_settings', name: 'Open Settings Center (Ctrl+,)', description: 'Configure AI models, desktop integrations, terminal experience, and preferences' },
+          { id: 'open_desktop_integrations', name: 'Settings: Desktop Integrations & CLI', description: 'Configure terminal launcher in PATH, Linux file manager scripts, and IDE profiles' },
+          { id: 'open_terminal_experience', name: 'Settings: Terminal Experience (Zen vs Visual Mode)', description: 'Switch between distraction-free Zen mode and persistent Visual controls' },
+          { id: 'open_general_settings', name: 'Settings: General & Setup Diagnostics', description: 'Shell detection, config storage, system platform details, and onboarding launcher' },
+          { id: 'toggle_ui_mode', name: `Toggle UI Mode (Current: ${uiMode === 'zen' ? 'Zen Mode' : 'Visual Mode'})`, description: 'Switch between minimal hover-reveal controls and always-on visual buttons' },
+          { id: 'keyboard_shortcuts', name: 'Keyboard Shortcuts & Help (F1)', description: 'View interactive cheatsheet of all hotkeys, splits, and workflows' },
           { id: 'open_embedded_ai', name: 'Sentinel Embedded AI (Qwen 2.5 3B)', description: 'Manage self-contained local model — Zero Ollama required' },
-          { id: 'open_ai_settings', name: 'Open AI Settings', description: 'Configure local AI models (Ollama, Qwen)' },
           { id: 'personalize', name: 'Personalize UI', description: 'Open color theme and glassmorphic appearance customization' },
-          { id: 'workspace_switcher', name: 'Switch Workspace (Cmd+O)', description: 'Jump to ROS, Node, Python, Rust, or Docker projects' },
-          { id: 'port_manager', name: 'Active Ports & Processes (Cmd+Shift+P)', description: 'Inspect and free listening network ports' },
+          { id: 'workflow_manager', name: 'Workflow & Macro Manager (Cmd+Shift+W)', description: 'View, edit, reorder and replay deterministic zero-token multi-stage workflows' },
           { id: 'history_search', name: 'Command History (Ctrl+R)', description: 'Search previous commands ranked by frequency and recency' },
           { id: 'plugin_marketplace', name: 'Plugin Marketplace (Cmd+Shift+X)', description: 'Browse and hot-reload community extensions, tools, and themes' },
+          { id: 'open_onboarding', name: 'Welcome: Setup & Onboarding Wizard', description: 'Re-run initial terminal experience setup, mode selection, and system integrations' },
           { id: 'export_audit_log', name: 'Export Cryptographic Audit Log', description: 'Generate SOC 2 / ISO 27001 tamper-evident signed audit trail' },
           { id: 'export_rice_profile', name: 'Export Rice & AI Profile', description: 'Backup custom themes, aliases, and learned AI patterns' }
         ]}
         onExecuteCapability={async (id) => {
-          if (id === 'open_embedded_ai') {
-            setShowEmbeddedModal(true);
-          } else if (id === 'open_ai_settings') {
+          if (id === 'open_settings') {
+            setSettingsTab('ai');
             setShowAiSettings(true);
+          } else if (id === 'open_desktop_integrations') {
+            setSettingsTab('integrations');
+            setShowAiSettings(true);
+          } else if (id === 'open_terminal_experience') {
+            setSettingsTab('appearance');
+            setShowAiSettings(true);
+          } else if (id === 'open_general_settings') {
+            setSettingsTab('general');
+            setShowAiSettings(true);
+          } else if (id === 'open_onboarding') {
+            setShowWizard(true);
+          } else if (id === 'toggle_ui_mode') {
+            handleToggleUiMode(uiMode === 'zen' ? 'visual' : 'zen');
+          } else if (id === 'keyboard_shortcuts') {
+            setShowHelpModal(true);
+          } else if (id === 'open_embedded_ai') {
+            setShowEmbeddedModal(true);
           } else if (id === 'personalize') {
             setShowThemeModal(true);
-          } else if (id === 'workspace_switcher') {
-            setShowWorkspaceSwitcher(true);
-          } else if (id === 'port_manager') {
-            setShowPortManager(true);
+          } else if (id === 'workflow_manager') {
+            setShowWorkflowManager(true);
           } else if (id === 'history_search') {
             setShowHistorySearch(true);
           } else if (id === 'plugin_marketplace') {
@@ -815,21 +1309,37 @@ function App() {
         }}
       />
       {showAiSettings && (
-        <div style={{ position: 'absolute', top: '40px', bottom: '28px', left: 0, right: 0, zIndex: 9000 }}>
-          <AiSettingsPage />
-          <button 
-            onClick={() => setShowAiSettings(false)} 
-            style={{ 
-              position: 'absolute', top: '16px', right: '16px', 
-              padding: '8px 16px', backgroundColor: 'var(--sentinel-selection)', 
-              color: 'var(--sentinel-fg)', border: 'none', borderRadius: '4px', cursor: 'pointer' 
+        <div style={{ position: 'fixed', inset: 0, zIndex: 9999, backgroundColor: '#090b10' }}>
+          <AiSettingsPage 
+            onClose={() => setShowAiSettings(false)} 
+            initialTab={settingsTab}
+            currentUiMode={uiMode}
+            onSelectUiMode={handleToggleUiMode}
+            onLaunchOnboarding={() => {
+              setShowAiSettings(false);
+              setShowWizard(true);
             }}
-          >
-            Close Settings
-          </button>
+          />
         </div>
       )}
-      <InstallerWizard isOpen={showWizard} onClose={() => setShowWizard(false)} />
+      <InstallerWizard 
+        isOpen={showWizard} 
+        onClose={() => {
+          setShowWizard(false);
+          const currentMode = localStorage.getItem('sentinel_ui_mode') || uiMode;
+          if (currentMode === 'zen' && !localStorage.getItem('sentinel_zen_tip_shown')) {
+            setShowZenCallout(true);
+          }
+        }} 
+        onSelectUiMode={handleToggleUiMode}
+      />
+      <ZenModeHelpCallout 
+        isOpen={showZenCallout}
+        onDismiss={() => {
+          setShowZenCallout(false);
+          localStorage.setItem('sentinel_zen_tip_shown', 'true');
+        }}
+      />
     </div>
   );
 }

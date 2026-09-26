@@ -53,6 +53,12 @@ export class DotfileManager {
       relativePath: '.config/sway/config',
       autostartSyntax: 'i3'
     },
+    autostart: {
+      id: 'autostart',
+      name: 'XDG Desktop Autostart Directory',
+      relativePath: '.config/autostart',
+      autostartSyntax: 'desktop'
+    },
     bashrc: {
       id: 'bashrc',
       name: 'Bash Shell Configuration',
@@ -77,10 +83,13 @@ export class DotfileManager {
   /**
    * Resolves the absolute path for a dotfile target.
    */
-  public static resolvePath(targetKey: string, customHome?: string): string {
+  public static resolvePath(targetKey: string, customHome?: string, appName?: string): string {
     const home = customHome || process.env.HOME || process.env.USERPROFILE || '';
     const target = this.TARGETS[targetKey.toLowerCase()];
     if (target) {
+      if (target.id === 'autostart' && appName) {
+        return path.join(home, target.relativePath, `${appName.toLowerCase().replace(/[^a-z0-9_-]/g, '')}.desktop`);
+      }
       return path.join(home, target.relativePath);
     }
     // If passed directly as a relative or absolute path
@@ -100,11 +109,22 @@ export class DotfileManager {
     io: FileSystemIO = this.defaultIO,
     customHome?: string
   ): Promise<DotfileChangeResult> {
-    const filePath = this.resolvePath(targetKey, customHome);
+    const filePath = this.resolvePath(targetKey, customHome, appName);
     const target = this.TARGETS[targetKey.toLowerCase()] || this.TARGETS.hyprland;
 
     const fileExists = await io.exists(filePath);
     if (!fileExists) {
+      if (target.autostartSyntax === 'desktop' && enable) {
+        const cleanApp = appName.trim();
+        const desktopContent = `[Desktop Entry]\nType=Application\nName=${cleanApp}\nExec=${cleanApp}\nHidden=false\nNoDisplay=false\nX-GNOME-Autostart-enabled=true\n`;
+        await io.writeFile(filePath, desktopContent);
+        return {
+          success: true,
+          modifiedFile: filePath,
+          diff: `+ ${desktopContent.trim()}`,
+          actionTaken: `Created XDG autostart entry for "${cleanApp}" at ${filePath}`
+        };
+      }
       return {
         success: false,
         modifiedFile: filePath,

@@ -1,4 +1,48 @@
+import { ShellAstParser } from './ShellAstParser';
+
 export type RiskLevel = 'SAFE' | 'SENSITIVE' | 'ADMIN' | 'CRITICAL' | 'UNKNOWN';
+
+export type PolicyCategory =
+  | 'filesystem-read'
+  | 'filesystem-write'
+  | 'filesystem-delete'
+  | 'process-inspect'
+  | 'process-kill'
+  | 'package-management'
+  | 'network-egress'
+  | 'network-config'
+  | 'privilege-escalation'
+  | 'ui-input'
+  | 'git-mutation'
+  | 'docker-lifecycle'
+  | 'shell-generic'
+  | 'system-settings';
+
+export type PolicyPosture = 'allow' | 'ask' | 'deny';
+
+export interface CategoryPolicy {
+  category: PolicyCategory;
+  defaultPosture: PolicyPosture;
+  consentRequired: boolean;
+  requiresPassword?: boolean;
+}
+
+export const DEFAULT_CATEGORY_POLICIES: Record<PolicyCategory, CategoryPolicy> = {
+  'filesystem-read': { category: 'filesystem-read', defaultPosture: 'allow', consentRequired: false },
+  'filesystem-write': { category: 'filesystem-write', defaultPosture: 'ask', consentRequired: true },
+  'filesystem-delete': { category: 'filesystem-delete', defaultPosture: 'ask', consentRequired: true, requiresPassword: true },
+  'process-inspect': { category: 'process-inspect', defaultPosture: 'allow', consentRequired: false },
+  'process-kill': { category: 'process-kill', defaultPosture: 'ask', consentRequired: true, requiresPassword: true },
+  'package-management': { category: 'package-management', defaultPosture: 'ask', consentRequired: true },
+  'network-egress': { category: 'network-egress', defaultPosture: 'ask', consentRequired: true },
+  'network-config': { category: 'network-config', defaultPosture: 'ask', consentRequired: true, requiresPassword: true },
+  'privilege-escalation': { category: 'privilege-escalation', defaultPosture: 'ask', consentRequired: true, requiresPassword: true },
+  'ui-input': { category: 'ui-input', defaultPosture: 'ask', consentRequired: true },
+  'git-mutation': { category: 'git-mutation', defaultPosture: 'ask', consentRequired: true },
+  'docker-lifecycle': { category: 'docker-lifecycle', defaultPosture: 'ask', consentRequired: true },
+  'shell-generic': { category: 'shell-generic', defaultPosture: 'ask', consentRequired: true },
+  'system-settings': { category: 'system-settings', defaultPosture: 'ask', consentRequired: true, requiresPassword: true },
+};
 
 export interface RiskAnalysisResult {
   score: number; // 0-100
@@ -6,6 +50,7 @@ export interface RiskAnalysisResult {
   explanation: string;
   requiresPassword?: boolean;
   requiresConsent?: boolean;
+  categories?: PolicyCategory[];
 }
 
 export interface ISecurityEngine {
@@ -19,15 +64,35 @@ export class SecurityEngine implements ISecurityEngine {
     const fullCmd = [command, ...args].join(' ').trim();
     const lowerCmd = fullCmd.toLowerCase();
 
+    // 0. Obfuscated Execution Detection (Phase 0.5, Item 20)
+    const obfuscation = ShellAstParser.isObfuscatedExecution(fullCmd);
+    if (obfuscation.isObfuscated) {
+      return {
+        score: 75,
+        level: 'SENSITIVE',
+        explanation: `Obfuscated shell execution detected (${obfuscation.reasons.join('; ')}). Explicit user consent required.`,
+        requiresPassword: false,
+        requiresConsent: true,
+        categories: ['shell-generic']
+      };
+    }
+
+    // Strip leading environment variable assignments (e.g. "LC_ALL=C LANG=C ps ...", "VAR=val cmd")
+    // to accurately classify the underlying binary while preventing evasion.
+    const cleanCmd = lowerCmd.replace(/^(?:[a-z_][a-z0-9_]*=[^\s]*\s+)+/i, '').trim();
+
     // 1. Super-User / Administrator Commands
-    if (lowerCmd.includes('sudo ') || lowerCmd.includes('su ') || lowerCmd.startsWith('sudo') || lowerCmd.includes('chown ') || lowerCmd.includes('chmod ')) {
-      if (lowerCmd.includes('rm ') || lowerCmd.includes('mkfs') || lowerCmd.includes('dd ')) {
+    if (cleanCmd.includes('sudo ') || cleanCmd.includes('su ') || cleanCmd.startsWith('sudo') || cleanCmd.includes('chown ') || cleanCmd.includes('chmod ') ||
+        lowerCmd.includes('sudo ') || lowerCmd.includes('su ') || lowerCmd.startsWith('sudo') || lowerCmd.includes('chown ') || lowerCmd.includes('chmod ')) {
+      if (cleanCmd.includes('rm ') || cleanCmd.includes('mkfs') || cleanCmd.includes('dd ') ||
+          lowerCmd.includes('rm ') || lowerCmd.includes('mkfs') || lowerCmd.includes('dd ')) {
         return { 
           score: 100, 
           level: 'CRITICAL', 
           explanation: 'Destructive super-user system command detected. Mandatory user consent and password authentication required.',
           requiresPassword: true,
-          requiresConsent: true
+          requiresConsent: true,
+          categories: ['privilege-escalation', 'filesystem-delete']
         };
       }
       return { 
@@ -35,40 +100,49 @@ export class SecurityEngine implements ISecurityEngine {
         level: 'ADMIN', 
         explanation: 'Super-user / administrative privilege elevation detected. Password and explicit user consent required.',
         requiresPassword: true,
-        requiresConsent: true
+        requiresConsent: true,
+        categories: ['privilege-escalation']
       };
     }
 
     // 2. Destructive Deletions (Filesystem, Rm, Trash, Rmdir, Unlink)
-    if (lowerCmd.startsWith('rm ') || lowerCmd.includes(' rm ') || lowerCmd.startsWith('rmdir') || lowerCmd.includes('trash') || lowerCmd.includes('unlink')) {
+    if (cleanCmd.startsWith('rm ') || cleanCmd.includes(' rm ') || cleanCmd.startsWith('rmdir') || cleanCmd.includes('trash') || cleanCmd.includes('unlink') ||
+        lowerCmd.startsWith('rm ') || lowerCmd.includes(' rm ') || lowerCmd.startsWith('rmdir') || lowerCmd.includes('trash') || lowerCmd.includes('unlink')) {
       return { 
         score: 95, 
         level: 'CRITICAL', 
         explanation: 'Filesystem deletion or trash operation detected. Deleting anything strictly requires explicit user consent and password authentication.',
         requiresPassword: true,
-        requiresConsent: true
+        requiresConsent: true,
+        categories: ['filesystem-delete']
       };
     }
 
     // 3. Mid-Level System Commands (Process termination, Network/Hardware toggles, Daemons)
-    if (lowerCmd.startsWith('kill') || lowerCmd.includes(' kill ') || lowerCmd.startsWith('pkill') || lowerCmd.includes('pkill ') || lowerCmd.startsWith('killall') || lowerCmd.includes('ifconfig') || lowerCmd.includes('systemctl') || lowerCmd.includes('service ')) {
+    if (cleanCmd.startsWith('kill') || cleanCmd.includes(' kill ') || cleanCmd.startsWith('pkill') || cleanCmd.includes('pkill ') || cleanCmd.startsWith('killall') || cleanCmd.includes('ifconfig') || cleanCmd.includes('systemctl') || cleanCmd.includes('service ') ||
+        lowerCmd.startsWith('kill') || lowerCmd.includes(' kill ') || lowerCmd.startsWith('pkill') || lowerCmd.includes('pkill ') || lowerCmd.startsWith('killall') || lowerCmd.includes('ifconfig') || lowerCmd.includes('systemctl') || lowerCmd.includes('service ')) {
+      const isKill = cleanCmd.startsWith('kill') || cleanCmd.includes('kill') || cleanCmd.startsWith('pkill') ||
+                     lowerCmd.startsWith('kill') || lowerCmd.includes('kill') || lowerCmd.startsWith('pkill');
       return { 
         score: 85, 
         level: 'ADMIN', 
         explanation: 'Mid-level operating system modification or process termination detected. User consent and password authentication strictly required.',
         requiresPassword: true,
-        requiresConsent: true
+        requiresConsent: true,
+        categories: [isKill ? 'process-kill' : 'network-config']
       };
     }
 
     // 4. Session & Screen Lock Commands
-    if (lowerCmd.includes('displaysleepnow') || lowerCmd.includes('lockworkstation') || lowerCmd.includes('lock-session')) {
+    if (cleanCmd.includes('displaysleepnow') || cleanCmd.includes('lockworkstation') || cleanCmd.includes('lock-session') ||
+        lowerCmd.includes('displaysleepnow') || lowerCmd.includes('lockworkstation') || lowerCmd.includes('lock-session')) {
       return {
         score: 65,
         level: 'SENSITIVE',
         explanation: 'Operating system screen lock command detected. User confirmation required before locking the display.',
         requiresPassword: false,
-        requiresConsent: true
+        requiresConsent: true,
+        categories: ['system-settings']
       };
     }
 
@@ -77,13 +151,16 @@ export class SecurityEngine implements ISecurityEngine {
       'ls', 'pwd', 'echo', 'cat', 'whoami', 'date', 'time', 'cal', 'env', 'clear',
       'uptime', 'uname', 'which', 'head', 'tail', 'grep', 'system_profiler', 'ps',
       'osascript', 'df', 'du', 'top', 'htop', 'id', 'hostname', 'groups', 'printenv',
-      'mdfind', 'lsof', 'sw_vers', 'file', 'wc', 'sort', 'uniq', 'awk', 'sed', 'cut', 'tr'
+      'mdfind', 'lsof', 'sw_vers', 'file', 'wc', 'sort', 'uniq', 'awk', 'sed', 'cut', 'tr',
+      'free', 'ip', 'ss', 'ping', 'lscpu', 'acpi', 'upower', 'nmcli', 'lsblk',
+      'timedatectl', 'resolvectl', 'sensors', 'hostnamectl', 'inxi', 'lsusb', 'lspci', 'arch',
+      'lsmod', 'getconf', 'iw', 'who', 'last', 'mount', 'swapon', 'dmesg', 'pstree', 'pgrep', 'pidof', 'strings', 'ldd', 'getpcaps'
     ];
-    const parts = lowerCmd.split(/\s+/);
-    const firstWord = parts[0];
-    const secondWord = parts[1];
+    const parts = cleanCmd.split(/\s+/);
+    const firstWord = parts[0] || '';
+    const secondWord = parts[1] || '';
 
-    const isSafeFind = firstWord === 'find' && !lowerCmd.includes('-delete') && !lowerCmd.includes('-exec') && !lowerCmd.includes(' rm ');
+    const isSafeFind = firstWord === 'find' && !cleanCmd.includes('-delete') && !cleanCmd.includes('-exec') && !cleanCmd.includes(' rm ');
     const isSafePmset = firstWord === 'pmset' && secondWord === '-g';
     const isSafeNetworksetup = firstWord === 'networksetup' && (secondWord?.startsWith('-list') || secondWord?.startsWith('-get'));
 
@@ -95,17 +172,31 @@ export class SecurityEngine implements ISecurityEngine {
       (firstWord === 'git' && ['status', 'log', 'diff', 'show', 'branch', 'remote'].includes(secondWord)) ||
       (['npm', 'pnpm', 'yarn', 'bun', 'cargo', 'go', 'pytest', 'vitest'].includes(firstWord) && ['test', 'run', 'check', 'lint', 'audit', 'version', '--version', '-v'].includes(secondWord || ''))
     ) {
-      return { score: 5, level: 'SAFE', explanation: 'Safe read-only or developer test command.', requiresPassword: false, requiresConsent: false };
+      return {
+        score: 5,
+        level: 'SAFE',
+        explanation: 'Safe read-only or developer test command.',
+        requiresPassword: false,
+        requiresConsent: false,
+        categories: ['filesystem-read', 'process-inspect']
+      };
     }
 
     // 6. Generative Long-Tail Shell Command Execution
     // Requires explicit user consent and presents 1-line plain English explanation without requiring system password
+    let genCategory: PolicyCategory = 'shell-generic';
+    if (firstWord === 'git') genCategory = 'git-mutation';
+    else if (firstWord === 'docker') genCategory = 'docker-lifecycle';
+    else if (['npm', 'pnpm', 'yarn', 'bun', 'cargo', 'pip', 'pip3'].includes(firstWord)) genCategory = 'package-management';
+    else if (['curl', 'wget', 'ssh', 'scp'].includes(firstWord)) genCategory = 'network-egress';
+
     return {
       score: 55,
       level: 'SENSITIVE',
       explanation: explanation || `Executes terminal command: "${fullCmd}". User confirmation required before execution.`,
       requiresPassword: false,
-      requiresConsent: true
+      requiresConsent: true,
+      categories: [genCategory]
     };
   }
 
@@ -113,10 +204,14 @@ export class SecurityEngine implements ISecurityEngine {
     let highestScore = 0;
     let requiresPassword = false;
     let requiresConsent = false;
+    const categoriesSet = new Set<PolicyCategory>();
 
     for (const action of actions) {
       const id = action?.capabilityId || action?.tool || '';
       const risk = this.calculateRisk(id, action?.parameters || action?.entities || {});
+      if (risk.categories) {
+        for (const cat of risk.categories) categoriesSet.add(cat);
+      }
       if (risk.score > highestScore) highestScore = risk.score;
       if (risk.requiresPassword) requiresPassword = true;
       if (risk.requiresConsent) requiresConsent = true;
@@ -129,7 +224,8 @@ export class SecurityEngine implements ISecurityEngine {
       level: highestScore >= 80 ? 'CRITICAL' : highestScore > 50 ? 'SENSITIVE' : 'SAFE',
       explanation: requiresPassword ? 'Workflow contains deletion, super-user, or mid-level system commands requiring password authentication and consent.' : 'Workflow risk analyzed.',
       requiresPassword,
-      requiresConsent
+      requiresConsent,
+      categories: Array.from(categoriesSet)
     };
   }
 
@@ -148,7 +244,8 @@ export class SecurityEngine implements ISecurityEngine {
           level: 'CRITICAL', 
           explanation: `Destructive filesystem deletion (${op}) on '${path}'. All deletion operations strictly require explicit user consent and password authentication.`,
           requiresPassword: true,
-          requiresConsent: true
+          requiresConsent: true,
+          categories: ['filesystem-delete']
         };
       }
       if (op === 'permissions' || op === 'chmod' || op === 'chown' || op === 'move' || op === 'rename') {
@@ -157,11 +254,19 @@ export class SecurityEngine implements ISecurityEngine {
           level: 'ADMIN',
           explanation: `Filesystem alteration (${op}) on '${path}'. Mid-level file modifications require user consent and password authentication.`,
           requiresPassword: true,
-          requiresConsent: true
+          requiresConsent: true,
+          categories: ['filesystem-write']
         };
       }
       if (op === 'read' || op === 'list' || op === 'mkdir' || op === 'create' || op === 'cd' || op === 'navigate' || op === 'search' || op === 'locate_files') {
-        return { score: 5, level: 'SAFE', explanation: 'Safe non-destructive filesystem read/navigation operation.', requiresPassword: false, requiresConsent: false };
+        return {
+          score: 5,
+          level: 'SAFE',
+          explanation: 'Safe non-destructive filesystem read/navigation operation.',
+          requiresPassword: false,
+          requiresConsent: false,
+          categories: ['filesystem-read']
+        };
       }
     }
 
@@ -174,7 +279,8 @@ export class SecurityEngine implements ISecurityEngine {
           level: 'ADMIN',
           explanation: `Mid-level process control or application termination (${capabilityId}) detected. Explicit user consent and password authentication are strictly required.`,
           requiresPassword: true,
-          requiresConsent: true
+          requiresConsent: true,
+          categories: ['process-kill']
         };
       }
       if (action.includes('lock') || action.includes('displaysleepnow')) {
@@ -183,7 +289,8 @@ export class SecurityEngine implements ISecurityEngine {
           level: 'SENSITIVE',
           explanation: `System display or session lock (${capabilityId}) detected. User confirmation required before locking screen.`,
           requiresPassword: false,
-          requiresConsent: true
+          requiresConsent: true,
+          categories: ['system-settings']
         };
       }
     }
@@ -193,7 +300,14 @@ export class SecurityEngine implements ISecurityEngine {
       const action = capabilityId.toLowerCase();
       // Exclude basic bluetooth toggles from ADMIN risk
       if (capabilityId.includes('bluetooth') && (action.includes('on') || action.includes('off') || action.includes('connect') || action.includes('disconnect'))) {
-        return { score: 30, level: 'SAFE', explanation: 'Standard user-level Bluetooth control.', requiresPassword: false, requiresConsent: false };
+        return {
+          score: 30,
+          level: 'SAFE',
+          explanation: 'Standard user-level Bluetooth control.',
+          requiresPassword: false,
+          requiresConsent: false,
+          categories: ['system-settings']
+        };
       }
       
       if (action.includes('toggle') || action.includes('off') || action.includes('on') || action.includes('disconnect') || action.includes('bind') || action.includes('config')) {
@@ -202,7 +316,8 @@ export class SecurityEngine implements ISecurityEngine {
           level: 'ADMIN',
           explanation: `Mid-level network/hardware system configuration (${capabilityId}) detected. Requires user consent and password authentication.`,
           requiresPassword: true,
-          requiresConsent: true
+          requiresConsent: true,
+          categories: ['network-config']
         };
       }
     }
@@ -216,7 +331,8 @@ export class SecurityEngine implements ISecurityEngine {
           level: 'SENSITIVE',
           explanation: `Git repository modification (${capabilityId}) detected. Requires user review.`,
           requiresPassword: false,
-          requiresConsent: false
+          requiresConsent: false,
+          categories: ['git-mutation']
         };
       }
     }
@@ -229,7 +345,8 @@ export class SecurityEngine implements ISecurityEngine {
           level: 'SENSITIVE',
           explanation: `Docker container lifecycle modification (${capabilityId}) detected. Requires user review.`,
           requiresPassword: false,
-          requiresConsent: false
+          requiresConsent: false,
+          categories: ['docker-lifecycle']
         };
       }
     }
@@ -240,7 +357,8 @@ export class SecurityEngine implements ISecurityEngine {
         level: 'SENSITIVE',
         explanation: 'Remote SSH connection detected. Requires user review.',
         requiresPassword: false,
-        requiresConsent: false
+        requiresConsent: false,
+        categories: ['network-egress']
       };
     }
 
@@ -250,10 +368,18 @@ export class SecurityEngine implements ISecurityEngine {
         level: 'SENSITIVE',
         explanation: `Software package management operation (${capabilityId}) detected. Requires user review.`,
         requiresPassword: false,
-        requiresConsent: false
+        requiresConsent: false,
+        categories: ['package-management']
       };
     }
 
-    return { score: 20, level: 'SAFE', explanation: 'Standard read-only or low-risk capability execution.', requiresPassword: false, requiresConsent: false };
+    return {
+      score: 20,
+      level: 'SAFE',
+      explanation: 'Standard read-only or low-risk capability execution.',
+      requiresPassword: false,
+      requiresConsent: false,
+      categories: ['shell-generic']
+    };
   }
 }

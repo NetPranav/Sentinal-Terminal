@@ -9,6 +9,8 @@
 
 import { invoke } from '@tauri-apps/api/core';
 import { safeBase64Encode } from '../../utils/encodingUtils';
+import { SecretRedactor } from '../security/SecretRedactor';
+import { ProjectFingerprint } from './ProjectFingerprint';
 
 export interface LearnedPattern {
   id: string;
@@ -23,6 +25,11 @@ export interface LearnedPattern {
   timesUsed: number;
   createdAt: number;
   lastUsedAt?: number;
+  projectFingerprint?: string; // Phase 0.5, Item 4
+  successCount?: number;       // Phase 0.5, Item 12
+  failCount?: number;          // Phase 0.5, Item 12
+  rollingSuccessRate?: number; // Phase 0.5, Item 12 (0.0 to 1.0)
+  retired?: boolean;           // Phase 0.5, Item 12 (<0.2)
 }
 
 export interface MatchResult {
@@ -52,9 +59,10 @@ export class DemonstrationLearningEngine {
    * Correlates an unresolved AI goal with a demonstrated shell command.
    * Generalizes arguments into dynamic placeholders and persists the pattern.
    */
-  public learnFromDemonstration(unresolvedGoal: string, demonstratedCommand: string): LearnedPattern | null {
-    const goalClean = unresolvedGoal.trim();
-    const cmdClean = demonstratedCommand.trim();
+  public learnFromDemonstration(unresolvedGoal: string, demonstratedCommand: string, cwd?: string): LearnedPattern | null {
+    const goalClean = SecretRedactor.redact(unresolvedGoal.trim());
+    const cmdClean = SecretRedactor.redact(demonstratedCommand.trim());
+    const projectFp = ProjectFingerprint.compute(cwd).fingerprint;
 
     if (!goalClean || !cmdClean) return null;
     // Don't learn from trivial single-token navigation/inspection commands
@@ -126,7 +134,12 @@ export class DemonstrationLearningEngine {
       demonstratedCommand: cmdClean,
       confidence: 1.0,
       timesUsed: 1,
-      createdAt: Date.now()
+      createdAt: Date.now(),
+      projectFingerprint: projectFp,
+      successCount: 1,
+      failCount: 0,
+      rollingSuccessRate: 1.0,
+      retired: false
     };
 
     this.patterns.set(id, pattern);
@@ -138,9 +151,11 @@ export class DemonstrationLearningEngine {
    * Explicitly teaches Sentinel a new goal-to-command pattern.
    * e.g. /learn sync drone logs -> rsync -avz pi@rover:/logs/ ./rover_logs/
    */
-  public learnExplicit(triggerGoal: string, command: string, explanation?: string): LearnedPattern {
-    const goalClean = triggerGoal.trim();
-    const cmdClean = command.trim();
+  public learnExplicit(triggerGoal: string, command: string, explanation?: string, cwd?: string): LearnedPattern {
+    const goalClean = SecretRedactor.redact(triggerGoal.trim());
+    const cmdClean = SecretRedactor.redact(command.trim());
+    const explanationClean = explanation ? SecretRedactor.redact(explanation) : undefined;
+    const projectFp = ProjectFingerprint.compute(cwd).fingerprint;
 
     // Check if user specified placeholders in goal, e.g. "convert {file} to webm"
     const hasPlaceholders = /\{([a-z0-9_-]+)\}/i.test(goalClean);
@@ -169,13 +184,18 @@ export class DemonstrationLearningEngine {
       triggerRegex: regexStr,
       rawGoalTemplate: goalClean,
       commandTemplate: cmdTemplate,
-      explanation: explanation || `Learned workflow: executes '${cmdClean}'`,
+      explanation: explanationClean || `Learned workflow: executes '${cmdClean}'`,
       source: 'explicit_user_teach',
       originalGoal: goalClean,
       demonstratedCommand: cmdClean,
       confidence: 1.0,
       timesUsed: 1,
-      createdAt: Date.now()
+      createdAt: Date.now(),
+      projectFingerprint: projectFp,
+      successCount: 1,
+      failCount: 0,
+      rollingSuccessRate: 1.0,
+      retired: false
     };
 
     this.patterns.set(id, pattern);
@@ -184,17 +204,73 @@ export class DemonstrationLearningEngine {
   }
 
   /**
-   * Matches a natural language goal against the repository of learned patterns.
-   * If matched, interpolates dynamic arguments into the command template.
+   * Records execution outcome for a learned pattern to update confidence and retirement.
    */
-  public matchGoal(goal: string): MatchResult {
-    const cleanGoal = goal.trim();
+  public recordPatternOutcome(patternIdOrGoal: string, success: boolean): boolean {
+    let pattern: LearnedPattern | undefined;
+    if (this.patterns.has(patternIdOrGoal)) {
+      pattern = this.patterns.get(patternIdOrGoal);
+    } else {
+      const lower = patternIdOrGoal.toLowerCase().trim();
+      for (const p of this.patterns.values()) {
+        if (p.id === patternIdOrGoal || p.originalGoal.toLowerCase() === lower) {
+          pattern = p;
+          break;
+        }
+      }
+    }
 
-    for (const pattern of this.patterns.values()) {
+    if (!pattern) return false;
+
+    if (success) {
+      pattern.successCount = (pattern.successCount || 0) + 1;
+    } else {
+      pattern.failCount = (pattern.failCount || 0) + 1;
+    }
+
+    const total = (pattern.successCount || 0) + (pattern.failCount || 0);
+    pattern.rollingSuccessRate = total > 0 ? (pattern.successCount || 0) / total : 1.0;
+
+    // Retire flaky or stale patterns whose success rate drops below 0.2 (Phase 0.5, Item 12)
+    if (pattern.rollingSuccessRate < 0.2 && total >= 3) {
+      pattern.retired = true;
+      pattern.confidence = 0.05;
+    } else {
+      pattern.confidence = Math.max(0.1, pattern.rollingSuccessRate);
+    }
+
+    this.savePatterns();
+    return true;
+  }
+
+  public matchGoal(goal: string, cwd?: string): MatchResult {
+    return this.matchIntent(goal, cwd);
+  }
+
+  /**
+   * Check if an input goal matches any stored learned pattern.
+   * Scopes matching to the current project fingerprint if provided.
+   */
+  public matchIntent(inputGoal: string, cwd?: string): MatchResult {
+    if (!inputGoal) return { matched: false };
+    const cleanInput = inputGoal.trim();
+    const activeProjectFp = ProjectFingerprint.compute(cwd).fingerprint;
+
+    // Filter out retired patterns
+    const candidates = Array.from(this.patterns.values()).filter(p => !p.retired);
+
+    // Sort candidates: same project first, then higher rolling success rate
+    candidates.sort((a, b) => {
+      const aProj = a.projectFingerprint === activeProjectFp ? 1 : (a.projectFingerprint === 'global' ? 0 : -1);
+      const bProj = b.projectFingerprint === activeProjectFp ? 1 : (b.projectFingerprint === 'global' ? 0 : -1);
+      if (aProj !== bProj) return bProj - aProj;
+      return (b.rollingSuccessRate ?? b.confidence) - (a.rollingSuccessRate ?? a.confidence);
+    });
+
+    for (const pattern of candidates) {
       try {
         const regex = new RegExp(pattern.triggerRegex, 'i');
-        const match = cleanGoal.match(regex);
-
+        const match = cleanInput.match(regex);
         if (match) {
           let interpolated = pattern.commandTemplate;
 

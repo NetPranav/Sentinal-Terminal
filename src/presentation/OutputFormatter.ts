@@ -22,6 +22,8 @@ const C = {
   boldCyan: '\x1b[1;36m',
   boldRed: '\x1b[1;31m',
   boldYellow: '\x1b[1;33m',
+  boldMagenta: '\x1b[1;35m',
+  boldWhite: '\x1b[1;37m',
 };
 
 export interface AgentEventFormatted {
@@ -131,7 +133,7 @@ export function formatAgentEvent(event: AgentEventFormatted): string {
 /**
  * Format structured data (like file lists, device lists, etc.) for clean terminal display.
  */
-export function formatDataOutput(data: any): string {
+export function formatDataOutput(data: any, options?: { goal?: string }): string {
   if (!data) return '';
 
   // File/directory listing
@@ -161,8 +163,48 @@ export function formatDataOutput(data: any): string {
   }
 
   // Process list
-  if (data.processes && Array.isArray(data.processes)) {
-    return formatProcessList(data.processes);
+  const procs = data.activeProcesses || data.processes;
+  if (procs && Array.isArray(procs)) {
+    const isSingular = data.singular === true 
+      || data.count === 1 
+      || procs.length === 1 
+      || /\b(?:which\s+process|what\s+process|single\s+process|top\s+process|highest\s+(?:cpu|ram|memory)|most\s+(?:cpu|ram|memory))\b/i.test(options?.goal || '');
+    const sortBy = data.sortedBy ? ` (sorted by ${String(data.sortedBy).toUpperCase()})` : '';
+    return formatProcessList(procs, sortBy, isSingular);
+  }
+
+  // Storage volumes
+  if (data.volumes && Array.isArray(data.volumes)) {
+    return formatVolumeList(data.volumes);
+  }
+
+  // Battery status
+  if (typeof data === 'object' && ('percentage' in data || 'batteryLevel' in data) && ('powerSource' in data || 'status' in data || 'isCharging' in data)) {
+    return formatBatteryStatus(data);
+  }
+
+  // RAM status
+  if (typeof data === 'object' && ('totalGb' in data || 'total' in data) && ('usedGb' in data || 'used' in data) && ('freeGb' in data || 'availableGb' in data)) {
+    return formatRamStatus(data);
+  }
+
+  // System Uptime
+  if (typeof data === 'object' && (data.uptimeString || ('uptime' in data && !data.os))) {
+    const up = data.uptimeString || data.uptime;
+    return `\r\n  ${C.boldCyan}▶ System Uptime:${C.reset} ${C.boldGreen}${up}${C.reset}\r\n`;
+  }
+
+  // CPU Info & Load Average
+  if (typeof data === 'object' && (data.loadAverage || (data.model && !data.os))) {
+    const model = data.model ? `\r\n  ${C.boldCyan}Model:${C.reset} ${data.model}` : '';
+    const cores = data.cores ? `\r\n  ${C.boldCyan}Cores:${C.reset} ${data.cores}` : '';
+    const load = data.loadAverage ? `\r\n  ${C.boldCyan}Load Average:${C.reset} ${Array.isArray(data.loadAverage) ? data.loadAverage.join(', ') : data.loadAverage}` : '';
+    return `\r\n  ${C.boldCyan}CPU Information:${C.reset}${model}${cores}${load}\r\n`;
+  }
+
+  // System info
+  if (typeof data === 'object' && data.os && (data.kernel || data.arch || data.cpus)) {
+    return formatSystemInfo(data);
   }
 
   // Command stdout
@@ -196,9 +238,9 @@ function formatFileList(files: any[]): string {
   const lines = files.slice(0, 50).map(f => {
     const name = typeof f === 'string' ? f : (f.name || f.path || String(f));
     const isDir = typeof f === 'object' && (f.isDirectory || f.type === 'directory');
-    const icon = isDir ? '📁' : '📄';
+    const marker = isDir ? `${C.dim}d${C.reset}` : `${C.dim}-${C.reset}`;
     const size = typeof f === 'object' && f.size ? ` ${C.dim}(${formatSize(f.size)})${C.reset}` : '';
-    return `  ${icon} ${isDir ? C.boldCyan : C.white}${name}${C.reset}${size}`;
+    return `  ${marker} ${isDir ? C.boldCyan : C.white}${name}${isDir ? '/' : ''}${C.reset}${size}`;
   });
 
   if (files.length > 50) {
@@ -215,7 +257,7 @@ function formatDeviceList(devices: any[]): string {
     const name = d.name || d.address || String(d);
     const connected = d.connected ? `${C.green} (connected)${C.reset}` : '';
     const addr = d.address ? ` ${C.dim}${d.address}${C.reset}` : '';
-    return `  🔵 ${C.white}${name}${C.reset}${addr}${connected}`;
+    return `  • ${C.white}${name}${C.reset}${addr}${connected}`;
   });
 
   return `\r\n${lines.join('\r\n')}\r\n`;
@@ -227,8 +269,8 @@ function formatNetworkList(networks: any[]): string {
   const lines = networks.map(n => {
     const name = n.ssid || n.name || String(n);
     const signal = n.signal ? ` ${C.dim}(${n.signal})${C.reset}` : '';
-    const secured = n.security ? ` 🔒` : '';
-    return `  📶 ${C.white}${name}${C.reset}${signal}${secured}`;
+    const secured = n.security ? ` ${C.dim}[secured]${C.reset}` : '';
+    return `  • ${C.white}${name}${C.reset}${signal}${secured}`;
   });
 
   return `\r\n${lines.join('\r\n')}\r\n`;
@@ -242,10 +284,10 @@ function formatSearchResults(results: any[]): string {
     const isDir = typeof r === 'object'
       ? (r.isDirectory || r.type === 'directory')
       : (!path.split('/').pop()?.includes('.') || path.endsWith('/'));
-    const icon = isDir ? '📁' : '📄';
+    const marker = isDir ? `${C.dim}d${C.reset}` : `${C.dim}-${C.reset}`;
     const color = isDir ? C.boldCyan : C.white;
     const size = typeof r === 'object' && r.size ? ` ${C.dim}(${formatSize(r.size)})${C.reset}` : '';
-    return `  ${icon} ${color}${path}${C.reset}${size}`;
+    return `  ${marker} ${color}${path}${isDir ? '/' : ''}${C.reset}${size}`;
   });
 
   if (results.length > 30) {
@@ -255,17 +297,83 @@ function formatSearchResults(results: any[]): string {
   return `\r\n${lines.join('\r\n')}\r\n`;
 }
 
-function formatProcessList(processes: any[]): string {
+function formatProcessList(processes: any[], titleExtra: string = '', isSingular: boolean = false): string {
   if (processes.length === 0) return `\r\n${C.dim}  No processes found${C.reset}\r\n`;
-  
-  const lines = processes.slice(0, 30).map(p => {
+
+  if (isSingular) {
+    const p = processes[0];
     const name = p.name || p.command || String(p);
-    const pid = p.pid ? ` ${C.dim}PID:${p.pid}${C.reset}` : '';
-    const cpu = p.cpu ? ` ${C.dim}CPU:${p.cpu}%${C.reset}` : '';
-    return `  ⚙ ${C.white}${name}${C.reset}${pid}${cpu}`;
+    const pid = p.pid !== undefined ? `${C.dim}PID:${p.pid}${C.reset}` : '';
+    const cpuVal = p.cpuPercent ?? p.cpu;
+    const cpu = cpuVal !== undefined ? `${C.boldYellow}CPU: ${cpuVal}%${C.reset}` : '';
+    const ramVal = p.ramPercent ?? (p.ramMb ? `${p.ramMb}MB` : undefined);
+    const ram = ramVal !== undefined ? `${C.boldMagenta}RAM: ${typeof ramVal === 'number' ? `${ramVal}%` : ramVal}${C.reset}` : '';
+
+    const details = [pid, cpu, ram].filter(Boolean).join(` ${C.dim}|${C.reset} `);
+    const label = titleExtra ? `Top Process${titleExtra}` : 'Top Process';
+    return `\r\n  ${C.boldCyan}▶ ${label}:${C.reset} ${C.boldWhite}${name}${C.reset}${details ? `  (${details})` : ''}\r\n`;
+  }
+  
+  const header = titleExtra ? `\r\n${C.boldCyan}Top Processes${titleExtra}:${C.reset}\r\n` : '\r\n';
+  const lines = processes.slice(0, 20).map(p => {
+    const name = p.name || p.command || String(p);
+    const pid = p.pid !== undefined ? `${C.dim}PID:${p.pid}${C.reset}` : '';
+    const cpuVal = p.cpuPercent ?? p.cpu;
+    const cpu = cpuVal !== undefined ? `${C.yellow}CPU: ${cpuVal}%${C.reset}` : '';
+    const ramVal = p.ramPercent ?? (p.ramMb ? `${p.ramMb}MB` : undefined);
+    const ram = ramVal !== undefined ? `${C.magenta}RAM: ${typeof ramVal === 'number' ? `${ramVal}%` : ramVal}${C.reset}` : '';
+    
+    const details = [pid, cpu, ram].filter(Boolean).join(` ${C.dim}|${C.reset} `);
+    return `  • ${C.boldWhite}${name}${C.reset}${details ? `  ${details}` : ''}`;
   });
 
-  return `\r\n${lines.join('\r\n')}\r\n`;
+  return `${header}${lines.join('\r\n')}\r\n`;
+}
+
+function formatVolumeList(volumes: any[]): string {
+  if (volumes.length === 0) return `\r\n${C.dim}  No storage volumes detected${C.reset}\r\n`;
+
+  const header = `\r\n${C.boldCyan}Storage Mounts & Disk Usage:${C.reset}\r\n`;
+  const lines = volumes.map(v => {
+    const mount = v.mount || v.mountedOn || '/';
+    const total = v.total ?? (v.totalGb ? `${v.totalGb} GB` : 'unknown');
+    const avail = v.available ?? (v.availableGb ? `${v.availableGb} GB` : '');
+    const pct = v.percentUsed ?? (v.usePercent ? `${v.usePercent}` : '');
+    const fs = v.filesystem ? `${C.dim}(${v.filesystem})${C.reset}` : '';
+    
+    const spaceInfo = avail && total ? `${C.green}${avail} free${C.reset} of ${total}` : `${total}`;
+    const pctInfo = pct ? ` [${C.yellow}${pct} used${C.reset}]` : '';
+
+    return `  • ${C.boldWhite}${mount}${C.reset} ${fs} — ${spaceInfo}${pctInfo}`;
+  });
+
+  return `${header}${lines.join('\r\n')}\r\n`;
+}
+
+function formatBatteryStatus(data: any): string {
+  const pct = data.percentage ?? data.batteryLevel;
+  const status = data.status || (data.isCharging ? 'Charging' : (data.noBattery ? 'AC Power' : 'Discharging'));
+  const source = data.powerSource ? ` (${data.powerSource})` : '';
+  const icon = data.isCharging ? '[AC]' : '[BAT]';
+  return `\r\n  ${C.boldCyan}${icon} Battery:${C.reset} ${C.boldGreen}${pct}%${C.reset} — ${status}${source}\r\n`;
+}
+
+function formatRamStatus(data: any): string {
+  const total = data.totalGb ? `${data.totalGb} GB` : data.total;
+  const used = data.usedGb ? `${data.usedGb} GB` : data.used;
+  const avail = data.availableGb ? `${data.availableGb} GB` : (data.freeGb ? `${data.freeGb} GB free` : data.free);
+  const swap = data.swapTotalGb ? ` | Swap: ${data.swapUsedGb || 0} GB used of ${data.swapTotalGb} GB` : '';
+  return `\r\n  ${C.boldCyan}System Memory (RAM):${C.reset} ${C.boldGreen}${used} used${C.reset} / ${total} total (${avail} available)${swap}\r\n`;
+}
+
+function formatSystemInfo(data: any): string {
+  const os = `${C.boldWhite}${data.os}${C.reset}`;
+  const kernel = data.kernel ? ` | Kernel: ${C.dim}${data.kernel}${C.reset}` : '';
+  const arch = data.arch ? ` (${data.arch})` : '';
+  const cpu = data.model ? `\r\n  ${C.boldCyan}CPU:${C.reset} ${data.model} (${data.cpus} cores)` : (data.cpus ? `\r\n  ${C.boldCyan}CPUs:${C.reset} ${data.cpus} cores` : '');
+  const mem = data.memoryGb ? `\r\n  ${C.boldCyan}Memory:${C.reset} ${data.memoryGb} GB` : '';
+  const uptime = data.uptime ? `\r\n  ${C.boldCyan}Uptime:${C.reset} ${data.uptime}` : '';
+  return `\r\n  ${C.boldCyan}OS:${C.reset} ${os}${arch}${kernel}${cpu}${mem}${uptime}\r\n`;
 }
 
 function formatSize(bytes: number): string {

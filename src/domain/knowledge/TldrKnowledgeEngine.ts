@@ -668,7 +668,12 @@ export class TldrKnowledgeEngine {
   // =========================================================================
 
   public isMacPlatform(platform?: string): boolean {
-    if (!platform) return true;
+    if (!platform) {
+      if (typeof process !== 'undefined' && process.platform) {
+        return process.platform === 'darwin';
+      }
+      return false;
+    }
     const p = platform.toLowerCase();
     return p.includes('mac') || p.includes('darwin') || p.includes('osx') || p.includes('apple');
   }
@@ -677,11 +682,12 @@ export class TldrKnowledgeEngine {
    * Matches a natural language user goal or prompt directly against the
    * canonical tldr recipes with confidence scoring and argument extraction.
    */
-  public matchGoal(goal: string, osPlatform: string = 'osx'): TldrMatchResult | null {
+  public matchGoal(goal: string, osPlatform?: string): TldrMatchResult | null {
     if (!goal || !goal.trim()) return null;
 
     const cleanGoal = goal.toLowerCase().trim();
-    const isMac = this.isMacPlatform(osPlatform);
+    const resolvedPlatform = osPlatform || (typeof process !== 'undefined' && process.platform === 'darwin' ? 'osx' : 'linux');
+    const isMac = this.isMacPlatform(resolvedPlatform);
 
     // 1. High-Priority Direct Canonical Recipe Matches
     // DNS Flush
@@ -697,18 +703,20 @@ export class TldrKnowledgeEngine {
       }
     }
 
-    // Inspect Specific Port (e.g. "who is using port 3000", "port 8080", "check port 5432")
-    const specificPortMatch = cleanGoal.match(/(?:who\s+is\s+using\s+port|check\s+port|inspect\s+port|port)\s*:?\s*(\d+)/i);
-    if (specificPortMatch && specificPortMatch[1]) {
-      const portNum = specificPortMatch[1];
-      const page = this.pages.get('lsof');
-      if (page && page.examples[1]) {
-        return {
-          page,
-          example: page.examples[1],
-          confidence: 0.95,
-          interpolatedCommand: page.examples[1].command.replace('{{port}}', portNum)
-        };
+    // Inspect Specific Port (e.g. "who is using port 3000", "check port 5432")
+    if (!cleanGoal.includes('kill') && !cleanGoal.includes('terminate') && !cleanGoal.includes('pid')) {
+      const specificPortMatch = cleanGoal.match(/(?:who\s+is\s+using\s+port|check\s+port|inspect\s+port|listening\s+on\s+port)\s*:?\s*(\d+)/i);
+      if (specificPortMatch && specificPortMatch[1]) {
+        const portNum = specificPortMatch[1];
+        const page = this.pages.get('lsof');
+        if (page && page.examples[1]) {
+          return {
+            page,
+            example: page.examples[1],
+            confidence: 0.95,
+            interpolatedCommand: page.examples[1].command.replace('{{port}}', portNum)
+          };
+        }
       }
     }
 
@@ -853,13 +861,14 @@ export class TldrKnowledgeEngine {
    * Retrieves all canonical examples for a specific command name,
    * filtered for the current operating system.
    */
-  public getExamplesForCommand(commandName: string, osPlatform: string = 'osx'): TldrExample[] {
+  public getExamplesForCommand(commandName: string, osPlatform?: string): TldrExample[] {
     if (!commandName) return [];
     const cleanCmd = commandName.trim().toLowerCase();
     const page = this.pages.get(cleanCmd);
     if (!page) return [];
 
-    const isMac = this.isMacPlatform(osPlatform);
+    const resolvedPlatform = osPlatform || (typeof process !== 'undefined' && process.platform === 'darwin' ? 'osx' : 'linux');
+    const isMac = this.isMacPlatform(resolvedPlatform);
     const targetPlatform = isMac ? 'osx' : 'linux';
 
     return page.examples.filter(ex => ex.platform === 'common' || ex.platform === targetPlatform);
@@ -869,8 +878,9 @@ export class TldrKnowledgeEngine {
    * Formats high-precision few-shot exemplar text for injection into
    * LLM prompts or system context.
    */
-  public formatFewShotExemplar(commandName: string, osPlatform: string = 'osx'): string {
-    const examples = this.getExamplesForCommand(commandName, osPlatform);
+  public formatFewShotExemplar(commandName: string, osPlatform?: string): string {
+    const resolvedPlatform = osPlatform || (typeof process !== 'undefined' && process.platform === 'darwin' ? 'osx' : 'linux');
+    const examples = this.getExamplesForCommand(commandName, resolvedPlatform);
     if (examples.length === 0) return '';
 
     const lines = [`Ground-Truth CLI Recipes for "${commandName}":`];

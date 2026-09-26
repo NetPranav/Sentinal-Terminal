@@ -12,6 +12,8 @@
 
 import { spawnSync } from 'node:child_process';
 import * as os from 'node:os';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 
 export interface CommandExecutionRecord {
   command: string;
@@ -23,6 +25,7 @@ export interface CommandExecutionRecord {
   code: number;
   durationMs: number;
   timestamp: number;
+  isAuditLog?: boolean;
 }
 
 export type CommandExecutionListener = (record: CommandExecutionRecord) => void;
@@ -68,8 +71,22 @@ export class NodeTauriBridge {
   /**
    * Get all recorded command executions in this session.
    */
-  public static getHistory(): CommandExecutionRecord[] {
-    return [...this.commandHistory];
+  public static getHistory(includeAudit = true): CommandExecutionRecord[] {
+    if (includeAudit) {
+      return [...this.commandHistory];
+    }
+    return this.commandHistory.filter(c => !c.isAuditLog);
+  }
+
+  /**
+   * Get capability commands executed by the user / agent (excludes internal audit logging and probe checks).
+   */
+  public static getCapabilityCommands(): CommandExecutionRecord[] {
+    return this.commandHistory.filter(c => 
+      !c.isAuditLog && 
+      !c.fullCommand.includes('learned_patterns.json') &&
+      !c.fullCommand.includes('test -f "$HOME/.sentinel/models')
+    );
   }
 
   /**
@@ -77,6 +94,17 @@ export class NodeTauriBridge {
    */
   public static clearHistory(): void {
     this.commandHistory = [];
+  }
+
+  /**
+   * Directly execute a command using the bridge.
+   */
+  public static execute(command: string, args: string[] = [], cwd?: string): { code: number; stdout: string; stderr: string } {
+    // When called with a bare command string (no args), use sh -c for shell evaluation
+    if (args.length === 0) {
+      return this.handleInvoke('execute_command', { command: 'sh', args: ['-c', command], cwd });
+    }
+    return this.handleInvoke('execute_command', { command, args, cwd });
   }
 
   /**
@@ -123,6 +151,7 @@ export class NodeTauriBridge {
 
         const durationMs = performance.now() - startTime;
         const fullCommand = args.length > 0 ? `${command} ${args.join(' ')}` : command;
+        const isAuditLog = fullCommand.includes('.sentinel/audit.') || fullCommand.includes('audit.jsonl') || fullCommand.includes('audit.benchmark.jsonl');
 
         const record: CommandExecutionRecord = {
           command,
@@ -133,7 +162,8 @@ export class NodeTauriBridge {
           stderr,
           code,
           durationMs,
-          timestamp: Date.now()
+          timestamp: Date.now(),
+          isAuditLog
         };
 
         this.commandHistory.push(record);
@@ -150,7 +180,11 @@ export class NodeTauriBridge {
 
       case 'list_processes': {
         try {
-          const res = spawnSync('ps', ['-eo', 'pid,pcpu,pmem,comm', '-r'], { encoding: 'utf-8' });
+          const isLinux = process.platform === 'linux';
+          const args = isLinux
+            ? ['-eo', 'pid,pcpu,pmem,comm', '--sort=-pcpu']
+            : ['-eo', 'pid,pcpu,pmem,comm', '-r'];
+          const res = spawnSync('ps', args, { encoding: 'utf-8' });
           const lines = (res.stdout || '').split('\n').filter(Boolean);
           const processes: Array<{ pid: number; name: string; memory: number; cpu: number; cmd: string[] }> = [];
 
@@ -201,6 +235,44 @@ export class NodeTauriBridge {
 
       case 'get_launch_args': {
         return process.argv;
+      }
+
+      case 'get_app_binary_path': {
+        return process.execPath;
+      }
+
+      case 'write_system_file': {
+        const filePath = (payload as any)?.path;
+        const contents = (payload as any)?.contents ?? '';
+        if (filePath) {
+          const dir = path.dirname(filePath);
+          if (!fs.existsSync(dir)) {
+            fs.mkdirSync(dir, { recursive: true });
+          }
+          fs.writeFileSync(filePath, contents, 'utf-8');
+        }
+        return null;
+      }
+
+      case 'create_system_dir': {
+        const dirPath = (payload as any)?.path;
+        if (dirPath && !fs.existsSync(dirPath)) {
+          fs.mkdirSync(dirPath, { recursive: true });
+        }
+        return null;
+      }
+
+      case 'read_system_file': {
+        const filePath = (payload as any)?.path;
+        if (filePath && fs.existsSync(filePath)) {
+          return fs.readFileSync(filePath, 'utf-8');
+        }
+        throw new Error(`File not found: ${filePath}`);
+      }
+
+      case 'check_path_exists': {
+        const checkPath = (payload as any)?.path;
+        return checkPath ? fs.existsSync(checkPath) : false;
       }
 
       default:

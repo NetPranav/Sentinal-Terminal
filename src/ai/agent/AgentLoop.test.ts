@@ -353,7 +353,7 @@ describe('AgentLoop fast-path routing', () => {
         expect.any(String),
         expect.any(String),
         expect.objectContaining({
-          grammar: expect.stringContaining('action_execute')
+          grammar: expect.stringContaining('action-execute')
         })
       );
 
@@ -542,9 +542,9 @@ describe('AgentLoop fast-path routing', () => {
       const mockToolExecutor = {
         hasDriver: vi.fn().mockReturnValue(true),
         execute: vi.fn()
-          .mockResolvedValueOnce({ success: false, error: 'Command badcmd1 not found', data: { code: 127 } })
-          .mockResolvedValueOnce({ success: false, error: 'Command badcmd2 not found', data: { code: 127 } })
-          .mockResolvedValueOnce({ success: false, error: 'Command badcmd3 not found', data: { code: 127 } })
+          .mockResolvedValueOnce({ success: false, error: 'Command badcmd1 failed: unrecognized option --xyz', data: { code: 1 } })
+          .mockResolvedValueOnce({ success: false, error: 'Command badcmd2 failed: unrecognized option --xyz', data: { code: 1 } })
+          .mockResolvedValueOnce({ success: false, error: 'Command badcmd3 failed: unrecognized option --xyz', data: { code: 1 } })
           // Safety net fallback execution
           .mockResolvedValueOnce({ success: true, data: { stdout: '/Users/test/frontend', code: 0 } })
       };
@@ -567,7 +567,50 @@ describe('AgentLoop fast-path routing', () => {
       const safetyNetEvent = events.find(e => e.type === 'thinking' && e.message.includes('Three command attempts failed'));
       expect(safetyNetEvent).toBeDefined();
     });
+
+    it('skips retries and activates fallback immediately when failure is unrecoverable (MISSING_BINARY) (0.5.10)', async () => {
+      const mockProvider = {
+        isAvailable: vi.fn().mockResolvedValue(true),
+        generate: vi.fn().mockResolvedValueOnce({
+          content: JSON.stringify({ action: 'execute', command: 'missingtool' })
+        })
+      };
+
+      const mockModelManager = {
+        getActiveProvider: () => mockProvider,
+        getActiveModel: () => ({ modelId: 'test-model' }),
+        initialize: vi.fn().mockResolvedValue(undefined)
+      } as any;
+
+      const mockToolExecutor = {
+        hasDriver: vi.fn().mockReturnValue(true),
+        execute: vi.fn()
+          // First attempt fails with missing binary (127)
+          .mockResolvedValueOnce({ success: false, error: 'zsh: command not found: missingtool', data: { code: 127 } })
+          // Deterministic fallback executes directly without retrying missingtool
+          .mockResolvedValueOnce({ success: true, data: { stdout: '/Users/test/frontend', code: 0 } })
+      };
+
+      const loop = new AgentLoop(
+        { toolIndex: { has: () => false, getAll: () => [] } } as any,
+        mockModelManager
+      );
+      (loop as any).toolExecutor = mockToolExecutor;
+
+      const events: any[] = [];
+      loop.onEvent((ev) => events.push(ev));
+
+      const result = await loop.run('find all frontend folders in my system', { os: 'mac', cwd: '/test' });
+
+      // Skips retry 2 and retry 3: called only 2 times (attempt 1 + fallback)!
+      expect(mockToolExecutor.execute).toHaveBeenCalledTimes(2);
+      expect(result.success).toBe(true);
+
+      const unrecoverableEvent = events.find(e => e.type === 'thinking' && e.message.includes('Unrecoverable failure (MISSING_BINARY)'));
+      expect(unrecoverableEvent).toBeDefined();
+    });
   });
+
 
   describe('Phase 4.1 — Speculative Shadow-PTY Simulation Integration', () => {
     it('should speculatively evaluate candidates and swap unviable model syntax for verified winner', async () => {
@@ -743,6 +786,7 @@ To push the current branch and set the remote as upstream, use
       );
       expect(remediationEvent).toBeDefined();
     });
+
   });
 
   describe('Application and process management fast paths', () => {
@@ -781,6 +825,40 @@ To push the current branch and set the remote as upstream, use
       expect(res3?.tool).toBe('system.kill_process');
       expect(res3?.params.process).toBe('Music');
       expect(res3?.params.ifRunning).toBe(true);
+    });
+  });
+
+  describe('sanitizeDesktopAppCommand & application opening', () => {
+    it('rewrites "zen" binary invocations to "zen-browser"', () => {
+      const sanitized = AgentLoop.sanitizeDesktopAppCommand('zen & code /path/to/folder &');
+      expect(sanitized).toBe('zen-browser & code /path/to/folder &');
+    });
+
+    it('prepends hyprctl workspace dispatch when goal specifies a workspace', () => {
+      const sanitized = AgentLoop.sanitizeDesktopAppCommand(
+        'zen-browser & code /path/to/folder &',
+        'open zen browser and /path/to/folder in vscode in 5th workspace'
+      );
+      expect(sanitized).toContain('hyprctl dispatch workspace 5');
+      expect(sanitized).toContain('zen-browser & code /path/to/folder &');
+    });
+
+    it('does not duplicate hyprctl dispatch if already present', () => {
+      const original = '(hyprctl dispatch workspace 5 >/dev/null 2>&1 || true) && zen-browser & code /path/to/folder &';
+      const sanitized = AgentLoop.sanitizeDesktopAppCommand(
+        original,
+        'open zen browser and /path/to/folder in vscode in 5th workspace'
+      );
+      expect(sanitized).toBe(original);
+    });
+
+    it('matches composite app launch regex with workspace specifier', () => {
+      const res = findFastPath('open zen browser and "/home/test/Projects" folder in vscode in 5th workspace');
+      expect(res).not.toBeNull();
+      expect(res?.tool).toBe('shell.execute');
+      expect(res?.params.command).toContain('hyprctl dispatch');
+      expect(res?.params.command).toContain('zen-browser');
+      expect(res?.params.command).toContain('code "/home/test/Projects"');
     });
   });
 });

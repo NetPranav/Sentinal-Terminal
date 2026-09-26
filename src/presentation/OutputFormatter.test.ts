@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { formatAgentEvent, formatMarkdownTerminal } from './OutputFormatter';
+import { formatAgentEvent, formatMarkdownTerminal, formatDataOutput } from './OutputFormatter';
 
 describe('OutputFormatter — Terminal Markdown & CRLF Formatting', () => {
   it('formats multi-line markdown responses without any bare LF (staircase prevention)', () => {
@@ -63,5 +63,91 @@ sudo networksetup -setmanual en1 192.168.1.100 255.255.255.0 192.168.1.1
     const error = formatAgentEvent({ type: 'error', message: 'Operation failed\nAccess denied' });
     expect(/(?<!\r)\n/.test(error)).toBe(false);
     expect(error.endsWith('\r\n')).toBe(true);
+  });
+
+  it('formats activeProcesses cleanly with PID, CPU%, and RAM%', () => {
+    const out = formatDataOutput({
+      sortedBy: 'cpu',
+      activeProcesses: [
+        { pid: 20485, name: 'spotify', cpuPercent: 19.7, ramPercent: 2.7 },
+        { pid: 21581, name: 'WebKitWebProcess', cpuPercent: 10.3, ramPercent: 2.7 }
+      ]
+    });
+
+    expect(out).toContain('Top Processes (sorted by CPU)');
+    expect(out).toContain('spotify');
+    expect(out).toContain('PID:20485');
+    expect(out).toContain('CPU: 19.7%');
+    expect(out).toContain('RAM: 2.7%');
+    expect(/(?<!\r)\n/.test(out)).toBe(false);
+  });
+
+  it('formats storage volumes cleanly with mounts and free space', () => {
+    const out = formatDataOutput({
+      volumes: [
+        { mount: '/', total: '261G', available: '64G', percentUsed: '75%', filesystem: '/dev/nvme0n1p6' }
+      ]
+    });
+
+    expect(out).toContain('Storage Mounts & Disk Usage');
+    expect(out).toContain('/dev/nvme0n1p6');
+    expect(out).toContain('64G free');
+    expect(out).toContain('of 261G');
+    expect(out).toContain('75% used');
+    expect(/(?<!\r)\n/.test(out)).toBe(false);
+  });
+
+  it('formats battery status and ram status cleanly', () => {
+    const batOut = formatDataOutput({
+      percentage: 58,
+      status: 'Not charging',
+      powerSource: 'Battery (BAT1)'
+    });
+    expect(batOut).toContain('Battery:');
+    expect(batOut).toContain('58%');
+    expect(batOut).toContain('Not charging');
+
+    const ramOut = formatDataOutput({
+      totalGb: 15.1,
+      usedGb: 6.4,
+      availableGb: 8.9,
+      swapTotalGb: 7.7,
+      swapUsedGb: 2.2
+    });
+    expect(ramOut).toContain('System Memory (RAM):');
+    expect(ramOut).toContain('6.4 GB used');
+    expect(ramOut).toContain('15.1 GB total');
+  });
+
+  it('formats single process card when singular query is requested', () => {
+    const out = formatDataOutput({
+      sortedBy: 'cpu',
+      count: 1,
+      singular: true,
+      activeProcesses: [
+        { pid: 52374, name: 'llama-server', cpuPercent: 196, ramPercent: 19.9 }
+      ]
+    });
+
+    expect(out).toContain('▶ Top Process (sorted by CPU):');
+    expect(out).toContain('llama-server');
+    expect(out).toContain('PID:52374');
+    expect(out).toContain('CPU: 196%');
+    expect(out).toContain('RAM: 19.9%');
+    expect(/(?<!\r)\n/.test(out)).toBe(false);
+  });
+
+  it('formats single process card when goal asks "which process is using the most cpu"', () => {
+    const out = formatDataOutput({
+      sortedBy: 'cpu',
+      activeProcesses: [
+        { pid: 52374, name: 'llama-server', cpuPercent: 196, ramPercent: 19.9 },
+        { pid: 50208, name: 'Isolated Web Co', cpuPercent: 29.7, ramPercent: 4.3 }
+      ]
+    }, { goal: 'which process is using the most cpu' });
+
+    expect(out).toContain('▶ Top Process (sorted by CPU):');
+    expect(out).toContain('llama-server');
+    expect(out).not.toContain('Isolated Web Co');
   });
 });

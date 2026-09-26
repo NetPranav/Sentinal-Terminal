@@ -26,6 +26,7 @@ export class PtyOutputObserver {
   private recentOutputBuffer: string[] = [];
   private activeRemediation: RemediationPrompt | null = null;
   private listeners: ((remediation: RemediationPrompt | null) => void)[] = [];
+  private isSuspended: boolean = false;
 
   public static getInstance(): PtyOutputObserver {
     if (!PtyOutputObserver.instance) {
@@ -34,11 +35,35 @@ export class PtyOutputObserver {
     return PtyOutputObserver.instance;
   }
 
+  public isObserverSuspended(): boolean {
+    return this.isSuspended;
+  }
+
+  public setSuspended(suspended: boolean): void {
+    this.isSuspended = suspended;
+  }
+
   /**
    * Ingest streaming terminal output chunks
    */
   public ingest(chunk: string, cwd?: string, command?: string): RemediationPrompt | null {
     if (!chunk) return null;
+
+    // Detect alternate screen buffer entry/exit sequences BEFORE stripping ANSI
+    // \x1b[?1049h or \x1b[?47h: Enter alternate screen buffer (e.g. vim, htop, tmux, less)
+    if (chunk.includes('\x1b[?1049h') || chunk.includes('\x1b[?47h')) {
+      this.isSuspended = true;
+    }
+    // \x1b[?1049l or \x1b[?47l: Exit alternate screen buffer
+    if (chunk.includes('\x1b[?1049l') || chunk.includes('\x1b[?47l')) {
+      this.isSuspended = false;
+    }
+
+    // When inside an interactive full-screen TUI application, suspend passive observation
+    // to prevent misfiring auto-heal suggestions on TUI redraws.
+    if (this.isSuspended) {
+      return null;
+    }
 
     // Filter out common raw ANSI escape codes to inspect clean text
     const cleanChunk = chunk.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '');

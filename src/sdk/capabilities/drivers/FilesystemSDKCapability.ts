@@ -201,7 +201,7 @@ export class FilesystemSDKCapability extends BaseCapabilityDriver<FsDriverInput,
             stdout = `Directory Contents (${targetPath}):\r\n  (Directory is completely empty on disk — 0 folders, 0 files)`;
           } else {
             stdout = `Directory Contents (${targetPath}):\r\n` +
-              entries.map(e => `  ${e.isDirectory ? '📁' : '📄'} ${e.name}`).join('\r\n');
+              entries.map(e => `  ${e.isDirectory ? '[DIR]' : '[FILE]'} ${e.name}`).join('\r\n');
           }
           return { success: true, data: { entries, stdout }, commandExecuted: `fs.readDir("${resolvedPath}")` };
         }
@@ -239,7 +239,7 @@ export class FilesystemSDKCapability extends BaseCapabilityDriver<FsDriverInput,
         case 'cd': {
           if (!resolvedPath) return { success: false, error: { code: 'MISSING_PATH', message: 'Path required' } };
           const stdout = `Changed directory to: ${targetPath}`;
-          return { success: true, data: { path: resolvedPath, stdout }, commandExecuted: `cd "${resolvedPath}"` };
+          return { success: true, data: { path: resolvedPath, stdout, code: 0 }, commandExecuted: `cd "${resolvedPath}"` };
         }
 
         case 'copy': {

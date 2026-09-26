@@ -8,14 +8,14 @@ describe('GbnfGrammarManager (Phase 5.3 — GBNF Constrained Decoding)', () => {
     it('provides valid SENTINEL_ACTION GBNF grammar definition', () => {
       const gbnf = GbnfGrammarManager.getGrammar('SENTINEL_ACTION');
 
-      expect(gbnf).toContain('root ::= action_execute | action_done');
+      expect(gbnf).toContain('root ::= action-execute | action-done');
       expect(gbnf).toContain('\\"action\\"');
       expect(gbnf).toContain('\\"execute\\"');
       expect(gbnf).toContain('\\"command\\"');
       expect(gbnf).toContain('\\"explanation\\"');
       expect(gbnf).toContain('\\"done\\"');
       expect(gbnf).toContain('\\"summary\\"');
-      expect(gbnf).toContain('char ::=');
+      expect(gbnf).toContain('string ::=');
       expect(gbnf).toContain('ws ::=');
     });
 
@@ -28,7 +28,7 @@ describe('GbnfGrammarManager (Phase 5.3 — GBNF Constrained Decoding)', () => {
       expect(gbnf).toContain('\\"clarify\\"');
       expect(gbnf).toContain('\\"summary\\"');
       expect(gbnf).toContain('\\"steps\\"');
-      expect(gbnf).toContain('string_list ::=');
+      expect(gbnf).toContain('string-list ::=');
     });
 
     it('provides valid STRICT_JSON GBNF grammar definition', () => {

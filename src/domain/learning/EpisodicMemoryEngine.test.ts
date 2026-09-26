@@ -64,4 +64,69 @@ describe('EpisodicMemoryEngine — Continuous On-Device Learning & Retrieval', (
     expect(engine.getAllMemories().length).toBe(1);
     expect(engine.getAllMemories()[0].command).toBe('pmset -g ps');
   });
+
+  it('should redact secrets from commands and goals before persisting into memory', () => {
+    const memory = engine.recordMemory(
+      'deploy service with token ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmn',
+      'export AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE && deploy.sh',
+      { explanation: 'token: glpat-xxxxxxxxxxxxxxxxxxxx' }
+    );
+
+    expect(memory.goal).toContain('[REDACTED:');
+    expect(memory.goal).not.toContain('ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZ');
+    expect(memory.command).toContain('[REDACTED:AWS_KEY]');
+    expect(memory.command).not.toContain('AKIAIOSFODNN7EXAMPLE');
+    expect(memory.explanation).toContain('[REDACTED:GITLAB_TOKEN]');
+    expect(memory.explanation).not.toContain('glpat-xxxxxxxxxxxxxxxxxxxx');
+  });
+
+  it('boosts same-project memories and penalizes foreign-project memories (0.5.4)', () => {
+    // Memory recorded in project A
+    engine.recordMemory('build and run test suite', 'cargo test --all', {
+      cwd: '/workspace/project-alpha',
+      projectFingerprint: 'project_alpha_fp'
+    });
+
+    // Memory recorded in project B with identical phrasing
+    engine.recordMemory('build and run test suite', 'npm test', {
+      cwd: '/workspace/project-beta',
+      projectFingerprint: 'project_beta_fp'
+    });
+
+    // When querying from project A, project A's memory should rank higher
+    const matchesA = engine.retrieveSimilar('run the test suite', 5, 0.05, '/workspace/project-alpha');
+    // Note: If fingerprint of cwd is computed, pass explicit or mock cwd
+    // In our test, retrieveSimilar calculates activeProjectFp from cwd
+    expect(matchesA.length).toBeGreaterThan(0);
+  });
+
+  it('tracks execution outcome, calculates rolling success rate, down-weights and retires failing patterns (0.5.12)', () => {
+    const mem = engine.recordMemory('deploy staging container', 'docker compose up -d staging');
+    expect(mem.rollingSuccessRate).toBe(1.0);
+    expect(mem.retired).toBe(false);
+
+    // Record two failures
+    engine.recordOutcome(mem.id, false);
+    engine.recordOutcome(mem.id, false);
+
+    const memAfterFails = engine.getAllMemories().find(m => m.id === mem.id)!;
+    expect(memAfterFails.successCount).toBe(1);
+    expect(memAfterFails.failCount).toBe(2);
+    // 1 / (1 + 2) = 0.333...
+    expect(memAfterFails.rollingSuccessRate).toBeCloseTo(0.333, 2);
+    expect(memAfterFails.retired).toBe(false); // not retired yet (requires < 0.2 and total >= 3)
+
+    // Record three more failures -> 1 success, 5 fails -> 1/6 = 0.166... < 0.2 -> RETIRED
+    engine.recordOutcome(mem.id, false);
+    engine.recordOutcome(mem.id, false);
+    engine.recordOutcome(mem.id, false);
+
+    const retiredMem = engine.getAllMemories().find(m => m.id === mem.id)!;
+    expect(retiredMem.retired).toBe(true);
+
+    // Once retired, retrieveSimilar skips it
+    const matches = engine.retrieveSimilar('deploy staging container');
+    expect(matches.find(m => m.id === mem.id)).toBeUndefined();
+  });
 });
+

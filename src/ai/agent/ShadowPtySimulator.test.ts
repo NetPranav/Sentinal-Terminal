@@ -97,9 +97,9 @@ describe('ShadowPtySimulator — Speculative Shadow-PTY Simulation Engine', () =
       expect(isTransformed).toBe(true);
     });
 
-    it('should transform unmapped mutating command into safe zsh -n syntax verification', () => {
+    it('should transform unmapped mutating command into safe shell -n syntax verification', () => {
       const { predicate, isTransformed } = simulator.toSafePredicate('chmod +x script.sh && ./script.sh', 'safe_mutation');
-      expect(predicate).toContain('/bin/zsh -n -c');
+      expect(predicate).toMatch(/\/(?:zsh|bash|sh)\s+-n\s+-c/);
       expect(isTransformed).toBe(true);
     });
   });
@@ -235,10 +235,12 @@ describe('ShadowPtySimulator — Speculative Shadow-PTY Simulation Engine', () =
     const simulator = new ShadowPtySimulator();
 
     it('should execute read-only probe in ephemeral subshell in <50ms', async () => {
+      const isMac = process.platform === 'darwin';
+      const cmd = isMac ? 'sw_vers' : 'echo macOS version 14.5';
       const startTime = performance.now();
       const report = await simulator.speculate(
         'check macOS version',
-        'sw_vers',
+        cmd,
         { os: 'mac', cwd: process.cwd() }
       );
       const elapsed = performance.now() - startTime;
@@ -263,5 +265,45 @@ describe('ShadowPtySimulator — Speculative Shadow-PTY Simulation Engine', () =
       // PID 999999 does not exist, so exitCode is 1
       expect(report.evaluatedCandidates[0].exitCode).toBe(1);
     });
+
+    it('should route high-risk AST-only command to AST assessment without sandbox execution (0.5.5)', async () => {
+      const mockExecutor = vi.fn();
+      const mockSim = new ShadowPtySimulator({ executor: mockExecutor });
+
+      const report = await mockSim.speculate(
+        'delete all files from root',
+        'rm -rf /',
+        { os: 'linux', cwd: '/' }
+      );
+
+      // Should NOT have called the executor (skips sandbox execution!)
+      expect(mockExecutor).not.toHaveBeenCalled();
+
+      // Primary candidate should be evaluated via AST and pruned
+      const primary = report.evaluatedCandidates[0];
+      expect(primary.pruned).toBe(true);
+      expect(primary.stdout).toContain('AST-Only Assessment');
+      expect(primary.empiricalScore).toBeLessThan(0);
+    });
+
+    it('should transform cargo build to cargo check via dry-run routing (0.5.5)', async () => {
+      const mockExecutor = vi.fn().mockResolvedValue({ stdout: 'Finished dev profile', stderr: '', code: 0 });
+      const mockSim = new ShadowPtySimulator({ executor: mockExecutor });
+
+      const report = await mockSim.speculate(
+        'compile rust binary',
+        'cargo build --release',
+        { os: 'linux', cwd: '/tmp' }
+      );
+
+      expect(report.evaluatedCandidates[0].isPredicateTransformed).toBe(true);
+      expect(report.evaluatedCandidates[0].executedCommand).toBe('cargo check --release');
+      expect(mockExecutor).toHaveBeenCalledWith(
+        expect.any(String),
+        ['-c', 'cargo check --release'],
+        '/tmp'
+      );
+    });
   });
 });
+

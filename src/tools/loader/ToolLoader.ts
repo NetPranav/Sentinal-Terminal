@@ -189,7 +189,7 @@ export class ToolLoader {
     if (!silent) {
       console.log(`[ToolLoader] Loaded ${loaded} tools, ${failed} failed.`);
       for (const d of diagnostics) {
-        const prefix = d.level === 'error' ? '❌' : '⚠️';
+        const prefix = d.level === 'error' ? '[x]' : '[!]';
         console.warn(`${prefix} [${d.toolPath}/${d.file}] ${d.message}`);
       }
     }

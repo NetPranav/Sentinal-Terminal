@@ -2,7 +2,7 @@
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Sentinel Terminal",
   "version": "2.0.0",
-  "identifier": "com.pranav.sentinel-terminal",
+  "identifier": "org.sentinel.terminal",
   "build": {
     "beforeDevCommand": "npm run dev",
     "devUrl": "http://localhost:1420",
@@ -14,10 +14,7 @@
       {
         "title": "Sentinel Terminal",
         "width": 1024,
-        "height": 768,
-        "titleBarStyle": "Overlay",
-        "hiddenTitle": true,
-        "transparent": true
+        "height": 768
       }
     ],
     "security": {
@@ -31,15 +28,31 @@
       "icons/32x32.png",
       "icons/128x128.png",
       "icons/128x128@2x.png",
-      "icons/icon.icns",
+      "icons/icon.png",
       "icons/icon.ico"
     ],
     "category": "DeveloperTool",
-    "macOS": {
-      "minimumSystemVersion": "12.0",
-      "infoPlist": "Info.plist"
-    },
-    "externalBin": ["binaries/llama-server"],
-    "resources": ["resources/models/*"]
+    "shortDescription": "Autonomous AI-Native Linux Terminal Copilot",
+    "longDescription": "High-performance AI-native Linux terminal emulator with embedded llama-server, multi-stage workflow macros, and native system diagnostics.",
+    "copyright": "2026 Sentinel Terminal Contributors",
+    "linux": {
+      "deb": {
+        "depends": [
+          "libwebkit2gtk-4.1-0 | libwebkit2gtk-4.0-37",
+          "libappindicator3-1 | libayatana-appindicator3-1",
+          "openssl"
+        ]
+      },
+      "rpm": {
+        "depends": [
+          "webkit2gtk4.1",
+          "openssl"
+        ]
+      },
+      "appimage": {
+        "bundleMediaFramework": false
+      }
+    }
   }
 }
+

@@ -22,16 +22,13 @@ export class GbnfGrammarManager {
    * or
    *   {"action": "done", "summary": "<sum>"}
    */
-  public static readonly SENTINEL_ACTION_GBNF = `root ::= action_execute | action_done
+  public static readonly SENTINEL_ACTION_GBNF = `root ::= action-execute | action-done
 
-action_execute ::= "{" ws "\\"action\\"" ws ":" ws "\\"execute\\"" ws "," ws "\\"command\\"" ws ":" ws string ws "," ws "\\"explanation\\"" ws ":" ws string ws "}"
-  | "{" ws "\\"action\\"" ws ":" ws "\\"execute\\"" ws "," ws "\\"explanation\\"" ws ":" ws string ws "," ws "\\"command\\"" ws ":" ws string ws "}"
+action-execute ::= ("{" ws "\\"action\\"" ws ":" ws "\\"execute\\"" ws "," ws "\\"command\\"" ws ":" ws string ws "," ws "\\"explanation\\"" ws ":" ws string ws "}") | ("{" ws "\\"action\\"" ws ":" ws "\\"execute\\"" ws "," ws "\\"explanation\\"" ws ":" ws string ws "," ws "\\"command\\"" ws ":" ws string ws "}")
 
-action_done ::= "{" ws "\\"action\\"" ws ":" ws "\\"done\\"" ws "," ws "\\"summary\\"" ws ":" ws string ws "}"
-  | "{" ws "\\"summary\\"" ws ":" ws string ws "," ws "\\"action\\"" ws ":" ws "\\"done\\"" ws "}"
+action-done ::= ("{" ws "\\"action\\"" ws ":" ws "\\"done\\"" ws "," ws "\\"summary\\"" ws ":" ws string ws "}") | ("{" ws "\\"summary\\"" ws ":" ws string ws "," ws "\\"action\\"" ws ":" ws "\\"done\\"" ws "}")
 
-string ::= "\\"" char* "\\""
-char ::= [^"\\\\\\x7F\\x00-\\x1F] | "\\\\" (["\\\\/bfnrt] | "u" [0-9a-fA-F] [0-9a-fA-F] [0-9a-fA-F] [0-9a-fA-F])
+string ::= "\\"" ([^"\\\\\\x7F\\x00-\\x1F] | "\\\\" (["\\\\bfnrt] | "u" [0-9a-fA-F] [0-9a-fA-F] [0-9a-fA-F] [0-9a-fA-F]))* "\\""
 ws ::= [ \\t\\n\\r]*`;
 
   /**
@@ -39,11 +36,10 @@ ws ::= [ \\t\\n\\r]*`;
    * Strictly enforces:
    *   {"decision": "plan" | "clarify", "summary": "<string>", "steps": ["<step1>", ...], "question": "<opt>"}
    */
-  public static readonly SENTINEL_PLANNER_GBNF = `root ::= "{" ws "\\"decision\\"" ws ":" ws ("\\"plan\\"" | "\\"clarify\\"") ws "," ws "\\"summary\\"" ws ":" ws string ws "," ws "\\"steps\\"" ws ":" ws string_list (ws "," ws "\\"question\\"" ws ":" ws string)? ws "}"
+  public static readonly SENTINEL_PLANNER_GBNF = `root ::= "{" ws "\\"decision\\"" ws ":" ws ("\\"plan\\"" | "\\"clarify\\"") ws "," ws "\\"summary\\"" ws ":" ws string ws "," ws "\\"steps\\"" ws ":" ws string-list (ws "," ws "\\"question\\"" ws ":" ws string)? ws "}"
 
-string_list ::= "[" ws (string (ws "," ws string)*)? ws "]"
-string ::= "\\"" char* "\\""
-char ::= [^"\\\\\\x7F\\x00-\\x1F] | "\\\\" (["\\\\/bfnrt] | "u" [0-9a-fA-F] [0-9a-fA-F] [0-9a-fA-F] [0-9a-fA-F])
+string-list ::= "[" ws (string (ws "," ws string)*)? ws "]"
+string ::= "\\"" ([^"\\\\\\x7F\\x00-\\x1F] | "\\\\" (["\\\\bfnrt] | "u" [0-9a-fA-F] [0-9a-fA-F] [0-9a-fA-F] [0-9a-fA-F]))* "\\""
 ws ::= [ \\t\\n\\r]*`;
 
   /**
@@ -59,9 +55,7 @@ array ::= "[" ws (value (ws "," ws value)*)? ws "]"
 
 value ::= object | array | string | number | "true" | "false" | "null"
 
-string ::= "\\"" char* "\\""
-char ::= [^"\\\\\\x7F\\x00-\\x1F] | "\\\\" (["\\\\/bfnrt] | "u" [0-9a-fA-F] [0-9a-fA-F] [0-9a-fA-F] [0-9a-fA-F])
-
+string ::= "\\"" ([^"\\\\\\x7F\\x00-\\x1F] | "\\\\" (["\\\\bfnrt] | "u" [0-9a-fA-F] [0-9a-fA-F] [0-9a-fA-F] [0-9a-fA-F]))* "\\""
 number ::= ("-"? ([0-9] | [1-9] [0-9]*)) ("." [0-9]+)? ([eE] [-+]? [0-9]+)?
 ws ::= [ \\t\\n\\r]*`;
 
@@ -112,7 +106,7 @@ ws ::= [ \\t\\n\\r]*`;
       } else if (propDef.type === 'boolean') {
         valueExpr = '("true" | "false")';
       } else if (propDef.type === 'array') {
-        valueExpr = 'string_list';
+        valueExpr = 'string-list';
       }
 
       const rule = `"\\"${key}\\"" ws ":" ws ${valueExpr}`;
@@ -123,9 +117,8 @@ ws ::= [ \\t\\n\\r]*`;
     const propSequence = propRules.join(' ws "," ws ');
     return `root ::= "{" ws ${propSequence} ws "}"
 
-string_list ::= "[" ws (string (ws "," ws string)*)? ws "]"
-string ::= "\\"" char* "\\""
-char ::= [^"\\\\\\x7F\\x00-\\x1F] | "\\\\" (["\\\\/bfnrt] | "u" [0-9a-fA-F] [0-9a-fA-F] [0-9a-fA-F] [0-9a-fA-F])
+string-list ::= "[" ws (string (ws "," ws string)*)? ws "]"
+string ::= "\\"" ([^"\\\\\\x7F\\x00-\\x1F] | "\\\\" (["\\\\bfnrt] | "u" [0-9a-fA-F] [0-9a-fA-F] [0-9a-fA-F] [0-9a-fA-F]))* "\\""
 number ::= ("-"? ([0-9] | [1-9] [0-9]*)) ("." [0-9]+)? ([eE] [-+]? [0-9]+)?
 ws ::= [ \\t\\n\\r]*`;
   }

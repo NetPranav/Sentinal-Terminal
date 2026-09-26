@@ -1,13 +1,33 @@
 use std::sync::Mutex;
 use std::process::{Child, Command, Stdio};
 use std::path::PathBuf;
-use serde::Serialize;
+use std::collections::{HashMap, VecDeque};
+use std::time::{SystemTime, UNIX_EPOCH};
+use serde::{Deserialize, Serialize};
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+pub struct QueuedInferenceSlot {
+    pub session_id: String,
+    pub request_id: String,
+    pub created_at_ms: u64,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct InferenceQueueStatus {
+    pub active_request: Option<QueuedInferenceSlot>,
+    pub queued_count: usize,
+    pub session_queue_counts: HashMap<String, usize>,
+    pub is_cpu_fallback: bool,
+}
 
 pub struct EmbeddedLlmState {
     pub process: Mutex<Option<Child>>,
     pub active_model: Mutex<Option<String>>,
     pub active_lora: Mutex<Option<String>>,
     pub port: u16,
+    pub is_cpu_fallback: Mutex<bool>,
+    pub active_request: Mutex<Option<QueuedInferenceSlot>>,
+    pub queue: Mutex<VecDeque<QueuedInferenceSlot>>,
 }
 
 impl Default for EmbeddedLlmState {
@@ -17,6 +37,9 @@ impl Default for EmbeddedLlmState {
             active_model: Mutex::new(None),
             active_lora: Mutex::new(None),
             port: 8847,
+            is_cpu_fallback: Mutex::new(false),
+            active_request: Mutex::new(None),
+            queue: Mutex::new(VecDeque::new()),
         }
     }
 }
@@ -28,6 +51,8 @@ pub struct EmbeddedLlmStatus {
     pub active_model: Option<String>,
     pub active_lora: Option<String>,
     pub port: u16,
+    pub is_cpu_fallback: bool,
+    pub queued_requests: usize,
 }
 
 fn get_home_dir() -> Option<PathBuf> {
@@ -42,17 +67,22 @@ fn find_llama_server_binary() -> Option<PathBuf> {
 
     if let Some(home) = get_home_dir() {
         candidates.push(home.join(".sentinel").join("bin").join("llama-server"));
+        candidates.push(home.join(".local").join("bin").join("llama-server"));
     }
 
     if let Ok(exe) = std::env::current_exe() {
         if let Some(parent) = exe.parent() {
             candidates.push(parent.join("llama-server"));
             candidates.push(parent.join("../MacOS/llama-server"));
+            candidates.push(parent.join("../bin/llama-server"));
         }
     }
 
-    candidates.push(PathBuf::from("/opt/homebrew/bin/llama-server"));
+    // Common Linux and package locations
+    candidates.push(PathBuf::from("/usr/lib/ollama/llama-server"));
+    candidates.push(PathBuf::from("/usr/bin/llama-server"));
     candidates.push(PathBuf::from("/usr/local/bin/llama-server"));
+    candidates.push(PathBuf::from("/opt/homebrew/bin/llama-server"));
 
     candidates.into_iter().find(|p| p.exists() && p.is_file())
 }
@@ -82,6 +112,32 @@ fn find_model_file(preferred: Option<String>) -> Option<PathBuf> {
                 }
             }
         }
+
+        // Check user's Ollama model cache
+        let ollama_blobs = home.join(".ollama").join("models").join("blobs");
+        if let Ok(entries) = std::fs::read_dir(&ollama_blobs) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if let Ok(metadata) = path.metadata() {
+                    if metadata.len() > 500 * 1024 * 1024 {
+                        candidates.push(path);
+                    }
+                }
+            }
+        }
+    }
+
+    // Check system Ollama blobs (/var/lib/ollama/blobs)
+    let var_ollama = PathBuf::from("/var/lib/ollama/blobs");
+    if let Ok(entries) = std::fs::read_dir(&var_ollama) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if let Ok(metadata) = path.metadata() {
+                if metadata.len() > 500 * 1024 * 1024 {
+                    candidates.push(path);
+                }
+            }
+        }
     }
 
     candidates.into_iter().find(|p| p.exists() && p.is_file())
@@ -92,13 +148,14 @@ pub fn start_embedded_llm(
     state: tauri::State<'_, EmbeddedLlmState>,
     model_path: Option<String>,
     lora_path: Option<String>,
+    gpu_layers: Option<i32>,
 ) -> Result<bool, String> {
     let bin_path = find_llama_server_binary().ok_or_else(|| {
-        "llama-server binary not found in ~/.sentinel/bin, app bundle, or /opt/homebrew/bin".to_string()
+        "llama-server binary not found in ~/.sentinel/bin, /usr/lib/ollama, or /usr/bin".to_string()
     })?;
 
     let model_file = find_model_file(model_path).ok_or_else(|| {
-        "No GGUF model file found. Download Qwen2.5-Coder-3B into ~/.sentinel/models/".to_string()
+        "No GGUF model file found. Download a model into ~/.sentinel/models/".to_string()
     })?;
 
     let mut proc_guard = state.process.lock().map_err(|e| e.to_string())?;
@@ -117,16 +174,32 @@ pub fn start_embedded_llm(
     let model_str = model_file.to_string_lossy().into_owned();
     let port_str = state.port.to_string();
 
+    let is_cpu = gpu_layers.map_or(false, |l| l <= 0);
+    {
+        let mut fb_guard = state.is_cpu_fallback.lock().map_err(|e| e.to_string())?;
+        *fb_guard = is_cpu;
+    }
+
+    let ngl_val = if is_cpu {
+        "0".to_string()
+    } else {
+        gpu_layers.unwrap_or(99).to_string()
+    };
+
     let mut args = vec![
         "--port".to_string(), port_str,
         "-m".to_string(), model_str.clone(),
-        "-ngl".to_string(), "99".to_string(),
+        "-ngl".to_string(), ngl_val,
         "-t".to_string(), n_threads,
-        "--flash-attn".to_string(),
         "-b".to_string(), "2048".to_string(),
         "-c".to_string(), "4096".to_string(),
         "--no-warmup".to_string(),
     ];
+
+    if !is_cpu {
+        args.push("--flash-attn".to_string());
+        args.push("auto".to_string());
+    }
 
     let mut applied_lora: Option<String> = None;
     if let Some(ref lora) = lora_path {
@@ -138,12 +211,27 @@ pub fn start_embedded_llm(
         }
     }
 
-    let child = Command::new(&bin_path)
-        .args(&args)
+    let mut cmd = Command::new(&bin_path);
+    cmd.args(&args)
         .stdout(Stdio::null())
-        .stderr(Stdio::null())
+        .stderr(Stdio::null());
+
+    #[cfg(target_os = "linux")]
+    {
+        use std::os::unix::process::CommandExt;
+        unsafe {
+            cmd.pre_exec(|| {
+                libc::prctl(libc::PR_SET_PDEATHSIG, libc::SIGTERM);
+                Ok(())
+            });
+        }
+    }
+
+    let child = cmd
         .spawn()
         .map_err(|e| format!("Failed to spawn llama-server at {}: {}", bin_path.display(), e))?;
+
+    crate::logger::log_info("LLM", &format!("Spawned llama-server (pid: {}) on port {}", child.id(), state.port));
 
     let mut model_guard = state.active_model.lock().map_err(|e| e.to_string())?;
     let mut lora_guard = state.active_lora.lock().map_err(|e| e.to_string())?;
@@ -154,19 +242,26 @@ pub fn start_embedded_llm(
     Ok(true)
 }
 
-#[tauri::command]
-pub fn stop_embedded_llm(state: tauri::State<'_, EmbeddedLlmState>) -> Result<bool, String> {
-    let mut proc_guard = state.process.lock().map_err(|e| e.to_string())?;
-    if let Some(mut child) = proc_guard.take() {
-        let _ = child.kill();
-        let _ = child.wait();
+pub fn terminate_embedded_llm_child(state: &EmbeddedLlmState) {
+    if let Ok(mut proc_guard) = state.process.lock() {
+        if let Some(mut child) = proc_guard.take() {
+            crate::logger::log_info("LLM", &format!("Terminating embedded llama-server (pid: {})", child.id()));
+            let _ = child.kill();
+            let _ = child.wait();
+        }
     }
 
-    let mut model_guard = state.active_model.lock().map_err(|e| e.to_string())?;
-    let mut lora_guard = state.active_lora.lock().map_err(|e| e.to_string())?;
-    *model_guard = None;
-    *lora_guard = None;
+    if let Ok(mut model_guard) = state.active_model.lock() {
+        *model_guard = None;
+    }
+    if let Ok(mut lora_guard) = state.active_lora.lock() {
+        *lora_guard = None;
+    }
+}
 
+#[tauri::command]
+pub fn stop_embedded_llm(state: tauri::State<'_, EmbeddedLlmState>) -> Result<bool, String> {
+    terminate_embedded_llm_child(state.inner());
     Ok(true)
 }
 
@@ -177,6 +272,9 @@ pub fn get_embedded_llm_status(
     let mut proc_guard = state.process.lock().map_err(|e| e.to_string())?;
     let model_guard = state.active_model.lock().map_err(|e| e.to_string())?;
     let lora_guard = state.active_lora.lock().map_err(|e| e.to_string())?;
+    let fb_guard = state.is_cpu_fallback.lock().map_err(|e| e.to_string())?;
+    let active_guard = state.active_request.lock().map_err(|e| e.to_string())?;
+    let queue_guard = state.queue.lock().map_err(|e| e.to_string())?;
 
     let is_running = if let Some(ref mut child) = *proc_guard {
         match child.try_wait() {
@@ -196,11 +294,250 @@ pub fn get_embedded_llm_status(
         None
     };
 
+    let total_queued = queue_guard.len() + if active_guard.is_some() { 1 } else { 0 };
+
     Ok(EmbeddedLlmStatus {
         is_running,
         pid,
         active_model: model_guard.clone(),
         active_lora: lora_guard.clone(),
         port: state.port,
+        is_cpu_fallback: *fb_guard,
+        queued_requests: total_queued,
     })
+}
+
+#[tauri::command]
+pub fn acquire_inference_slot(
+    state: tauri::State<'_, EmbeddedLlmState>,
+    session_id: String,
+    request_id: String,
+) -> Result<bool, String> {
+    let mut active_guard = state.active_request.lock().map_err(|e| e.to_string())?;
+    let mut queue_guard = state.queue.lock().map_err(|e| e.to_string())?;
+
+    let now_ms = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_millis() as u64)
+        .unwrap_or(0);
+
+    let slot = QueuedInferenceSlot {
+        session_id,
+        request_id,
+        created_at_ms: now_ms,
+    };
+
+    if active_guard.is_none() {
+        *active_guard = Some(slot);
+        Ok(true)
+    } else {
+        queue_guard.push_back(slot);
+        Ok(false)
+    }
+}
+
+#[tauri::command]
+pub fn release_inference_slot(
+    state: tauri::State<'_, EmbeddedLlmState>,
+    session_id: String,
+    request_id: String,
+) -> Result<Option<QueuedInferenceSlot>, String> {
+    let mut active_guard = state.active_request.lock().map_err(|e| e.to_string())?;
+    let mut queue_guard = state.queue.lock().map_err(|e| e.to_string())?;
+
+    if let Some(ref current) = *active_guard {
+        if current.session_id == session_id && current.request_id == request_id {
+            *active_guard = queue_guard.pop_front();
+            return Ok(active_guard.clone());
+        }
+    }
+
+    queue_guard.retain(|s| !(s.session_id == session_id && s.request_id == request_id));
+    Ok(active_guard.clone())
+}
+
+#[tauri::command]
+pub fn cancel_session_requests(
+    state: tauri::State<'_, EmbeddedLlmState>,
+    session_id: String,
+) -> Result<usize, String> {
+    let mut active_guard = state.active_request.lock().map_err(|e| e.to_string())?;
+    let mut queue_guard = state.queue.lock().map_err(|e| e.to_string())?;
+
+    let initial_len = queue_guard.len();
+    queue_guard.retain(|s| s.session_id != session_id);
+    let removed = initial_len - queue_guard.len();
+
+    if let Some(ref current) = *active_guard {
+        if current.session_id == session_id {
+            *active_guard = queue_guard.pop_front();
+            return Ok(removed + 1);
+        }
+    }
+
+    Ok(removed)
+}
+
+#[tauri::command]
+pub fn get_inference_queue_status(
+    state: tauri::State<'_, EmbeddedLlmState>,
+) -> Result<InferenceQueueStatus, String> {
+    let active_guard = state.active_request.lock().map_err(|e| e.to_string())?;
+    let queue_guard = state.queue.lock().map_err(|e| e.to_string())?;
+    let fb_guard = state.is_cpu_fallback.lock().map_err(|e| e.to_string())?;
+
+    let mut session_counts: HashMap<String, usize> = HashMap::new();
+    if let Some(ref act) = *active_guard {
+        *session_counts.entry(act.session_id.clone()).or_insert(0) += 1;
+    }
+    for item in queue_guard.iter() {
+        *session_counts.entry(item.session_id.clone()).or_insert(0) += 1;
+    }
+
+    Ok(InferenceQueueStatus {
+        active_request: active_guard.clone(),
+        queued_count: queue_guard.len(),
+        session_queue_counts: session_counts,
+        is_cpu_fallback: *fb_guard,
+    })
+}
+
+#[tauri::command]
+pub fn verify_file_checksum(
+    file_path: String,
+    expected_sha256: String,
+) -> Result<bool, String> {
+    let resolved_path = if file_path.starts_with("~/") {
+        if let Ok(home) = std::env::var("HOME").or_else(|_| std::env::var("USERPROFILE")) {
+            file_path.replacen("~", &home, 1)
+        } else {
+            file_path
+        }
+    } else if file_path.starts_with("$HOME/") {
+        if let Ok(home) = std::env::var("HOME").or_else(|_| std::env::var("USERPROFILE")) {
+            file_path.replacen("$HOME", &home, 1)
+        } else {
+            file_path
+        }
+    } else {
+        file_path
+    };
+
+    let path = std::path::Path::new(&resolved_path);
+    if !path.exists() || !path.is_file() {
+        return Err(format!("File not found: {}", resolved_path));
+    }
+
+    let output = Command::new("sha256sum")
+        .arg(&resolved_path)
+        .output()
+        .or_else(|_| {
+            Command::new("shasum")
+                .arg("-a")
+                .arg("256")
+                .arg(&resolved_path)
+                .output()
+        })
+        .map_err(|e| format!("Failed to execute checksum utility: {}", e))?;
+
+    if !output.status.success() {
+        return Err("Checksum calculation command exited with error".to_string());
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let calculated = stdout
+        .split_whitespace()
+        .next()
+        .unwrap_or("")
+        .trim()
+        .to_lowercase();
+
+    Ok(calculated == expected_sha256.trim().to_lowercase())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_inference_queue_slot_lifecycle() {
+        let state = EmbeddedLlmState::default();
+
+        // 1. First slot acquired immediately
+        {
+            let mut active = state.active_request.lock().unwrap();
+            let queue = state.queue.lock().unwrap();
+            assert!(active.is_none());
+            *active = Some(QueuedInferenceSlot {
+                session_id: "tab-1".to_string(),
+                request_id: "req-1".to_string(),
+                created_at_ms: 100,
+            });
+            assert!(active.is_some());
+            assert_eq!(queue.len(), 0);
+        }
+
+        // 2. Second slot queued
+        {
+            let mut queue = state.queue.lock().unwrap();
+            queue.push_back(QueuedInferenceSlot {
+                session_id: "tab-2".to_string(),
+                request_id: "req-2".to_string(),
+                created_at_ms: 200,
+            });
+            assert_eq!(queue.len(), 1);
+        }
+
+        // 3. Releasing active slot advances queue to next slot
+        {
+            let mut active = state.active_request.lock().unwrap();
+            let mut queue = state.queue.lock().unwrap();
+            assert_eq!(active.as_ref().unwrap().session_id, "tab-1");
+            *active = queue.pop_front();
+            assert_eq!(active.as_ref().unwrap().session_id, "tab-2");
+            assert_eq!(queue.len(), 0);
+        }
+    }
+
+    #[test]
+    fn test_session_cancellation_cleans_up() {
+        let state = EmbeddedLlmState::default();
+
+        {
+            let mut active = state.active_request.lock().unwrap();
+            let mut queue = state.queue.lock().unwrap();
+            *active = Some(QueuedInferenceSlot {
+                session_id: "tab-dead".to_string(),
+                request_id: "req-1".to_string(),
+                created_at_ms: 100,
+            });
+            queue.push_back(QueuedInferenceSlot {
+                session_id: "tab-alive".to_string(),
+                request_id: "req-2".to_string(),
+                created_at_ms: 200,
+            });
+            queue.push_back(QueuedInferenceSlot {
+                session_id: "tab-dead".to_string(),
+                request_id: "req-3".to_string(),
+                created_at_ms: 300,
+            });
+        }
+
+        // Cancel "tab-dead"
+        {
+            let mut active = state.active_request.lock().unwrap();
+            let mut queue = state.queue.lock().unwrap();
+            queue.retain(|s| s.session_id != "tab-dead");
+            if let Some(ref act) = *active {
+                if act.session_id == "tab-dead" {
+                    *active = queue.pop_front();
+                }
+            }
+        }
+
+        let active = state.active_request.lock().unwrap();
+        let queue = state.queue.lock().unwrap();
+        assert_eq!(active.as_ref().unwrap().session_id, "tab-alive");
+        assert_eq!(queue.len(), 0);
+    }
 }

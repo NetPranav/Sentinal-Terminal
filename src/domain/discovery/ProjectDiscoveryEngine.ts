@@ -304,7 +304,7 @@ export class ProjectDiscoveryEngine {
       return `  [${m.id}] ${relativePath} (${typeBadge})`;
     }).join('\n');
 
-    return `🔍 Found ${matches.length} project workspaces matching "${keyword}":\n${list}\nWhich project would you like to run? [1-${matches.length}]:`;
+    return `:: Found ${matches.length} project workspaces matching "${keyword}":\n${list}\nWhich project would you like to run? [1-${matches.length}]:`;
   }
 
   /**

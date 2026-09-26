@@ -6,12 +6,18 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "build:app": "tauri build --bundles app && mkdir -p build && rm -rf \"build/Sentinel Terminal.app\" && cp -R \"src-tauri/target/release/bundle/macos/Sentinel Terminal.app\" build/ && rm -rf \"/Applications/Sentinel Terminal.app\" && cp -R \"src-tauri/target/release/bundle/macos/Sentinel Terminal.app\" /Applications/",
+    "bundle:linux": "tauri build",
+    "bundle:deb": "tauri build --bundles deb",
+    "bundle:rpm": "tauri build --bundles rpm",
+    "bundle:appimage": "tauri build --bundles appimage",
+    "check:triple": "npm test && npm run build && cargo check --manifest-path src-tauri/Cargo.toml",
     "preview": "vite preview",
     "tauri": "tauri",
     "test": "vitest run",
     "agent": "tsx scripts/agent-cli.ts",
-    "cli": "tsx scripts/agent-cli.ts"
+    "cli": "tsx scripts/agent-cli.ts",
+    "benchmark": "tsx scripts/benchmark_prompts.ts",
+    "benchmark:domain": "tsx scripts/benchmark_prompts.ts --domain"
   },
   "dependencies": {
     "@tauri-apps/api": "^2",
@@ -23,8 +29,10 @@
     "@tauri-apps/plugin-process": "^2.3.1",
     "@tauri-apps/plugin-shell": "^2.3.5",
     "@xterm/addon-fit": "^0.11.0",
+    "@xterm/addon-search": "^0.16.0",
     "@xterm/addon-webgl": "^0.19.0",
     "@xterm/xterm": "^6.0.0",
+    "lucide-react": "^1.45.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "uuid": "^14.0.1",

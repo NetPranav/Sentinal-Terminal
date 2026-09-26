@@ -1,6 +1,7 @@
 mod pty;
 mod process_cmds;
 mod embedded_server;
+pub mod logger;
 
 #[cfg(target_os = "macos")]
 fn request_bluetooth_permission() {
@@ -30,67 +31,26 @@ fn request_bluetooth_permission() {}
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    logger::init();
+    logger::log_info("BOOT", "Initializing Sentinel Terminal runtime");
     tauri::Builder::default()
         .setup(|app| {
+            logger::log_info("SETUP", "Initializing core application services");
             request_bluetooth_permission();
 
-            // Spawn Embedded LLM Sidecar
             use tauri::Manager;
-            
-            // Find the llama-server binary — it's placed next to our main executable by Tauri
-            let exe_dir = std::env::current_exe()
-                .ok()
-                .and_then(|p| p.parent().map(|d| d.to_path_buf()));
-            
-            if let Some(exe_dir) = exe_dir {
-                // Model is in the resources directory
-                let model_path = if let Ok(resource_dir) = app.path().resource_dir() {
-                    resource_dir.join("resources/models/model.gguf")
-                } else {
-                    exe_dir.join("resources/models/model.gguf")
-                };
-                
-                // Try multiple possible locations for the llama-server binary
-                let possible_paths = vec![
-                    exe_dir.join("llama-server"),                    // dev mode: target/debug/llama-server
-                    exe_dir.join("../MacOS/llama-server"),           // bundled .app: Contents/MacOS/llama-server
-                ];
-                
-                let binary_path = possible_paths.iter().find(|p| p.exists());
-                
-                match binary_path {
-                    Some(bin_path) => {
-                        let model_str = model_path.to_string_lossy().into_owned();
-                        let bin_str = bin_path.to_string_lossy().into_owned();
-                        println!("Starting llama-server: {} with model: {}", bin_str, model_str);
-                        // Get CPU thread count for optimal threading
-                        let n_threads = std::thread::available_parallelism()
-                            .map(|n| n.get())
-                            .unwrap_or(4)
-                            .to_string();
-                        
-                        match std::process::Command::new(bin_path)
-                            .args([
-                                "--port", "8847",
-                                "-m", &model_str,
-                                "-ngl", "99",           // Offload ALL layers to Metal GPU
-                                "-t", &n_threads,       // Use all CPU threads for prompt processing
-                                "--flash-attn",         // Flash attention for faster inference
-                                "-b", "2048",           // Larger batch size for throughput
-                                "-c", "4096",           // Context window
-                                "--no-warmup",          // Skip warmup for faster startup
-                            ])
-                            .stdout(std::process::Stdio::null())
-                            .stderr(std::process::Stdio::null())
-                            .spawn()
-                        {
-                            Ok(child) => println!("Successfully spawned llama-server (pid: {})", child.id()),
-                            Err(e) => eprintln!("Failed to spawn llama-server: {}", e),
+            if let Some(main_win) = app.get_webview_window("main") {
+                match main_win.url() {
+                    Ok(url) => {
+                        logger::log_info("WINDOW", &format!("Main webview URL: {}", url));
+                        if url.as_str().contains("localhost:1420") {
+                            logger::log_warn("WEBVIEW", "Running against external devUrl (http://localhost:1420). Frontend dev server required.");
+                        } else if url.as_str().starts_with("tauri://") {
+                            logger::log_info("WEBVIEW", "Embedded production assets active via custom-protocol (tauri://localhost)");
                         }
-                    },
-                    None => {
-                        eprintln!("Could not find llama-server binary. Searched: {:?}", 
-                            possible_paths.iter().map(|p| p.display().to_string()).collect::<Vec<_>>());
+                    }
+                    Err(e) => {
+                        logger::log_error("WINDOW", &format!("Failed to determine main webview URL: {}", e));
                     }
                 }
             }
@@ -195,22 +155,65 @@ pub fn run() {
             pty::write_pty,
             pty::resize_pty,
             pty::kill_pty,
+            pty::get_default_shell,
             process_cmds::list_processes,
             process_cmds::kill_process,
             process_cmds::get_system_stats,
             process_cmds::execute_command,
             process_cmds::get_launch_args,
+            process_cmds::get_app_binary_path,
+            process_cmds::write_system_file,
+            process_cmds::create_system_dir,
+            process_cmds::read_system_file,
+            process_cmds::check_path_exists,
             embedded_server::start_embedded_llm,
             embedded_server::stop_embedded_llm,
-            embedded_server::get_embedded_llm_status
+            embedded_server::get_embedded_llm_status,
+            embedded_server::acquire_inference_slot,
+            embedded_server::release_inference_slot,
+            embedded_server::cancel_session_requests,
+            embedded_server::get_inference_queue_status,
+            embedded_server::verify_file_checksum,
+            logger::log_diagnostic,
+            logger::is_debug_active
         ])
+        .on_window_event(|window, event| {
+            match event {
+                tauri::WindowEvent::Destroyed => {
+                    logger::log_info("WINDOW", &format!("Webview window destroyed: {}", window.label()));
+                    use tauri::Manager;
+                    if let Some(state) = window.try_state::<embedded_server::EmbeddedLlmState>() {
+                        embedded_server::terminate_embedded_llm_child(&state);
+                    }
+                }
+                tauri::WindowEvent::CloseRequested { .. } => {
+                    logger::log_info("WINDOW", &format!("Webview window close requested: {}", window.label()));
+                }
+                _ => {}
+            }
+        })
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
         .run(|app_handle, event| {
-            if let tauri::RunEvent::Opened { urls } = event {
-                use tauri::Emitter;
-                let url_strings: Vec<String> = urls.into_iter().map(|u| u.to_string()).collect();
-                let _ = app_handle.emit("sentinel-url", url_strings);
+            match event {
+                tauri::RunEvent::Ready => {
+                    logger::log_info("APP", "Sentinel Terminal application runtime READY");
+                }
+                tauri::RunEvent::ExitRequested { .. } | tauri::RunEvent::Exit => {
+                    logger::log_info("APP", "Sentinel Terminal application runtime EXIT");
+                    use tauri::Manager;
+                    if let Some(state) = app_handle.try_state::<embedded_server::EmbeddedLlmState>() {
+                        embedded_server::terminate_embedded_llm_child(&state);
+                    }
+                }
+                #[cfg(any(target_os = "macos", target_os = "ios"))]
+                tauri::RunEvent::Opened { urls } => {
+                    use tauri::Emitter;
+                    let url_strings: Vec<String> = urls.into_iter().map(|u| u.to_string()).collect();
+                    logger::log_info("URL", &format!("Opened via protocol handler: {:?}", url_strings));
+                    let _ = app_handle.emit("sentinel-url", url_strings);
+                }
+                _ => {}
             }
         });
 }

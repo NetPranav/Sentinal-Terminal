@@ -52,10 +52,37 @@ pub fn spawn_pty(
 
     #[cfg(target_os = "windows")]
     let default_shell = "powershell.exe".to_string();
-    #[cfg(not(target_os = "windows"))]
+    #[cfg(target_os = "macos")]
     let default_shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".to_string());
+    #[cfg(target_os = "linux")]
+    let default_shell = std::env::var("SHELL")
+        .ok()
+        .filter(|s| !s.trim().is_empty() && std::path::Path::new(s).exists())
+        .unwrap_or_else(|| {
+            if std::path::Path::new("/bin/bash").exists() {
+                "/bin/bash".to_string()
+            } else if std::path::Path::new("/usr/bin/fish").exists() {
+                "/usr/bin/fish".to_string()
+            } else if std::path::Path::new("/usr/bin/bash").exists() {
+                "/usr/bin/bash".to_string()
+            } else {
+                "/bin/sh".to_string()
+            }
+        });
 
-    let target_shell = shell.filter(|s| !s.trim().is_empty()).unwrap_or(default_shell);
+    let target_shell = shell
+        .filter(|s| {
+            let trimmed = s.trim();
+            if trimmed.is_empty() {
+                return false;
+            }
+            if trimmed.contains('/') || trimmed.contains('\\') {
+                std::path::Path::new(trimmed).exists()
+            } else {
+                true
+            }
+        })
+        .unwrap_or(default_shell);
     let mut cmd = CommandBuilder::new(&target_shell);
 
     if login_shell == Some(true) && !target_shell.contains("pwsh") && !target_shell.contains("powershell") {
@@ -80,11 +107,11 @@ pub fn spawn_pty(
                 .filter(|p| p.is_dir())
         });
 
-    if let Some(dir) = target_dir {
+    if let Some(ref dir) = target_dir {
         cmd.cwd(dir);
     }
 
-    // Enforce standard macOS terminal emulator variables
+    // Enforce standard terminal emulator variables
     cmd.env("TERM", "xterm-256color");
     cmd.env("COLORTERM", "truecolor");
     cmd.env("TERM_PROGRAM", "Sentinel Terminal");
@@ -100,14 +127,75 @@ pub fn spawn_pty(
     }
 
     if let Ok(path) = std::env::var("PATH") {
-        if !path.contains("/opt/homebrew/bin") && !path.contains("/usr/local/bin") {
-            cmd.env("PATH", format!("{}:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin", path));
+        let mut path_additions: Vec<String> = Vec::new();
+        #[cfg(target_os = "macos")]
+        {
+            if !path.contains("/opt/homebrew/bin") { path_additions.push("/opt/homebrew/bin".to_string()); }
+            if !path.contains("/opt/homebrew/sbin") { path_additions.push("/opt/homebrew/sbin".to_string()); }
+            if !path.contains("/usr/local/bin") { path_additions.push("/usr/local/bin".to_string()); }
+        }
+        #[cfg(target_os = "linux")]
+        {
+            if let Ok(home) = std::env::var("HOME") {
+                let local_bin = format!("{}/.local/bin", home);
+                let cargo_bin = format!("{}/.cargo/bin", home);
+                if std::path::Path::new(&local_bin).exists() && !path.contains(&local_bin) {
+                    path_additions.push(local_bin);
+                }
+                if std::path::Path::new(&cargo_bin).exists() && !path.contains(&cargo_bin) {
+                    path_additions.push(cargo_bin);
+                }
+            }
+            if !path.contains("/usr/local/bin") { path_additions.push("/usr/local/bin".to_string()); }
+            if !path.contains("/usr/bin") { path_additions.push("/usr/bin".to_string()); }
+            if !path.contains("/bin") { path_additions.push("/bin".to_string()); }
+            if !path.contains("/usr/local/sbin") { path_additions.push("/usr/local/sbin".to_string()); }
+            if !path.contains("/usr/sbin") { path_additions.push("/usr/sbin".to_string()); }
+            if !path.contains("/sbin") { path_additions.push("/sbin".to_string()); }
+        }
+        if !path_additions.is_empty() {
+            cmd.env("PATH", format!("{}:{}", path, path_additions.join(":")));
         }
     } else {
+        #[cfg(target_os = "macos")]
         cmd.env("PATH", "/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin");
+        #[cfg(target_os = "linux")]
+        cmd.env("PATH", "/usr/local/bin:/usr/bin:/bin:/usr/local/sbin:/usr/sbin:/sbin");
     }
 
-    let _child = pair.slave.spawn_command(cmd).map_err(|e| e.to_string())?;
+    let _child = match pair.slave.spawn_command(cmd) {
+        Ok(child) => child,
+        Err(e) => {
+            #[cfg(target_os = "linux")]
+            {
+                eprintln!("[pty] Failed to spawn '{}': {}. Falling back to default shell...", target_shell, e);
+                let fallback = if std::path::Path::new("/bin/bash").exists() {
+                    "/bin/bash"
+                } else if std::path::Path::new("/usr/bin/bash").exists() {
+                    "/usr/bin/bash"
+                } else {
+                    "/bin/sh"
+                };
+                let mut fallback_cmd = CommandBuilder::new(fallback);
+                if login_shell == Some(true) {
+                    fallback_cmd.arg("-l");
+                }
+                if let Some(dir) = target_dir {
+                    fallback_cmd.cwd(dir);
+                }
+                fallback_cmd.env("TERM", "xterm-256color");
+                fallback_cmd.env("COLORTERM", "truecolor");
+                fallback_cmd.env("TERM_PROGRAM", "Sentinel Terminal");
+                fallback_cmd.env("TERM_PROGRAM_VERSION", "0.1.0");
+                fallback_cmd.env("SENTINEL_TERMINAL", "1");
+                pair.slave.spawn_command(fallback_cmd).map_err(|fb_err| {
+                    format!("Failed to spawn shell '{}' ({}) and fallback '{}' ({})", target_shell, e, fallback, fb_err)
+                })?
+            }
+            #[cfg(not(target_os = "linux"))]
+            return Err(e.to_string());
+        }
+    };
     
     drop(pair.slave);
     
@@ -134,6 +222,8 @@ pub fn spawn_pty(
         }
         let _ = app_handle_clone.emit("pty-exit", session_id_clone.clone());
     });
+
+    crate::logger::log_info("PTY", &format!("Spawned PTY session {} (rows: {}, cols: {}, shell: {})", session_id, rows, cols, target_shell));
 
     state.sessions.lock().unwrap().insert(session_id.clone(), PtySession {
         master: pair.master,
@@ -186,8 +276,35 @@ pub fn kill_pty(
 ) -> Result<(), String> {
     let mut sessions = state.sessions.lock().unwrap();
     if sessions.remove(&session_id).is_some() {
+        crate::logger::log_info("PTY", &format!("Terminated PTY session {}", session_id));
         Ok(())
     } else {
         Err("Session not found".to_string())
     }
 }
+
+#[tauri::command]
+pub fn get_default_shell() -> String {
+    #[cfg(target_os = "windows")]
+    return "powershell.exe".to_string();
+
+    #[cfg(target_os = "macos")]
+    return std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".to_string());
+
+    #[cfg(target_os = "linux")]
+    return std::env::var("SHELL")
+        .ok()
+        .filter(|s| !s.trim().is_empty() && std::path::Path::new(s).exists())
+        .unwrap_or_else(|| {
+            if std::path::Path::new("/bin/bash").exists() {
+                "/bin/bash".to_string()
+            } else if std::path::Path::new("/usr/bin/fish").exists() {
+                "/usr/bin/fish".to_string()
+            } else if std::path::Path::new("/usr/bin/bash").exists() {
+                "/usr/bin/bash".to_string()
+            } else {
+                "/bin/sh".to_string()
+            }
+        });
+}
+

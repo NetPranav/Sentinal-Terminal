@@ -334,7 +334,7 @@ export class AdaptivePlanEngine {
 
             if (options.onPhysicalActionRequired) {
               const confirmed = await options.onPhysicalActionRequired({
-                prompt: diag.physicalPrompt || `⚠️ ${diag.cause}`,
+                prompt: diag.physicalPrompt || `[!] ${diag.cause}`,
                 cause: diag.cause,
                 phaseId: phase.id
               });

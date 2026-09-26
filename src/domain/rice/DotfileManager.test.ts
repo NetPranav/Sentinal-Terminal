@@ -105,4 +105,26 @@ exec --no-startup-id gazebo
     expect(result.success).toBe(true);
     expect(writtenFile).toContain('# exec --no-startup-id gazebo # Disabled by Sentinel');
   });
+
+  it('supports universal XDG desktop autostart entry generation for GNOME/KDE/XFCE', async () => {
+    let writtenFile = '';
+    let writtenPath = '';
+    const mockIO: FileSystemIO = {
+      exists: async () => false,
+      readFile: async () => '',
+      writeFile: async (p, content) => {
+        writtenPath = p;
+        writtenFile = content;
+      },
+      copyFile: async () => {}
+    };
+
+    const result = await DotfileManager.toggleAutostart('firefox', true, 'autostart', mockIO, '/home/user');
+
+    expect(result.success).toBe(true);
+    expect(writtenPath).toContain('.config/autostart/firefox.desktop');
+    expect(writtenFile).toContain('[Desktop Entry]');
+    expect(writtenFile).toContain('Exec=firefox');
+    expect(writtenFile).toContain('X-GNOME-Autostart-enabled=true');
+  });
 });

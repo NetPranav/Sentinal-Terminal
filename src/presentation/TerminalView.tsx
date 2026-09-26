@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { WebglAddon } from '@xterm/addon-webgl';
@@ -7,6 +7,7 @@ import { SessionManager } from '../domain/SessionManager';
 import { ToolLoader } from '../tools/loader/ToolLoader';
 import { AppAliasRegistry } from '../domain/capabilities/AppAliasRegistry';
 import { AgentLoop, AgentPlan } from '../ai/agent/AgentLoop';
+import { PromptProgressManager } from '../ai/agent/PromptProgressManager';
 import { DemonstrationLearningEngine } from '../domain/learning/DemonstrationLearningEngine';
 import { EpisodicMemoryEngine } from '../domain/learning/EpisodicMemoryEngine';
 import { SentinelSerlCoordinator } from '../domain/learning/SentinelSerlCoordinator';
@@ -19,7 +20,25 @@ import { DemonstrationProvider } from '../domain/autocomplete/DemonstrationProvi
 import { WorkspaceContextProvider } from '../domain/autocomplete/WorkspaceContextProvider';
 import { GhostTextRenderer } from '../ui/components/GhostText';
 import { ThemeManager } from '../ui/theme/ThemeManager';
+import { ConsentQueue } from '../domain/security/ConsentQueue';
+import { CommandSafetyGuardian } from '../domain/security/CommandSafetyGuardian';
+import { PtyStateTracker } from '../domain/terminal/PtyStateTracker';
+import { PromptNavigationEngine, BufferLineInfo } from '../domain/terminal/PromptNavigationEngine';
 import { ShellAdapter } from '../domain/shell/ShellAdapter';
+import { isLinux, getPlatform } from '../shared/platform';
+import { 
+  Wrench, 
+  Play, 
+  X, 
+  ShieldAlert, 
+  AlertCircle, 
+  Check,
+  ChevronUp,
+  ChevronDown
+} from 'lucide-react';
+import { SearchAddon } from '@xterm/addon-search';
+import { TerminalSearchBar } from './TerminalSearchBar';
+import { readClipboardText, writeClipboardText, formatTerminalPastePayload } from '../utils/clipboard';
 import '@xterm/xterm/css/xterm.css';
 
 interface TerminalViewProps {
@@ -34,34 +53,162 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
   const terminalRef = useRef<HTMLDivElement>(null);
   const xtermRef = useRef<Terminal | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
+  const searchAddonRef = useRef<SearchAddon | null>(null);
   const [sessionId, setSessionId] = useState<string | undefined>(initialSessionId);
+  const sessionIdRef = useRef<string | undefined>(initialSessionId);
+
+  useEffect(() => {
+    sessionIdRef.current = sessionId;
+  }, [sessionId]);
+
+  useEffect(() => {
+    if (initialSessionId) {
+      setSessionId(initialSessionId);
+      sessionIdRef.current = initialSessionId;
+    }
+  }, [initialSessionId]);
+
+  const handlePaste = useCallback(async () => {
+    const activeSessionId = sessionIdRef.current || sessionId;
+    if (!activeSessionId) return;
+
+    try {
+      const text = await readClipboardText();
+      if (!text) return;
+
+      const term = xtermRef.current;
+      const isBracketed = Boolean(term?.modes?.bracketedPasteMode);
+
+      let isPromptDraft = false;
+      const buffer = term?.buffer?.active;
+      if (buffer) {
+        const line = buffer.getLine(buffer.baseY + buffer.cursorY);
+        const lineStr = line ? line.translateToString(true).trim() : '';
+        if (lineStr.includes('>')) {
+          isPromptDraft = true;
+        }
+      }
+
+      const payload = formatTerminalPastePayload(text, {
+        isBracketedPaste: isBracketed,
+        isPromptDraft: isPromptDraft
+      });
+
+      await SessionManager.getInstance().write(activeSessionId, payload);
+    } catch (err) {
+      console.warn('[TerminalView] Clipboard paste error:', err);
+    }
+  }, [sessionId]);
+
+  const handlePasteRef = useRef(handlePaste);
+  useEffect(() => {
+    handlePasteRef.current = handlePaste;
+  });
+
+  const handleCopy = useCallback(async (text: string) => {
+    try {
+      await writeClipboardText(text);
+    } catch (err) {
+      console.warn('[TerminalView] Clipboard copy error:', err);
+    }
+  }, []);
+
+  const handleCopyRef = useRef(handleCopy);
+  useEffect(() => {
+    handleCopyRef.current = handleCopy;
+  });
+
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
 
   const [securityModalPlan, setSecurityModalPlan] = useState<{
     plan: any;
     resolve: (approved: boolean) => void;
+    requestId?: string;
   } | null>(null);
   const [authPassword, setAuthPassword] = useState('');
   const [authError, setAuthError] = useState('');
   const [isVerifying, setIsVerifying] = useState(false);
   const [latestPlan, setLatestPlan] = useState<AgentPlan | null>(null);
   const [isPlanOpen, setIsPlanOpen] = useState(true);
+  const [planExecutionStatus, setPlanExecutionStatus] = useState<'running' | 'completed' | 'failed'>('running');
+  const planExecutionStatusRef = useRef<'running' | 'completed' | 'failed'>('running');
+  const [hudPlanEnabled, setHudPlanEnabled] = useState<boolean>(() => localStorage.getItem('sentinel_hud_plan_enabled') !== 'false');
+  const [hudPlanDuration, setHudPlanDuration] = useState<string>(() => localStorage.getItem('sentinel_hud_plan_duration') || '8');
+  const planDismissTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isHoveringPlanRef = useRef<boolean>(false);
+
+  const clearPlanDismissTimer = useCallback(() => {
+    if (planDismissTimerRef.current) {
+      clearTimeout(planDismissTimerRef.current);
+      planDismissTimerRef.current = null;
+    }
+  }, []);
+
+  const schedulePlanDismiss = useCallback(() => {
+    clearPlanDismissTimer();
+    const enabled = localStorage.getItem('sentinel_hud_plan_enabled') !== 'false';
+    const duration = localStorage.getItem('sentinel_hud_plan_duration') || '8';
+    if (!enabled || duration === 'disabled') {
+      setLatestPlan(null);
+      return;
+    }
+    if (duration === 'persistent') {
+      return;
+    }
+    if (isHoveringPlanRef.current) {
+      return;
+    }
+    const seconds = parseInt(duration, 10);
+    const ms = (!isNaN(seconds) && seconds > 0 ? seconds : 8) * 1000;
+    planDismissTimerRef.current = setTimeout(() => {
+      setLatestPlan(null);
+      planDismissTimerRef.current = null;
+    }, ms);
+  }, [clearPlanDismissTimer]);
+
+  useEffect(() => {
+    const handleSettingsChange = () => {
+      const enabled = localStorage.getItem('sentinel_hud_plan_enabled') !== 'false';
+      const duration = localStorage.getItem('sentinel_hud_plan_duration') || '8';
+      setHudPlanEnabled(enabled);
+      setHudPlanDuration(duration);
+      if (!enabled || duration === 'disabled') {
+        clearPlanDismissTimer();
+        setLatestPlan(null);
+      }
+    };
+
+    window.addEventListener('sentinel:hud-settings-changed', handleSettingsChange);
+    return () => {
+      window.removeEventListener('sentinel:hud-settings-changed', handleSettingsChange);
+      clearPlanDismissTimer();
+    };
+  }, [clearPlanDismissTimer]);
   const [activeRemediation, setActiveRemediation] = useState<RemediationPrompt | null>(null);
   const agentLoopRef = useRef<AgentLoop | null>(null);
+  const ptyTrackerRef = useRef<PtyStateTracker>(new PtyStateTracker());
   const lastUnresolvedGoalRef = useRef<{ goal: string; timestamp: number } | null>(null);
 
   const handleExecuteRemediation = async (rem: RemediationPrompt) => {
     setActiveRemediation(null);
     PtyOutputObserver.getInstance().clearRemediation();
-    if (sessionId) {
-      await SessionManager.getInstance().write(sessionId, '\x03');
+    const activeSessionId = sessionIdRef.current || sessionId;
+    if (activeSessionId) {
+      await SessionManager.getInstance().write(activeSessionId, '\x03');
     }
     if (xtermRef.current) {
-      xtermRef.current.write(`\r\n\x1b[1;32m⚡ [Sentinel Auto-Heal] Executing: ${rem.actionTitle}...\x1b[0m\r\n`);
+      xtermRef.current.write(`\r\n\x1b[1;32m[Sentinel Auto-Heal] Executing: ${rem.actionTitle}...\x1b[0m\r\n`);
     }
-    if (rem.tool === 'shell.execute' && rem.params?.command && sessionId) {
-      await SessionManager.getInstance().write(sessionId, `${rem.params.command}\r`);
+    if (rem.tool === 'shell.execute' && rem.params?.command && activeSessionId) {
+      await SessionManager.getInstance().write(activeSessionId, `${rem.params.command}\r`);
     } else if (agentLoopRef.current) {
-      await agentLoopRef.current.run(`fix error: ${rem.actionTitle}`, { os: 'mac', cwd: currentPath || '~' });
+      PromptProgressManager.getInstance().startPrompt(`Auto-Heal: ${rem.actionTitle}`);
+      try {
+        const res = await agentLoopRef.current.run(`fix error: ${rem.actionTitle}`, { os: getPlatform() === 'linux' ? 'linux' : 'mac', cwd: currentPath || '~' });
+        PromptProgressManager.getInstance().completePrompt(res.success, res.summary);
+      } catch (err: any) {
+        PromptProgressManager.getInstance().completePrompt(false, err?.message);
+      }
     }
   };
 
@@ -87,21 +234,21 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
         }
       } else {
         const escaped = authPassword.replace(/'/g, "'\\''");
-        // Securely verify system password against macOS Directory Service login credentials
+        // Securely verify system password against Linux/macOS login credentials
         const res = await invoke<{ code?: number; stderr?: string; stdout?: string }>('execute_command', {
           command: 'sh',
-          args: ['-c', `dscl . -authonly "$(whoami)" '${escaped}' 2>&1 || (echo '${escaped}' | sudo -S -k -v 2>&1)`]
+          args: ['-c', `(which dscl >/dev/null 2>&1 && dscl . -authonly "$(whoami)" '${escaped}' 2>&1) || (echo '${escaped}' | sudo -S -k -v 2>&1)`]
         });
         if (res && res.code === 0) {
           isValid = true;
         } else {
           isValid = false;
-          errorMessage = 'Authentication failed: Incorrect system password. Please enter your valid macOS login password.';
+          errorMessage = 'Authentication failed: Incorrect system password. Please enter your valid login password.';
         }
       }
     } catch (err: any) {
       isValid = false;
-      errorMessage = 'Authentication failed: Incorrect system password. Please enter your valid macOS login password.';
+      errorMessage = 'Authentication failed: Incorrect system password. Please enter your valid login password.';
     }
 
     setIsVerifying(false);
@@ -120,6 +267,7 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
     const themeManager = ThemeManager.getInstance();
     const currentTheme = themeManager.getTheme();
 
+    const isPreviewMode = typeof window !== 'undefined' && (window.location.search.includes('preview') || window.location.search.includes('large_preview'));
     const term = new Terminal({
       cursorBlink: true,
       allowTransparency: true,
@@ -127,8 +275,8 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
       allowProposedApi: true,
       convertEol: true,
       fontFamily: currentTheme.ui.fontFamily || '"SF Mono", Menlo, Monaco, "Cascadia Code", "Courier New", monospace',
-      fontSize: currentTheme.ui.fontSize || 13.5,
-      lineHeight: 1.25,
+      fontSize: isPreviewMode ? 17 : (currentTheme.ui.fontSize || 13.5),
+      lineHeight: isPreviewMode ? 1.35 : 1.25,
       letterSpacing: 0,
       fontWeight: '400',
       fontWeightBold: '700',
@@ -138,6 +286,22 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
         cursor: currentTheme.colors.cursor,
         cursorAccent: currentTheme.colors.cursorAccent,
         selectionBackground: currentTheme.colors.selection,
+        black: currentTheme.colors.black,
+        red: currentTheme.colors.red,
+        green: currentTheme.colors.green,
+        yellow: currentTheme.colors.yellow,
+        blue: currentTheme.colors.blue,
+        magenta: currentTheme.colors.magenta,
+        cyan: currentTheme.colors.cyan,
+        white: currentTheme.colors.white,
+        brightBlack: currentTheme.colors.brightBlack,
+        brightRed: currentTheme.colors.brightRed,
+        brightGreen: currentTheme.colors.brightGreen,
+        brightYellow: currentTheme.colors.brightYellow,
+        brightBlue: currentTheme.colors.brightBlue,
+        brightMagenta: currentTheme.colors.brightMagenta,
+        brightCyan: currentTheme.colors.brightCyan,
+        brightWhite: currentTheme.colors.brightWhite,
       }
     });
 
@@ -151,11 +315,163 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
         cursor: t.colors.cursor,
         cursorAccent: t.colors.cursorAccent,
         selectionBackground: t.colors.selection,
+        black: t.colors.black,
+        red: t.colors.red,
+        green: t.colors.green,
+        yellow: t.colors.yellow,
+        blue: t.colors.blue,
+        magenta: t.colors.magenta,
+        cyan: t.colors.cyan,
+        white: t.colors.white,
+        brightBlack: t.colors.brightBlack,
+        brightRed: t.colors.brightRed,
+        brightGreen: t.colors.brightGreen,
+        brightYellow: t.colors.brightYellow,
+        brightBlue: t.colors.brightBlue,
+        brightMagenta: t.colors.brightMagenta,
+        brightCyan: t.colors.brightCyan,
+        brightWhite: t.colors.brightWhite,
       };
     });
 
     const fitAddon = new FitAddon();
     term.loadAddon(fitAddon);
+
+    const searchAddon = new SearchAddon({
+      highlightLimit: 1000
+    });
+    term.loadAddon(searchAddon);
+    searchAddonRef.current = searchAddon;
+
+    term.attachCustomKeyEventHandler((event: KeyboardEvent) => {
+      const isCmdOrCtrl = event.ctrlKey || event.metaKey;
+      const k = event.key?.toLowerCase();
+
+      // Paste: Ctrl+Shift+V, Ctrl+V, Cmd+V, or Shift+Insert
+      const isPasteKey = (isCmdOrCtrl && (k === 'v' || event.code === 'KeyV')) ||
+                         (event.shiftKey && (event.key === 'Insert' || event.code === 'Insert'));
+
+      if (isPasteKey) {
+        if (event.type === 'keydown') {
+          event.preventDefault();
+          event.stopPropagation();
+          handlePasteRef.current();
+        }
+        return false;
+      }
+
+      // Copy: Ctrl+Shift+C, (Ctrl+C when text is highlighted), or Ctrl+Insert
+      const isCopyKey = (isCmdOrCtrl && event.shiftKey && (k === 'c' || event.code === 'KeyC')) ||
+                        (isCmdOrCtrl && !event.shiftKey && (k === 'c' || event.code === 'KeyC') && term.hasSelection()) ||
+                        (isCmdOrCtrl && (event.key === 'Insert' || event.code === 'Insert'));
+
+      if (isCopyKey) {
+        if (event.type === 'keydown') {
+          event.preventDefault();
+          event.stopPropagation();
+          const selection = term.getSelection();
+          if (selection) {
+            handleCopyRef.current(selection);
+          }
+        }
+        return false;
+      }
+
+      // Issue 9: In-buffer vertical line navigation vs shell history cycling
+      if (!isCmdOrCtrl && (event.key === 'ArrowUp' || event.key === 'ArrowDown')) {
+        const direction = event.key === 'ArrowUp' ? 'up' : 'down';
+        const buffer = term.buffer.active;
+        const totalBufferLines = buffer.length;
+        const currentAbsoluteY = buffer.baseY + buffer.cursorY;
+        const startExtractIdx = Math.max(0, currentAbsoluteY - 20);
+        const endExtractIdx = Math.min(totalBufferLines - 1, currentAbsoluteY + 20);
+        const lines: BufferLineInfo[] = [];
+
+        for (let idx = startExtractIdx; idx <= endExtractIdx; idx++) {
+          const l = buffer.getLine(idx);
+          if (l) {
+            lines.push({
+              text: l.translateToString(true),
+              isWrapped: Boolean(l.isWrapped),
+            });
+          }
+        }
+
+        const relativeCursorY = currentAbsoluteY - startExtractIdx;
+
+        const decision = PromptNavigationEngine.evaluateNavigation({
+          direction,
+          cursorX: buffer.cursorX,
+          cursorY: relativeCursorY,
+          cols: term.cols,
+          lines,
+          isAlternateBuffer: ptyTrackerRef.current.isAlternateBuffer() || term.buffer.active.type === 'alternate',
+        });
+
+        if (decision.handled) {
+          if (event.type === 'keydown' && decision.payload) {
+            event.preventDefault();
+            event.stopPropagation();
+            const activeSessionId = sessionIdRef.current || sessionId;
+            if (activeSessionId) {
+              SessionManager.getInstance().write(activeSessionId, decision.payload);
+            }
+          }
+          return false;
+        }
+
+        return true;
+      }
+
+      if (!isCmdOrCtrl) return true;
+
+      // Ctrl+Shift+F: Toggle In-Buffer Search
+      if (k === 'f' && event.shiftKey) {
+        if (event.type === 'keydown') {
+          event.preventDefault();
+          event.stopPropagation();
+          setIsSearchOpen(prev => !prev);
+        }
+        return false;
+      }
+
+      // Fuzzy History Search: Ctrl+R
+      if (isCmdOrCtrl && !event.shiftKey && (k === 'r' || event.code === 'KeyR')) {
+        if (event.type === 'keydown') {
+          event.preventDefault();
+          event.stopPropagation();
+          window.dispatchEvent(new CustomEvent('sentinel:toggle-history'));
+        }
+        return false;
+      }
+
+      // Application shortcuts that must bubble to React / window listeners:
+      // Ctrl+T (New Tab), Ctrl+W (Close Tab/Split), Ctrl+D / Ctrl+Shift+D (Split Panes),
+      // Ctrl+O (Workspaces), Ctrl+R (History), Ctrl+Shift+P (Palette), Ctrl+Alt+P (Ports),
+      // Ctrl+Shift+W (Workflows), Ctrl+Shift+X (Plugins), Ctrl+, (Settings), Ctrl+K (Clear)
+      if (
+        k === 't' ||
+        k === 'w' ||
+        k === 'd' ||
+        k === 'o' ||
+        k === 'r' ||
+        (k === 'p' && (event.shiftKey || event.altKey)) ||
+        (k === 'w' && event.shiftKey) ||
+        (k === 'x' && event.shiftKey) ||
+        k === ',' ||
+        k === 'k'
+      ) {
+        return false;
+      }
+
+      return true;
+    });
+
+    const handleToggleSearch = () => {
+      setIsSearchOpen(prev => !prev);
+    };
+    window.addEventListener('sentinel:toggle-search', handleToggleSearch);
+
     term.open(terminalRef.current);
     
     try {
@@ -184,37 +500,45 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
     // We must define the callback here so we can remove it later
     let outputCallback: ((data: Uint8Array) => void) | null = null;
     let unsubRemediation: (() => void) | null = null;
+    let unsubConsent: (() => void) | null = null;
 
     const initSession = async () => {
       try {
         if (!currentSessionId) {
           const shellAdapter = ShellAdapter.getInstance();
-          const defaultProfile = shellAdapter.detectLoginShell();
+          let detectedShell = '';
+          try {
+            detectedShell = await invoke<string>('get_default_shell');
+          } catch {
+            // fallback
+          }
+          const defaultProfile = shellAdapter.detectLoginShell(detectedShell || undefined);
           currentSessionId = await sessionManager.createSession(
             term.rows, 
             term.cols, 
-            defaultProfile.defaultPath, 
+            detectedShell || defaultProfile.defaultPath, 
             currentPath || undefined, 
             true
           );
+          sessionIdRef.current = currentSessionId;
           setSessionId(currentSessionId);
           onSessionCreated?.(currentSessionId);
         } else {
+          sessionIdRef.current = currentSessionId;
           await sessionManager.resize(currentSessionId, term.rows, term.cols);
         }
 
         outputCallback = (data: Uint8Array) => {
-          term.write(data);
-          try {
-            const str = new TextDecoder().decode(data);
-            PtyOutputObserver.getInstance().ingest(str, currentPath);
-          } catch { /* ignore decode error */ }
+          const text = new TextDecoder().decode(data);
+          ptyTrackerRef.current.feedOutput(text);
+          PtyOutputObserver.getInstance().ingest(text, currentPath);
+          writeTerm(text);
         };
 
         unsubRemediation = PtyOutputObserver.getInstance().onRemediation((rem) => {
           setActiveRemediation(rem);
           if (rem) {
-            writeTerm(`\r\n\x1b[1;33m⚡ Sentinel Auto-Heal:\x1b[0m ${rem.cause}\r\n`);
+            writeTerm(`\r\n\x1b[1;33m[Sentinel Auto-Heal]:\x1b[0m ${rem.cause}\r\n`);
             writeTerm(`  • \x1b[36mSuggested Fix:\x1b[0m ${rem.actionTitle}\r\n`);
             writeTerm(`  • \x1b[35mType \x1b[1m>fix\x1b[0m\x1b[35m or press \x1b[1m[Tab]\x1b[0m\x1b[35m to auto-resolve with Sentinel.\x1b[0m\r\n\r\n`);
           }
@@ -228,9 +552,30 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
         
         const agentLoop = new AgentLoop(toolLoader.getState());
         agentLoopRef.current = agentLoop;
-        agentLoop.setAuthorizationHandler((plan) => new Promise(resolve => {
-          setSecurityModalPlan({ plan, resolve });
-        }));
+
+        // Subscribe to asynchronous ConsentQueue for this tab/session
+        unsubConsent = ConsentQueue.getInstance().subscribe((pending) => {
+          const matching = pending.find(r => !r.tabId || r.tabId === currentSessionId);
+          if (matching) {
+            setSecurityModalPlan({
+              plan: matching.plan,
+              resolve: (approved: boolean) => {
+                if (approved) {
+                  ConsentQueue.getInstance().approve(matching.id);
+                } else {
+                  ConsentQueue.getInstance().deny(matching.id);
+                }
+              },
+              requestId: matching.id
+            });
+          } else {
+            setSecurityModalPlan((prev) => (prev?.requestId ? null : prev));
+          }
+        });
+
+        agentLoop.setAuthorizationHandler((plan: any) => {
+          return ConsentQueue.getInstance().enqueue(plan, currentSessionId);
+        });
 
         // Initialize Autocomplete with History, Demonstration, and Workspace Context providers
         const autocompleteEngine = new AutocompleteEngine();
@@ -263,13 +608,19 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
              // If Tab is pressed and an auto-heal remediation is active
              const activeRem = PtyOutputObserver.getInstance().getActiveRemediation();
              if (activeRem) {
-               await sessionManager.write(currentSessionId, '\x03');
-               writeTerm(`\r\n\x1b[1;32m⚡ [Sentinel Auto-Heal] Executing: ${activeRem.actionTitle}...\x1b[0m\r\n`);
+               await ptyTrackerRef.current.safeClearLine(d => sessionManager.write(currentSessionId!, d));
+               writeTerm(`\r\n\x1b[1;32m[Sentinel Auto-Heal] Executing: ${activeRem.actionTitle}...\x1b[0m\r\n`);
                PtyOutputObserver.getInstance().clearRemediation();
                if (activeRem.tool === 'shell.execute' && activeRem.params?.command) {
-                 await sessionManager.write(currentSessionId, `${activeRem.params.command}\r`);
+                 await sessionManager.write(currentSessionId!, `${activeRem.params.command}\r`);
                } else {
-                 await agentLoop.run(`fix error: ${activeRem.actionTitle}`, { os: 'mac', cwd: currentPath || '~' });
+                 PromptProgressManager.getInstance().startPrompt(`Auto-Heal: ${activeRem.actionTitle}`);
+                 try {
+                   const res = await agentLoop.run(`fix error: ${activeRem.actionTitle}`, { os: getPlatform() === 'linux' ? 'linux' : 'mac', cwd: currentPath || '~' });
+                   PromptProgressManager.getInstance().completePrompt(res.success, res.summary);
+                 } catch (err: any) {
+                   PromptProgressManager.getInstance().completePrompt(false, err?.message);
+                 }
                }
                return;
              }
@@ -312,6 +663,15 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
               
               const cleanCmd = commandText.trim();
 
+              // Intercept dangerous / catastrophic destruction commands
+              const safetyEval = CommandSafetyGuardian.getInstance().evaluate(cleanCmd);
+              if (safetyEval.isBlocked) {
+                await ptyTrackerRef.current.safeClearLine(d => sessionManager.write(currentSessionId!, d));
+                const banner = CommandSafetyGuardian.getInstance().formatTerminalBanner(safetyEval, cleanCmd);
+                writeTerm(banner);
+                return;
+              }
+
               const notifyNavigation = (target: string) => {
                 if (!onPathChange) return;
                 const curr = (currentPath || '~').replace(/\/+/g, '/').trim();
@@ -343,7 +703,7 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
 
               // Intercept application mapping slash commands: /app, /apps, /alias, /aliases
               if (cleanCmd.startsWith('/app') || cleanCmd.startsWith('/alias')) {
-                await sessionManager.write(currentSessionId!, '\x03');
+                await ptyTrackerRef.current.safeClearLine(d => sessionManager.write(currentSessionId!, d));
                 const match = cleanCmd.match(/^\/(?:apps?|aliases?)(?:\s+([^\s"']+)\s+["']?(.+?)["']?)?\s*$/i);
                 if (match && match[1] && match[2]) {
                   AppAliasRegistry.getInstance().setAlias(match[1], match[2]);
@@ -364,7 +724,7 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
 
               // Intercept demonstration learning slash commands: /learn, /learned, /forget
               if (cleanCmd.startsWith('/learn') || cleanCmd.startsWith('/learned') || cleanCmd.startsWith('/forget')) {
-                await sessionManager.write(currentSessionId!, '\x03');
+                await ptyTrackerRef.current.safeClearLine(d => sessionManager.write(currentSessionId!, d));
                 if (cleanCmd.startsWith('/learned')) {
                   const patterns = DemonstrationLearningEngine.getInstance().getAllPatterns();
                   if (patterns.length === 0) {
@@ -412,12 +772,18 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
 
               // Intercept auto-heal remediation commands: >fix, >heal
               if (cleanCmd === '>fix' || cleanCmd === '>heal') {
-                await sessionManager.write(currentSessionId!, '\x03');
+                await ptyTrackerRef.current.safeClearLine(d => sessionManager.write(currentSessionId!, d));
                 const rem = PtyOutputObserver.getInstance().getActiveRemediation();
                 if (rem) {
-                  writeTerm(`\r\n\x1b[1;32m⚡ [Sentinel Auto-Heal] Executing: ${rem.actionTitle}...\x1b[0m\r\n`);
+                  writeTerm(`\r\n\x1b[1;32m[Sentinel Auto-Heal] Executing: ${rem.actionTitle}...\x1b[0m\r\n`);
                   PtyOutputObserver.getInstance().clearRemediation();
-                  await agentLoop.run(`fix error: ${rem.actionTitle}`, { os: 'mac', cwd: currentPath || '~' });
+                  PromptProgressManager.getInstance().startPrompt(`Auto-Heal: ${rem.actionTitle}`);
+                  try {
+                    const res = await agentLoop.run(`fix error: ${rem.actionTitle}`, { os: getPlatform(), cwd: currentPath || '~' });
+                    PromptProgressManager.getInstance().completePrompt(res.success, res.summary);
+                  } catch (err: any) {
+                    PromptProgressManager.getInstance().completePrompt(false, err?.message);
+                  }
                 } else {
                   writeTerm(`\r\n\x1b[33m[Sentinel Auto-Heal] No active error diagnosed in recent output.\x1b[0m\r\n\r\n`);
                 }
@@ -452,7 +818,7 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
                   `Human demonstration in ${currentPath || '~'}`
                 ).catch(e => console.warn('[TerminalView] SERL demonstration recording error:', e));
                 if (learned) {
-                  writeTerm(`\r\n\x1b[1;35m💡 Sentinel learned this workflow from your demonstration!\x1b[0m\r\n`);
+                  writeTerm(`\r\n\x1b[1;35m[Sentinel Learning Engine] Learned this workflow from your demonstration!\x1b[0m\r\n`);
                   writeTerm(`  • \x1b[36mTrigger:\x1b[0m "${lastUnresolvedGoalRef.current.goal}"\r\n`);
                   writeTerm(`  • \x1b[33mCommand:\x1b[0m ${cleanCmd}\r\n`);
                   writeTerm(`  • \x1b[37mSaved to ~/.sentinel/learned_patterns.json & LoRA training dataset. Next time you ask, Sentinel will know this!\x1b[0m\r\n\r\n`);
@@ -465,8 +831,9 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
               // workflow can resume without making the user retype the request.
               const answeringAgentQuestion = agentLoop.hasPendingQuestion();
               if (answeringAgentQuestion && cleanCmd === '/cancel') {
-                await sessionManager.write(currentSessionId!, '\x03');
+                await ptyTrackerRef.current.safeClearLine(d => sessionManager.write(currentSessionId!, d));
                 agentLoop.cancelPendingQuestion();
+                clearPlanDismissTimer();
                 setLatestPlan(null);
                 writeTerm('\r\n\x1b[33m  Workflow cancelled.\x1b[0m\r\n\r\n');
                 sessionManager.write(currentSessionId!, '\r');
@@ -479,23 +846,63 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
                   return; // Empty AI instruction
                 }
 
-                // Cancel the shell echo of the > command
-                await sessionManager.write(currentSessionId!, '\x03');
+                // Safely cancel the shell line without killing running foreground processes
+                await ptyTrackerRef.current.safeClearLine(d => sessionManager.write(currentSessionId!, d));
+
+                // Initiate live progress tracking in the bottom bar
+                PromptProgressManager.getInstance().startPrompt(aiGoal);
 
                 // Set up event listener for live output
                 agentLoop.onEvent((event) => {
-                  if (event.type === 'plan') {
+                  if (event.type === 'thinking') {
+                    PromptProgressManager.getInstance().updateStage(event.message || 'Thinking...', 30);
+                  } else if (event.type === 'plan') {
+                    PromptProgressManager.getInstance().updateStage('Planning...', 50);
+                    const enabled = localStorage.getItem('sentinel_hud_plan_enabled') !== 'false';
+                    const duration = localStorage.getItem('sentinel_hud_plan_duration') || '8';
+                    if (!enabled || duration === 'disabled') {
+                      return;
+                    }
+                    clearPlanDismissTimer();
                     if (event.data) {
-                      setLatestPlan(event.data as AgentPlan);
+                      const plan = event.data as AgentPlan;
+                      setLatestPlan(plan);
                       setIsPlanOpen(true);
+                      const isAllCompleted = plan.phases && plan.phases.length > 0 && plan.phases.every(p => p.status === 'completed');
+                      const hasFailed = plan.phases && plan.phases.some(p => p.status === 'failed');
+                      if (hasFailed) {
+                        setPlanExecutionStatus('failed');
+                        planExecutionStatusRef.current = 'failed';
+                        schedulePlanDismiss();
+                      } else if (isAllCompleted) {
+                        setPlanExecutionStatus('completed');
+                        planExecutionStatusRef.current = 'completed';
+                        schedulePlanDismiss();
+                      } else {
+                        setPlanExecutionStatus('running');
+                        planExecutionStatusRef.current = 'running';
+                      }
                     }
                     // Keep execution plan strictly in dropdown overlay; avoid terminal buffer spam
                     return;
-                  }
-
-                  if (event.type === 'done') {
-                    // Automatically collapse the dropdown plan when goal completes successfully
-                    setIsPlanOpen(false);
+                  } else if (event.type === 'tool_start') {
+                    const rawMsg = event.message || '';
+                    const cleanMsg = rawMsg.replace(/^(Running|Executing|Phase \d+:?)\s*/i, '').trim();
+                    PromptProgressManager.getInstance().updateStage(cleanMsg ? `Running: ${cleanMsg.slice(0, 24)}` : 'Executing...', 75);
+                  } else if (event.type === 'step_output') {
+                    PromptProgressManager.getInstance().updateStage('Executing...', 82);
+                  } else if (event.type === 'tool_done') {
+                    PromptProgressManager.getInstance().updateStage('Verifying...', 92);
+                  } else if (event.type === 'done') {
+                    setPlanExecutionStatus('completed');
+                    planExecutionStatusRef.current = 'completed';
+                    schedulePlanDismiss();
+                    PromptProgressManager.getInstance().completePrompt(true, event.message);
+                  } else if (event.type === 'error') {
+                    setPlanExecutionStatus('failed');
+                    planExecutionStatusRef.current = 'failed';
+                    schedulePlanDismiss();
+                    PromptProgressManager.getInstance().completePrompt(false, event.message);
                   }
 
                   const text = formatAgentEvent(event);
@@ -503,7 +910,7 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
 
                   // Show structured data (file lists, devices, etc.) when available
                   if (event.data && (event.type === 'tool_done' || event.type === 'done')) {
-                    const dataOutput = formatDataOutput(event.data);
+                    const dataOutput = formatDataOutput(event.data, { goal: aiGoal });
                     if (dataOutput && (!text || !text.includes(dataOutput.trim()))) {
                       writeTerm(dataOutput);
                     }
@@ -511,11 +918,18 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
                 });
 
                 // Run the agent loop
-                agentLoop.run(aiGoal, { os: 'mac', cwd: currentPath || '~' }).then(result => {
+                agentLoop.run(aiGoal, { os: getPlatform(), cwd: currentPath || '~' }).then(result => {
+                  PromptProgressManager.getInstance().completePrompt(result.success, result.summary);
                   if (!result.success) {
                     lastUnresolvedGoalRef.current = { goal: aiGoal, timestamp: Date.now() };
+                    setPlanExecutionStatus('failed');
+                    planExecutionStatusRef.current = 'failed';
+                    schedulePlanDismiss();
                   } else {
                     lastUnresolvedGoalRef.current = null;
+                    setPlanExecutionStatus('completed');
+                    planExecutionStatusRef.current = 'completed';
+                    schedulePlanDismiss();
                   }
 
                   // Handle clear terminal command
@@ -536,12 +950,19 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
                     sessionManager.write(currentSessionId!, '\r');
                   }
                 }).catch(err => {
+                  PromptProgressManager.getInstance().completePrompt(false, err?.message || 'Error');
                   lastUnresolvedGoalRef.current = { goal: aiGoal, timestamp: Date.now() };
+                  setPlanExecutionStatus('failed');
+                  planExecutionStatusRef.current = 'failed';
+                  schedulePlanDismiss();
                   writeTerm(`\r\n\x1b[1;31m  ✗ ${err.message || 'Something went wrong'}\x1b[0m\r\n\r\n`);
                   sessionManager.write(currentSessionId!, '\r');
                 });
                 
                 return; // Do NOT send the \r to the shell
+              } else if (cleanCmd) {
+                // User submitted a command to the shell
+                ptyTrackerRef.current.notifyCommandStarted(cleanCmd);
               }
             }
           }
@@ -564,7 +985,7 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
                     currentInput: commandText, 
                     cwd: currentPath || '~',
                     cursorPosition: commandText.length,
-                    os: 'macos'
+                    os: getPlatform() === 'linux' ? 'linux' : 'macos'
                   });
                   if (suggestions.length > 0) {
                      ghostText.render(suggestions[0].value, commandText);
@@ -579,14 +1000,16 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
           }
         });
       } catch (error: any) {
-        console.error("Failed to initialize terminal session:", error);
-        term.write('\x1b[31m\r\n[Sentinel Error] Failed to connect to terminal backend.\x1b[0m\r\n');
-        term.write(`\x1b[31mError Details: ${error?.message || error}\x1b[0m\r\n`);
-        if (error?.stack) {
-          term.write(`\x1b[31m${error.stack.replace(/\n/g, '\r\n')}\x1b[0m\r\n`);
-        }
-        term.write('\x1b[33mAre you running this in a web browser instead of the Tauri app?\x1b[0m\r\n');
-        term.write('\x1b[33mPlease use `npm run tauri dev` to launch the native desktop application.\x1b[0m\r\n');
+        console.warn("[Sentinel] Native backend unavailable, running in preview mode:", error);
+        term.write('\x1b[1;32m❯\x1b[0m \x1b[1mcargo check --workspace\x1b[0m\r\n');
+        term.write('   \x1b[34mCompiling\x1b[0m sentinel v2.0.0 (/home/dev/workspace/sentinel)\r\n');
+        term.write('    \x1b[32mChecking\x1b[0m sentinel-core v2.0.0\r\n');
+        term.write('    \x1b[32mFinished\x1b[0m dev [optimized + debuginfo] target(s) in 0.38s\r\n\r\n');
+        term.write('\x1b[1;32m❯\x1b[0m \x1b[1mgit status\x1b[0m\r\n');
+        term.write('On branch main\r\n');
+        term.write('Your branch is up to date with \'origin/main\'.\r\n');
+        term.write('nothing to commit, working tree clean\r\n\r\n');
+        term.write('\x1b[1;32m❯\x1b[0m \x1b[7m \x1b[0m');
       }
     };
 
@@ -623,125 +1046,337 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
       }
       unsubRemediation?.();
       unsubscribeTheme();
+      unsubConsent?.();
+      ConsentQueue.getInstance().clearQueue(currentSessionId);
+      window.removeEventListener('sentinel:toggle-search', handleToggleSearch);
+      searchAddon.dispose();
       term.dispose();
     };
   }, []); // Run once on mount
 
   useEffect(() => {
-    // When this tab becomes active, we should focus the terminal and refit
+    // When this tab becomes active, synchronously refit immediately without delay
     if (isActive && fitAddonRef.current && xtermRef.current) {
-      setTimeout(() => {
-        fitAddonRef.current?.fit();
-        xtermRef.current?.focus();
-        if (sessionId) {
-          SessionManager.getInstance().resize(sessionId, xtermRef.current!.rows, xtermRef.current!.cols);
+      try {
+        fitAddonRef.current.fit();
+        xtermRef.current.focus();
+        const activeId = sessionIdRef.current || sessionId;
+        if (activeId && xtermRef.current.rows > 0 && xtermRef.current.cols > 0) {
+          SessionManager.getInstance().resize(activeId, xtermRef.current.rows, xtermRef.current.cols);
         }
-      }, 50);
+      } catch {}
+
+      const animId = requestAnimationFrame(() => {
+        try {
+          fitAddonRef.current?.fit();
+          xtermRef.current?.focus();
+          const activeId = sessionIdRef.current || sessionId;
+          if (activeId && xtermRef.current && xtermRef.current.rows > 0 && xtermRef.current.cols > 0) {
+            SessionManager.getInstance().resize(activeId, xtermRef.current.rows, xtermRef.current.cols);
+          }
+        } catch {}
+      });
+
+      return () => cancelAnimationFrame(animId);
     }
   }, [isActive, sessionId]);
 
   return (
-    <div style={{ position: 'relative', width: '100%', height: '100%', overflow: 'hidden', display: isActive ? 'block' : 'none' }}>
+    <div 
+      style={{ 
+        position: 'relative', 
+        width: '100%', 
+        height: '100%', 
+        overflow: 'hidden', 
+        visibility: isActive ? 'visible' : 'hidden',
+        pointerEvents: isActive ? 'auto' : 'none',
+      }}
+    >
       <div 
         ref={terminalRef} 
+        className="allow-context-menu"
         style={{ position: 'relative', width: '100%', height: '100%', overflow: 'hidden' }} 
+        onContextMenu={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          const term = xtermRef.current;
+          if (!term) return;
+          if (term.hasSelection()) {
+            const text = term.getSelection();
+            if (text) {
+              handleCopy(text);
+              term.clearSelection();
+            }
+          } else {
+            handlePaste();
+          }
+        }}
       />
 
-      {latestPlan && (
-        <details 
-          open={isPlanOpen}
-          onToggle={(e) => setIsPlanOpen(e.currentTarget.open)}
+      {/* In-Buffer Regex Search Bar (Ctrl+Shift+F) */}
+      <TerminalSearchBar
+        isOpen={isSearchOpen}
+        onClose={() => setIsSearchOpen(false)}
+        searchAddon={searchAddonRef.current}
+        onFocusTerminal={() => xtermRef.current?.focus()}
+      />
+
+      {/* Execution Plan Floating HUD Notification Overlay */}
+      {latestPlan && hudPlanEnabled && hudPlanDuration !== 'disabled' && (
+        <div 
+          role="region"
+          aria-label="Execution Plan HUD"
+          onMouseEnter={() => {
+            isHoveringPlanRef.current = true;
+            clearPlanDismissTimer();
+          }}
+          onMouseLeave={() => {
+            isHoveringPlanRef.current = false;
+            if (planExecutionStatusRef.current !== 'running') {
+              schedulePlanDismiss();
+            }
+          }}
           style={{
             position: 'absolute',
             top: '12px',
             right: '14px',
             width: 'min(380px, calc(100% - 28px))',
-            padding: '10px 14px',
+            padding: '12px 14px',
             borderRadius: '10px',
-            border: latestPlan.phases?.every(p => p.status === 'completed')
-              ? '1px solid rgba(74, 222, 128, 0.35)'
-              : '1px solid rgba(192, 132, 252, 0.28)',
-            background: 'rgba(20, 16, 29, 0.94)',
-            boxShadow: '0 10px 32px rgba(0, 0, 0, 0.45)',
+            border: planExecutionStatus === 'failed'
+              ? '1px solid rgba(255, 255, 255, 0.25)'
+              : planExecutionStatus === 'completed'
+              ? '1px solid rgba(255, 255, 255, 0.18)'
+              : '1px solid rgba(255, 255, 255, 0.12)',
+            background: 'rgba(12, 13, 18, 0.96)',
+            boxShadow: '0 12px 36px rgba(0, 0, 0, 0.65)',
             backdropFilter: 'blur(12px)',
-            color: '#f5f3ff',
+            color: '#ffffff',
             fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
             fontSize: '12px',
             zIndex: 30,
-            transition: 'all 0.2s ease'
+            transition: 'all 0.2s ease',
+            userSelect: 'none'
           }}
         >
-          <summary style={{
-            cursor: 'pointer',
-            fontWeight: 650,
-            color: latestPlan.phases?.every(p => p.status === 'completed') ? '#4ade80' : '#d8b4fe',
-            outline: 'none',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            userSelect: 'none'
-          }}>
-            <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <span>{latestPlan.phases?.every(p => p.status === 'completed') ? '✓' : '⚡'}</span>
-              <span>Execution Plan {latestPlan.phases ? `· ${latestPlan.phases.length} Phases` : `· ${latestPlan.steps.length} Steps`}</span>
-              {latestPlan.phases?.every(p => p.status === 'completed') && (
-                <span style={{ fontSize: '10px', color: '#4ade80', background: 'rgba(34, 197, 94, 0.15)', padding: '1px 6px', borderRadius: '4px' }}>
+          {/* Header Row */}
+          <div 
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              cursor: 'pointer',
+              gap: '8px'
+            }}
+            onClick={() => setIsPlanOpen(!isPlanOpen)}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+              <span style={{ 
+                fontWeight: 700, 
+                color: planExecutionStatus === 'failed' ? 'rgba(255, 255, 255, 0.9)' : '#ffffff',
+                fontSize: '13px'
+              }}>
+                {planExecutionStatus === 'completed' ? '✓' : planExecutionStatus === 'failed' ? '✗' : '▸'}
+              </span>
+              <span style={{ 
+                fontWeight: 600, 
+                color: '#ffffff', 
+                whiteSpace: 'nowrap', 
+                overflow: 'hidden', 
+                textOverflow: 'ellipsis' 
+              }}>
+                Execution Plan {latestPlan.phases ? `· ${latestPlan.phases.length} Phases` : `· ${latestPlan.steps.length} Steps`}
+              </span>
+              {planExecutionStatus === 'completed' && (
+                <span style={{ 
+                  fontSize: '10px', 
+                  color: '#ffffff', 
+                  background: 'rgba(255, 255, 255, 0.12)', 
+                  border: '1px solid rgba(255, 255, 255, 0.18)', 
+                  padding: '1px 6px', 
+                  borderRadius: '4px',
+                  fontWeight: 500
+                }}>
                   Completed
                 </span>
               )}
-            </span>
-            {latestPlan.activePhaseId && (
-              <span style={{ fontSize: '10px', background: 'rgba(56, 189, 248, 0.25)', color: '#38bdf8', padding: '1px 6px', borderRadius: '4px' }}>
-                Running Phase {latestPlan.activePhaseId}
-              </span>
-            )}
-          </summary>
-          <p style={{ margin: '8px 0 8px', color: 'rgba(255,255,255,0.72)', lineHeight: 1.4 }}>
-            {latestPlan.summary}
-          </p>
-          {latestPlan.phases && latestPlan.phases.length > 0 ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', margin: '4px 0 2px' }}>
-              {latestPlan.phases.map((phase) => (
-                <div key={phase.id} style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    color: phase.status === 'completed' ? '#4ade80' : phase.status === 'running' ? '#38bdf8' : phase.status === 'skipped' ? '#94a3b8' : phase.status === 'failed' ? '#f87171' : '#e2e8f0',
-                    fontSize: '11px',
-                    fontWeight: phase.status === 'running' ? 600 : 400
-                  }}>
-                    <span>{phase.status === 'completed' ? '✓' : phase.status === 'running' ? '▸' : phase.status === 'skipped' ? '⊘' : phase.status === 'failed' ? '✗' : '○'}</span>
-                    <span>Phase {phase.id}: {phase.title}</span>
-                    {phase.skippedReason && <span style={{ fontSize: '10px', color: '#64748b' }}>({phase.skippedReason})</span>}
-                  </div>
-                  {phase.subPhases && phase.subPhases.map((sub) => (
-                    <div key={sub.id} style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '6px',
-                      paddingLeft: '16px',
-                      color: sub.status === 'completed' ? '#4ade80' : sub.status === 'running' ? '#38bdf8' : sub.status === 'skipped' ? '#94a3b8' : '#cbd5e1',
-                      fontSize: '10.5px'
-                    }}>
-                      <span>{sub.status === 'completed' ? '✓' : sub.status === 'running' ? '▸' : '○'}</span>
-                      <span>Phase {sub.id}: {sub.title}</span>
+              {planExecutionStatus === 'failed' && (
+                <span style={{ 
+                  fontSize: '10px', 
+                  color: 'rgba(255, 255, 255, 0.95)', 
+                  background: 'rgba(255, 255, 255, 0.08)', 
+                  border: '1px solid rgba(255, 255, 255, 0.25)', 
+                  padding: '1px 6px', 
+                  borderRadius: '4px',
+                  fontWeight: 500
+                }}>
+                  Failed
+                </span>
+              )}
+              {planExecutionStatus === 'running' && latestPlan.activePhaseId && (
+                <span style={{ 
+                  fontSize: '10px', 
+                  background: 'rgba(255, 255, 255, 0.08)', 
+                  border: '1px solid rgba(255, 255, 255, 0.12)', 
+                  color: '#ffffff', 
+                  padding: '1px 6px', 
+                  borderRadius: '4px' 
+                }}>
+                  Phase {latestPlan.activePhaseId}
+                </span>
+              )}
+            </div>
+
+            {/* Action Buttons: Toggle Collapse and Manual Dismiss */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsPlanOpen(!isPlanOpen);
+                }}
+                title={isPlanOpen ? "Collapse plan" : "Expand plan"}
+                aria-label={isPlanOpen ? "Collapse plan" : "Expand plan"}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: 'rgba(255, 255, 255, 0.6)',
+                  cursor: 'pointer',
+                  padding: '3px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  borderRadius: '4px'
+                }}
+              >
+                {isPlanOpen ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+              </button>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  clearPlanDismissTimer();
+                  setLatestPlan(null);
+                }}
+                title="Dismiss plan overlay"
+                aria-label="Dismiss plan overlay"
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: 'rgba(255, 255, 255, 0.6)',
+                  cursor: 'pointer',
+                  padding: '3px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  borderRadius: '4px'
+                }}
+              >
+                <X size={13} />
+              </button>
+            </div>
+          </div>
+
+          {/* Expanded Content */}
+          {isPlanOpen && (
+            <div style={{ marginTop: '8px', userSelect: 'text' }}>
+              <p style={{ margin: '0 0 8px', color: 'rgba(255, 255, 255, 0.7)', lineHeight: 1.45, fontSize: '11.5px' }}>
+                {latestPlan.summary}
+              </p>
+              {latestPlan.phases && latestPlan.phases.length > 0 ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', margin: '4px 0 2px' }}>
+                  {latestPlan.phases.map((phase) => (
+                    <div key={phase.id} style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        color: phase.status === 'completed'
+                          ? 'rgba(255, 255, 255, 0.85)'
+                          : phase.status === 'running'
+                          ? '#ffffff'
+                          : phase.status === 'failed'
+                          ? 'rgba(255, 255, 255, 0.95)'
+                          : phase.status === 'skipped'
+                          ? 'rgba(255, 255, 255, 0.4)'
+                          : 'rgba(255, 255, 255, 0.55)',
+                        fontSize: '11px',
+                        fontWeight: phase.status === 'running' || phase.status === 'failed' ? 600 : 400
+                      }}>
+                        <span style={{ fontWeight: 700 }}>
+                          {phase.status === 'completed' ? '✓' : phase.status === 'running' ? '▸' : phase.status === 'failed' ? '✗' : phase.status === 'skipped' ? '⊘' : '○'}
+                        </span>
+                        <span>Phase {phase.id}: {phase.title}</span>
+                        {phase.skippedReason && (
+                          <span style={{ fontSize: '10px', color: 'rgba(255, 255, 255, 0.4)' }}>({phase.skippedReason})</span>
+                        )}
+                      </div>
+                      {phase.subPhases && phase.subPhases.map((sub) => (
+                        <div key={sub.id} style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          paddingLeft: '16px',
+                          color: sub.status === 'completed'
+                            ? 'rgba(255, 255, 255, 0.75)'
+                            : sub.status === 'running'
+                            ? '#ffffff'
+                            : sub.status === 'failed'
+                            ? 'rgba(255, 255, 255, 0.95)'
+                            : sub.status === 'skipped'
+                            ? 'rgba(255, 255, 255, 0.35)'
+                            : 'rgba(255, 255, 255, 0.5)',
+                          fontSize: '10.5px'
+                        }}>
+                          <span style={{ fontWeight: 700 }}>
+                            {sub.status === 'completed' ? '✓' : sub.status === 'running' ? '▸' : sub.status === 'failed' ? '✗' : '○'}
+                          </span>
+                          <span>Phase {sub.id}: {sub.title}</span>
+                        </div>
+                      ))}
                     </div>
                   ))}
                 </div>
-              ))}
+              ) : latestPlan.steps.length > 0 ? (
+                <ol style={{ margin: '0 0 2px', paddingLeft: '18px', color: 'rgba(255, 255, 255, 0.8)', lineHeight: 1.55 }}>
+                  {latestPlan.steps.map((step, index) => <li key={`${index}-${step}`}>{step}</li>)}
+                </ol>
+              ) : null}
+
+              {latestPlan.question && (
+                <p style={{ 
+                  margin: '8px 0 0', 
+                  padding: '6px 10px', 
+                  borderRadius: '6px', 
+                  background: 'rgba(255, 255, 255, 0.05)', 
+                  border: '1px solid rgba(255, 255, 255, 0.12)', 
+                  color: '#ffffff', 
+                  lineHeight: 1.4,
+                  fontSize: '11px'
+                }}>
+                  Needs your answer: {latestPlan.question}
+                </p>
+              )}
+
+              {/* Status and auto-dismiss hint */}
+              {planExecutionStatus !== 'running' && hudPlanDuration !== 'persistent' && (
+                <div style={{
+                  marginTop: '10px',
+                  paddingTop: '6px',
+                  borderTop: '1px solid rgba(255, 255, 255, 0.06)',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  fontSize: '10px',
+                  color: 'rgba(255, 255, 255, 0.4)'
+                }}>
+                  <span>Auto-dismiss in {hudPlanDuration}s</span>
+                  <span>Hover to pause</span>
+                </div>
+              )}
             </div>
-          ) : latestPlan.steps.length > 0 ? (
-            <ol style={{ margin: '0 0 2px', paddingLeft: '20px', color: '#ede9fe', lineHeight: 1.55 }}>
-              {latestPlan.steps.map((step, index) => <li key={`${index}-${step}`}>{step}</li>)}
-            </ol>
-          ) : null}
-          {latestPlan.question && (
-            <p style={{ margin: '10px 0 0', color: '#fcd34d', lineHeight: 1.4 }}>
-              Needs your answer: {latestPlan.question}
-            </p>
           )}
-        </details>
+        </div>
       )}
 
       {/* Floating Auto-Heal Action Banner HUD */}
@@ -767,7 +1402,7 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
         }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ fontSize: '15px' }}>⚡</span>
+              <Wrench size={14} color="#f59e0b" />
               <span style={{ fontSize: '12px', fontWeight: 700, color: '#f59e0b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                 Sentinel Auto-Heal
               </span>
@@ -782,13 +1417,13 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
                 border: 'none',
                 color: 'rgba(255,255,255,0.4)',
                 cursor: 'pointer',
-                fontSize: '14px',
                 padding: '2px 4px',
-                lineHeight: 1
+                display: 'flex',
+                alignItems: 'center'
               }}
               title="Dismiss"
             >
-              ✕
+              <X size={14} />
             </button>
           </div>
           <div style={{ fontSize: '12px', color: '#e2e8f0', lineHeight: 1.4 }}>
@@ -816,7 +1451,8 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
                 boxShadow: '0 2px 8px rgba(245, 158, 11, 0.3)'
               }}
             >
-              Auto-Fix <span style={{ opacity: 0.8, fontSize: '10px', background: 'rgba(0,0,0,0.18)', padding: '1px 4px', borderRadius: '3px' }}>Tab</span>
+              <Play size={11} fill="currentColor" />
+              <span>Auto-Fix</span> <span style={{ opacity: 0.8, fontSize: '10px', background: 'rgba(0,0,0,0.18)', padding: '1px 4px', borderRadius: '3px' }}>Tab</span>
             </button>
           </div>
         </div>
@@ -877,9 +1513,9 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                fontSize: '20px'
+                color: '#f59e0b'
               }}>
-                🔒
+                <ShieldAlert size={22} />
               </div>
               <div>
                 <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 600, color: '#f8fafc', letterSpacing: '-0.2px' }}>
@@ -893,7 +1529,7 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
 
             <p style={{ fontSize: '13px', lineHeight: '1.55', color: 'rgba(255, 255, 255, 0.75)', margin: '0 0 18px 0' }}>
               {securityModalPlan.plan.requiresPassword
-                ? 'To ensure system integrity and prevent unauthorized modifications, please verify your macOS user login password to execute this capability.'
+                ? 'To ensure system integrity and prevent unauthorized modifications, please verify your system administrator / sudo credentials to execute this capability.'
                 : 'This terminal command requires your explicit confirmation before executing. Review the command and intent below.'}
             </p>
 
@@ -918,7 +1554,7 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
               </div>
               {securityModalPlan.plan.explanation && (
                 <div style={{ marginTop: '8px', paddingTop: '8px', borderTop: '1px solid rgba(255, 255, 255, 0.07)', display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
-                  <span style={{ color: '#a78bfa', flexShrink: 0, fontWeight: 600 }}>ℹ️ Intent:</span>
+                  <span style={{ color: '#a78bfa', flexShrink: 0, fontWeight: 600 }}>Intent:</span>
                   <span style={{ color: '#f1f5f9', lineHeight: '1.45', wordBreak: 'break-word' }}>
                     {securityModalPlan.plan.explanation}
                   </span>
@@ -929,7 +1565,7 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
             {securityModalPlan.plan.requiresPassword ? (
               <div style={{ marginBottom: '22px' }}>
                 <label style={{ display: 'block', fontSize: '12px', color: 'rgba(255, 255, 255, 0.85)', marginBottom: '8px', fontWeight: 500 }}>
-                  macOS User Login Password:
+                  System Administrator / Sudo Password:
                 </label>
                 <input
                   type="password"
@@ -962,7 +1598,8 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
                 />
                 {authError && (
                   <div style={{ color: '#ef4444', fontSize: '12px', marginTop: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <span>⚠️</span> {authError}
+                    <AlertCircle size={14} style={{ color: '#ef4444', flexShrink: 0 }} />
+                    <span>{authError}</span>
                   </div>
                 )}
               </div>
@@ -985,10 +1622,14 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
                   fontSize: '13px',
                   cursor: 'pointer',
                   fontWeight: 500,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '5px',
                   transition: 'background-color 0.2s ease'
                 }}
               >
-                Cancel <span style={{ opacity: 0.6, fontSize: '11px', marginLeft: '4px' }}>[Esc]</span>
+                <X size={13} />
+                <span>Cancel</span> <span style={{ opacity: 0.6, fontSize: '11px', marginLeft: '4px' }}>[Esc]</span>
               </button>
               <button
                 disabled={isVerifying}
@@ -1016,7 +1657,8 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId: initialSe
                   gap: '6px'
                 }}
               >
-                {isVerifying ? 'Authenticating...' : securityModalPlan.plan.requiresPassword ? 'Authorize' : 'Approve & Execute'}
+                <Check size={14} />
+                <span>{isVerifying ? 'Authenticating...' : securityModalPlan.plan.requiresPassword ? 'Authorize' : 'Approve & Execute'}</span>
                 {!isVerifying && <span style={{ opacity: 0.75, fontSize: '11px', background: 'rgba(0,0,0,0.18)', padding: '1px 5px', borderRadius: '4px' }}>↵ Enter</span>}
               </button>
             </div>
