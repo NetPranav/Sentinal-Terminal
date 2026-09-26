@@ -1,6 +1,7 @@
 mod pty;
 mod process_cmds;
 mod embedded_server;
+pub mod logger;
 
 #[cfg(target_os = "macos")]
 fn request_bluetooth_permission() {
@@ -30,9 +31,29 @@ fn request_bluetooth_permission() {}
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    logger::init();
+    logger::log_info("BOOT", "Initializing Sentinel Terminal runtime");
     tauri::Builder::default()
-        .setup(|_app| {
+        .setup(|app| {
+            logger::log_info("SETUP", "Initializing core application services");
             request_bluetooth_permission();
+
+            use tauri::Manager;
+            if let Some(main_win) = app.get_webview_window("main") {
+                match main_win.url() {
+                    Ok(url) => {
+                        logger::log_info("WINDOW", &format!("Main webview URL: {}", url));
+                        if url.as_str().contains("localhost:1420") {
+                            logger::log_warn("WEBVIEW", "Running against external devUrl (http://localhost:1420). Frontend dev server required.");
+                        } else if url.as_str().starts_with("tauri://") {
+                            logger::log_info("WEBVIEW", "Embedded production assets active via custom-protocol (tauri://localhost)");
+                        }
+                    }
+                    Err(e) => {
+                        logger::log_error("WINDOW", &format!("Failed to determine main webview URL: {}", e));
+                    }
+                }
+            }
             
             #[cfg(target_os = "macos")]
             {
@@ -152,21 +173,34 @@ pub fn run() {
             embedded_server::release_inference_slot,
             embedded_server::cancel_session_requests,
             embedded_server::get_inference_queue_status,
-            embedded_server::verify_file_checksum
+            embedded_server::verify_file_checksum,
+            logger::log_diagnostic,
+            logger::is_debug_active
         ])
         .on_window_event(|window, event| {
-            if let tauri::WindowEvent::Destroyed = event {
-                use tauri::Manager;
-                if let Some(state) = window.try_state::<embedded_server::EmbeddedLlmState>() {
-                    embedded_server::terminate_embedded_llm_child(&state);
+            match event {
+                tauri::WindowEvent::Destroyed => {
+                    logger::log_info("WINDOW", &format!("Webview window destroyed: {}", window.label()));
+                    use tauri::Manager;
+                    if let Some(state) = window.try_state::<embedded_server::EmbeddedLlmState>() {
+                        embedded_server::terminate_embedded_llm_child(&state);
+                    }
                 }
+                tauri::WindowEvent::CloseRequested { .. } => {
+                    logger::log_info("WINDOW", &format!("Webview window close requested: {}", window.label()));
+                }
+                _ => {}
             }
         })
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
         .run(|app_handle, event| {
             match event {
+                tauri::RunEvent::Ready => {
+                    logger::log_info("APP", "Sentinel Terminal application runtime READY");
+                }
                 tauri::RunEvent::ExitRequested { .. } | tauri::RunEvent::Exit => {
+                    logger::log_info("APP", "Sentinel Terminal application runtime EXIT");
                     use tauri::Manager;
                     if let Some(state) = app_handle.try_state::<embedded_server::EmbeddedLlmState>() {
                         embedded_server::terminate_embedded_llm_child(&state);
@@ -176,6 +210,7 @@ pub fn run() {
                 tauri::RunEvent::Opened { urls } => {
                     use tauri::Emitter;
                     let url_strings: Vec<String> = urls.into_iter().map(|u| u.to_string()).collect();
+                    logger::log_info("URL", &format!("Opened via protocol handler: {:?}", url_strings));
                     let _ = app_handle.emit("sentinel-url", url_strings);
                 }
                 _ => {}

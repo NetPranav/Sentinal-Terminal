@@ -14,6 +14,7 @@ This document tracks verified resolutions, architectural implementations, touche
 8. [Issue 4: Linux Desktop / File Manager Context Actions Integration](#issue-4-linux-desktop--file-manager-context-actions-integration)
 9. [Issue 5: VS Code & Cursor IDE Profiles Usability](#issue-5-vs-code--cursor-ide-profiles-usability)
 10. [Issue 6: Sentinel CLI Launcher Installation & Execution](#issue-6-sentinel-cli-launcher-installation--execution)
+11. [Issue 12: Release Webview White Screen & Live Diagnostic Logging System](#issue-12-release-webview-white-screen--live-diagnostic-logging-system)
 
 ---
 
@@ -497,4 +498,82 @@ The onboarding CLI launcher installation generated a script at `~/.local/bin/sen
 - [`packaging/arch/sentinel-terminal.desktop`](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/packaging/arch/sentinel-terminal.desktop): Updated desktop entry with `%U` and directory MIME type.
 - [`packaging/desktop/com.pranav.sentinel-terminal.desktop`](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/packaging/desktop/com.pranav.sentinel-terminal.desktop): Updated desktop entry with `inode/directory`.
 - [`src/domain/integration/InstallerService.test.ts`](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/domain/integration/InstallerService.test.ts): Unit tests verifying recursion elimination, wrapper generation, and desktop registration.
+
+---
+
+## Issue 12: Release Webview White Screen & Live Diagnostic Logging System
+
+### 12.1 Problem Statement
+When updating or launching Sentinel Terminal from a packaged release (`sentinel-terminal-bin-2.0.0-3-x86_64.pkg.tar.zst`), the application opened to a blank white screen displaying:
+```
+Could not connect to localhost: Connection refused
+```
+No interface rendered, terminal prompts were inaccessible, and when launched via terminal without diagnostic output, errors were swallowed or sent to `/dev/null`.
+
+### 12.2 Resolution Status
+- **Status:** Resolved & Verified
+- **Validation:** 
+  - Automated unit test suite: 193/193 test files passed (1,388 tests, 0 failures).
+  - Production build: `npm run build` completed cleanly.
+  - Rust release compilation: `cargo build --release` with `custom-protocol` feature.
+  - Runtime verification: Live diagnostic logging confirmed via `sentinel --debug` and direct binary launch (`tauri://localhost` active, PTY spawned, llama-server spawned).
+  - Arch Linux package: `sentinel-terminal-bin-2.0.0-4-x86_64.pkg.tar.zst` (6.8 MB) built and validated.
+
+### 12.3 Technical Root Causes
+1. **Missing `custom-protocol` Feature in Cargo.toml**:
+   - In Tauri v2, `tauri-macros::generate_context` checks `cfg!(not(feature = "custom-protocol"))` to decide whether to embed assets or point to the development server.
+   - `src-tauri/Cargo.toml` lacked a `[features]` section mapping `default` to `custom-protocol = ["tauri/custom-protocol"]`.
+   - Consequently, building with `cargo build --release` without explicit feature flags defaulted to development mode (`cargo:dev=true`), which hardcoded the webview initial URL to `devUrl` (`http://localhost:1420`).
+   - When installed as a release package without Vite dev server active on port 1420, WebKit GTK failed to connect to `127.0.0.1:1420`, showing "Connection refused" on a white screen.
+2. **Lack of Terminal Foreground Diagnostic Mode**:
+   - Standard CLI launchers in `packaging/arch/sentinel` and `InstallerService.ts` redirected all stdout and stderr to `/dev/null` (`>/dev/null 2>&1 &`).
+   - When the app failed, no errors were visible to the user in the terminal, making debugging impossible without manual inspection.
+3. **No Frontend-to-Terminal Diagnostic Bridge**:
+   - Uncaught JavaScript runtime exceptions, React mount crashes, and console errors inside WebKit GTK remained hidden within webview developer tools rather than streaming to the terminal.
+4. **Packaging Script Lacked Verification Guardrails**:
+   - `packaging/arch/build-pacman.sh` did not build the frontend bundle, did not pass `--features tauri/custom-protocol`, and lacked sanity assertions verifying that assets were actually embedded in the binary before packaging.
+
+### 12.4 Implemented Architecture & Remediation
+1. **Configured Cargo Features in `src-tauri/Cargo.toml`**:
+   - Added:
+     ```toml
+     [features]
+     default = ["custom-protocol"]
+     custom-protocol = ["tauri/custom-protocol"]
+     ```
+   - Added `chrono = { version = "0.4", default-features = false, features = ["clock"] }` for standard ISO-8601 UTC timestamps.
+2. **Native Rust Diagnostic Logger (`src-tauri/src/logger.rs`)**:
+   - Implemented thread-safe diagnostic engine checking `--debug`, `-d`, `--verbose`, `-v`, and `SENTINEL_DEBUG=1`.
+   - Structured, zero-emoji log format:
+     `[YYYY-MM-DDTHH:MM:SSZ] [LEVEL] [TAG] message`
+   - Exposed Tauri commands `log_diagnostic(level, tag, message)` and `is_debug_active()`.
+3. **Webview URL and Runtime Lifecycle Monitoring (`src-tauri/src/lib.rs`)**:
+   - Automatically inspects the webview's resolved URL on startup. Logs confirmation when `tauri://localhost` is active, or issues immediate warning if `localhost:1420` is detected.
+   - Added diagnostic logging across PTY session allocation (`pty.rs`), embedded LLM server lifecycle (`embedded_server.rs`), and window lifecycle events.
+4. **Foreground Streaming in CLI Launchers**:
+   - Updated `packaging/arch/sentinel` and `src/domain/integration/InstallerService.ts` to inspect incoming arguments.
+   - When `--debug`, `-d`, `--verbose`, or `-v` is present (or `SENTINEL_DEBUG=1` is set), execution remains attached in the foreground (`exec "$APP_BIN" "$@"`) streaming live logs directly to the user's terminal.
+5. **Frontend Diagnostic Logger (`src/infrastructure/logging/DiagnosticLogger.ts`)**:
+   - Intercepts `window.onerror` and `window.onunhandledrejection`, forwarding stack traces to the terminal logger.
+   - Bridges `console.error` and `console.warn` into the native terminal output stream in real-time.
+   - Initialized at earliest entrypoint in `src/main.tsx`.
+6. **Hardened Arch Linux Packaging (`packaging/arch/build-pacman.sh` & `PKGBUILD`)**:
+   - Automates `npm run build` and `cargo build --release --features tauri/custom-protocol`.
+   - Validates embedded assets by checking for `tauri://localhost` in binary strings before running `makepkg`.
+   - Bumped package release to `pkgrel=4` in `PKGBUILD`, producing `sentinel-terminal-bin-2.0.0-4-x86_64.pkg.tar.zst`.
+
+### 12.5 Touched Components & Files
+- [`src-tauri/Cargo.toml`](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src-tauri/Cargo.toml): Added `[features]` default with `custom-protocol`, added `chrono`.
+- [`src-tauri/src/logger.rs`](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src-tauri/src/logger.rs): Native diagnostic logging engine with flag parsing and formatted output.
+- [`src-tauri/src/lib.rs`](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src-tauri/src/lib.rs): Registered logger commands, webview URL validation, and lifecycle hooks.
+- [`src-tauri/src/pty.rs`](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src-tauri/src/pty.rs): Added PTY session spawn/kill diagnostic logs.
+- [`src-tauri/src/embedded_server.rs`](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src-tauri/src/embedded_server.rs): Added LLM server process spawn/kill diagnostic logs.
+- [`packaging/arch/sentinel`](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/packaging/arch/sentinel): Added foreground streaming pass-through for debug flags.
+- [`src/domain/integration/InstallerService.ts`](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/domain/integration/InstallerService.ts): Updated CLI launcher template with debug flag support.
+- [`src/infrastructure/logging/DiagnosticLogger.ts`](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/infrastructure/logging/DiagnosticLogger.ts): Frontend error interceptor and console forwarder.
+- [`src/main.tsx`](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/src/main.tsx): Initialized `DiagnosticLogger` on application startup.
+- [`packaging/arch/PKGBUILD`](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/packaging/arch/PKGBUILD): Bumped `pkgrel=4`.
+- [`packaging/arch/build-pacman.sh`](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/packaging/arch/build-pacman.sh): Automated web asset build, custom-protocol compilation, and binary asset verification.
+- [`docs/TROUBLESHOOTING.md`](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/docs/TROUBLESHOOTING.md): Documented root cause, permanent resolution, and terminal live logging usage.
+- [`docs/FIXED.md`](file:///home/overxpowered/padhai_in_linux/Projects/sentinal/docs/FIXED.md): Documented Issue 12 resolution.
 

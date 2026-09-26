@@ -16,6 +16,7 @@ This document provides technical root-cause analyses, architectural impact asses
 9. [Issue 9: Arrow Key In-Buffer Line Navigation vs. History Ingestion in Long Prompts](#issue-9-arrow-key-in-buffer-line-navigation-vs-history-ingestion-in-long-prompts)
 10. [Issue 10: Diminutive Tab Close Button Hit-Target and Sub-Pixel Dot Artifact](#issue-10-diminutive-tab-close-button-hit-target-and-sub-pixel-dot-artifact)
 11. [Issue 11: Prompt Abnormally Magnifying / Canvas Scaling Glitch on Tab Close](#issue-11-prompt-abnormally-magnifying--canvas-scaling-glitch-on-tab-close)
+12. [Issue 12: Release Webview White Screen & Live Diagnostic Logging System](#issue-12-release-webview-white-screen--live-diagnostic-logging-system)
 
 ---
 
@@ -578,14 +579,41 @@ When closing a terminal tab (or closing a split pane), the shell prompt (`userna
 | **1. Cloud API Connection Test** | `CloudApiProvider.ts`, `AiSettingsPage.tsx` | Bug Fix & Resilience | Low-Medium | **Resolved** (`5daff74`) |
 | **2. Multi-Step Workflow Failure** | `AdaptivePlanEngine.ts`, `ShellSDKCapability.ts`, `IntentModel.ts` | Bug Fix & Architecture | Medium-High | Needs Fix |
 | **3. Persistent HUD Overlay** | `TerminalView.tsx`, `AiSettingsPage.tsx` | UI Bug Fix & Settings | Low-Medium | **Resolved** (`8613aca`) |
-| **4. Linux File Manager Actions** | `InstallerService.ts`, `App.tsx`, `TerminalView.tsx` | Feature & Bug Fix | Medium | Needs Fix |
-| **5. IDE Profiles Integration** | `InstallerService.ts`, `InstallerWizard.tsx` | Refactor & Reliability | Medium | Needs Fix |
-| **6. Sentinel CLI Launcher** | `InstallerService.ts`, `packaging/` | Bug Fix & Safety | Medium | Needs Fix |
+| **4. Linux File Manager Actions** | `InstallerService.ts`, `App.tsx`, `TerminalView.tsx` | Feature & Bug Fix | Medium | **Resolved** |
+| **5. IDE Profiles Integration** | `InstallerService.ts`, `InstallerWizard.tsx` | Refactor & Reliability | Medium | **Resolved** |
+| **6. Sentinel CLI Launcher** | `InstallerService.ts`, `packaging/` | Bug Fix & Safety | Medium | **Resolved** |
 | **7. Workflows Onboarding Selection** | `InstallerWizard.tsx`, `DiskWorkflowStorage.ts`, `StarterWorkflows.ts` | New Feature & Cleanup | Medium | **Resolved** |
 | **8. Clipboard Paste on Prompt Entry** | `TerminalView.tsx`, `src/utils/clipboard.ts` | Bug Fix | Low-Medium | **Resolved** (`224a50e`) |
 | **9. Arrow Key In-Buffer Navigation** | `TerminalView.tsx`, `PromptNavigationEngine.ts` | Architecture & UX | Medium | **Resolved** |
 | **10. Tab Close Button Visibility** | `App.tsx`, `App.css` | UI Polish | Low | **Resolved** |
 | **11. Tab Close Canvas Scaling Glitch** | `TerminalView.tsx`, `App.tsx`, `App.css` | UI Bug Fix | Low-Medium | **Resolved** |
+| **12. Release Webview White Screen & Live Logging** | `src-tauri/`, `packaging/`, `DiagnosticLogger.ts` | Bug Fix & Diagnostics | Medium | **Resolved** |
+
+---
+
+## Issue 12: Release Webview White Screen & Live Diagnostic Logging System
+
+### 12.1 Problem Statement
+When installing and launching Sentinel Terminal from the Arch Linux release package (`sentinel-terminal-bin-2.0.0-3-x86_64.pkg.tar.zst`), the application opened to a blank white screen with:
+```
+Could not connect to localhost: Connection refused
+```
+No interface rendered, terminal prompts were inaccessible, and when launched via terminal, silent background disowning prevented diagnosing the failure.
+
+### 12.2 Resolution Status
+- **Status:** **Resolved & Verified** (Release: `2.0.0-4`)
+- **Automated Validation:** 100% test pass rate across 193 test files (1,388 tests, 0 failures).
+- **Packaging:** Automated build script verified asset embedding with `tauri://localhost` and generated `sentinel-terminal-bin-2.0.0-4-x86_64.pkg.tar.zst`.
+
+### 12.3 Root Cause & Remediation Summary
+1. **Root Cause**: `src-tauri/Cargo.toml` lacked default `custom-protocol = ["tauri/custom-protocol"]`. In Tauri v2, `tauri-macros::generate_context` checks `cfg!(not(feature = "custom-protocol"))`, defaulting to development mode (`cargo:dev=true`) and loading `devUrl` (`http://localhost:1420`).
+2. **Remediation**:
+   - Added `[features]` default with `custom-protocol = ["tauri/custom-protocol"]`.
+   - Built native diagnostic logger in `src-tauri/src/logger.rs` with zero-emoji format and flag detection (`--debug`, `-d`, `--verbose`, `-v`, `SENTINEL_DEBUG=1`).
+   - Attached webview URL validation in `src-tauri/src/lib.rs`.
+   - Created frontend `DiagnosticLogger` in `src/infrastructure/logging/DiagnosticLogger.ts` bridging `window.onerror`, `unhandledrejection`, `console.error`, and `console.warn` into the terminal stream.
+   - Enhanced CLI launchers (`packaging/arch/sentinel` and `InstallerService.ts`) to stream logs attached in the foreground when debug flags are provided.
+   - Hardened `packaging/arch/build-pacman.sh` and bumped `PKGBUILD` to `pkgrel=4`.
 
 ---
 *Document generated for pair-programming reference following repository guidelines (Zero Emojis, Grayscale Standards, Full Screens).*

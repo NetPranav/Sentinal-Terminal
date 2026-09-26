@@ -286,11 +286,26 @@ else
   APP_BIN=""
 fi
 
+# Foreground diagnostic / live logging mode:
+for arg in "$@"; do
+  if [ "$arg" = "--debug" ] || [ "$arg" = "-d" ] || [ "$arg" = "--verbose" ] || [ "$arg" = "-v" ]; then
+    if [ -n "$APP_BIN" ]; then
+      exec "$APP_BIN" "$@"
+    fi
+  fi
+done
+
+if [ -n "$SENTINEL_DEBUG" ]; then
+  if [ -n "$APP_BIN" ]; then
+    exec "$APP_BIN" "$@"
+  fi
+fi
+
 target="$1"
 if [ -z "$target" ]; then target="."; fi
 
-# Direct pass-through for CLI flags
-if [ "$target" = "--help" ] || [ "$target" = "-h" ] || [ "$target" = "--version" ] || [ "$target" = "-v" ]; then
+# Direct pass-through for help and version queries
+if [ "$target" = "--help" ] || [ "$target" = "-h" ] || [ "$target" = "--version" ]; then
   if [ -n "$APP_BIN" ]; then
     exec "$APP_BIN" "$@"
   fi

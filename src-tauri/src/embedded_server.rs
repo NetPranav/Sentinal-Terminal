@@ -231,6 +231,8 @@ pub fn start_embedded_llm(
         .spawn()
         .map_err(|e| format!("Failed to spawn llama-server at {}: {}", bin_path.display(), e))?;
 
+    crate::logger::log_info("LLM", &format!("Spawned llama-server (pid: {}) on port {}", child.id(), state.port));
+
     let mut model_guard = state.active_model.lock().map_err(|e| e.to_string())?;
     let mut lora_guard = state.active_lora.lock().map_err(|e| e.to_string())?;
     *model_guard = Some(model_str);
@@ -243,7 +245,7 @@ pub fn start_embedded_llm(
 pub fn terminate_embedded_llm_child(state: &EmbeddedLlmState) {
     if let Ok(mut proc_guard) = state.process.lock() {
         if let Some(mut child) = proc_guard.take() {
-            println!("Terminating embedded llama-server (pid: {})...", child.id());
+            crate::logger::log_info("LLM", &format!("Terminating embedded llama-server (pid: {})", child.id()));
             let _ = child.kill();
             let _ = child.wait();
         }

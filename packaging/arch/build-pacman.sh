@@ -5,23 +5,41 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 BUNDLE_DIR="${REPO_ROOT}/src-tauri/target/release/bundle/pacman"
 BUILD_DIR="${SCRIPT_DIR}/build"
+RELEASE_BIN="${REPO_ROOT}/src-tauri/target/release/sentinel-terminal"
 
 echo "=== Building Arch Linux Pacman Package for Sentinel Terminal ==="
 
-# Ensure release binary exists
-if [ ! -f "${REPO_ROOT}/src-tauri/target/release/sentinel-terminal" ]; then
-    echo "ERROR: Release binary not found at src-tauri/target/release/sentinel-terminal"
-    echo "Run 'npm run tauri build' or 'cargo build --release' first."
+# Step 1: Ensure frontend production assets are built
+echo "[1/4] Building web application production assets..."
+cd "${REPO_ROOT}"
+npm run build
+
+# Step 2: Build release binary with explicit custom-protocol feature
+echo "[2/4] Compiling Rust release binary with embedded assets (custom-protocol)..."
+cargo build --release --manifest-path "${REPO_ROOT}/src-tauri/Cargo.toml" --features tauri/custom-protocol
+
+# Step 3: Hardened verification of embedded assets
+echo "[3/4] Verifying binary asset embedding and protocol configuration..."
+if [ ! -f "${RELEASE_BIN}" ]; then
+    echo "ERROR: Release binary not found at ${RELEASE_BIN}" >&2
     exit 1
 fi
 
-# Prepare build directory
+if ! strings "${RELEASE_BIN}" | grep "tauri://localhost" >/dev/null; then
+    echo "ERROR: Release binary was compiled without embedded assets or custom-protocol!" >&2
+    echo "The binary lacks 'tauri://localhost' and will fail with 'connection refused' at runtime." >&2
+    exit 1
+fi
+echo "Asset embedding verified: 'tauri://localhost' is active."
+
+# Step 4: Package via makepkg
+echo "[4/4] Assembling Arch Linux package via makepkg..."
 rm -rf "${BUILD_DIR}"
 mkdir -p "${BUILD_DIR}"
 mkdir -p "${BUNDLE_DIR}"
 
 # Stage sources
-cp "${REPO_ROOT}/src-tauri/target/release/sentinel-terminal" "${BUILD_DIR}/"
+cp "${RELEASE_BIN}" "${BUILD_DIR}/"
 cp "${SCRIPT_DIR}/sentinel" "${BUILD_DIR}/"
 cp "${SCRIPT_DIR}/sentinel-shell" "${BUILD_DIR}/"
 cp "${SCRIPT_DIR}/sentinel_open.desktop" "${BUILD_DIR}/"
@@ -40,13 +58,17 @@ PKG_FILES=$(find "${BUILD_DIR}" -name "*.pkg.tar.zst" -type f)
 if [ -n "${PKG_FILES}" ]; then
     cp ${PKG_FILES} "${BUNDLE_DIR}/"
     for f in ${PKG_FILES}; do
-        echo "Pacman package created: ${BUNDLE_DIR}/$(basename "${f}")"
+        pkg_dest="${BUNDLE_DIR}/$(basename "${f}")"
+        echo "Pacman package created: ${pkg_dest}"
+        echo "Package size: $(du -h "${pkg_dest}" | cut -f1)"
+        echo "Installation command:"
+        echo "  sudo pacman -U ${pkg_dest}"
     done
 else
-    echo "ERROR: Failed to find generated .pkg.tar.zst"
+    echo "ERROR: Failed to find generated .pkg.tar.zst" >&2
     exit 1
 fi
 
-# Clean up
+# Clean up build directory
 rm -rf "${BUILD_DIR}"
 echo "=== Arch Pacman Package Build Complete ==="

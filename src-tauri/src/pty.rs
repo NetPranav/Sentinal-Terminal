@@ -223,6 +223,8 @@ pub fn spawn_pty(
         let _ = app_handle_clone.emit("pty-exit", session_id_clone.clone());
     });
 
+    crate::logger::log_info("PTY", &format!("Spawned PTY session {} (rows: {}, cols: {}, shell: {})", session_id, rows, cols, target_shell));
+
     state.sessions.lock().unwrap().insert(session_id.clone(), PtySession {
         master: pair.master,
         writer,
@@ -274,6 +276,7 @@ pub fn kill_pty(
 ) -> Result<(), String> {
     let mut sessions = state.sessions.lock().unwrap();
     if sessions.remove(&session_id).is_some() {
+        crate::logger::log_info("PTY", &format!("Terminated PTY session {}", session_id));
         Ok(())
     } else {
         Err("Session not found".to_string())

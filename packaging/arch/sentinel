@@ -2,16 +2,29 @@
 # Sentinel Terminal CLI Launcher (Arch Linux)
 set -e
 
-APP_BIN="/usr/bin/sentinel-terminal"
+APP_BIN="${APP_BIN:-/usr/bin/sentinel-terminal}"
 if [ ! -x "$APP_BIN" ]; then
-  APP_BIN="$(command -v sentinel-terminal 2>/dev/null || echo "sentinel-terminal")"
+  APP_BIN="$(command -v sentinel-terminal 2>/dev/null || echo "$APP_BIN")"
+fi
+
+# Foreground diagnostic / live logging mode:
+# If user passes --debug, -d, --verbose, or -v, or has SENTINEL_DEBUG set,
+# run attached in the foreground without swallowing stdout/stderr.
+for arg in "$@"; do
+  if [ "$arg" = "--debug" ] || [ "$arg" = "-d" ] || [ "$arg" = "--verbose" ] || [ "$arg" = "-v" ]; then
+    exec "$APP_BIN" "$@"
+  fi
+done
+
+if [ -n "$SENTINEL_DEBUG" ]; then
+  exec "$APP_BIN" "$@"
 fi
 
 target="$1"
 if [ -z "$target" ]; then target="."; fi
 
-# Direct pass-through for CLI flags
-if [ "$target" = "--help" ] || [ "$target" = "-h" ] || [ "$target" = "--version" ] || [ "$target" = "-v" ]; then
+# Direct pass-through for help and version queries
+if [ "$target" = "--help" ] || [ "$target" = "-h" ] || [ "$target" = "--version" ]; then
   exec "$APP_BIN" "$@"
 fi
 

@@ -64,3 +64,77 @@ If the status indicator displays `AI: Off`:
 ### B. Missing Binaries in Standalone App
 - Sentinel automatically incorporates standard paths into session environments (`/usr/local/bin`, `~/.cargo/bin`, `~/.local/bin`, `/opt/homebrew/bin`).
 - If custom toolchains (e.g. `nvm`, `pyenv`, `asdf`) are not found, ensure their exports are present in `~/.bashrc` or `~/.zshrc`.
+
+---
+
+## 4. Webview, Packaging & Live Diagnostic Logging System
+
+### A. White Screen: "Could not connect to localhost: Connection refused"
+- **Symptom**: When opening Sentinel Terminal after installing a release package (e.g. `.pkg.tar.zst` or `.deb`), the window displays a blank white screen with the text:
+  ```
+  Could not connect to localhost: Connection refused
+  ```
+- **Technical Root Cause**:
+  In Tauri v2, `tauri-macros::generate_context` compiles embedded production assets into the binary only if the `custom-protocol` feature is active on `tauri`.
+  If `src-tauri/Cargo.toml` lacks:
+  ```toml
+  [features]
+  default = ["custom-protocol"]
+  custom-protocol = ["tauri/custom-protocol"]
+  ```
+  Tauri defaults to development mode (`cargo:dev=true`), which hardcodes the webview initial URL to `devUrl` (`http://localhost:1420`). When installed as a standalone release package without an active Vite dev server running in the background, the webview attempts to connect to `127.0.0.1:1420`, resulting in a fatal connection refused error.
+- **Permanent Resolution**:
+  1. `src-tauri/Cargo.toml` defines `default = ["custom-protocol"]` and `custom-protocol = ["tauri/custom-protocol"]`.
+  2. The packaging build pipeline (`packaging/arch/build-pacman.sh`) automatically runs `npm run build` and compiles with `--features tauri/custom-protocol`.
+  3. The build pipeline performs an automated pre-packaging sanity verification asserting that the compiled binary contains `tauri://localhost` before allowing `makepkg` to produce release archives.
+
+### B. Live Terminal Diagnostic Logging System
+Sentinel Terminal includes an end-to-end live diagnostic logging system spanning the native Rust backend, Webview runtime, and frontend React engine.
+
+#### Launching with Live Logs
+To diagnose runtime issues, window loading failures, IPC errors, or background crashes, launch Sentinel Terminal from any terminal using diagnostic flags or environment variables:
+
+```bash
+# Using CLI launcher
+sentinel --debug
+sentinel -d
+sentinel --verbose
+sentinel -v
+
+# Or using environment variable
+SENTINEL_DEBUG=1 sentinel
+
+# Or launching binary directly
+sentinel-terminal --debug
+```
+
+#### Foreground Attached Execution
+When launched with any debug flag, the launcher wrapper automatically bypasses background disowning (`>/dev/null 2>&1 &`) and attaches directly to your terminal (`exec "$APP_BIN" "$@"`).
+
+#### Log Output Format
+All log output adheres strictly to zero-emoji, grayscale terminal standards with ISO-8601 UTC timestamps:
+```text
+================================================================================
+[YYYY-MM-DDTHH:MM:SSZ] [SYSTEM] Sentinel Terminal Diagnostic Logging ACTIVE (PID: <pid>)
+[YYYY-MM-DDTHH:MM:SSZ] [SYSTEM] OS: linux | Arch: x86_64 | Release: 2.0.0
+================================================================================
+[YYYY-MM-DDTHH:MM:SSZ] [INFO ] [BOOT] Initializing Sentinel Terminal runtime
+[YYYY-MM-DDTHH:MM:SSZ] [INFO ] [SETUP] Initializing core application services
+[YYYY-MM-DDTHH:MM:SSZ] [INFO ] [WINDOW] Main webview URL: tauri://localhost
+[YYYY-MM-DDTHH:MM:SSZ] [INFO ] [WEBVIEW] Embedded production assets active via custom-protocol (tauri://localhost)
+[YYYY-MM-DDTHH:MM:SSZ] [INFO ] [APP] Sentinel Terminal application runtime READY
+[YYYY-MM-DDTHH:MM:SSZ] [INFO ] [FRONTEND] DiagnosticLogger initialized in webview context
+[YYYY-MM-DDTHH:MM:SSZ] [INFO ] [PTY] Spawned PTY session <uuid> (rows: 45, cols: 109, shell: /bin/bash)
+[YYYY-MM-DDTHH:MM:SSZ] [INFO ] [LLM] Spawned llama-server (pid: <pid>) on port 8847
+```
+
+#### Monitored Subsystems & Diagnostic Tags
+- **`[BOOT]`**: Runtime initialization and core plugins configuration.
+- **`[SETUP]`**: Platform-specific permissions and hardware capability checks.
+- **`[WINDOW]`**: Window creation, focus, resize, and destruction tracking.
+- **`[WEBVIEW]`**: Real-time validation of loaded URL (`tauri://localhost` vs `http://localhost:1420`).
+- **`[APP]`**: Application lifecycle events (`READY`, `EXIT`, `ExitRequested`).
+- **`[FRONTEND]`**: Uncaught JavaScript errors (`window.onerror`), unhandled promise rejections (`unhandledrejection`), and initialization status.
+- **`[CONSOLE]`**: Real-time capture of `console.error` and `console.warn` forwarded from WebKit GTK.
+- **`[PTY]`**: Terminal session allocation, rows/cols geometry, shell binary resolution, and teardown.
+- **`[LLM]`**: Embedded `llama-server` process spawn, port binding, and termination signals.
